@@ -1,4 +1,6 @@
 import os
+import requests
+import json
 
 from agent.tools_and_schemas import SearchQueryList, Reflection
 from dotenv import load_dotenv
@@ -90,20 +92,10 @@ def continue_to_web_research(state: QueryGenerationState):
 
 
 def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
-    """LangGraph 节点，使用原生 Google 搜索 API 工具执行网络研究。
-
-    结合 DeepSeek 模型执行网络搜索。
-
-    参数：
-        state: 包含搜索查询和研究循环计数的当前图状态
-        config: 可运行配置，包括搜索 API 设置
-
-    返回：
-        包含状态更新的字典，包括 sources_gathered、research_loop_count 和 web_research_results
-    """
-    # 首先询问用户是否允许执行搜索
+    """LangGraph 节点，直接调用 searchapi.io 百度引擎进行网络研究。"""
+    # 先询问用户是否允许搜索
     human_response = interrupt({
-        "message": f"是否允许使用 DeepSeek 搜索以下内容？\n\n搜索内容: {state['search_query']}\n\n选择'继续'允许搜索，选择'取消'结束搜索。",
+        "message": f"是否允许使用百度搜索以下内容？\n\n搜索内容: {state['search_query']}\n\n选择'继续'允许搜索，选择'取消'结束搜索。",
         "current_query": state["search_query"],
     })
 
@@ -115,36 +107,44 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
             "messages": [AIMessage(content="用户取消了搜索操作，研究过程已结束。")]
         }
 
-    # 配置
-    configurable = Configuration.from_runnable_config(config)
-    formatted_prompt = web_searcher_instructions.format(
-        current_date=get_current_date(),
-        research_topic=state["search_query"],
-    )
+    api_key = os.getenv("SEARCHAPI_API_KEY")
+    url = "https://www.searchapi.io/api/v1/search"
+    params = {
+        "engine": "baidu",
+        "q": state["search_query"],
+        "api_key": api_key
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        try:
+            data = response.json()
+            results = data.get("organic_results", [])
+            if not results:
+                result = "未找到相关结果。"
+            else:
+                lines = []
+                for item in results[:5]:
+                    title = item.get("title", "")
+                    link = item.get("link", "")
+                    snippet = item.get("snippet", "")
+                    lines.append(f"【{title}】\n{link}\n{snippet}\n")
+                result = "\n".join(lines)
+        except Exception as e:
+            result = f"解析搜索结果失败: {e}"
+    else:
+        result = f"API请求失败，状态码: {response.status_code}, 错误信息: {response.text}"
 
-    # 使用 DeepSeek 进行网络研究（简化实现）
-    llm = ChatDeepSeek(
-        model=configurable.query_generator_model,
-        temperature=0,
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-    )
-    
-    response = llm.invoke(formatted_prompt)
-    
-    # 创建简化的来源和引用
     sources_gathered = [{
-        "short_url": f"source_{state['id']}",
-        "value": "网络研究结果",
-        "title": "搜索结果"
+        "short_url": f"searchapi_{state['id']}",
+        "value": "searchapi.io 结果",
+        "title": "searchapi.io"
     }]
-    
-    modified_text = response.content
-    
+    print(1111111111111, result)
+
     return {
         "sources_gathered": sources_gathered,
         "search_query": [state["search_query"]],
-        "web_research_result": [modified_text]
+        "web_research_result": [result]
     }
 
 
