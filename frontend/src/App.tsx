@@ -21,6 +21,9 @@ export default function App() {
     initial_search_query_count: number;
     max_research_loops: number;
     reasoning_model: string;
+  }, {
+    message?: string;
+    [key: string]: any;
   }>({
     apiUrl: import.meta.env.DEV
       ? "http://localhost:2024"
@@ -148,6 +151,43 @@ export default function App() {
     thread.stop();
     window.location.reload();
   }, [thread]);
+
+  // 处理中断状态
+  if (thread.interrupt) {
+    return (
+      <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
+        <main className="h-full w-full max-w-4xl mx-auto">
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <h1 className="text-2xl text-yellow-400 font-bold">对话已中断</h1>
+              <p className="text-yellow-400 text-center">
+                {thread.interrupt.value?.message || "需要您的确认才能继续"}
+              </p>
+              <div className="flex gap-4">
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    thread.submit(undefined, { command: { resume: true } });
+                  }}
+                >
+                  继续
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    thread.stop();
+                    window.location.reload();
+                  }}
+                >
+                  取消
+                </Button>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">

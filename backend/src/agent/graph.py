@@ -3,7 +3,7 @@ import os
 from agent.tools_and_schemas import SearchQueryList, Reflection
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
-from langgraph.types import Send
+from langgraph.types import Send, interrupt
 from langgraph.graph import StateGraph
 from langgraph.graph import START, END
 from langchain_core.runnables import RunnableConfig
@@ -131,11 +131,14 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     
     modified_text = response.content
 
-    return {
+    # 每次收集信息时都询问用户是否继续
+    total_sources = len(state.get("sources_gathered", [])) + len(sources_gathered)
+    return interrupt({
+        "message": f"已收集到 {total_sources} 个信息来源。是否继续收集更多信息，还是基于现有信息生成答案？",
         "sources_gathered": sources_gathered,
         "search_query": [state["search_query"]],
         "web_research_result": [modified_text],
-    }
+    })
 
 
 def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
@@ -156,6 +159,25 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     # Increment the research loop count and get the reasoning model
     state["research_loop_count"] = state.get("research_loop_count", 0) + 1
     reasoning_model = state.get("reasoning_model", configurable.reflection_model)
+
+    # 检查是否需要中断询问用户
+    research_loop_count = state["research_loop_count"]
+    max_research_loops = (
+        state.get("max_research_loops")
+        if state.get("max_research_loops") is not None
+        else configurable.max_research_loops
+    )
+    
+    # 第一轮研究完成后立即询问用户是否继续
+    if research_loop_count >= 1:
+        return interrupt({
+            "message": f"已完成第 {research_loop_count} 轮研究，当前已收集到 {len(state.get('sources_gathered', []))} 个信息来源。是否继续深入研究？",
+            "is_sufficient": None,
+            "knowledge_gap": None,
+            "follow_up_queries": None,
+            "research_loop_count": state["research_loop_count"],
+            "number_of_ran_queries": len(state["search_query"]),
+        })
 
     # Format the prompt
     current_date = get_current_date()
@@ -234,6 +256,15 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     """
     configurable = Configuration.from_runnable_config(config)
     reasoning_model = state.get("reasoning_model") or configurable.answer_model
+
+    # 检查是否需要中断询问用户（当研究循环次数较多时）
+    research_loop_count = state.get("research_loop_count", 0)
+    if research_loop_count >= 1:  # 当研究循环超过1次时询问（降低阈值便于测试）
+        return interrupt({
+            "message": f"已完成 {research_loop_count} 轮深入研究，基于 {len(state.get('sources_gathered', []))} 个信息来源。是否满意当前的研究深度，还是需要继续深入研究？",
+            "messages": state.get("messages", []),
+            "sources_gathered": state.get("sources_gathered", []),
+        })
 
     # Format the prompt
     current_date = get_current_date()
