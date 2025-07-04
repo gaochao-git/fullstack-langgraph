@@ -175,8 +175,7 @@ export default function App() {
                 <Button
                   variant="destructive"
                   onClick={() => {
-                    thread.stop();
-                    window.location.reload();
+                    thread.submit(undefined, { command: { resume: false } });
                   }}
                 >
                   取消

@@ -3,7 +3,7 @@ import os
 from agent.tools_and_schemas import SearchQueryList, Reflection
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage
-from langgraph.types import Send, interrupt
+from langgraph.types import Send, interrupt, Command
 from langgraph.graph import StateGraph
 from langgraph.graph import START, END
 from langchain_core.runnables import RunnableConfig
@@ -101,6 +101,20 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     返回：
         包含状态更新的字典，包括 sources_gathered、research_loop_count 和 web_research_results
     """
+    # 首先询问用户是否允许执行搜索
+    human_response = interrupt({
+        "message": f"是否允许使用 DeepSeek 搜索以下内容？\n\n搜索内容: {state['search_query']}\n\n选择'继续'允许搜索，选择'取消'结束搜索。",
+        "current_query": state["search_query"],
+    })
+
+    if not human_response:
+        return {
+            "sources_gathered": [],
+            "search_query": [state["search_query"]],
+            "web_research_result": ["用户取消了搜索操作"],
+            "messages": [AIMessage(content="用户取消了搜索操作，研究过程已结束。")]
+        }
+
     # 配置
     configurable = Configuration.from_runnable_config(config)
     formatted_prompt = web_searcher_instructions.format(
@@ -109,7 +123,6 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     )
 
     # 使用 DeepSeek 进行网络研究（简化实现）
-    # 注意：DeepSeek 没有像 Gemini 那样的内置网络搜索，所以我们使用简化方法
     llm = ChatDeepSeek(
         model=configurable.query_generator_model,
         temperature=0,
@@ -117,8 +130,6 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
         api_key=os.getenv("DEEPSEEK_API_KEY"),
     )
     
-    # 现在，我们将创建一个简化的研究结果
-    # 在实际实现中，您可能希望集成单独的搜索 API
     response = llm.invoke(formatted_prompt)
     
     # 创建简化的来源和引用
@@ -129,15 +140,12 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     }]
     
     modified_text = response.content
-
-    # 每次收集信息时都询问用户是否继续
-    total_sources = len(state.get("sources_gathered", [])) + len(sources_gathered)
-    return interrupt({
-        "message": f"已收集到 {total_sources} 个信息来源。是否继续收集更多信息，还是基于现有信息生成答案？",
+    
+    return {
         "sources_gathered": sources_gathered,
         "search_query": [state["search_query"]],
-        "web_research_result": [modified_text],
-    })
+        "web_research_result": [modified_text]
+    }
 
 
 def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
@@ -153,29 +161,11 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     返回：
         包含状态更新的字典，包括 search_query 键，其中包含生成的后续查询
     """
-    configurable = Configuration.from_runnable_config(config)
-    # 增加研究循环计数并获取推理模型
+    # 增加研究循环计数
     state["research_loop_count"] = state.get("research_loop_count", 0) + 1
-    reasoning_model = state.get("reasoning_model", configurable.reflection_model)
-
-    # 检查是否需要中断询问用户
     research_loop_count = state["research_loop_count"]
-    max_research_loops = (
-        state.get("max_research_loops")
-        if state.get("max_research_loops") is not None
-        else configurable.max_research_loops
-    )
-    
-    # 第一轮研究完成后立即询问用户是否继续
-    if research_loop_count >= 1:
-        return interrupt({
-            "message": f"已完成第 {research_loop_count} 轮研究，当前已收集到 {len(state.get('sources_gathered', []))} 个信息来源。是否继续深入研究？",
-            "is_sufficient": None,
-            "knowledge_gap": None,
-            "follow_up_queries": None,
-            "research_loop_count": state["research_loop_count"],
-            "number_of_ran_queries": len(state["search_query"]),
-        })
+    configurable = Configuration.from_runnable_config(config)
+    reasoning_model = state.get("reasoning_model", configurable.reflection_model)
 
     # 格式化提示词
     current_date = get_current_date()
@@ -249,17 +239,9 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     返回：
         包含状态更新的字典，包括 running_summary 键，其中包含格式化的带有来源的最终摘要
     """
+    # 检查是否需要中断询问用户（当研究循环次数较多时）  
     configurable = Configuration.from_runnable_config(config)
     reasoning_model = state.get("reasoning_model") or configurable.answer_model
-
-    # 检查是否需要中断询问用户（当研究循环次数较多时）
-    research_loop_count = state.get("research_loop_count", 0)
-    if research_loop_count >= 1:  # 当研究循环超过1次时询问（降低阈值便于测试）
-        return interrupt({
-            "message": f"已完成 {research_loop_count} 轮深入研究，基于 {len(state.get('sources_gathered', []))} 个信息来源。是否满意当前的研究深度，还是需要继续深入研究？",
-            "messages": state.get("messages", []),
-            "sources_gathered": state.get("sources_gathered", []),
-        })
 
     # 格式化提示词
     current_date = get_current_date()
