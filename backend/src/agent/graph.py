@@ -35,30 +35,29 @@ load_dotenv()
 if os.getenv("DEEPSEEK_API_KEY") is None:
     raise ValueError("DEEPSEEK_API_KEY is not set")
 
-# DeepSeek client initialization (if needed for future web search integration)
+# DeepSeek 客户端初始化（如果将来需要用于网络搜索集成）
 
 
-# Nodes
+# 节点
 def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerationState:
-    """LangGraph node that generates search queries based on the User's question.
+    """LangGraph 节点，基于用户问题生成搜索查询。
 
-    Uses Gemini 2.0 Flash to create an optimized search queries for web research based on
-    the User's question.
+    使用 DeepSeek 模型根据用户问题创建优化的搜索查询，用于网络研究。
 
-    Args:
-        state: Current graph state containing the User's question
-        config: Configuration for the runnable, including LLM provider settings
+    参数：
+        state: 包含用户问题的当前图状态
+        config: 可运行配置，包括 LLM 提供商设置
 
-    Returns:
-        Dictionary with state update, including search_query key containing the generated queries
+    返回：
+        包含状态更新的字典，包括 search_query 键，其中包含生成的查询
     """
     configurable = Configuration.from_runnable_config(config)
 
-    # check for custom initial search query count
+    # 检查自定义初始搜索查询数量
     if state.get("initial_search_query_count") is None:
         state["initial_search_query_count"] = configurable.number_of_initial_queries
 
-    # init DeepSeek Chat
+    # 初始化 DeepSeek Chat
     llm = ChatDeepSeek(
         model=configurable.query_generator_model,
         temperature=1.0,
@@ -67,22 +66,22 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
     )
     structured_llm = llm.with_structured_output(SearchQueryList)
 
-    # Format the prompt
+    # 格式化提示词
     current_date = get_current_date()
     formatted_prompt = query_writer_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         number_queries=state["initial_search_query_count"],
     )
-    # Generate the search queries
+    # 生成搜索查询
     result = structured_llm.invoke(formatted_prompt)
     return {"search_query": result.query}
 
 
 def continue_to_web_research(state: QueryGenerationState):
-    """LangGraph node that sends the search queries to the web research node.
+    """LangGraph 节点，将搜索查询发送到网络研究节点。
 
-    This is used to spawn n number of web research nodes, one for each search query.
+    用于生成 n 个网络研究节点，每个搜索查询对应一个。
     """
     return [
         Send("web_research", {"search_query": search_query, "id": int(idx)})
@@ -91,26 +90,26 @@ def continue_to_web_research(state: QueryGenerationState):
 
 
 def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
-    """LangGraph node that performs web research using the native Google Search API tool.
+    """LangGraph 节点，使用原生 Google 搜索 API 工具执行网络研究。
 
-    Executes a web search using the native Google Search API tool in combination with Gemini 2.0 Flash.
+    结合 DeepSeek 模型执行网络搜索。
 
-    Args:
-        state: Current graph state containing the search query and research loop count
-        config: Configuration for the runnable, including search API settings
+    参数：
+        state: 包含搜索查询和研究循环计数的当前图状态
+        config: 可运行配置，包括搜索 API 设置
 
-    Returns:
-        Dictionary with state update, including sources_gathered, research_loop_count, and web_research_results
+    返回：
+        包含状态更新的字典，包括 sources_gathered、research_loop_count 和 web_research_results
     """
-    # Configure
+    # 配置
     configurable = Configuration.from_runnable_config(config)
     formatted_prompt = web_searcher_instructions.format(
         current_date=get_current_date(),
         research_topic=state["search_query"],
     )
 
-    # Use DeepSeek for web research (simplified implementation)
-    # Note: DeepSeek doesn't have built-in web search like Gemini, so we'll use a simplified approach
+    # 使用 DeepSeek 进行网络研究（简化实现）
+    # 注意：DeepSeek 没有像 Gemini 那样的内置网络搜索，所以我们使用简化方法
     llm = ChatDeepSeek(
         model=configurable.query_generator_model,
         temperature=0,
@@ -118,15 +117,15 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
         api_key=os.getenv("DEEPSEEK_API_KEY"),
     )
     
-    # For now, we'll create a simplified research result
-    # In a real implementation, you might want to integrate with a separate search API
+    # 现在，我们将创建一个简化的研究结果
+    # 在实际实现中，您可能希望集成单独的搜索 API
     response = llm.invoke(formatted_prompt)
     
-    # Create simplified sources and citations
+    # 创建简化的来源和引用
     sources_gathered = [{
         "short_url": f"source_{state['id']}",
-        "value": "Web research result",
-        "title": "Search result"
+        "value": "网络研究结果",
+        "title": "搜索结果"
     }]
     
     modified_text = response.content
@@ -142,21 +141,20 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
 
 
 def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
-    """LangGraph node that identifies knowledge gaps and generates potential follow-up queries.
+    """LangGraph 节点，识别知识差距并生成潜在的后续查询。
 
-    Analyzes the current summary to identify areas for further research and generates
-    potential follow-up queries. Uses structured output to extract
-    the follow-up query in JSON format.
+    分析当前摘要以识别需要进一步研究的领域并生成潜在的后续查询。
+    使用结构化输出以 JSON 格式提取后续查询。
 
-    Args:
-        state: Current graph state containing the running summary and research topic
-        config: Configuration for the runnable, including LLM provider settings
+    参数：
+        state: 包含运行摘要和研究主题的当前图状态
+        config: 可运行配置，包括 LLM 提供商设置
 
-    Returns:
-        Dictionary with state update, including search_query key containing the generated follow-up query
+    返回：
+        包含状态更新的字典，包括 search_query 键，其中包含生成的后续查询
     """
     configurable = Configuration.from_runnable_config(config)
-    # Increment the research loop count and get the reasoning model
+    # 增加研究循环计数并获取推理模型
     state["research_loop_count"] = state.get("research_loop_count", 0) + 1
     reasoning_model = state.get("reasoning_model", configurable.reflection_model)
 
@@ -179,14 +177,14 @@ def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
             "number_of_ran_queries": len(state["search_query"]),
         })
 
-    # Format the prompt
+    # 格式化提示词
     current_date = get_current_date()
     formatted_prompt = reflection_instructions.format(
         current_date=current_date,
         research_topic=get_research_topic(state["messages"]),
         summaries="\n\n---\n\n".join(state["web_research_result"]),
     )
-    # init Reasoning Model
+    # 初始化推理模型
     llm = ChatDeepSeek(
         model=reasoning_model,
         temperature=1.0,
@@ -208,17 +206,16 @@ def evaluate_research(
     state: ReflectionState,
     config: RunnableConfig,
 ) -> OverallState:
-    """LangGraph routing function that determines the next step in the research flow.
+    """LangGraph 路由函数，确定研究流程中的下一步。
 
-    Controls the research loop by deciding whether to continue gathering information
-    or to finalize the summary based on the configured maximum number of research loops.
+    通过决定是否继续收集信息或根据配置的最大研究循环数完成摘要来控制研究循环。
 
-    Args:
-        state: Current graph state containing the research loop count
-        config: Configuration for the runnable, including max_research_loops setting
+    参数：
+        state: 包含研究循环计数的当前图状态
+        config: 可运行配置，包括 max_research_loops 设置
 
-    Returns:
-        String literal indicating the next node to visit ("web_research" or "finalize_summary")
+    返回：
+        指示要访问的下一个节点的字符串字面量（"web_research" 或 "finalize_summary"）
     """
     configurable = Configuration.from_runnable_config(config)
     max_research_loops = (
@@ -242,17 +239,15 @@ def evaluate_research(
 
 
 def finalize_answer(state: OverallState, config: RunnableConfig):
-    """LangGraph node that finalizes the research summary.
+    """LangGraph 节点，完成研究摘要。
 
-    Prepares the final output by deduplicating and formatting sources, then
-    combining them with the running summary to create a well-structured
-    research report with proper citations.
+    通过去重和格式化来源，然后将它们与运行摘要结合起来创建具有适当引用的结构良好的研究报告，准备最终输出。
 
-    Args:
-        state: Current graph state containing the running summary and sources gathered
+    参数：
+        state: 包含运行摘要和收集来源的当前图状态
 
-    Returns:
-        Dictionary with state update, including running_summary key containing the formatted final summary with sources
+    返回：
+        包含状态更新的字典，包括 running_summary 键，其中包含格式化的带有来源的最终摘要
     """
     configurable = Configuration.from_runnable_config(config)
     reasoning_model = state.get("reasoning_model") or configurable.answer_model
@@ -266,7 +261,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
             "sources_gathered": state.get("sources_gathered", []),
         })
 
-    # Format the prompt
+    # 格式化提示词
     current_date = get_current_date()
     formatted_prompt = answer_instructions.format(
         current_date=current_date,
@@ -274,7 +269,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
         summaries="\n---\n\n".join(state["web_research_result"]),
     )
 
-    # init Reasoning Model, default to DeepSeek Chat
+    # 初始化推理模型，默认为 DeepSeek Chat
     llm = ChatDeepSeek(
         model=reasoning_model,
         temperature=0,
@@ -283,7 +278,7 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     )
     result = llm.invoke(formatted_prompt)
 
-    # Replace the short urls with the original urls and add all used urls to the sources_gathered
+    # 用原始 URL 替换短 URL，并将所有使用的 URL 添加到 sources_gathered
     unique_sources = []
     for source in state["sources_gathered"]:
         if source["short_url"] in result.content:
@@ -298,29 +293,29 @@ def finalize_answer(state: OverallState, config: RunnableConfig):
     }
 
 
-# Create our Agent Graph
+# 创建我们的 Agent 图
 builder = StateGraph(OverallState, config_schema=Configuration)
 
-# Define the nodes we will cycle between
+# 定义我们将循环的节点
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
 builder.add_node("reflection", reflection)
 builder.add_node("finalize_answer", finalize_answer)
 
-# Set the entrypoint as `generate_query`
-# This means that this node is the first one called
+# 将入口点设置为 `generate_query`
+# 这意味着这个节点是第一个被调用的
 builder.add_edge(START, "generate_query")
-# Add conditional edge to continue with search queries in a parallel branch
+# 添加条件边以在并行分支中继续搜索查询
 builder.add_conditional_edges(
     "generate_query", continue_to_web_research, ["web_research"]
 )
-# Reflect on the web research
+# 反思网络研究
 builder.add_edge("web_research", "reflection")
-# Evaluate the research
+# 评估研究
 builder.add_conditional_edges(
     "reflection", evaluate_research, ["web_research", "finalize_answer"]
 )
-# Finalize the answer
+# 完成答案
 builder.add_edge("finalize_answer", END)
 
 graph = builder.compile(name="pro-search-agent")
