@@ -12,10 +12,11 @@ import {
 
 // Updated InputFormProps
 interface InputFormProps {
-  onSubmit: (inputValue: string, effort: string, model: string) => void;
+  onSubmit: (inputValue: string, effort?: string, model?: string) => void;
   onCancel: () => void;
   isLoading: boolean;
   hasHistory: boolean;
+  isDiagnosticMode?: boolean;
 }
 
 export const InputForm: React.FC<InputFormProps> = ({
@@ -23,6 +24,7 @@ export const InputForm: React.FC<InputFormProps> = ({
   onCancel,
   isLoading,
   hasHistory,
+  isDiagnosticMode = false,
 }) => {
   const [internalInputValue, setInternalInputValue] = useState("");
   const [effort, setEffort] = useState("medium");
@@ -31,7 +33,11 @@ export const InputForm: React.FC<InputFormProps> = ({
   const handleInternalSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!internalInputValue.trim()) return;
-    onSubmit(internalInputValue, effort, model);
+    if (isDiagnosticMode) {
+      onSubmit(internalInputValue);
+    } else {
+      onSubmit(internalInputValue, effort, model);
+    }
     setInternalInputValue("");
   };
 
@@ -59,7 +65,11 @@ export const InputForm: React.FC<InputFormProps> = ({
           value={internalInputValue}
           onChange={(e) => setInternalInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Who won the Euro 2024 and scored the most goals?"
+          placeholder={
+            isDiagnosticMode
+              ? "What issue would you like me to diagnose?"
+              : "Who won the Euro 2024 and scored the most goals?"
+          }
           className={`w-full text-neutral-100 placeholder-neutral-500 resize-none border-0 focus:outline-none focus:ring-0 outline-none focus-visible:ring-0 shadow-none
                         md:text-base  min-h-[56px] max-h-[200px]`}
           rows={1}
@@ -86,78 +96,80 @@ export const InputForm: React.FC<InputFormProps> = ({
               } p-2 cursor-pointer rounded-full transition-all duration-200 text-base`}
               disabled={isSubmitDisabled}
             >
-              Search
+              {isDiagnosticMode ? "Diagnose" : "Search"}
               <Send className="h-5 w-5" />
             </Button>
           )}
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <div className="flex flex-row gap-2">
-          <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
-            <div className="flex flex-row items-center text-sm">
-              <Brain className="h-4 w-4 mr-2" />
-              Effort
+      {!isDiagnosticMode && (
+        <div className="flex items-center justify-between">
+          <div className="flex flex-row gap-2">
+            <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
+              <div className="flex flex-row items-center text-sm">
+                <Brain className="h-4 w-4 mr-2" />
+                Effort
+              </div>
+              <Select value={effort} onValueChange={setEffort}>
+                <SelectTrigger className="w-[160px] bg-transparent border-none cursor-pointer">
+                  <SelectValue placeholder="Effort" />
+                </SelectTrigger>
+                <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
+                  <SelectItem
+                    value="low"
+                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                  >
+                    Low
+                  </SelectItem>
+                  <SelectItem
+                    value="medium"
+                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                  >
+                    Medium
+                  </SelectItem>
+                  <SelectItem
+                    value="high"
+                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                  >
+                    High
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={effort} onValueChange={setEffort}>
-              <SelectTrigger className="w-[160px] bg-transparent border-none cursor-pointer">
-                <SelectValue placeholder="Effort" />
-              </SelectTrigger>
-              <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
-                <SelectItem
-                  value="low"
-                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                >
-                  Low
-                </SelectItem>
-                <SelectItem
-                  value="medium"
-                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                >
-                  Medium
-                </SelectItem>
-                <SelectItem
-                  value="high"
-                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                >
-                  High
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
-            <div className="flex flex-row items-center text-sm ml-2">
-              <Cpu className="h-4 w-4 mr-2" />
-              Model
+            <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
+              <div className="flex flex-row items-center text-sm ml-2">
+                <Cpu className="h-4 w-4 mr-2" />
+                Model
+              </div>
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger className="w-[260px] bg-transparent border-none cursor-pointer">
+                  <SelectValue placeholder="Model" />
+                </SelectTrigger>
+                <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
+                  <SelectItem
+                    value="deepseek-chat"
+                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                  >
+                    <div className="flex items-center">
+                      <Zap className="h-4 w-4 mr-2 text-yellow-400" /> DeepSeek Chat
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger className="w-[260px] bg-transparent border-none cursor-pointer">
-                <SelectValue placeholder="Model" />
-              </SelectTrigger>
-              <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
-                <SelectItem
-                  value="deepseek-chat"
-                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                >
-                  <div className="flex items-center">
-                    <Zap className="h-4 w-4 mr-2 text-yellow-400" /> DeepSeek Chat
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
+          {hasHistory && (
+            <Button
+              className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer rounded-xl rounded-t-sm pl-2 "
+              variant="default"
+              onClick={() => window.location.reload()}
+            >
+              <SquarePen size={16} />
+              New {isDiagnosticMode ? "Diagnosis" : "Search"}
+            </Button>
+          )}
         </div>
-        {hasHistory && (
-          <Button
-            className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer rounded-xl rounded-t-sm pl-2 "
-            variant="default"
-            onClick={() => window.location.reload()}
-          >
-            <SquarePen size={16} />
-            New Search
-          </Button>
-        )}
-      </div>
+      )}
     </form>
   );
 };

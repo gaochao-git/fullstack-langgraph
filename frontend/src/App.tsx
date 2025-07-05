@@ -1,228 +1,143 @@
-import { useStream } from "@langchain/langgraph-sdk/react";
-import type { Message } from "@langchain/langgraph-sdk";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { ProcessedEvent } from "@/components/ActivityTimeline";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { ChatMessagesView } from "@/components/ChatMessagesView";
-import { Button } from "@/components/ui/button";
+import { Routes, Route, Link } from "react-router-dom";
+import { Layout, Menu, Typography, theme } from "antd";
+import {
+  RobotOutlined,
+  ToolOutlined,
+  ApiOutlined,
+  BookOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+} from "@ant-design/icons";
+import { useState } from "react";
+import ResearchAgent from "./agents/research_agent/ResearchAgent";
+import DiagnosticAgent from "./agents/diagnostic_agent/DiagnosticAgent";
+
+const { Header, Sider, Content } = Layout;
+const { Title } = Typography;
 
 export default function App() {
-  const [processedEventsTimeline, setProcessedEventsTimeline] = useState<
-    ProcessedEvent[]
-  >([]);
-  const [historicalActivities, setHistoricalActivities] = useState<
-    Record<string, ProcessedEvent[]>
-  >({});
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const hasFinalizeEventOccurredRef = useRef(false);
-  const [error, setError] = useState<string | null>(null);
-  const thread = useStream<{
-    messages: Message[];
-    initial_search_query_count: number;
-    max_research_loops: number;
-    reasoning_model: string;
-  }, {
-    message?: string;
-    [key: string]: any;
-  }>({
-    apiUrl: import.meta.env.DEV
-      ? "http://localhost:2024"
-      : "http://localhost:8123",
-    assistantId: "research_agent",
-    messagesKey: "messages",
-    onUpdateEvent: (event: any) => {
-      let processedEvent: ProcessedEvent | null = null;
-      if (event.generate_query) {
-        processedEvent = {
-          title: "Generating Search Queries",
-          data: event.generate_query?.search_query?.join(", ") || "",
-        };
-      } else if (event.web_research) {
-        const sources = event.web_research.sources_gathered || [];
-        const numSources = sources.length;
-        const uniqueLabels = [
-          ...new Set(sources.map((s: any) => s.label).filter(Boolean)),
-        ];
-        const exampleLabels = uniqueLabels.slice(0, 5).join(", ");
-        processedEvent = {
-          title: "Web Research",
-          data: `Gathered ${numSources} sources. Related to: ${
-            exampleLabels || "N/A"
-          }.`,
-        };
-      } else if (event.reflection) {
-        processedEvent = {
-          title: "Reflection",
-          data: "Analysing Web Research Results",
-        };
-      } else if (event.finalize_answer) {
-        processedEvent = {
-          title: "Finalizing Answer",
-          data: "Composing and presenting the final answer.",
-        };
-        hasFinalizeEventOccurredRef.current = true;
-      }
-      if (processedEvent) {
-        setProcessedEventsTimeline((prevEvents) => [
-          ...prevEvents,
-          processedEvent!,
-        ]);
-      }
-    },
-    onError: (error: any) => {
-      setError(error.message);
-    },
-  });
-
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollViewport = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      );
-      if (scrollViewport) {
-        scrollViewport.scrollTop = scrollViewport.scrollHeight;
-      }
-    }
-  }, [thread.messages]);
-
-  useEffect(() => {
-    if (
-      hasFinalizeEventOccurredRef.current &&
-      !thread.isLoading &&
-      thread.messages.length > 0
-    ) {
-      const lastMessage = thread.messages[thread.messages.length - 1];
-      if (lastMessage && lastMessage.type === "ai" && lastMessage.id) {
-        setHistoricalActivities((prev) => ({
-          ...prev,
-          [lastMessage.id!]: [...processedEventsTimeline],
-        }));
-      }
-      hasFinalizeEventOccurredRef.current = false;
-    }
-  }, [thread.messages, thread.isLoading, processedEventsTimeline]);
-
-  const handleSubmit = useCallback(
-    (submittedInputValue: string, effort: string, model: string) => {
-      if (!submittedInputValue.trim()) return;
-      setProcessedEventsTimeline([]);
-      hasFinalizeEventOccurredRef.current = false;
-
-      // convert effort to, initial_search_query_count and max_research_loops
-      // low means max 1 loop and 1 query
-      // medium means max 3 loops and 3 queries
-      // high means max 10 loops and 5 queries
-      let initial_search_query_count = 0;
-      let max_research_loops = 0;
-      switch (effort) {
-        case "low":
-          initial_search_query_count = 1;
-          max_research_loops = 1;
-          break;
-        case "medium":
-          initial_search_query_count = 3;
-          max_research_loops = 3;
-          break;
-        case "high":
-          initial_search_query_count = 5;
-          max_research_loops = 10;
-          break;
-      }
-
-      const newMessages: Message[] = [
-        ...(thread.messages || []),
-        {
-          type: "human",
-          content: submittedInputValue,
-          id: Date.now().toString(),
-        },
-      ];
-      thread.submit({
-        messages: newMessages,
-        initial_search_query_count: initial_search_query_count,
-        max_research_loops: max_research_loops,
-        reasoning_model: model,
-      });
-    },
-    [thread]
-  );
-
-  const handleCancel = useCallback(() => {
-    thread.stop();
-    window.location.reload();
-  }, [thread]);
-
-  // 处理中断状态
-  if (thread.interrupt) {
-    return (
-      <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
-        <main className="h-full w-full max-w-4xl mx-auto">
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="flex flex-col items-center justify-center gap-4">
-              <h1 className="text-2xl text-yellow-400 font-bold">对话已中断</h1>
-              <p className="text-yellow-400 text-center">
-                {thread.interrupt.value?.message || "需要您的确认才能继续"}
-              </p>
-              <div className="flex gap-4">
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    thread.submit(undefined, { command: { resume: true } });
-                  }}
-                >
-                  继续
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    thread.submit(undefined, { command: { resume: false } });
-                  }}
-                >
-                  取消
-                </Button>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const [collapsed, setCollapsed] = useState(false);
+  const {
+    token: { colorBgContainer },
+  } = theme.useToken();
 
   return (
-    <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
-      <main className="h-full w-full max-w-4xl mx-auto">
-          {thread.messages.length === 0 ? (
-            <WelcomeScreen
-              handleSubmit={handleSubmit}
-              isLoading={thread.isLoading}
-              onCancel={handleCancel}
-            />
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="flex flex-col items-center justify-center gap-4">
-                <h1 className="text-2xl text-red-400 font-bold">Error</h1>
-                <p className="text-red-400">{JSON.stringify(error)}</p>
-
-                <Button
-                  variant="destructive"
-                  onClick={() => window.location.reload()}
-                >
-                  Retry
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <ChatMessagesView
-              messages={thread.messages}
-              isLoading={thread.isLoading}
-              scrollAreaRef={scrollAreaRef}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              liveActivityEvents={processedEventsTimeline}
-              historicalActivities={historicalActivities}
-            />
-          )}
-      </main>
-    </div>
+    <Layout style={{ minHeight: "100vh" }}>
+      <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
+        <div style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.2)' }} />
+        <Menu
+          theme="dark"
+          mode="inline"
+          defaultSelectedKeys={['1']}
+          items={[
+            {
+              key: '1',
+              icon: <RobotOutlined />,
+              label: <Link to="/">智能体</Link>,
+            },
+            {
+              key: '2',
+              icon: <ToolOutlined />,
+              label: <Link to="/tools">工具</Link>,
+            },
+            {
+              key: '3',
+              icon: <ApiOutlined />,
+              label: <Link to="/models">模型</Link>,
+            },
+            {
+              key: '4',
+              icon: <BookOutlined />,
+              label: <Link to="/knowledge">知识库</Link>,
+            },
+          ]}
+        />
+      </Sider>
+      <Layout>
+        <Header
+          style={{
+            padding: 0,
+            background: colorBgContainer,
+            display: 'flex',
+            alignItems: 'center',
+            borderBottom: '1px solid #f0f0f0',
+            height: 48,
+            lineHeight: '48px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              fontSize: '16px',
+              width: 48,
+              height: 48,
+              border: 'none',
+              background: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </button>
+          <Title level={4} style={{ margin: 0 }}>
+            基础设施智能运维平台
+          </Title>
+        </Header>
+        <Layout style={{ height: 'calc(100vh - 48px)' }}>
+          <Content 
+            style={{ 
+              padding: '8px',
+              overflow: 'auto',
+              backgroundColor: '#f5f5f5',
+              height: '100%'
+            }}
+          >
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Link to="/agents/research_agent" className="block">
+                      <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                        <RobotOutlined className="text-2xl text-blue-500 mb-3" />
+                        <h2 className="text-xl font-semibold mb-2">研究助手</h2>
+                        <p className="text-gray-600">
+                          强大的研究助手，可以帮助你进行网络搜索、信息整理和深度分析。
+                        </p>
+                      </div>
+                    </Link>
+                    <Link to="/agents/diagnostic_agent" className="block">
+                      <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                        <RobotOutlined className="text-2xl text-green-500 mb-3" />
+                        <h2 className="text-xl font-semibold mb-2">故障诊断助手</h2>
+                        <p className="text-gray-600">
+                          智能系统监控与故障诊断，实时分析系统性能指标。
+                        </p>
+                      </div>
+                    </Link>
+                  </div>
+                }
+              />
+              <Route path="/agents/research_agent" element={<ResearchAgent />} />
+              <Route path="/agents/diagnostic_agent" element={<DiagnosticAgent />} />
+              <Route
+                path="*"
+                element={
+                  <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                    <h1 className="text-4xl font-bold text-red-400">404 - 页面不存在</h1>
+                    <p className="text-gray-600">您访问的页面不存在。</p>
+                    <Link to="/">
+                      <button className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
+                        返回首页
+                      </button>
+                    </Link>
+                  </div>
+                }
+              />
+            </Routes>
+          </Content>
+        </Layout>
+      </Layout>
+    </Layout>
   );
 }

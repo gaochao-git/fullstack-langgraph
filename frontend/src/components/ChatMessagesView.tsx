@@ -226,10 +226,11 @@ interface ChatMessagesViewProps {
   messages: Message[];
   isLoading: boolean;
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
-  onSubmit: (inputValue: string, effort: string, model: string) => void;
+  onSubmit: (inputValue: string, effort?: string, model?: string) => void;
   onCancel: () => void;
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
+  isDiagnosticMode?: boolean;
 }
 
 export function ChatMessagesView({
@@ -240,6 +241,7 @@ export function ChatMessagesView({
   onCancel,
   liveActivityEvents,
   historicalActivities,
+  isDiagnosticMode = false,
 }: ChatMessagesViewProps) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
@@ -252,71 +254,57 @@ export function ChatMessagesView({
       console.error("Failed to copy text: ", err);
     }
   };
+
   return (
     <div className="flex flex-col h-full">
-      <ScrollArea className="flex-1 overflow-y-auto" ref={scrollAreaRef}>
-        <div className="p-4 md:p-6 space-y-2 max-w-4xl mx-auto pt-16">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+        <div className="flex flex-col gap-8">
           {messages.map((message, index) => {
-            const isLast = index === messages.length - 1;
+            const isLastMessage = index === messages.length - 1;
             return (
-              <div key={message.id || `msg-${index}`} className="space-y-3">
-                <div
-                  className={`flex items-start gap-3 ${
-                    message.type === "human" ? "justify-end" : ""
-                  }`}
-                >
-                  {message.type === "human" ? (
-                    <HumanMessageBubble
-                      message={message}
-                      mdComponents={mdComponents}
-                    />
-                  ) : (
-                    <AiMessageBubble
-                      message={message}
-                      historicalActivity={historicalActivities[message.id!]}
-                      liveActivity={liveActivityEvents} // Pass global live events
-                      isLastMessage={isLast}
-                      isOverallLoading={isLoading} // Pass global loading state
-                      mdComponents={mdComponents}
-                      handleCopy={handleCopy}
-                      copiedMessageId={copiedMessageId}
-                    />
-                  )}
-                </div>
+              <div
+                key={message.id || index}
+                className={`flex flex-col ${
+                  message.type === "human" ? "items-end" : "items-start"
+                }`}
+              >
+                {message.type === "human" ? (
+                  <HumanMessageBubble
+                    message={message}
+                    mdComponents={mdComponents}
+                  />
+                ) : (
+                  <AiMessageBubble
+                    message={message}
+                    historicalActivity={historicalActivities[message.id!]}
+                    liveActivity={isLastMessage ? liveActivityEvents : undefined}
+                    isLastMessage={isLastMessage}
+                    isOverallLoading={isLoading}
+                    mdComponents={mdComponents}
+                    handleCopy={handleCopy}
+                    copiedMessageId={copiedMessageId}
+                  />
+                )}
               </div>
             );
           })}
-          {isLoading &&
-            (messages.length === 0 ||
-              messages[messages.length - 1].type === "human") && (
-              <div className="flex items-start gap-3 mt-3">
-                {" "}
-                {/* AI message row structure */}
-                <div className="relative group max-w-[85%] md:max-w-[80%] rounded-xl p-3 shadow-sm break-words bg-neutral-800 text-neutral-100 rounded-bl-none w-full min-h-[56px]">
-                  {liveActivityEvents.length > 0 ? (
-                    <div className="text-xs">
-                      <ActivityTimeline
-                        processedEvents={liveActivityEvents}
-                        isLoading={true}
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-start h-full">
-                      <Loader2 className="h-5 w-5 animate-spin text-neutral-400 mr-2" />
-                      <span>Processing...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+          {isLoading && messages[messages.length - 1]?.type === "human" && (
+            <div className="flex items-center gap-2 text-neutral-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {isDiagnosticMode ? "Diagnosing..." : "Researching..."}
+            </div>
+          )}
         </div>
       </ScrollArea>
-      <InputForm
-        onSubmit={onSubmit}
-        isLoading={isLoading}
-        onCancel={onCancel}
-        hasHistory={messages.length > 0}
-      />
+      <div className="p-4 border-t border-neutral-700">
+        <InputForm
+          onSubmit={onSubmit}
+          isLoading={isLoading}
+          onCancel={onCancel}
+          hasHistory={true}
+          isDiagnosticMode={isDiagnosticMode}
+        />
+      </div>
     </div>
   );
 }
