@@ -107,13 +107,8 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
             "messages": [AIMessage(content="用户取消了搜索操作，研究过程已结束。")]
         }
 
-    api_key = os.getenv("SEARCHAPI_API_KEY")
     url = "https://www.searchapi.io/api/v1/search"
-    params = {
-        "engine": "baidu",
-        "q": state["search_query"],
-        "api_key": api_key
-    }
+    params = {"engine": "baidu","q": state["search_query"],"api_key": os.getenv("SEARCHAPI_API_KEY")}
     response = requests.get(url, params=params)
     sources_gathered = []
     if response.status_code == 200:
@@ -145,9 +140,6 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
             result = f"解析搜索结果失败: {e}"
     else:
         result = f"API请求失败，状态码: {response.status_code}, 错误信息: {response.text}"
-
-    print(1111111111111, result)
-
     return {
         "sources_gathered": sources_gathered,
         "search_query": [state["search_query"]],

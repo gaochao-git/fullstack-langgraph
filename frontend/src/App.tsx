@@ -43,7 +43,7 @@ export default function App() {
         const uniqueLabels = [
           ...new Set(sources.map((s: any) => s.label).filter(Boolean)),
         ];
-        const exampleLabels = uniqueLabels.slice(0, 3).join(", ");
+        const exampleLabels = uniqueLabels.slice(0, 5).join(", ");
         processedEvent = {
           title: "Web Research",
           data: `Gathered ${numSources} sources. Related to: ${
