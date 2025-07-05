@@ -1,7 +1,7 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Copy, CopyCheck } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings } from "lucide-react";
 import { InputForm } from "@/components/InputForm";
 import { Button } from "@/components/ui/button";
 import { useState, ReactNode } from "react";
@@ -158,6 +158,119 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
   );
 };
 
+// 工具调用组件
+interface ToolCallProps {
+  toolCall: any;
+  toolResult?: any;
+}
+
+const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const toolName = toolCall?.name || "Unknown Tool";
+  const toolArgs = toolCall?.args || {};
+  const toolResultContent = toolResult?.content || "";
+  
+  return (
+    <div className="border border-neutral-600 rounded-lg mb-3 bg-neutral-800">
+      {/* 工具调用头部 */}
+      <div 
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-neutral-700"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-2">
+          <Settings className="h-4 w-4 text-blue-400" />
+          <span className="font-mono text-sm text-blue-400">{toolName}</span>
+          <Badge variant="secondary" className="text-xs">
+            {toolCall?.id ? `ID: ${toolCall.id}` : "Tool Call"}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-neutral-400" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-neutral-400" />
+          )}
+        </div>
+      </div>
+      
+      {/* 展开的内容 */}
+      {isExpanded && (
+        <div className="border-t border-neutral-600 p-3 space-y-3">
+          {/* 参数 */}
+          <div>
+            <h4 className="text-sm font-semibold text-neutral-300 mb-2">参数:</h4>
+            <pre className="bg-neutral-900 p-2 rounded text-xs overflow-x-auto">
+              {JSON.stringify(toolArgs, null, 2)}
+            </pre>
+          </div>
+          
+          {/* 输出结果 */}
+          {toolResultContent && (
+            <div>
+              <h4 className="text-sm font-semibold text-neutral-300 mb-2">输出:</h4>
+              <pre className="bg-neutral-900 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto">
+                {typeof toolResultContent === 'string' 
+                  ? toolResultContent 
+                  : JSON.stringify(toolResultContent, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 工具调用列表组件
+interface ToolCallsProps {
+  message: Message;
+  allMessages: Message[];
+}
+
+const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
+  // 检查是否有工具调用
+  const toolCalls = (message as any).tool_calls || [];
+  
+  if (!toolCalls.length) return null;
+  
+  // 查找对应的工具结果
+  const findToolResult = (toolCallId: string) => {
+    const messageIndex = allMessages.findIndex(msg => msg.id === message.id);
+    if (messageIndex === -1) return null;
+    
+    // 查找下一个 ToolMessage
+    for (let i = messageIndex + 1; i < allMessages.length; i++) {
+      const nextMessage = allMessages[i];
+      if (nextMessage.type === 'tool' && (nextMessage as any).tool_call_id === toolCallId) {
+        return nextMessage;
+      }
+    }
+    return null;
+  };
+  
+  return (
+    <div className="mb-3">
+      <h4 className="text-sm font-semibold text-neutral-300 mb-2 flex items-center gap-2">
+        <Settings className="h-4 w-4" />
+        工具调用 ({toolCalls.length})
+      </h4>
+      <div className="space-y-2">
+        {toolCalls.map((toolCall: any, index: number) => {
+          const toolResult = findToolResult(toolCall.id);
+          return (
+            <ToolCall 
+              key={toolCall.id || index} 
+              toolCall={toolCall}
+              toolResult={toolResult}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 // Props for AiMessageBubble
 interface AiMessageBubbleProps {
   message: Message;
@@ -168,6 +281,7 @@ interface AiMessageBubbleProps {
   mdComponents: typeof mdComponents;
   handleCopy: (text: string, messageId: string) => void;
   copiedMessageId: string | null;
+  allMessages: Message[];
 }
 
 // AiMessageBubble Component
@@ -180,6 +294,7 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
   mdComponents,
   handleCopy,
   copiedMessageId,
+  allMessages,
 }) => {
   // Determine which activity events to show and if it's for a live loading message
   const activityForThisBubble =
@@ -196,6 +311,10 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
           />
         </div>
       )}
+      
+      {/* 工具调用 */}
+      <ToolCalls message={message} allMessages={allMessages} />
+      
       <ReactMarkdown components={mdComponents}>
         {typeof message.content === "string"
           ? message.content
@@ -286,6 +405,7 @@ export function ChatMessagesView({
                       mdComponents={mdComponents}
                       handleCopy={handleCopy}
                       copiedMessageId={copiedMessageId}
+                      allMessages={messages}
                     />
                   )}
               </div>
