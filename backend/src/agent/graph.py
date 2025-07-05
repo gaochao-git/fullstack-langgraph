@@ -118,7 +118,6 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
             if not results:
                 result = "未找到相关结果。"
             else:
-                lines = []
                 for idx, item in enumerate(results[:5]):
                     title = item.get("title", "")
                     link = item.get("link", "")
@@ -134,8 +133,9 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
                         "display_link": display_link,
                         "date": date
                     })
-                    lines.append(f"【{title}】\n{link}\n{display_link}\n{date}\n{snippet}\n")
-                result = "\n".join(lines)
+                # 用 sources_gathered 拼接 result
+                format_str = "【{title}】\n{short_url}\n{display_link}\n{date}\n{snippet}\n"
+                result = "\n".join([format_str.format(**src) for src in sources_gathered])
         except Exception as e:
             result = f"解析搜索结果失败: {e}"
     else:
