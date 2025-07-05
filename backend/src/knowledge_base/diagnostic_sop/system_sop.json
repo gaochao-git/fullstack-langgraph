@@ -1,0 +1,242 @@
+{
+  "sop_101": {
+    "id": "SOP-SYS-101",
+    "title": "磁盘空间不足诊断",
+    "category": "system",
+    "description": "诊断服务器磁盘空间不足的标准操作程序",
+    "severity": "critical",
+    "symptoms": ["磁盘使用率超过90%", "No space left on device", "应用无法写入文件"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查磁盘使用情况",
+        "command": "df -h",
+        "description": "查看各分区磁盘使用率",
+        "requires_approval": true
+      },
+      {
+        "step": 2,
+        "action": "找出大文件和目录",
+        "command": "du -sh --exclude='/proc' --exclude='/sys' /* | sort -rh | head -10",
+        "description": "定位占用空间最大的目录",
+        "requires_approval": true
+      },
+      {
+        "step": 3,
+        "action": "检查日志文件大小",
+        "command": "find /var/log -size +100M -exec ls -lh {} \\;",
+        "description": "查找大于100M的日志文件",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "分析临时文件占用",
+        "command": "du -sh /tmp /var/tmp",
+        "description": "查看临时目录空间占用情况",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "检查可清理的日志文件",
+        "command": "find /var/log -name '*.log.*' -mtime +7 -ls",
+        "description": "列出7天前的日志文件（不删除）",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["bash", "system_commands"],
+    "escalation_criteria": "如果磁盘使用率超过95%",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议清理/tmp和/var/tmp中的临时文件",
+      "建议归档或删除旧的日志文件",
+      "建议联系系统管理员扩展磁盘空间",
+      "建议实施日志轮转策略"
+    ],
+    "prevention": [
+      "设置磁盘使用率监控告警",
+      "定期清理日志文件",
+      "实施日志轮转策略",
+      "监控大文件增长"
+    ]
+  },
+  "sop_102": {
+    "id": "SOP-SYS-102",
+    "title": "系统负载过高诊断",
+    "category": "system",
+    "description": "诊断Linux系统负载平均值过高的标准操作程序",
+    "severity": "high",
+    "symptoms": ["系统响应缓慢", "负载平均值过高", "CPU/IO等待时间长"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查当前负载",
+        "command": "uptime && cat /proc/loadavg",
+        "description": "查看系统负载平均值",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "查看CPU使用率",
+        "command": "top -bn1 | head -20",
+        "description": "检查CPU使用情况",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "检查IO等待",
+        "command": "iostat -x 1 5",
+        "description": "分析磁盘IO性能",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "查找高CPU进程",
+        "command": "ps aux --sort=-%cpu | head -10",
+        "description": "找出CPU使用率最高的进程",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "查找高内存进程",
+        "command": "ps aux --sort=-%mem | head -10",
+        "description": "找出内存使用率最高的进程",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["system_monitor", "process_tools"],
+    "escalation_criteria": "如果负载平均值持续超过CPU核心数的2倍",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议优化高CPU使用率的进程",
+      "建议优化高内存使用的进程",
+      "建议检查IO瓶颈并优化磁盘性能",
+      "建议联系系统管理员进行资源调优"
+    ],
+    "prevention": [
+      "监控系统负载趋势",
+      "合理配置服务资源",
+      "定期性能调优",
+      "容量规划"
+    ]
+  },
+  "sop_103": {
+    "id": "SOP-SYS-103",
+    "title": "内存不足诊断",
+    "category": "system",
+    "description": "诊断系统内存不足和内存泄漏问题",
+    "severity": "high",
+    "symptoms": ["内存使用率过高", "OOM Killer触发", "应用崩溃"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查内存使用情况",
+        "command": "free -h && cat /proc/meminfo",
+        "description": "查看内存使用详情",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "查看内存使用排行",
+        "command": "ps aux --sort=-%mem | head -10",
+        "description": "找出内存占用最高的进程",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "检查OOM日志",
+        "command": "dmesg | grep -i 'killed process'",
+        "description": "查看是否有进程被OOM Killer终止",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "分析进程内存详情",
+        "command": "cat /proc/meminfo | grep -E '(MemTotal|MemFree|MemAvailable|Buffers|Cached)'",
+        "description": "查看详细的内存分配情况",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "检查swap使用情况",
+        "command": "swapon -s && cat /proc/swaps",
+        "description": "查看交换空间使用情况",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["system_monitor"],
+    "escalation_criteria": "如果内存使用率超过90%且持续增长",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议优化高内存使用的进程",
+      "建议增加系统内存",
+      "建议配置或增大swap空间",
+      "建议联系系统管理员分析内存泄漏"
+    ],
+    "prevention": [
+      "监控内存使用趋势",
+      "合理配置应用内存",
+      "定期重启长期运行的服务",
+      "内存泄漏检测"
+    ]
+  },
+  "sop_104": {
+    "id": "SOP-SYS-104",
+    "title": "服务异常停止诊断",
+    "category": "system",
+    "description": "诊断关键系统服务意外停止的问题",
+    "severity": "critical",
+    "symptoms": ["服务无响应", "端口未监听", "业务功能异常"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查服务状态",
+        "command": "systemctl status <service_name>",
+        "description": "查看服务的详细状态信息",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "查看服务日志",
+        "command": "journalctl -u <service_name> -n 50 --no-pager",
+        "description": "检查服务的最近日志",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "检查进程状态",
+        "command": "ps aux | grep <service_name>",
+        "description": "确认服务进程是否存在",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "检查端口占用",
+        "command": "netstat -tlnp | grep <port>",
+        "description": "确认服务端口是否被占用",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "检查服务配置",
+        "command": "systemctl show <service_name> | grep -E '(ExecStart|ExecStop|Restart)'",
+        "description": "查看服务启动配置",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["systemctl", "process_monitor"],
+    "escalation_criteria": "如果服务关键且影响核心业务",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议检查服务配置文件是否正确",
+      "建议查看系统资源是否充足",
+      "建议检查服务依赖项是否正常",
+      "建议联系系统管理员恢复服务"
+    ],
+    "prevention": [
+      "设置服务监控告警",
+      "配置服务自动重启",
+      "定期健康检查",
+      "服务依赖管理"
+    ]
+  }
+} 

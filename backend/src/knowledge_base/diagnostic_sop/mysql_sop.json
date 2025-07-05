@@ -1,0 +1,242 @@
+{
+  "sop_001": {
+    "id": "SOP-DB-001",
+    "title": "MySQL高CPU使用率诊断",
+    "category": "database",
+    "description": "诊断MySQL数据库CPU使用率过高的标准操作程序",
+    "severity": "high",
+    "symptoms": ["CPU使用率高", "查询响应慢", "系统负载高"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查MySQL进程列表",
+        "command": "SHOW FULL PROCESSLIST;",
+        "description": "识别长时间运行的查询和阻塞进程",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "分析慢查询日志",
+        "command": "SELECT * FROM mysql.slow_log ORDER BY start_time DESC LIMIT 10;",
+        "description": "查看最近的慢查询记录",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "检查数据库连接数",
+        "command": "SHOW STATUS LIKE 'Threads_connected';",
+        "description": "确认连接数是否异常",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "检查InnoDB状态",
+        "command": "SHOW ENGINE INNODB STATUS;",
+        "description": "查看缓冲池命中率和锁等待情况",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "分析性能指标",
+        "command": "SHOW STATUS LIKE 'Com_%';",
+        "description": "查看数据库操作统计信息",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["mysql_client", "system_monitor"],
+    "escalation_criteria": "如果CPU使用率持续超过80%且影响业务",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议优化识别到的慢查询",
+      "建议调整连接池大小",
+      "建议增加索引优化查询性能",
+      "建议联系DBA进行深度优化"
+    ],
+    "prevention": [
+      "定期监控慢查询",
+      "合理设置连接池大小",
+      "监控CPU使用率趋势",
+      "定期维护索引"
+    ]
+  },
+  "sop_002": {
+    "id": "SOP-DB-002",
+    "title": "MySQL连接问题诊断",
+    "category": "database",
+    "description": "诊断MySQL连接超时、连接数过多等问题",
+    "severity": "high",
+    "symptoms": ["连接超时", "Too many connections", "应用无法连接数据库"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查当前连接数",
+        "command": "SHOW STATUS LIKE 'Threads_connected';",
+        "description": "查看当前活跃连接数量",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "检查最大连接数配置",
+        "command": "SHOW VARIABLES LIKE 'max_connections';",
+        "description": "确认最大连接数限制",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "查看连接来源",
+        "command": "SELECT USER, HOST, COUNT(*) FROM information_schema.PROCESSLIST GROUP BY USER, HOST;",
+        "description": "分析连接来源分布",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "检查连接状态",
+        "command": "SELECT COMMAND, COUNT(*) FROM information_schema.PROCESSLIST GROUP BY COMMAND;",
+        "description": "分析连接状态分布",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "检查连接等待时间",
+        "command": "SELECT ID, USER, HOST, TIME, STATE FROM information_schema.PROCESSLIST WHERE TIME > 300;",
+        "description": "查找长时间等待的连接",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["mysql_client"],
+    "escalation_criteria": "如果无法建立新连接且业务受影响",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议优化应用连接池配置",
+      "建议增加最大连接数限制",
+      "建议优化长时间运行的查询",
+      "建议实施连接超时策略"
+    ],
+    "prevention": [
+      "合理配置连接池",
+      "设置连接超时时间",
+      "监控连接数趋势",
+      "优化应用连接使用"
+    ]
+  },
+  "sop_003": {
+    "id": "SOP-DB-003",
+    "title": "MySQL慢查询分析",
+    "category": "database", 
+    "description": "分析MySQL慢查询性能问题",
+    "severity": "medium",
+    "symptoms": ["查询响应时间长", "数据库负载高", "用户体验差"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "检查慢查询日志状态",
+        "command": "SHOW VARIABLES LIKE 'slow_query_log%';",
+        "description": "确认慢查询日志配置",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "查看慢查询统计",
+        "command": "SHOW STATUS LIKE 'Slow_queries';",
+        "description": "查看慢查询总数",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "分析最近的慢查询",
+        "command": "SELECT sql_text, query_time, rows_examined FROM mysql.slow_log ORDER BY start_time DESC LIMIT 5;",
+        "description": "查看最近的慢查询详情",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "检查表索引情况",
+        "command": "SELECT TABLE_NAME, INDEX_NAME, CARDINALITY FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME;",
+        "description": "查看当前数据库的索引情况",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "分析查询执行计划",
+        "command": "EXPLAIN SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND != 'Sleep';",
+        "description": "分析当前活跃查询的执行计划",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["mysql_client"],
+    "escalation_criteria": "如果慢查询影响核心业务功能",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议优化识别到的慢查询SQL",
+      "建议为高频查询字段添加索引",
+      "建议重构复杂查询",
+      "建议联系DBA进行查询优化"
+    ],
+    "prevention": [
+      "定期分析慢查询日志",
+      "查询性能测试",
+      "索引优化维护",
+      "SQL代码审查"
+    ]
+  },
+  "sop_004": {
+    "id": "SOP-DB-004",
+    "title": "MySQL死锁问题分析",
+    "category": "database",
+    "description": "分析MySQL数据库死锁问题",
+    "severity": "high",
+    "symptoms": ["事务超时", "应用报错", "Deadlock found when trying to get lock"],
+    "steps": [
+      {
+        "step": 1,
+        "action": "查看死锁信息",
+        "command": "SHOW ENGINE INNODB STATUS\\G",
+        "description": "检查最近的死锁信息",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "action": "检查死锁检测配置",
+        "command": "SHOW VARIABLES LIKE 'innodb_deadlock_detect';",
+        "description": "确认死锁检测是否启用",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "action": "检查锁等待情况",
+        "command": "SELECT * FROM information_schema.INNODB_TRX WHERE trx_state = 'LOCK WAIT';",
+        "description": "查看当前锁等待的事务",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "action": "分析锁持有情况",
+        "command": "SELECT * FROM information_schema.INNODB_LOCKS;",
+        "description": "查看当前锁状态",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "action": "检查事务隔离级别",
+        "command": "SELECT @@transaction_isolation;",
+        "description": "确认当前事务隔离级别",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["mysql_client"],
+    "escalation_criteria": "如果死锁频繁发生影响业务",
+    "diagnostic_only": true,
+    "recommendations": [
+      "建议优化事务逻辑减少锁冲突",
+      "建议调整事务隔离级别",
+      "建议优化SQL执行顺序",
+      "建议联系DBA分析死锁模式"
+    ],
+    "prevention": [
+      "优化事务设计",
+      "保持事务简短",
+      "统一表访问顺序",
+      "合理使用索引"
+    ]
+  }
+} 
