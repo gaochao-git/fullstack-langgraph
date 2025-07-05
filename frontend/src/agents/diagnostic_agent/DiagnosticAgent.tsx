@@ -1,26 +1,19 @@
 import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ProcessedEvent } from "@/components/ActivityTimeline";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
-import { ChatMessagesView } from "@/components/ChatMessagesView";
 import { Button } from "@/components/ui/button";
+import { DiagnosticChatView } from "./DiagnosticChatView";
+import type { ProcessedEvent } from "./DiagnosticChatView";
 
 export default function DiagnosticAgent() {
-  const [processedEventsTimeline, setProcessedEventsTimeline] = useState<
-    ProcessedEvent[]
-  >([]);
-  const [historicalActivities, setHistoricalActivities] = useState<
-    Record<string, ProcessedEvent[]>
-  >({});
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
+  const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
   const hasFinalizeEventOccurredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+
   const thread = useStream<{
     messages: Message[];
-  }, {
-    message?: string;
-    [key: string]: any;
   }>({
     apiUrl: import.meta.env.DEV
       ? "http://localhost:2024"
@@ -57,17 +50,6 @@ export default function DiagnosticAgent() {
       setError(error.message);
     },
   });
-
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollViewport = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      );
-      if (scrollViewport) {
-        scrollViewport.scrollTop = scrollViewport.scrollHeight;
-      }
-    }
-  }, [thread.messages]);
 
   useEffect(() => {
     if (
@@ -120,7 +102,7 @@ export default function DiagnosticAgent() {
             <div className="flex flex-col items-center justify-center gap-4">
               <h1 className="text-2xl text-yellow-400 font-bold">对话已中断</h1>
               <p className="text-yellow-400 text-center">
-                {thread.interrupt.value?.message || "需要您的确认才能继续"}
+                需要您的确认才能继续
               </p>
               <div className="flex gap-4">
                 <Button
@@ -150,39 +132,36 @@ export default function DiagnosticAgent() {
   return (
     <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
       <main className="h-full w-full max-w-4xl mx-auto">
-          {thread.messages.length === 0 ? (
-            <WelcomeScreen
-              handleSubmit={handleSubmit}
-              isLoading={thread.isLoading}
-              onCancel={handleCancel}
-              isDiagnosticMode={true}
-            />
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="flex flex-col items-center justify-center gap-4">
-                <h1 className="text-2xl text-red-400 font-bold">Error</h1>
-                <p className="text-red-400">{JSON.stringify(error)}</p>
-
-                <Button
-                  variant="destructive"
-                  onClick={() => window.location.reload()}
-                >
-                  Retry
-                </Button>
-              </div>
+        {thread.messages.length === 0 ? (
+          <WelcomeScreen
+            handleSubmit={handleSubmit}
+            isLoading={thread.isLoading}
+            onCancel={handleCancel}
+            isDiagnosticMode={true}
+          />
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <h1 className="text-2xl text-red-400 font-bold">Error</h1>
+              <p className="text-red-400">{JSON.stringify(error)}</p>
+              <Button
+                variant="destructive"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
             </div>
-          ) : (
-            <ChatMessagesView
-              messages={thread.messages}
-              isLoading={thread.isLoading}
-              scrollAreaRef={scrollAreaRef}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-              liveActivityEvents={processedEventsTimeline}
-              historicalActivities={historicalActivities}
-              isDiagnosticMode={true}
-            />
-          )}
+          </div>
+        ) : (
+          <DiagnosticChatView
+            messages={thread.messages}
+            isLoading={thread.isLoading}
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
+            liveActivityEvents={processedEventsTimeline}
+            historicalActivities={historicalActivities}
+          />
+        )}
       </main>
     </div>
   );
