@@ -115,6 +115,7 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
         "api_key": api_key
     }
     response = requests.get(url, params=params)
+    sources_gathered = []
     if response.status_code == 200:
         try:
             data = response.json()
@@ -123,22 +124,28 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
                 result = "未找到相关结果。"
             else:
                 lines = []
-                for item in results[:5]:
+                for idx, item in enumerate(results[:5]):
                     title = item.get("title", "")
                     link = item.get("link", "")
+                    display_link = item.get("display_link", "")
+                    date = item.get("date", "")
                     snippet = item.get("snippet", "")
-                    lines.append(f"【{title}】\n{link}\n{snippet}\n")
+                    sources_gathered.append({
+                        "label": title or display_link or f"来源{idx+1}",
+                        "short_url": link,
+                        "value": link,
+                        "title": title,
+                        "snippet": snippet,
+                        "display_link": display_link,
+                        "date": date
+                    })
+                    lines.append(f"【{title}】\n{link}\n{display_link}\n{date}\n{snippet}\n")
                 result = "\n".join(lines)
         except Exception as e:
             result = f"解析搜索结果失败: {e}"
     else:
         result = f"API请求失败，状态码: {response.status_code}, 错误信息: {response.text}"
 
-    sources_gathered = [{
-        "short_url": f"searchapi_{state['id']}",
-        "value": "searchapi.io 结果",
-        "title": "searchapi.io"
-    }]
     print(1111111111111, result)
 
     return {
