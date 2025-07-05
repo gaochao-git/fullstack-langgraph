@@ -42,4 +42,4 @@ app.mount(
     "/app",
     create_frontend_router(),
     name="frontend",
-)
+) 
