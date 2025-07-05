@@ -96,12 +96,12 @@ export default function DiagnosticAgent() {
 
   if (thread.interrupt) {
     return (
-      <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
+      <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
         <main className="h-full w-full max-w-4xl mx-auto">
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="flex flex-col items-center justify-center gap-4">
-              <h1 className="text-2xl text-yellow-400 font-bold">对话已中断</h1>
-              <p className="text-yellow-400 text-center">
+            <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
+              <h1 className="text-2xl text-orange-500 font-bold">对话已中断</h1>
+              <p className="text-orange-600 text-center">
                 需要您的确认才能继续
               </p>
               <div className="flex gap-4">
@@ -110,6 +110,7 @@ export default function DiagnosticAgent() {
                   onClick={() => {
                     thread.submit(undefined, { command: { resume: true } });
                   }}
+                  className="bg-green-500 hover:bg-green-600 text-white"
                 >
                   继续
                 </Button>
@@ -130,7 +131,7 @@ export default function DiagnosticAgent() {
   }
 
   return (
-    <div className="flex h-screen bg-neutral-800 text-neutral-100 font-sans antialiased">
+    <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
       <main className="h-full w-full max-w-4xl mx-auto">
         {thread.messages.length === 0 ? (
           <WelcomeScreen
@@ -141,14 +142,14 @@ export default function DiagnosticAgent() {
           />
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="flex flex-col items-center justify-center gap-4">
-              <h1 className="text-2xl text-red-400 font-bold">Error</h1>
-              <p className="text-red-400">{JSON.stringify(error)}</p>
+            <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
+              <h1 className="text-2xl text-red-500 font-bold">错误</h1>
+              <p className="text-red-600">{JSON.stringify(error)}</p>
               <Button
                 variant="destructive"
                 onClick={() => window.location.reload()}
               >
-                Retry
+                重试
               </Button>
             </div>
           </div>

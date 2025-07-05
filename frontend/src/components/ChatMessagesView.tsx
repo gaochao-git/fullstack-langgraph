@@ -147,7 +147,7 @@ const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
 }) => {
   return (
     <div
-      className={`text-white rounded-3xl break-words min-h-7 bg-neutral-700 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg`}
+      className={`text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg`}
     >
       <ReactMarkdown components={mdComponents}>
         {typeof message.content === "string"
@@ -172,35 +172,35 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
   const toolResultContent = toolResult?.content || "";
   
   return (
-    <div className="border border-neutral-600 rounded-lg mb-3 bg-neutral-800">
+    <div className="border border-gray-300 rounded-lg mb-3 bg-gray-50">
       {/* 工具调用头部 */}
       <div 
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-neutral-700"
+        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
-          <Settings className="h-4 w-4 text-blue-400" />
-          <span className="font-mono text-sm text-blue-400">{toolName}</span>
+          <Settings className="h-4 w-4 text-blue-500" />
+          <span className="font-mono text-sm text-blue-600">{toolName}</span>
           <Badge variant="secondary" className="text-xs">
             {toolCall?.id ? `ID: ${toolCall.id}` : "Tool Call"}
           </Badge>
         </div>
         <div className="flex items-center gap-2">
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-neutral-400" />
+            <ChevronDown className="h-4 w-4 text-gray-500" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-neutral-400" />
+            <ChevronRight className="h-4 w-4 text-gray-500" />
           )}
         </div>
       </div>
       
       {/* 展开的内容 */}
       {isExpanded && (
-        <div className="border-t border-neutral-600 p-3 space-y-3">
+        <div className="border-t border-gray-300 p-3 space-y-3">
           {/* 参数 */}
           <div>
-            <h4 className="text-sm font-semibold text-neutral-300 mb-2">参数:</h4>
-            <pre className="bg-neutral-900 p-2 rounded text-xs overflow-x-auto">
+            <h4 className="text-sm font-semibold text-gray-700 mb-2">参数:</h4>
+            <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto text-gray-800">
               {JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
@@ -208,8 +208,8 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
           {/* 输出结果 */}
           {toolResultContent && (
             <div>
-              <h4 className="text-sm font-semibold text-neutral-300 mb-2">输出:</h4>
-              <pre className="bg-neutral-900 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto">
+              <h4 className="text-sm font-semibold text-gray-700 mb-2">输出:</h4>
+              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto text-gray-800">
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}
@@ -301,10 +301,14 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
     isLastMessage && isOverallLoading ? liveActivity : historicalActivity;
   const isLiveActivityForThisBubble = isLastMessage && isOverallLoading;
 
+  // 检查消息内容是否为空
+  const messageContent = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+  const hasContent = messageContent && messageContent.trim().length > 0;
+
   return (
     <div className={`relative break-words flex flex-col`}>
       {activityForThisBubble && activityForThisBubble.length > 0 && (
-        <div className="mb-3 border-b border-neutral-700 pb-3 text-xs">
+        <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
           <ActivityTimeline
             processedEvents={activityForThisBubble}
             isLoading={isLiveActivityForThisBubble}
@@ -315,28 +319,26 @@ const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
       {/* 工具调用 */}
       <ToolCalls message={message} allMessages={allMessages} />
       
-      <ReactMarkdown components={mdComponents}>
-        {typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content)}
-      </ReactMarkdown>
-      <Button
-        variant="default"
-        className={`cursor-pointer bg-neutral-700 border-neutral-600 text-neutral-300 self-end ${
-          message.content.length > 0 ? "visible" : "hidden"
-        }`}
-        onClick={() =>
-          handleCopy(
-            typeof message.content === "string"
-              ? message.content
-              : JSON.stringify(message.content),
-            message.id!
-          )
-        }
-      >
-        {copiedMessageId === message.id ? "Copied" : "Copy"}
-        {copiedMessageId === message.id ? <CopyCheck /> : <Copy />}
-      </Button>
+      {/* 消息内容 - 只有当内容不为空时才渲染 */}
+      {hasContent && (
+        <div className="text-gray-800 bg-gray-100 rounded-lg p-4 mb-2">
+          <ReactMarkdown components={mdComponents}>
+            {messageContent}
+          </ReactMarkdown>
+        </div>
+      )}
+      
+      {/* 复制按钮 - 只有当内容不为空时才显示 */}
+      {hasContent && (
+        <Button
+          variant="default"
+          className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end"
+          onClick={() => handleCopy(messageContent, message.id!)}
+        >
+          {copiedMessageId === message.id ? "Copied" : "Copy"}
+          {copiedMessageId === message.id ? <CopyCheck /> : <Copy />}
+        </Button>
+      )}
     </div>
   );
 };
@@ -373,11 +375,11 @@ export function ChatMessagesView({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
+    <div className="flex flex-col h-full bg-white" style={{ minHeight: 0 }}>
       {/* 消息区 */}
       <div
-        className="flex-1 overflow-y-auto px-2 py-4"
-        style={{ minHeight: 0, maxHeight: 'calc(100vh - 180px)' }} // 180px根据Header/InputForm实际高度调整
+        className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50"
+        style={{ minHeight: 0, maxHeight: 'calc(100vh - 180px)' }}
         ref={scrollAreaRef as any}
       >
         <div className="flex flex-col gap-8">
@@ -412,7 +414,7 @@ export function ChatMessagesView({
             );
           })}
           {isLoading && messages[messages.length - 1]?.type === "human" && (
-            <div className="flex items-center gap-2 text-neutral-400">
+            <div className="flex items-center gap-2 text-gray-600">
               <Loader2 className="h-4 w-4 animate-spin" />
               {isDiagnosticMode ? "Diagnosing..." : "Researching..."}
               </div>
@@ -426,9 +428,9 @@ export function ChatMessagesView({
         style={{
           position: 'sticky',
           bottom: 0,
-          background: '#18181b', // 与整体背景一致
+          background: '#ffffff',
           zIndex: 10,
-          borderTop: '1px solid #222',
+          borderTop: '1px solid #e5e7eb',
         }}
       >
         <InputForm
