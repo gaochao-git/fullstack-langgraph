@@ -1,18 +1,25 @@
+"""
+故障诊断代理 - 使用LangGraph架构，基于SOP知识库和智能工具选择
+"""
+
 import os
-import requests
 import json
+import requests
+from typing import Annotated, Dict, Any, List, Optional
+from typing_extensions import TypedDict
+from datetime import datetime
+import logging
+
+from langgraph.graph import StateGraph, END, START
+from langgraph.graph.message import add_messages
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import ToolNode, tools_condition
+
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
+from langchain_deepseek import ChatDeepSeek
 
 from agents.diagnostic_agent.tools_and_schemas import SearchQueryList, Reflection
-from dotenv import load_dotenv
-from langchain_core.messages import AIMessage
-from langgraph.types import Send, interrupt, Command
-from langgraph.graph import StateGraph
-from langgraph.graph import START, END
-from langchain_core.runnables import RunnableConfig
-
-# 导入SSH工具
-from tools import ssh_tool
-
 from agents.diagnostic_agent.state import (
     OverallState,
     QueryGenerationState,
@@ -23,11 +30,9 @@ from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.prompts import (
     get_current_date,
     query_writer_instructions,
-    web_searcher_instructions,
     reflection_instructions,
     answer_instructions,
 )
-from langchain_deepseek import ChatDeepSeek
 from agents.diagnostic_agent.utils import (
     get_citations,
     get_research_topic,
@@ -35,33 +40,55 @@ from agents.diagnostic_agent.utils import (
     resolve_urls,
 )
 
+# 导入工具
+from tools import ssh_tool
+from tools import sop_tool
+
+from dotenv import load_dotenv
+
 load_dotenv()
 
 if os.getenv("DEEPSEEK_API_KEY") is None:
     raise ValueError("DEEPSEEK_API_KEY is not set")
 
-# DeepSeek 客户端初始化（如果将来需要用于网络搜索集成）
+logger = logging.getLogger(__name__)
 
+# 定义诊断状态
+class DiagnosticState(TypedDict):
+    """诊断代理的状态"""
+    messages: Annotated[list, add_messages]  # LangGraph特殊注解，用于消息累积
+    sop_key: Optional[str]  # 用户提供的SOP键
+    sop_validated: bool  # SOP与问题的相关性是否已验证
+    sop_loaded: bool  # SOP是否已加载
+    tools_used: List[str]  # 已使用的工具列表
+    system_diagnosis_result: Annotated[list, lambda x, y: x + y]  # 诊断结果
 
-# 节点
-def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerationState:
-    """LangGraph 节点，基于用户问题生成搜索查询。
+# 收集所有工具
+def collect_all_tools():
+    """收集所有可用的诊断工具"""
+    all_tools = []
+    
+    # 添加SOP工具
+    all_tools.extend(sop_tool.sop_tools)
+    
+    # 添加SSH工具 - 直接使用工具函数
+    ssh_tools = [
+        ssh_tool.get_system_info,
+        ssh_tool.analyze_processes,
+        ssh_tool.check_service_status,
+        ssh_tool.analyze_system_logs,
+        ssh_tool.execute_system_command
+    ]
+    all_tools.extend(ssh_tools)
+    
+    logger.info(f"收集到 {len(all_tools)} 个工具")
+    return all_tools
 
-    使用 DeepSeek 模型根据用户问题创建优化的搜索查询，用于网络研究。
-
-    参数：
-        state: 包含用户问题的当前图状态
-        config: 可运行配置，包括 LLM 提供商设置
-
-    返回：
-        包含状态更新的字典，包括 search_query 键，其中包含生成的查询
-    """
+# 节点：分析故障信息并选择SOP
+def analyze_fault_and_select_sop(state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
+    """LangGraph 节点，分析用户输入的故障信息并选择合适的SOP。"""
     configurable = Configuration.from_runnable_config(config)
-
-    # 检查自定义初始搜索查询数量
-    if state.get("initial_search_query_count") is None:
-        state["initial_search_query_count"] = configurable.number_of_initial_queries
-
+    
     # 初始化 DeepSeek Chat
     llm = ChatDeepSeek(
         model=configurable.query_generator_model,
@@ -69,279 +96,158 @@ def generate_query(state: OverallState, config: RunnableConfig) -> QueryGenerati
         max_retries=2,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
     )
-    structured_llm = llm.with_structured_output(SearchQueryList)
+    
+    # 构建系统提示 - 不在节点中直接调用工具
+    system_prompt = """你是专业的故障诊断专家，需要根据用户描述的问题选择合适的SOP进行诊断。
 
-    # 格式化提示词
-    current_date = get_current_date()
-    formatted_prompt = query_writer_instructions.format(
-        current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
-        number_queries=state["initial_search_query_count"],
-    )
-    # 生成搜索查询
-    result = structured_llm.invoke(formatted_prompt)
-    return {"search_query": result.query}
+【诊断流程】
+1. 分析用户描述的问题
+2. 调用list_sops获取可用的SOP列表
+3. 从可用SOP中选择最相关的SOP
+4. 调用get_sop_detail获取SOP详情
+5. 按照SOP步骤进行诊断
 
+【工具使用规则】
+- 每次只调用一个工具
+- 根据SOP步骤和前一个工具结果选择下一个工具
+- 避免重复调用相同功能的工具
+- 所有工具自动连接到目标服务器
 
-def continue_to_web_research(state: QueryGenerationState):
-    """LangGraph 节点，将搜索查询发送到网络研究节点。
+【可用工具】
+- list_sops: 列出所有可用的SOP
+- get_sop_detail: 获取SOP详情
+- get_system_info: 获取系统信息
+- analyze_processes: 分析进程
+- check_service_status: 检查服务状态
+- analyze_system_logs: 分析系统日志
+- execute_system_command: 执行系统命令
 
-    用于生成 n 个网络研究节点，每个搜索查询对应一个。
-    """
-    return [
-        Send("web_research", {"search_query": search_query, "id": int(idx)})
-        for idx, search_query in enumerate(state["search_query"])
-    ]
+请分析用户问题并开始诊断流程。"""
 
-
-def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
-    """LangGraph 节点，直接调用 searchapi.io 百度引擎进行网络研究。"""
-    # 先询问用户是否允许搜索
-    human_response = interrupt({
-        "message": f"是否允许使用百度搜索以下内容？\n\n搜索内容: {state['search_query']}\n\n选择'继续'允许搜索，选择'取消'结束搜索。",
-        "current_query": state["search_query"],
-    })
-
-    if not human_response:
-        return {
-            "sources_gathered": [],
-            "search_query": [state["search_query"]],
-            "web_research_result": ["用户取消了搜索操作"],
-            "messages": [AIMessage(content="用户取消了搜索操作，研究过程已结束。")]
-        }
-
-    url = "https://www.searchapi.io/api/v1/search"
-    params = {"engine": "baidu","q": state["search_query"],"api_key": os.getenv("SEARCHAPI_API_KEY")}
-    response = requests.get(url, params=params)
-    sources_gathered = []
-    if response.status_code == 200:
-        try:
-            data = response.json()
-            results = data.get("organic_results", [])
-            if not results:
-                result = "未找到相关结果。"
-            else:
-                for idx, item in enumerate(results[:5]):
-                    title = item.get("title", "")
-                    link = item.get("link", "")
-                    display_link = item.get("display_link", "")
-                    date = item.get("date", "")
-                    snippet = item.get("snippet", "")
-                    sources_gathered.append({
-                        "label": title or display_link or f"来源{idx+1}",
-                        "short_url": link,
-                        "value": link,
-                        "title": title,
-                        "snippet": snippet,
-                        "display_link": display_link,
-                        "date": date
-                    })
-                # 用 sources_gathered 拼接 result
-                format_str = "【{title}】\n{short_url}\n{display_link}\n{date}\n{snippet}\n"
-                result = "\n".join([format_str.format(**src) for src in sources_gathered])
-        except Exception as e:
-            result = f"解析搜索结果失败: {e}"
-    else:
-        result = f"API请求失败，状态码: {response.status_code}, 错误信息: {response.text}"
+    # 构建消息
+    messages = state.get("messages", [])
+    if not any(isinstance(msg, SystemMessage) for msg in messages):
+        messages = [SystemMessage(content=system_prompt)] + messages
+    
+    # 绑定工具到LLM
+    all_tools = collect_all_tools()
+    llm_with_tools = llm.bind_tools(all_tools)
+    
+    # 调用LLM
+    response = llm_with_tools.invoke(messages)
+    
     return {
-        "sources_gathered": sources_gathered,
-        "search_query": [state["search_query"]],
-        "web_research_result": [result]
+        "messages": [response],
+        "sop_key": state.get("sop_key"),
+        "sop_validated": state.get("sop_validated", False),
+        "sop_loaded": state.get("sop_loaded", False),
+        "tools_used": state.get("tools_used", []),
+        "system_diagnosis_result": state.get("system_diagnosis_result", [])
     }
 
-
-def system_diagnosis(state: OverallState, config: RunnableConfig) -> OverallState:
-    """LangGraph 节点，使用SSH工具进行系统诊断。"""
-    # 先询问用户是否允许SSH连接
-    human_response = interrupt({
-        "message": "是否允许通过SSH连接获取系统信息进行诊断？\n\n选择'继续'允许SSH连接，选择'取消'跳过系统诊断。",
-    })
-
-    if not human_response:
-        return {
-            "system_diagnosis_result": ["用户取消了SSH连接，跳过系统诊断。"]
-        }
-
-    try:
-        # 使用SSH工具获取系统信息
-        system_info = ssh_tool.get_system_info()
-        
-        # 获取进程信息
-        process_info = ssh_tool.analyze_processes()
-        
-        # 检查关键服务状态
-        service_info = ssh_tool.check_service_status(service_names=["mysql", "zabbix-server", "nginx", "apache2"])
-        
-        diagnosis_result = {
-            "system_info": json.loads(system_info),
-            "process_analysis": json.loads(process_info),
-            "service_status": json.loads(service_info)
-        }
-        
-        return {
-            "system_diagnosis_result": [json.dumps(diagnosis_result, indent=2, ensure_ascii=False)]
-        }
-        
-    except Exception as e:
-        return {
-            "system_diagnosis_result": [f"系统诊断失败: {str(e)}"]
-        }
-
-
-def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
-    """LangGraph 节点，识别知识差距并生成潜在的后续查询。
-
-    分析当前摘要以识别需要进一步研究的领域并生成潜在的后续查询。
-    使用结构化输出以 JSON 格式提取后续查询。
-
-    参数：
-        state: 包含运行摘要和研究主题的当前图状态
-        config: 可运行配置，包括 LLM 提供商设置
-
-    返回：
-        包含状态更新的字典，包括 search_query 键，其中包含生成的后续查询
-    """
-    # 增加研究循环计数
-    state["research_loop_count"] = state.get("research_loop_count", 0) + 1
-    research_loop_count = state["research_loop_count"]
-    configurable = Configuration.from_runnable_config(config)
-    reasoning_model = state.get("reasoning_model", configurable.reflection_model)
-
-    # 格式化提示词
-    current_date = get_current_date()
-    formatted_prompt = reflection_instructions.format(
-        current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
-        summaries="\n\n---\n\n".join(state["web_research_result"]),
-    )
-    # 初始化推理模型
-    llm = ChatDeepSeek(
-        model=reasoning_model,
-        temperature=1.0,
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-    )
-    result = llm.with_structured_output(Reflection).invoke(formatted_prompt)
-
+# 状态更新节点
+def update_diagnostic_state(state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
+    """更新诊断状态"""
+    messages = state.get("messages", [])
+    current_sop_key = state.get("sop_key")
+    current_sop_validated = state.get("sop_validated", False)
+    current_sop_loaded = state.get("sop_loaded", False)
+    tools_used = state.get("tools_used", [])
+    
+    # 提取SOP键名
+    sop_key = current_sop_key
+    if not sop_key:
+        for msg in messages:
+            if hasattr(msg, 'content') and isinstance(msg.content, str):
+                import re
+                sop_matches = re.findall(r'sop_\w+', msg.content.lower())
+                if sop_matches:
+                    sop_key = sop_matches[0]
+                    break
+    
+    # 检查最近的工具调用
+    recent_tools = []
+    for msg in messages[-2:]:
+        if hasattr(msg, 'tool_calls') and msg.tool_calls:
+            for tool_call in msg.tool_calls:
+                if tool_call.get("name"):
+                    recent_tools.append(tool_call["name"])
+    
+    all_tools_used = list(set(tools_used + recent_tools))
+    
+    # SOP验证逻辑
+    sop_validated = current_sop_validated
+    sop_loaded = current_sop_loaded
+    
+    if sop_key and not sop_validated and "get_sop_detail" in recent_tools:
+        sop_validated = True
+        sop_loaded = True
+    elif sop_validated and "get_sop_detail" in recent_tools:
+        sop_loaded = True
+    
     return {
-        "is_sufficient": result.is_sufficient,
-        "knowledge_gap": result.knowledge_gap,
-        "follow_up_queries": result.follow_up_queries,
-        "research_loop_count": state["research_loop_count"],
-        "number_of_ran_queries": len(state["search_query"]),
+        "sop_key": sop_key,
+        "sop_validated": sop_validated,
+        "sop_loaded": sop_loaded,
+        "tools_used": all_tools_used,
+        "system_diagnosis_result": state.get("system_diagnosis_result", [])
     }
 
+# 路由函数
+def should_continue_diagnosis(state: DiagnosticState) -> str:
+    """检查是否应该继续诊断"""
+    sop_key = state.get("sop_key")
+    sop_validated = state.get("sop_validated", False)
+    sop_loaded = state.get("sop_loaded", False)
+    tools_used = state.get("tools_used", [])
+    messages = state.get("messages", [])
+    
+    # 检查最近的工具调用
+    recent_tools = []
+    for msg in messages[-2:]:
+        if hasattr(msg, 'tool_calls') and msg.tool_calls:
+            for tool_call in msg.tool_calls:
+                if tool_call.get("name"):
+                    recent_tools.append(tool_call["name"])
+    
+    # 1. 如果没有SOP键名，继续
+    if not sop_key:
+        return "update_state"
+    
+    # 2. 如果有SOP但未验证，继续
+    if sop_key and not sop_validated:
+        return "update_state"
+    
+    # 3. SOP已验证但未加载详情，继续
+    if sop_validated and not sop_loaded:
+        return "update_state"
+    
+    # 4. 完成条件：SOP已验证且已加载，使用了足够的工具且最近没有工具调用
+    if sop_validated and sop_loaded and len(tools_used) >= 3:
+        if not recent_tools:  # 没有最近的工具调用，说明在做分析
+            return END
+    
+    return "update_state"
 
-def evaluate_research(
-    state: ReflectionState,
-    config: RunnableConfig,
-) -> OverallState:
-    """LangGraph 路由函数，确定研究流程中的下一步。
+# 直接创建图
+builder = StateGraph(DiagnosticState)
 
-    通过决定是否继续收集信息或根据配置的最大研究循环数完成摘要来控制研究循环。
+# 收集所有工具
+all_tools = collect_all_tools()
 
-    参数：
-        state: 包含研究循环计数的当前图状态
-        config: 可运行配置，包括 max_research_loops 设置
+# 添加节点
+builder.add_node("analyze_fault", analyze_fault_and_select_sop)
+builder.add_node("tools", ToolNode(all_tools))
+builder.add_node("update_state", update_diagnostic_state)
 
-    返回：
-        指示要访问的下一个节点的字符串字面量（"web_research" 或 "finalize_summary"）
-    """
-    configurable = Configuration.from_runnable_config(config)
-    max_research_loops = (
-        state.get("max_research_loops")
-        if state.get("max_research_loops") is not None
-        else configurable.max_research_loops
-    )
-    if state["is_sufficient"] or state["research_loop_count"] >= max_research_loops:
-        return "finalize_answer"
-    else:
-        return [
-            Send(
-                "web_research",
-                {
-                    "search_query": follow_up_query,
-                    "id": state["number_of_ran_queries"] + int(idx),
-                },
-            )
-            for idx, follow_up_query in enumerate(state["follow_up_queries"])
-        ]
+# 添加边
+builder.add_edge(START, "analyze_fault")
+builder.add_conditional_edges("analyze_fault", tools_condition)
+builder.add_edge("tools", "update_state")
+builder.add_conditional_edges("update_state", should_continue_diagnosis, {
+    "update_state": "analyze_fault", 
+    END: END
+})
 
-
-def finalize_answer(state: OverallState, config: RunnableConfig):
-    """LangGraph 节点，完成研究摘要。
-
-    通过去重和格式化来源，然后将它们与运行摘要结合起来创建具有适当引用的结构良好的研究报告，准备最终输出。
-
-    参数：
-        state: 包含运行摘要和收集来源的当前图状态
-
-    返回：
-        包含状态更新的字典，包括 running_summary 键，其中包含格式化的带有来源的最终摘要
-    """
-    # 检查是否需要中断询问用户（当研究循环次数较多时）  
-    configurable = Configuration.from_runnable_config(config)
-    reasoning_model = state.get("reasoning_model") or configurable.answer_model
-
-    # 格式化提示词
-    current_date = get_current_date()
-    formatted_prompt = answer_instructions.format(
-        current_date=current_date,
-        research_topic=get_research_topic(state["messages"]),
-        summaries="\n---\n\n".join(state["web_research_result"]),
-    )
-
-    # 初始化推理模型，默认为 DeepSeek Chat
-    llm = ChatDeepSeek(
-        model=reasoning_model,
-        temperature=0,
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-    )
-    result = llm.invoke(formatted_prompt)
-
-    # 用原始 URL 替换短 URL，并将所有使用的 URL 添加到 sources_gathered
-    unique_sources = []
-    for source in state["sources_gathered"]:
-        if source["short_url"] in result.content:
-            result.content = result.content.replace(
-                source["short_url"], source["value"]
-            )
-            unique_sources.append(source)
-
-    return {
-        "messages": [AIMessage(content=result.content)],
-        "sources_gathered": unique_sources,
-    }
-
-
-# 创建我们的 Agent 图
-builder = StateGraph(OverallState, config_schema=Configuration)
-
-# 定义我们将循环的节点
-builder.add_node("generate_query", generate_query)
-builder.add_node("web_research", web_research)
-builder.add_node("system_diagnosis", system_diagnosis)
-builder.add_node("reflection", reflection)
-builder.add_node("finalize_answer", finalize_answer)
-
-# 将入口点设置为 `generate_query`
-# 这意味着这个节点是第一个被调用的
-builder.add_edge(START, "generate_query")
-# 添加条件边以在并行分支中继续搜索查询
-builder.add_conditional_edges(
-    "generate_query", continue_to_web_research, ["web_research"]
-)
-# 反思网络研究
-builder.add_edge("web_research", "reflection")
-# 评估研究
-builder.add_conditional_edges(
-    "reflection", evaluate_research, ["web_research", "finalize_answer"]
-)
-# 完成答案
-builder.add_edge("finalize_answer", END)
-
-# 添加系统诊断节点
-builder.add_edge("web_research", "system_diagnosis")
-
-graph = builder.compile(name="pro-search-agent")
+# 编译图
+graph = builder.compile(name="diagnostic-agent")

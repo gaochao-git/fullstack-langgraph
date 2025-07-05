@@ -249,15 +249,18 @@ export function ChatMessagesView({
     try {
       await navigator.clipboard.writeText(text);
       setCopiedMessageId(messageId);
-      setTimeout(() => setCopiedMessageId(null), 2000); // Reset after 2 seconds
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
-    }
+      setTimeout(() => setCopiedMessageId(null), 1500);
+    } catch {}
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+    <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
+      {/* 消息区 */}
+      <div
+        className="flex-1 overflow-y-auto px-2 py-4"
+        style={{ minHeight: 0, maxHeight: 'calc(100vh - 180px)' }} // 180px根据Header/InputForm实际高度调整
+        ref={scrollAreaRef as any}
+      >
         <div className="flex flex-col gap-8">
           {messages.map((message, index) => {
             const isLastMessage = index === messages.length - 1;
@@ -294,16 +297,27 @@ export function ChatMessagesView({
               {isDiagnosticMode ? "Diagnosing..." : "Researching..."}
               </div>
             )}
+          {/* 保证自动滚动到底部 */}
+          <div id="chat-messages-end" />
         </div>
-      </ScrollArea>
-      <div className="p-4 border-t border-neutral-700">
-      <InputForm
-        onSubmit={onSubmit}
-        isLoading={isLoading}
-        onCancel={onCancel}
-          hasHistory={true}
+      </div>
+      {/* 输入区固定底部 */}
+      <div
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          background: '#18181b', // 与整体背景一致
+          zIndex: 10,
+          borderTop: '1px solid #222',
+        }}
+      >
+        <InputForm
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+          isLoading={isLoading}
+          hasHistory={messages.length > 0}
           isDiagnosticMode={isDiagnosticMode}
-      />
+        />
       </div>
     </div>
   );
