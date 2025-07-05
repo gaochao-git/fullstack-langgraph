@@ -36,7 +36,7 @@ export const InputForm: React.FC<InputFormProps> = ({
     if (isDiagnosticMode) {
       onSubmit(internalInputValue);
     } else {
-      onSubmit(internalInputValue, effort, model);
+    onSubmit(internalInputValue, effort, model);
     }
     setInternalInputValue("");
   };
@@ -103,72 +103,72 @@ export const InputForm: React.FC<InputFormProps> = ({
         </div>
       </div>
       {!isDiagnosticMode && (
-        <div className="flex items-center justify-between">
-          <div className="flex flex-row gap-2">
-            <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
-              <div className="flex flex-row items-center text-sm">
-                <Brain className="h-4 w-4 mr-2" />
-                Effort
-              </div>
-              <Select value={effort} onValueChange={setEffort}>
-                <SelectTrigger className="w-[160px] bg-transparent border-none cursor-pointer">
-                  <SelectValue placeholder="Effort" />
-                </SelectTrigger>
-                <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
-                  <SelectItem
-                    value="low"
-                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                  >
-                    Low
-                  </SelectItem>
-                  <SelectItem
-                    value="medium"
-                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                  >
-                    Medium
-                  </SelectItem>
-                  <SelectItem
-                    value="high"
-                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                  >
-                    High
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+      <div className="flex items-center justify-between">
+        <div className="flex flex-row gap-2">
+          <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
+            <div className="flex flex-row items-center text-sm">
+              <Brain className="h-4 w-4 mr-2" />
+              Effort
             </div>
-            <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
-              <div className="flex flex-row items-center text-sm ml-2">
-                <Cpu className="h-4 w-4 mr-2" />
-                Model
-              </div>
-              <Select value={model} onValueChange={setModel}>
-                <SelectTrigger className="w-[260px] bg-transparent border-none cursor-pointer">
-                  <SelectValue placeholder="Model" />
-                </SelectTrigger>
-                <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
-                  <SelectItem
-                    value="deepseek-chat"
-                    className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
-                  >
-                    <div className="flex items-center">
-                      <Zap className="h-4 w-4 mr-2 text-yellow-400" /> DeepSeek Chat
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={effort} onValueChange={setEffort}>
+              <SelectTrigger className="w-[160px] bg-transparent border-none cursor-pointer">
+                <SelectValue placeholder="Effort" />
+              </SelectTrigger>
+              <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
+                <SelectItem
+                  value="low"
+                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                >
+                  Low
+                </SelectItem>
+                <SelectItem
+                  value="medium"
+                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                >
+                  Medium
+                </SelectItem>
+                <SelectItem
+                  value="high"
+                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                >
+                  High
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          {hasHistory && (
-            <Button
-              className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer rounded-xl rounded-t-sm pl-2 "
-              variant="default"
-              onClick={() => window.location.reload()}
-            >
-              <SquarePen size={16} />
-              New {isDiagnosticMode ? "Diagnosis" : "Search"}
-            </Button>
-          )}
+          <div className="flex flex-row gap-2 bg-neutral-700 border-neutral-600 text-neutral-300 focus:ring-neutral-500 rounded-xl rounded-t-sm pl-2  max-w-[100%] sm:max-w-[90%]">
+            <div className="flex flex-row items-center text-sm ml-2">
+              <Cpu className="h-4 w-4 mr-2" />
+              Model
+            </div>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger className="w-[260px] bg-transparent border-none cursor-pointer">
+                <SelectValue placeholder="Model" />
+              </SelectTrigger>
+              <SelectContent className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer">
+                <SelectItem
+                  value="deepseek-chat"
+                  className="hover:bg-neutral-600 focus:bg-neutral-600 cursor-pointer"
+                >
+                  <div className="flex items-center">
+                    <Zap className="h-4 w-4 mr-2 text-yellow-400" /> DeepSeek Chat
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
+        {hasHistory && (
+          <Button
+            className="bg-neutral-700 border-neutral-600 text-neutral-300 cursor-pointer rounded-xl rounded-t-sm pl-2 "
+            variant="default"
+            onClick={() => window.location.reload()}
+          >
+            <SquarePen size={16} />
+              New {isDiagnosticMode ? "Diagnosis" : "Search"}
+          </Button>
+        )}
+      </div>
       )}
     </form>
   );

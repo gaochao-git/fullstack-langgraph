@@ -104,7 +104,7 @@ export default function App() {
                         <p className="text-gray-600">
                           强大的研究助手，可以帮助你进行网络搜索、信息整理和深度分析。
                         </p>
-                      </div>
+              </div>
                     </Link>
                     <Link to="/agents/diagnostic_agent" className="block">
                       <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow">
@@ -113,9 +113,9 @@ export default function App() {
                         <p className="text-gray-600">
                           智能系统监控与故障诊断，实时分析系统性能指标。
                         </p>
-                      </div>
+            </div>
                     </Link>
-                  </div>
+      </div>
                 }
               />
               <Route path="/agents/research_agent" element={<ResearchAgent />} />
@@ -131,7 +131,7 @@ export default function App() {
                         返回首页
                       </button>
                     </Link>
-                  </div>
+              </div>
                 }
               />
             </Routes>

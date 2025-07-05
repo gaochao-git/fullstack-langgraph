@@ -262,29 +262,29 @@ export function ChatMessagesView({
           {messages.map((message, index) => {
             const isLastMessage = index === messages.length - 1;
             return (
-              <div
+                <div
                 key={message.id || index}
                 className={`flex flex-col ${
                   message.type === "human" ? "items-end" : "items-start"
-                }`}
-              >
-                {message.type === "human" ? (
-                  <HumanMessageBubble
-                    message={message}
-                    mdComponents={mdComponents}
-                  />
-                ) : (
-                  <AiMessageBubble
-                    message={message}
-                    historicalActivity={historicalActivities[message.id!]}
+                  }`}
+                >
+                  {message.type === "human" ? (
+                    <HumanMessageBubble
+                      message={message}
+                      mdComponents={mdComponents}
+                    />
+                  ) : (
+                    <AiMessageBubble
+                      message={message}
+                      historicalActivity={historicalActivities[message.id!]}
                     liveActivity={isLastMessage ? liveActivityEvents : undefined}
                     isLastMessage={isLastMessage}
                     isOverallLoading={isLoading}
-                    mdComponents={mdComponents}
-                    handleCopy={handleCopy}
-                    copiedMessageId={copiedMessageId}
-                  />
-                )}
+                      mdComponents={mdComponents}
+                      handleCopy={handleCopy}
+                      copiedMessageId={copiedMessageId}
+                    />
+                  )}
               </div>
             );
           })}
@@ -292,18 +292,18 @@ export function ChatMessagesView({
             <div className="flex items-center gap-2 text-neutral-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               {isDiagnosticMode ? "Diagnosing..." : "Researching..."}
-            </div>
-          )}
+              </div>
+            )}
         </div>
       </ScrollArea>
       <div className="p-4 border-t border-neutral-700">
-        <InputForm
-          onSubmit={onSubmit}
-          isLoading={isLoading}
-          onCancel={onCancel}
+      <InputForm
+        onSubmit={onSubmit}
+        isLoading={isLoading}
+        onCancel={onCancel}
           hasHistory={true}
           isDiagnosticMode={isDiagnosticMode}
-        />
+      />
       </div>
     </div>
   );

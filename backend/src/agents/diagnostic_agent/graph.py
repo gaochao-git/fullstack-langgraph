@@ -10,6 +10,9 @@ from langgraph.graph import StateGraph
 from langgraph.graph import START, END
 from langchain_core.runnables import RunnableConfig
 
+# 导入SSH工具
+from tools import ssh_tool
+
 from agents.diagnostic_agent.state import (
     OverallState,
     QueryGenerationState,
@@ -147,6 +150,44 @@ def web_research(state: WebSearchState, config: RunnableConfig) -> OverallState:
     }
 
 
+def system_diagnosis(state: OverallState, config: RunnableConfig) -> OverallState:
+    """LangGraph 节点，使用SSH工具进行系统诊断。"""
+    # 先询问用户是否允许SSH连接
+    human_response = interrupt({
+        "message": "是否允许通过SSH连接获取系统信息进行诊断？\n\n选择'继续'允许SSH连接，选择'取消'跳过系统诊断。",
+    })
+
+    if not human_response:
+        return {
+            "system_diagnosis_result": ["用户取消了SSH连接，跳过系统诊断。"]
+        }
+
+    try:
+        # 使用SSH工具获取系统信息
+        system_info = ssh_tool.get_system_info()
+        
+        # 获取进程信息
+        process_info = ssh_tool.analyze_processes()
+        
+        # 检查关键服务状态
+        service_info = ssh_tool.check_service_status(service_names=["mysql", "zabbix-server", "nginx", "apache2"])
+        
+        diagnosis_result = {
+            "system_info": json.loads(system_info),
+            "process_analysis": json.loads(process_info),
+            "service_status": json.loads(service_info)
+        }
+        
+        return {
+            "system_diagnosis_result": [json.dumps(diagnosis_result, indent=2, ensure_ascii=False)]
+        }
+        
+    except Exception as e:
+        return {
+            "system_diagnosis_result": [f"系统诊断失败: {str(e)}"]
+        }
+
+
 def reflection(state: OverallState, config: RunnableConfig) -> ReflectionState:
     """LangGraph 节点，识别知识差距并生成潜在的后续查询。
 
@@ -280,6 +321,7 @@ builder = StateGraph(OverallState, config_schema=Configuration)
 # 定义我们将循环的节点
 builder.add_node("generate_query", generate_query)
 builder.add_node("web_research", web_research)
+builder.add_node("system_diagnosis", system_diagnosis)
 builder.add_node("reflection", reflection)
 builder.add_node("finalize_answer", finalize_answer)
 
@@ -298,5 +340,8 @@ builder.add_conditional_edges(
 )
 # 完成答案
 builder.add_edge("finalize_answer", END)
+
+# 添加系统诊断节点
+builder.add_edge("web_research", "system_diagnosis")
 
 graph = builder.compile(name="pro-search-agent")
