@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings, User, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode } from "react";
@@ -196,69 +196,77 @@ export function DiagnosticChatView({
             <div key={round.user.id || idx}>
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
-                <div className="text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg">
-                  <MarkdownRenderer content={
-                    typeof round.user.content === "string"
-                      ? round.user.content
-                      : JSON.stringify(round.user.content)
-                  } />
+                <div className="flex items-center gap-2 justify-end">
+                  <div className="text-white rounded-2xl break-words min-h-7 bg-blue-600 max-w-[100%] sm:max-w-[90%] px-4 pt-3 pb-2">
+                    <span>
+                      {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
+                    </span>
+                  </div>
+                  <div className="rounded-full bg-blue-100 p-2 flex items-center justify-center">
+                    <User className="h-5 w-5 text-blue-600" />
+                  </div>
                 </div>
               </div>
               {/* 助手合并输出区域 */}
               {round.assistant.length > 0 && (
                 <div className="flex flex-col items-start mb-6">
-                  <div className="relative break-words flex flex-col max-w-[100%] sm:max-w-[90%] bg-gray-100 rounded-lg p-4">
-                    {round.assistant.map((msg, i) => {
-                      // 活动事件和 AI 内容
-                      if (msg.type === 'ai') {
-                        const activityForThisMessage = historicalActivities[msg.id!] || [];
-                        return (
-                          <div key={msg.id || i}>
-                            {activityForThisMessage.length > 0 && (
-                              <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
-                                <ActivityTimeline
-                                  processedEvents={activityForThisMessage}
-                                  isLoading={false}
-                                />
-                              </div>
-                            )}
-                            {/* AI 内容 */}
-                            {msg.content && (
-                              <div className="mb-2">
-                                <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
-                              </div>
-                            )}
-                            {/* 工具调用（只渲染本条消息的 tool_calls） */}
-                            {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
-                              <ToolCalls key={msg.id || i} message={msg} allMessages={messages} />
-                            )}
-                          </div>
-                        );
-                      }
-                      // 工具调用结果
-                      if (msg.type === 'tool') {
-                        // 不单独渲染，由 ToolCalls 负责
+                  <div className="flex items-start gap-2">
+                    <div className="rounded-full bg-gray-200 p-2 flex items-center justify-center">
+                      <Bot className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div className="relative break-words flex flex-col max-w-[100%] sm:max-w-[90%] bg-gray-100 rounded-lg p-4 shadow">
+                      {round.assistant.map((msg, i) => {
+                        // 活动事件和 AI 内容
+                        if (msg.type === 'ai') {
+                          const activityForThisMessage = historicalActivities[msg.id!] || [];
+                          return (
+                            <div key={msg.id || i}>
+                              {activityForThisMessage.length > 0 && (
+                                <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
+                                  <ActivityTimeline
+                                    processedEvents={activityForThisMessage}
+                                    isLoading={false}
+                                  />
+                                </div>
+                              )}
+                              {/* AI 内容 */}
+                              {msg.content && (
+                                <div className="mb-2">
+                                  <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
+                                </div>
+                              )}
+                              {/* 工具调用（只渲染本条消息的 tool_calls） */}
+                              {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
+                                <ToolCalls key={msg.id || i} message={msg} allMessages={messages} />
+                              )}
+                            </div>
+                          );
+                        }
+                        // 工具调用结果
+                        if (msg.type === 'tool') {
+                          // 不单独渲染，由 ToolCalls 负责
+                          return null;
+                        }
                         return null;
-                      }
-                      return null;
-                    })}
-                    {/* 合并区域只显示最后一条 AI 消息的复制按钮 */}
-                    {(() => {
-                      // 找到最后一条有内容的 AI 消息
-                      const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
-                      if (!lastAiMsg) return null;
-                      const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
-                      return (
-                        <Button
-                          variant="default"
-                          className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
-                          onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
-                        >
-                          {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
-                          {copiedMessageId === lastAiMsg.id ? <CopyCheck /> : <Copy />}
-                        </Button>
-                      );
-                    })()}
+                      })}
+                      {/* 合并区域只显示最后一条 AI 消息的复制按钮 */}
+                      {(() => {
+                        // 找到最后一条有内容的 AI 消息
+                        const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
+                        if (!lastAiMsg) return null;
+                        const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
+                        return (
+                          <Button
+                            variant="default"
+                            className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
+                            onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
+                          >
+                            {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
+                            {copiedMessageId === lastAiMsg.id ? <CopyCheck /> : <Copy />}
+                          </Button>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               )}
