@@ -1,7 +1,6 @@
 import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { Button } from "@/components/ui/button";
 import { DiagnosticChatView } from "./DiagnosticChatView";
 import type { ProcessedEvent } from "./DiagnosticChatView";
@@ -133,14 +132,7 @@ export default function DiagnosticAgent() {
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
       <main className="h-full w-full max-w-4xl mx-auto">
-        {thread.messages.length === 0 ? (
-          <WelcomeScreen
-            handleSubmit={handleSubmit}
-            isLoading={thread.isLoading}
-            onCancel={handleCancel}
-            isDiagnosticMode={true}
-          />
-        ) : error ? (
+        {error ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
               <h1 className="text-2xl text-red-500 font-bold">错误</h1>
