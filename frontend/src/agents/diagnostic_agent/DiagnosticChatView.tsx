@@ -204,7 +204,7 @@ export function DiagnosticChatView({
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
                 <div className="flex items-center gap-2 justify-end max-w-[100%] sm:max-w-[90%]">
-                  <div className="text-white rounded-2xl break-words min-h-7 bg-blue-600 overflow-x-auto min-w-fit px-4 pt-3 pb-2">
+                  <div className="text-gray-800 rounded-2xl break-words min-h-7 bg-blue-50 overflow-x-auto min-w-fit px-4 pt-3 pb-2">
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>
