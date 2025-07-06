@@ -53,20 +53,20 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
       
       {/* 展开的内容 */}
       {isExpanded && (
-        <div className="border-t border-gray-300 p-3 space-y-3">
+        <div className="border-t border-gray-300 p-3 space-y-3 overflow-x-auto">
           {/* 参数 */}
-          <div>
+          <div className="min-w-fit max-w-full">
             <h4 className="text-sm font-semibold text-gray-700 mb-2">参数:</h4>
-            <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto text-gray-800">
+            <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto text-gray-800 whitespace-pre max-w-full">
               {JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
           
           {/* 输出结果 */}
           {toolResultContent && (
-            <div>
+            <div className="min-w-fit max-w-full">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">输出:</h4>
-              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto text-gray-800">
+              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto text-gray-800 whitespace-pre max-w-full">
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}
@@ -196,20 +196,20 @@ export function DiagnosticChatView({
             <div className="flex flex-col items-center justify-center h-[40vh] text-gray-400 select-none">
               <h1 className="text-4xl font-bold mb-2">故障诊断助手</h1>
               <p className="text-lg mb-4">您希望我诊断什么问题？</p>
-              <p className="text-base">请在下方输入框描述您的问题并点击“诊断”</p>
+              <p className="text-base">请在下方输入框描述您的问题并点击"诊断"</p>
             </div>
           )}
           {dialogRounds.map((round, idx) => (
             <div key={round.user.id || idx}>
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
-                <div className="flex items-center gap-2 justify-end">
-                  <div className="text-white rounded-2xl break-words min-h-7 bg-blue-600 max-w-[100%] sm:max-w-[90%] px-4 pt-3 pb-2">
-                    <span>
+                <div className="flex items-center gap-2 justify-end max-w-[100%] sm:max-w-[90%]">
+                  <div className="text-white rounded-2xl break-words min-h-7 bg-blue-600 overflow-x-auto min-w-fit px-4 pt-3 pb-2">
+                    <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>
                   </div>
-                  <div className="rounded-full bg-blue-100 p-2 flex items-center justify-center">
+                  <div className="rounded-full bg-blue-100 p-2 flex-shrink-0 flex items-center justify-center">
                     <User className="h-5 w-5 text-blue-600" />
                   </div>
                 </div>
@@ -217,19 +217,19 @@ export function DiagnosticChatView({
               {/* 助手合并输出区域 */}
               {round.assistant.length > 0 && (
                 <div className="flex flex-col items-start mb-6">
-                  <div className="flex items-start gap-2">
-                    <div className="rounded-full bg-gray-200 p-2 flex items-center justify-center">
+                  <div className="flex items-start gap-2 max-w-[100%] sm:max-w-[90%]">
+                    <div className="rounded-full bg-gray-200 p-2 flex-shrink-0 flex items-center justify-center">
                       <Bot className="h-5 w-5 text-gray-600" />
                     </div>
-                    <div className="relative break-words flex flex-col max-w-[100%] sm:max-w-[90%] bg-gray-100 rounded-lg p-4 shadow">
+                    <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 w-full">
                       {round.assistant.map((msg, i) => {
                         // 活动事件和 AI 内容
                         if (msg.type === 'ai') {
                           const activityForThisMessage = historicalActivities[msg.id!] || [];
                           return (
-                            <div key={msg.id || i}>
+                            <div key={msg.id || i} className="min-w-0 w-full">
                               {activityForThisMessage.length > 0 && (
-                                <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
+                                <div className="mb-3 border-b border-gray-200 pb-3 text-xs overflow-x-auto">
                                   <ActivityTimeline
                                     processedEvents={activityForThisMessage}
                                     isLoading={false}
@@ -238,13 +238,19 @@ export function DiagnosticChatView({
                               )}
                               {/* AI 内容 */}
                               {msg.content && (
-                                <div className="mb-2">
-                                  <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
+                                <div className="mb-2 overflow-x-auto">
+                                  <div className="min-w-fit">
+                                    <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
+                                  </div>
                                 </div>
                               )}
                               {/* 工具调用（只渲染本条消息的 tool_calls） */}
                               {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
-                                <ToolCalls key={msg.id || i} message={msg} allMessages={messages} />
+                                <div className="overflow-x-auto">
+                                  <div className="min-w-fit">
+                                    <ToolCalls key={msg.id || i} message={msg} allMessages={messages} />
+                                  </div>
+                                </div>
                               )}
                             </div>
                           );
