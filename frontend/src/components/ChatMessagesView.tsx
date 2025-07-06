@@ -1,179 +1,68 @@
-import type React from "react";
+import { useState } from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings } from "lucide-react";
-import { InputForm } from "@/components/InputForm";
-import { Button } from "@/components/ui/button";
-import { useState, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  ActivityTimeline,
-  ProcessedEvent,
-} from "@/components/ActivityTimeline"; // Assuming ActivityTimeline is in the same dir or adjust path
+import { Copy, CopyCheck, ChevronDown, ChevronRight, Settings, Loader2 } from "lucide-react";
+import { ActivityTimeline } from "./ActivityTimeline";
+import { InputForm } from "./InputForm";
 
-// Markdown component props type from former ReportView
-type MdComponentProps = {
-  className?: string;
-  children?: ReactNode;
-  [key: string]: any;
-};
-
-// Markdown components (from former ReportView.tsx)
-const mdComponents = {
-  h1: ({ className, children, ...props }: MdComponentProps) => (
-    <h1 className={cn("text-2xl font-bold mt-4 mb-2", className)} {...props}>
-      {children}
-    </h1>
-  ),
-  h2: ({ className, children, ...props }: MdComponentProps) => (
-    <h2 className={cn("text-xl font-bold mt-3 mb-2", className)} {...props}>
-      {children}
-    </h2>
-  ),
-  h3: ({ className, children, ...props }: MdComponentProps) => (
-    <h3 className={cn("text-lg font-bold mt-3 mb-1", className)} {...props}>
-      {children}
-    </h3>
-  ),
-  p: ({ className, children, ...props }: MdComponentProps) => (
-    <p className={cn("mb-3 leading-7", className)} {...props}>
-      {children}
-    </p>
-  ),
-  a: ({ className, children, href, ...props }: MdComponentProps) => (
-    <Badge className="text-xs mx-0.5">
-      <a
-        className={cn("text-blue-400 hover:text-blue-300 text-xs", className)}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        {...props}
-      >
-        {children}
-      </a>
-    </Badge>
-  ),
-  ul: ({ className, children, ...props }: MdComponentProps) => (
-    <ul className={cn("list-disc pl-6 mb-3", className)} {...props}>
-      {children}
-    </ul>
-  ),
-  ol: ({ className, children, ...props }: MdComponentProps) => (
-    <ol className={cn("list-decimal pl-6 mb-3", className)} {...props}>
-      {children}
-    </ol>
-  ),
-  li: ({ className, children, ...props }: MdComponentProps) => (
-    <li className={cn("mb-1", className)} {...props}>
-      {children}
-    </li>
-  ),
-  blockquote: ({ className, children, ...props }: MdComponentProps) => (
-    <blockquote
-      className={cn(
-        "border-l-4 border-neutral-600 pl-4 italic my-3 text-sm",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </blockquote>
-  ),
-  code: ({ className, children, ...props }: MdComponentProps) => (
-    <code
-      className={cn(
-        "bg-neutral-900 rounded px-1 py-0.5 font-mono text-xs",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </code>
-  ),
-  pre: ({ className, children, ...props }: MdComponentProps) => (
-    <pre
-      className={cn(
-        "bg-neutral-900 p-3 rounded-lg overflow-x-auto font-mono text-xs my-3",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </pre>
-  ),
-  hr: ({ className, ...props }: MdComponentProps) => (
-    <hr className={cn("border-neutral-600 my-4", className)} {...props} />
-  ),
-  table: ({ className, children, ...props }: MdComponentProps) => (
-    <div className="my-3 overflow-x-auto">
-      <table className={cn("border-collapse w-full", className)} {...props}>
-        {children}
-      </table>
-    </div>
-  ),
-  th: ({ className, children, ...props }: MdComponentProps) => (
-    <th
-      className={cn(
-        "border border-neutral-600 px-3 py-2 text-left font-bold",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </th>
-  ),
-  td: ({ className, children, ...props }: MdComponentProps) => (
-    <td
-      className={cn("border border-neutral-600 px-3 py-2", className)}
-      {...props}
-    >
-      {children}
-    </td>
-  ),
-};
-
-// Props for HumanMessageBubble
-interface HumanMessageBubbleProps {
-  message: Message;
-  mdComponents: typeof mdComponents;
+// 处理过的事件类型
+export interface ProcessedEvent {
+  title: string;
+  data: any;
 }
 
-// HumanMessageBubble Component
-const HumanMessageBubble: React.FC<HumanMessageBubbleProps> = ({
-  message,
-  mdComponents,
-}) => {
-  return (
-    <div
-      className={`text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg`}
-    >
-      <ReactMarkdown components={mdComponents}>
-        {typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content)}
-      </ReactMarkdown>
-    </div>
-  );
+// 消息组合类型
+interface MessageGroup {
+  id: string;
+  start: number; // allMessages 的起始 index（包含）
+  end: number;   // allMessages 的结束 index（不包含）
+  humanMessage: Message;
+  isLastGroup: boolean;
+  isLoading: boolean;
+}
+
+// 将消息按对话组合
+const groupMessages = (messages: Message[]): MessageGroup[] => {
+  const groups: MessageGroup[] = [];
+  let start = 0;
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].type === 'human') {
+      if (i > start) {
+        // 上一组结束
+        groups[groups.length - 1].end = i;
+      }
+      groups.push({
+        id: messages[i].id || `group-${i}`,
+        start: i,
+        end: messages.length, // 先设为结尾，后面遇到下一个 human 会修正
+        humanMessage: messages[i],
+        isLastGroup: false,
+        isLoading: false,
+      });
+      start = i;
+    }
+  }
+  // 修正最后一组
+  if (groups.length > 0) {
+    groups[groups.length - 1].end = messages.length;
+    groups[groups.length - 1].isLastGroup = true;
+  }
+  return groups;
 };
 
 // 工具调用组件
-interface ToolCallProps {
+const ToolCall: React.FC<{
   toolCall: any;
   toolResult?: any;
-}
-
-const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
+}> = ({ toolCall, toolResult }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  const toolName = toolCall?.name || "Unknown Tool";
-  const toolArgs = toolCall?.args || {};
+  const toolName = toolCall?.name || toolCall?.function?.name || "Unknown Tool";
+  const toolArgs = toolCall?.args || toolCall?.function?.arguments || {};
   const toolResultContent = toolResult?.content || "";
-  
   return (
     <div className="border border-gray-300 rounded-lg mb-3 bg-gray-50">
-      {/* 工具调用头部 */}
       <div 
         className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100"
         onClick={() => setIsExpanded(!isExpanded)}
@@ -193,19 +82,14 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
           )}
         </div>
       </div>
-      
-      {/* 展开的内容 */}
       {isExpanded && (
         <div className="border-t border-gray-300 p-3 space-y-3">
-          {/* 参数 */}
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-2">参数:</h4>
             <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto text-gray-800">
-              {JSON.stringify(toolArgs, null, 2)}
+              {typeof toolArgs === 'string' ? toolArgs : JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
-          
-          {/* 输出结果 */}
           {toolResultContent && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-2">输出:</h4>
@@ -222,131 +106,140 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
   );
 };
 
-// 工具调用列表组件
-interface ToolCallsProps {
-  message: Message;
-  allMessages: Message[];
-}
+// 简化的 markdown 组件
+const mdComponents = {
+  // 基础组件即可
+};
 
-const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
-  // 检查是否有工具调用
-  const toolCalls = (message as any).tool_calls || [];
-  
-  if (!toolCalls.length) return null;
-  
-  // 查找对应的工具结果
-  const findToolResult = (toolCallId: string) => {
-    const messageIndex = allMessages.findIndex(msg => msg.id === message.id);
-    if (messageIndex === -1) return null;
-    
-    // 查找下一个 ToolMessage
-    for (let i = messageIndex + 1; i < allMessages.length; i++) {
-      const nextMessage = allMessages[i];
-      if (nextMessage.type === 'tool' && (nextMessage as any).tool_call_id === toolCallId) {
-        return nextMessage;
-      }
-    }
-    return null;
-  };
-  
+// 用户消息组件
+const HumanMessageGroup: React.FC<{ 
+  group: MessageGroup;
+}> = ({ group }) => {
+  if (!group.humanMessage) return null;
+
   return (
-    <div className="mb-3">
-      <h4 className="text-sm font-semibold text-neutral-300 mb-2 flex items-center gap-2">
-        <Settings className="h-4 w-4" />
-        工具调用 ({toolCalls.length})
-      </h4>
-      <div className="space-y-2">
-        {toolCalls.map((toolCall: any, index: number) => {
-          const toolResult = findToolResult(toolCall.id);
-          return (
-            <ToolCall 
-              key={toolCall.id || index} 
-              toolCall={toolCall}
-              toolResult={toolResult}
-            />
-          );
-        })}
+    <div className="flex flex-col items-end mb-6">
+      <div className="text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg">
+        <ReactMarkdown components={mdComponents}>
+          {typeof group.humanMessage.content === "string"
+            ? group.humanMessage.content
+            : JSON.stringify(group.humanMessage.content)}
+        </ReactMarkdown>
       </div>
     </div>
   );
 };
 
-// Props for AiMessageBubble
-interface AiMessageBubbleProps {
-  message: Message;
-  historicalActivity: ProcessedEvent[] | undefined;
-  liveActivity: ProcessedEvent[] | undefined;
-  isLastMessage: boolean;
-  isOverallLoading: boolean;
-  mdComponents: typeof mdComponents;
-  handleCopy: (text: string, messageId: string) => void;
-  copiedMessageId: string | null;
+// 助手消息组件
+const AssistantMessageGroup: React.FC<{
+  group: MessageGroup;
   allMessages: Message[];
-}
+  historicalActivities: Record<string, ProcessedEvent[]>;
+  liveActivityEvents: ProcessedEvent[];
+}> = ({ group, allMessages, historicalActivities, liveActivityEvents }) => {
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
 
-// AiMessageBubble Component
-const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({
-  message,
-  historicalActivity,
-  liveActivity,
-  isLastMessage,
-  isOverallLoading,
-  mdComponents,
-  handleCopy,
-  copiedMessageId,
-  allMessages,
-}) => {
-  // Determine which activity events to show and if it's for a live loading message
-  const activityForThisBubble =
-    isLastMessage && isOverallLoading ? liveActivity : historicalActivity;
-  const isLiveActivityForThisBubble = isLastMessage && isOverallLoading;
+  const handleCopy = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 1500);
+    } catch {}
+  };
 
-  // 检查消息内容是否为空
-  const messageContent = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
-  const hasContent = messageContent && messageContent.trim().length > 0;
+  // 活动事件
+  const activityForThisGroup =
+    group.isLastGroup && group.isLoading
+      ? liveActivityEvents
+      : (() => {
+          // 找到本组第一个 ai 消息的 id
+          const aiMsg = allMessages.slice(group.start + 1, group.end).find(m => m.type === 'ai');
+          return aiMsg ? historicalActivities[aiMsg.id!] : undefined;
+        })();
+  const isLiveActivityForThisGroup = group.isLastGroup && group.isLoading;
+
+  // 收集所有可复制内容
+  const allAiContent = allMessages
+    .slice(group.start + 1, group.end)
+    .filter(msg => msg.type === 'ai')
+    .map(msg => (typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)))
+    .filter(content => content && content.trim().length > 0)
+    .join('\n\n');
+
+  // 只要有内容就渲染
+  const hasContent = allMessages.slice(group.start + 1, group.end).some(
+    msg =>
+      (msg.type === 'ai' && msg.content && String(msg.content).trim()) ||
+      msg.type === 'tool'
+  );
+
+  if (!hasContent && (!activityForThisGroup || activityForThisGroup.length === 0)) {
+    return null;
+  }
 
   return (
-    <div className={`relative break-words flex flex-col`}>
-      {activityForThisBubble && activityForThisBubble.length > 0 && (
-        <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
-          <ActivityTimeline
-            processedEvents={activityForThisBubble}
-            isLoading={isLiveActivityForThisBubble}
-          />
-        </div>
-      )}
-      
-      {/* 工具调用 */}
-      <ToolCalls message={message} allMessages={allMessages} />
-      
-      {/* 消息内容 - 只有当内容不为空时才渲染 */}
-      {hasContent && (
-        <div className="text-gray-800 bg-gray-100 rounded-lg p-4 mb-2">
-          <ReactMarkdown components={mdComponents}>
-            {messageContent}
-          </ReactMarkdown>
-        </div>
-      )}
-      
-      {/* 复制按钮 - 只有当内容不为空时才显示 */}
-      {hasContent && (
-        <Button
-          variant="default"
-          className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end"
-          onClick={() => handleCopy(messageContent, message.id!)}
-        >
-          {copiedMessageId === message.id ? "Copied" : "Copy"}
-          {copiedMessageId === message.id ? <CopyCheck /> : <Copy />}
-        </Button>
-      )}
+    <div className="flex flex-col items-start mb-6">
+      <div className="relative break-words flex flex-col max-w-[100%] sm:max-w-[90%]">
+        {/* 活动事件时间线 */}
+        {activityForThisGroup && activityForThisGroup.length > 0 && (
+          <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
+            <ActivityTimeline
+              processedEvents={activityForThisGroup}
+              isLoading={isLiveActivityForThisGroup}
+            />
+          </div>
+        )}
+        {/* 交错渲染 */}
+        {allMessages.slice(group.start + 1, group.end).map((msg, idx) => {
+          if (msg.type === 'ai') {
+            const content =
+              typeof msg.content === 'string'
+                ? msg.content
+                : JSON.stringify(msg.content);
+            if (!content || !content.trim()) return null;
+            return (
+              <div key={msg.id || idx} className="text-gray-800 bg-gray-100 rounded-lg p-4 mb-2 w-full">
+                <ReactMarkdown components={mdComponents}>{content}</ReactMarkdown>
+              </div>
+            );
+          } else if (msg.type === 'tool') {
+            // 查找 tool_call 信息
+            const toolCallId = (msg as any).tool_call_id;
+            // 反查本组 aiMessage 里 tool_calls 的结构
+            const aiMsg = allMessages
+              .slice(group.start + 1, group.end)
+              .find(ai => ai.type === 'ai' && (ai as any).tool_calls && (ai as any).tool_calls.some((tc: any) => tc.id === toolCallId));
+            const toolCall = aiMsg ? (aiMsg as any).tool_calls.find((tc: any) => tc.id === toolCallId) : undefined;
+            return (
+              <ToolCall key={msg.id || idx} toolCall={toolCall} toolResult={msg} />
+            );
+          }
+          return null;
+        })}
+        {/* 复制按钮 */}
+        {hasContent && (
+          <Button
+            variant="default"
+            className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
+            onClick={() => {
+              const contentToCopy = allAiContent || "工具调用结果";
+              handleCopy(contentToCopy, group.id);
+            }}
+          >
+            {copiedMessageId === group.id ? "已复制" : "复制"}
+            {copiedMessageId === group.id ? <CopyCheck /> : <Copy />}
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
 
+// 聊天消息视图属性
 interface ChatMessagesViewProps {
   messages: Message[];
   isLoading: boolean;
-  scrollAreaRef: React.RefObject<HTMLDivElement | null>;
+  scrollAreaRef: React.RefObject<HTMLDivElement>;
   onSubmit: (inputValue: string, effort?: string, model?: string) => void;
   onCancel: () => void;
   liveActivityEvents: ProcessedEvent[];
@@ -376,54 +269,72 @@ export function ChatMessagesView({
 
   return (
     <div className="flex flex-col h-full bg-white" style={{ minHeight: 0 }}>
-      {/* 消息区 */}
       <div
         className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50"
         style={{ minHeight: 0, maxHeight: 'calc(100vh - 180px)' }}
         ref={scrollAreaRef as any}
       >
-        <div className="flex flex-col gap-8">
-          {messages.map((message, index) => {
-            const isLastMessage = index === messages.length - 1;
-            return (
-                <div
-                key={message.id || index}
-                className={`flex flex-col ${
-                  message.type === "human" ? "items-end" : "items-start"
-                  }`}
-                >
-                  {message.type === "human" ? (
-                    <HumanMessageBubble
-                      message={message}
-                      mdComponents={mdComponents}
-                    />
-                  ) : (
-                    <AiMessageBubble
-                      message={message}
-                      historicalActivity={historicalActivities[message.id!]}
-                    liveActivity={isLastMessage ? liveActivityEvents : undefined}
-                    isLastMessage={isLastMessage}
-                    isOverallLoading={isLoading}
-                      mdComponents={mdComponents}
-                      handleCopy={handleCopy}
-                      copiedMessageId={copiedMessageId}
-                      allMessages={messages}
-                    />
-                  )}
-              </div>
-            );
+        <div className="flex flex-col">
+          {messages.map((msg, idx) => {
+            // 用户消息
+            if (msg.type === 'human') {
+              return (
+                <div key={msg.id || idx} className="flex flex-col items-end mb-6">
+                  <div className="text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg">
+                    <ReactMarkdown components={mdComponents}>
+                      {typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)}
+                    </ReactMarkdown>
+                  </div>
+                </div>
+              );
+            }
+            // AI消息内容
+            if ((msg.type === 'ai' || msg.type === 'AIMessageChunk') && msg.content && String(msg.content).trim()) {
+              return (
+                <div key={msg.id || idx} className="flex flex-col items-start mb-6">
+                  <div className="text-gray-800 bg-gray-100 rounded-lg p-4 mb-2 w-full">
+                    <ReactMarkdown components={mdComponents}>
+                      {typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)}
+                    </ReactMarkdown>
+                  </div>
+                  <Button
+                    variant="default"
+                    className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
+                    onClick={() => handleCopy(msg.content, msg.id || String(idx))}
+                  >
+                    {copiedMessageId === (msg.id || String(idx)) ? "已复制" : "复制"}
+                    {copiedMessageId === (msg.id || String(idx)) ? <CopyCheck /> : <Copy />}
+                  </Button>
+                </div>
+              );
+            }
+            // AI消息的 tool_calls
+            if ((msg.type === 'ai' || msg.type === 'AIMessageChunk') && msg.additional_kwargs && msg.additional_kwargs.tool_calls && msg.additional_kwargs.tool_calls.length > 0) {
+              return msg.additional_kwargs.tool_calls.map((toolCall, tIdx) => (
+                <div key={(msg.id || idx) + '-tool-' + tIdx} className="flex flex-col items-start mb-6">
+                  <ToolCall toolCall={toolCall} />
+                </div>
+              ));
+            }
+            // tool消息
+            if (msg.type === 'tool') {
+              return (
+                <div key={msg.id || idx} className="flex flex-col items-start mb-6">
+                  <ToolCall toolCall={msg} toolResult={msg} />
+                </div>
+              );
+            }
+            return null;
           })}
-          {isLoading && messages[messages.length - 1]?.type === "human" && (
-            <div className="flex items-center gap-2 text-gray-600">
+          {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
+            <div className="flex items-center gap-2 text-gray-600 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {isDiagnosticMode ? "Diagnosing..." : "Researching..."}
-              </div>
-            )}
-          {/* 保证自动滚动到底部 */}
+              {isDiagnosticMode ? "诊断中..." : "研究中..."}
+            </div>
+          )}
           <div id="chat-messages-end" />
         </div>
       </div>
-      {/* 输入区固定底部 */}
       <div
         style={{
           position: 'sticky',
@@ -444,3 +355,4 @@ export function ChatMessagesView({
     </div>
   );
 }
+

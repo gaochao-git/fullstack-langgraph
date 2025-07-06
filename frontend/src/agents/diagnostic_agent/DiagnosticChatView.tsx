@@ -6,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import { ActivityTimeline } from "@/components/ActivityTimeline";
 
 // 诊断消息中的事件类型
 export interface ProcessedEvent {
   title: string;
-  data: string;
+  data: any;
 }
 
 // 工具调用组件 props
@@ -127,113 +128,6 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
   );
 };
 
-// 用户消息组件 props
-interface HumanMessageProps {
-  message: Message;
-}
-
-// 用户消息组件
-const HumanMessage: React.FC<HumanMessageProps> = ({ message }) => {
-  return (
-    <div className="flex flex-col items-end">
-      <div className="text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg">
-        <MarkdownRenderer content={
-          typeof message.content === "string"
-            ? message.content
-            : JSON.stringify(message.content)
-        } />
-      </div>
-    </div>
-  );
-};
-
-// AI 消息组件 props
-interface AIMessageProps {
-  message: Message;
-  allMessages: Message[];
-  isLastMessage: boolean;
-  isLoading: boolean;
-  historicalActivity?: ProcessedEvent[];
-  liveActivity?: ProcessedEvent[];
-}
-
-// AI 消息组件
-const AIMessage: React.FC<AIMessageProps> = ({
-  message,
-  allMessages,
-  isLastMessage,
-  isLoading,
-  historicalActivity,
-  liveActivity,
-}) => {
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-
-  const handleCopy = async (text: string, messageId: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedMessageId(messageId);
-      setTimeout(() => setCopiedMessageId(null), 1500);
-    } catch {}
-  };
-
-  // 确定要显示的活动事件
-  const activityForThisBubble =
-    isLastMessage && isLoading ? liveActivity : historicalActivity;
-  const isLiveActivityForThisBubble = isLastMessage && isLoading;
-
-  // 检查消息内容是否为空
-  const messageContent = typeof message.content === "string" ? message.content : JSON.stringify(message.content);
-  const hasContent = messageContent && messageContent.trim().length > 0;
-
-  return (
-    <div className="flex flex-col items-start">
-      <div className="relative break-words flex flex-col">
-        {/* 活动事件时间线 */}
-        {activityForThisBubble && activityForThisBubble.length > 0 && (
-          <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
-            <div className="space-y-2">
-              {activityForThisBubble.map((event, index) => (
-                <div key={index} className="flex items-start gap-2">
-                  <div className="w-24 text-gray-600">{event.title}</div>
-                  <div className="flex-1 text-gray-700">{event.data}</div>
-                </div>
-              ))}
-              {isLiveActivityForThisBubble && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  诊断中...
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* 工具调用 */}
-        <ToolCalls message={message} allMessages={allMessages} />
-        
-        {/* 消息内容 - 只有当内容不为空时才渲染 */}
-        {hasContent && (
-          <div className="text-gray-800 break-words min-h-7 bg-gray-100 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-lg mb-2">
-            <MarkdownRenderer content={messageContent} />
-          </div>
-        )}
-
-        {/* 复制按钮 - 只有当内容不为空时才显示 */}
-        {hasContent && (
-          <Button
-            variant="default"
-            className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
-            onClick={() => handleCopy(messageContent, message.id!)}
-          >
-            {copiedMessageId === message.id ? "已复制" : "复制"}
-            {copiedMessageId === message.id ? <CopyCheck className="ml-2" /> : <Copy className="ml-2" />}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // 诊断聊天视图 props
 interface DiagnosticChatViewProps {
   messages: Message[];
@@ -242,6 +136,12 @@ interface DiagnosticChatViewProps {
   onCancel: () => void;
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
+}
+
+// 新增：对话轮分组（每轮：用户消息+本轮所有助手消息）
+interface DialogRound {
+  user: Message;
+  assistant: Message[];
 }
 
 // 诊断聊天视图组件
@@ -253,14 +153,36 @@ export function DiagnosticChatView({
   liveActivityEvents,
   historicalActivities,
 }: DiagnosticChatViewProps) {
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState<string>("");
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const handleCopy = async (text: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 1500);
+    } catch {}
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
-    onSubmit(inputValue);
-    setInputValue("");
+    if (inputValue.trim()) {
+      onSubmit(inputValue.trim());
+      setInputValue("");
+    }
   };
+
+  // 分组：每个人类消息+其后的所有助手消息为一轮
+  const dialogRounds: DialogRound[] = [];
+  let currentRound: DialogRound | null = null;
+  messages.forEach((msg) => {
+    if (msg.type === 'human') {
+      if (currentRound) dialogRounds.push(currentRound);
+      currentRound = { user: msg, assistant: [] };
+    } else if (currentRound) {
+      currentRound.assistant.push(msg);
+    }
+  });
+  if (currentRound) dialogRounds.push(currentRound);
 
   return (
     <div className="flex flex-col h-full bg-white" style={{ minHeight: 0 }}>
@@ -269,62 +191,122 @@ export function DiagnosticChatView({
         className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50"
         style={{ minHeight: 0, maxHeight: 'calc(100vh - 180px)' }}
       >
-        <div className="flex flex-col gap-8">
-          {messages.map((message, index) => {
-            const isLastMessage = index === messages.length - 1;
-            return (
-              <div key={message.id || index}>
-                {message.type === "human" ? (
-                  <HumanMessage message={message} />
-                ) : (
-                  <AIMessage
-                    message={message}
-                    allMessages={messages}
-                    isLastMessage={isLastMessage}
-                    isLoading={isLoading}
-                    historicalActivity={historicalActivities[message.id!]}
-                    liveActivity={isLastMessage ? liveActivityEvents : undefined}
-                  />
-                )}
+        <div className="flex flex-col">
+          {dialogRounds.map((round, idx) => (
+            <div key={round.user.id || idx}>
+              {/* 用户消息 */}
+              <div className="flex flex-col items-end mb-6">
+                <div className="text-white rounded-3xl break-words min-h-7 bg-blue-500 max-w-[100%] sm:max-w-[90%] px-4 pt-3 rounded-br-lg">
+                  <MarkdownRenderer content={
+                    typeof round.user.content === "string"
+                      ? round.user.content
+                      : JSON.stringify(round.user.content)
+                  } />
+                </div>
               </div>
-            );
-          })}
-          {isLoading && messages[messages.length - 1]?.type === "human" && (
-            <div className="flex items-center gap-2 text-gray-600">
+              {/* 助手合并输出区域 */}
+              {round.assistant.length > 0 && (
+                <div className="flex flex-col items-start mb-6">
+                  <div className="relative break-words flex flex-col max-w-[100%] sm:max-w-[90%] bg-gray-100 rounded-lg p-4">
+                    {round.assistant.map((msg, i) => {
+                      // 活动事件和 AI 内容
+                      if (msg.type === 'ai') {
+                        const activityForThisMessage = historicalActivities[msg.id!] || [];
+                        return (
+                          <div key={msg.id || i}>
+                            {activityForThisMessage.length > 0 && (
+                              <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
+                                <ActivityTimeline
+                                  processedEvents={activityForThisMessage}
+                                  isLoading={false}
+                                />
+                              </div>
+                            )}
+                            {/* AI 内容 */}
+                            {msg.content && (
+                              <div className="mb-2">
+                                <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
+                              </div>
+                            )}
+                            {/* 工具调用（只渲染本条消息的 tool_calls） */}
+                            {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
+                              <ToolCalls key={msg.id || i} message={msg} allMessages={messages} />
+                            )}
+                          </div>
+                        );
+                      }
+                      // 工具调用结果
+                      if (msg.type === 'tool') {
+                        // 不单独渲染，由 ToolCalls 负责
+                        return null;
+                      }
+                      return null;
+                    })}
+                    {/* 合并区域只显示最后一条 AI 消息的复制按钮 */}
+                    {(() => {
+                      // 找到最后一条有内容的 AI 消息
+                      const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
+                      if (!lastAiMsg) return null;
+                      const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
+                      return (
+                        <Button
+                          variant="default"
+                          className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
+                          onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
+                        >
+                          {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
+                          {copiedMessageId === lastAiMsg.id ? <CopyCheck /> : <Copy />}
+                        </Button>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+          {/* 加载状态 */}
+          {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
+            <div className="flex items-center gap-2 text-gray-600 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
               诊断中...
             </div>
           )}
+          {/* 保证自动滚动到底部 */}
+          <div id="chat-messages-end" />
         </div>
       </div>
-
-      {/* 输入区 */}
+      {/* 输入区固定底部 */}
       <div
-        className="sticky bottom-0 bg-white border-t border-gray-200 p-4"
-        style={{ zIndex: 10 }}
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          background: '#ffffff',
+          zIndex: 10,
+          borderTop: '1px solid #e5e7eb',
+        }}
       >
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex gap-2 p-4">
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="请描述您遇到的问题..."
-            className="flex-1 bg-gray-100 text-gray-800 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={isLoading}
           />
           <Button
             type="submit"
             disabled={isLoading || !inputValue.trim()}
-            className="bg-blue-500 hover:bg-blue-600 text-white"
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
           >
-            发送
+            {isLoading ? "诊断中..." : "发送"}
           </Button>
-          {messages.length > 0 && (
+          {isLoading && (
             <Button
               type="button"
+              variant="outline"
               onClick={onCancel}
-              variant="destructive"
-              disabled={!isLoading}
+              className="px-4 py-2 text-red-500 border-red-500 hover:bg-red-50"
             >
               取消
             </Button>
