@@ -18,6 +18,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_deepseek import ChatDeepSeek
+from IPython.display import display, Image
 
 from agents.diagnostic_agent.tools_and_schemas import SearchQueryList, Reflection
 from agents.diagnostic_agent.state import (
@@ -244,10 +245,11 @@ builder.add_node("update_state", update_diagnostic_state)
 builder.add_edge(START, "analyze_fault")
 builder.add_conditional_edges("analyze_fault", tools_condition)
 builder.add_edge("tools", "update_state")
-builder.add_conditional_edges("update_state", should_continue_diagnosis, {
-    "update_state": "analyze_fault", 
-    END: END
-})
-
+builder.add_conditional_edges("update_state", should_continue_diagnosis, {"update_state": "analyze_fault", END: END})
 # 编译图
 graph = builder.compile(name="diagnostic-agent")
+
+# 将图保存到当前路径
+graph_image = graph.get_graph().draw_mermaid_png()
+with open("diagnostic_agent_graph.png", "wb") as f: f.write(graph_image)
+print("图已保存到: diagnostic_agent_graph.png")
