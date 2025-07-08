@@ -11,6 +11,7 @@
         "step": 1,
         "action": "检查磁盘使用情况",
         "command": "df -h",
+        "tool": "execute_system_command",
         "description": "查看各分区磁盘使用率",
         "requires_approval": true
       },
@@ -18,6 +19,7 @@
         "step": 2,
         "action": "找出大文件和目录",
         "command": "du -sh --exclude='/proc' --exclude='/sys' /* | sort -rh | head -10",
+        "tool": "execute_system_command",
         "description": "定位占用空间最大的目录",
         "requires_approval": true
       },
@@ -25,6 +27,7 @@
         "step": 3,
         "action": "检查日志文件大小",
         "command": "find /var/log -size +100M -exec ls -lh {} \\;",
+        "tool": "execute_system_command",
         "description": "查找大于100M的日志文件",
         "requires_approval": false
       },
@@ -32,6 +35,7 @@
         "step": 4,
         "action": "分析临时文件占用",
         "command": "du -sh /tmp /var/tmp",
+        "tool": "execute_system_command",
         "description": "查看临时目录空间占用情况",
         "requires_approval": false
       },
@@ -39,11 +43,12 @@
         "step": 5,
         "action": "检查可清理的日志文件",
         "command": "find /var/log -name '*.log.*' -mtime +7 -ls",
+        "tool": "execute_system_command",
         "description": "列出7天前的日志文件（不删除）",
         "requires_approval": false
       }
     ],
-    "tools_required": ["bash", "system_commands"],
+    "tools_required": ["get_current_time"],
     "escalation_criteria": "如果磁盘使用率超过95%",
     "diagnostic_only": true,
     "recommendations": [
@@ -71,6 +76,7 @@
         "step": 1,
         "action": "检查当前负载",
         "command": "uptime && cat /proc/loadavg",
+        "tool": "get_system_info",
         "description": "查看系统负载平均值",
         "requires_approval": false
       },
@@ -78,6 +84,7 @@
         "step": 2,
         "action": "查看CPU使用率",
         "command": "top -bn1 | head -20",
+        "tool": "analyze_processes",
         "description": "检查CPU使用情况",
         "requires_approval": false
       },
@@ -85,6 +92,7 @@
         "step": 3,
         "action": "检查IO等待",
         "command": "iostat -x 1 5",
+        "tool": "execute_system_command",
         "description": "分析磁盘IO性能",
         "requires_approval": false
       },
@@ -92,6 +100,7 @@
         "step": 4,
         "action": "查找高CPU进程",
         "command": "ps aux --sort=-%cpu | head -10",
+        "tool": "analyze_processes",
         "description": "找出CPU使用率最高的进程",
         "requires_approval": false
       },
@@ -99,6 +108,7 @@
         "step": 5,
         "action": "查找高内存进程",
         "command": "ps aux --sort=-%mem | head -10",
+        "tool": "analyze_processes",
         "description": "找出内存使用率最高的进程",
         "requires_approval": false
       }
@@ -131,6 +141,7 @@
         "step": 1,
         "action": "检查内存使用情况",
         "command": "free -h && cat /proc/meminfo",
+        "tool": "execute_system_command",
         "description": "查看内存使用详情",
         "requires_approval": false
       },
@@ -138,6 +149,7 @@
         "step": 2,
         "action": "查看内存使用排行",
         "command": "ps aux --sort=-%mem | head -10",
+        "tool": "execute_system_command",
         "description": "找出内存占用最高的进程",
         "requires_approval": false
       },
@@ -145,6 +157,7 @@
         "step": 3,
         "action": "检查OOM日志",
         "command": "dmesg | grep -i 'killed process'",
+        "tool": "execute_system_command",
         "description": "查看是否有进程被OOM Killer终止",
         "requires_approval": false
       },
@@ -152,6 +165,7 @@
         "step": 4,
         "action": "分析进程内存详情",
         "command": "cat /proc/meminfo | grep -E '(MemTotal|MemFree|MemAvailable|Buffers|Cached)'",
+        "tool": "execute_system_command",
         "description": "查看详细的内存分配情况",
         "requires_approval": false
       },
@@ -159,11 +173,12 @@
         "step": 5,
         "action": "检查swap使用情况",
         "command": "swapon -s && cat /proc/swaps",
+        "tool": "execute_system_command",
         "description": "查看交换空间使用情况",
         "requires_approval": false
       }
     ],
-    "tools_required": ["system_monitor"],
+    "tools_required": ["get_current_time"],
     "escalation_criteria": "如果内存使用率超过90%且持续增长",
     "diagnostic_only": true,
     "recommendations": [
@@ -179,64 +194,5 @@
       "内存泄漏检测"
     ]
   },
-  "sop_104": {
-    "id": "SOP-SYS-104",
-    "title": "服务异常停止诊断",
-    "category": "system",
-    "description": "诊断关键系统服务意外停止的问题",
-    "severity": "critical",
-    "symptoms": ["服务无响应", "端口未监听", "业务功能异常"],
-    "steps": [
-      {
-        "step": 1,
-        "action": "检查服务状态",
-        "command": "systemctl status <service_name>",
-        "description": "查看服务的详细状态信息",
-        "requires_approval": false
-      },
-      {
-        "step": 2,
-        "action": "查看服务日志",
-        "command": "journalctl -u <service_name> -n 50 --no-pager",
-        "description": "检查服务的最近日志",
-        "requires_approval": false
-      },
-      {
-        "step": 3,
-        "action": "检查进程状态",
-        "command": "ps aux | grep <service_name>",
-        "description": "确认服务进程是否存在",
-        "requires_approval": false
-      },
-      {
-        "step": 4,
-        "action": "检查端口占用",
-        "command": "netstat -tlnp | grep <port>",
-        "description": "确认服务端口是否被占用",
-        "requires_approval": false
-      },
-      {
-        "step": 5,
-        "action": "检查服务配置",
-        "command": "systemctl show <service_name> | grep -E '(ExecStart|ExecStop|Restart)'",
-        "description": "查看服务启动配置",
-        "requires_approval": false
-      }
-    ],
-    "tools_required": ["systemctl", "process_monitor"],
-    "escalation_criteria": "如果服务关键且影响核心业务",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议检查服务配置文件是否正确",
-      "建议查看系统资源是否充足",
-      "建议检查服务依赖项是否正常",
-      "建议联系系统管理员恢复服务"
-    ],
-    "prevention": [
-      "设置服务监控告警",
-      "配置服务自动重启",
-      "定期健康检查",
-      "服务依赖管理"
-    ]
-  }
+
 } 
