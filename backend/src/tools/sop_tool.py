@@ -36,6 +36,10 @@ class GetSOPDetailInput(BaseModel):
     """获取SOP详情工具的输入参数"""
     sop_key: str = Field(description="SOP键名，如sop_101")
 
+class GetSOPContentInput(BaseModel):
+    """获取SOP内容工具的输入参数"""
+    sop_key: str = Field(description="SOP键名，如sop_101")
+
 class ListSOPsInput(BaseModel):
     """列出所有SOP工具的输入参数"""
     category: str = Field(default="", description="SOP分类，如system、mysql")
@@ -71,6 +75,56 @@ def get_sop_detail(sop_key: str) -> str:
             "error": str(e),
             "sop_key": sop_key
         }, ensure_ascii=False)
+
+@tool("get_sop_content", args_schema=GetSOPContentInput)
+def get_sop_content(sop_key: str) -> str:
+    """获取SOP内容并更新诊断状态
+    
+    Args:
+        sop_key: SOP的键名，如"sop_101"
+    
+    Returns:
+        JSON格式的SOP内容和状态信息
+    """
+    try:
+        if sop_key in SOP_DATA:
+            sop_data = SOP_DATA[sop_key]
+            # 提取SOP内容
+            sop_content = {
+                "id": sop_data.get("id", ""),
+                "title": sop_data.get("title", ""),
+                "category": sop_data.get("category", ""),
+                "description": sop_data.get("description", ""),
+                "severity": sop_data.get("severity", ""),
+                "steps": sop_data.get("steps", []),
+                "symptoms": sop_data.get("symptoms", []),
+                "tools_needed": sop_data.get("tools_needed", [])
+            }
+            
+            return json.dumps({
+                "success": True,
+                "sop_content": sop_content,
+                "sop_state": "loaded",
+                "message": f"SOP内容获取成功：{sop_key}"
+            }, ensure_ascii=False, indent=2)
+        else:
+            available_sops = list(SOP_DATA.keys())
+            return json.dumps({
+                "success": False,
+                "sop_content": None,
+                "sop_state": "invalid",
+                "error": f"SOP '{sop_key}' 未找到",
+                "available_sops": available_sops[:10],
+                "message": f"SOP验证失败：{sop_key}"
+            }, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "sop_content": None,
+            "sop_state": "error",
+            "error": str(e),
+            "message": f"SOP验证异常：{sop_key} - {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 @tool("list_sops", args_schema=ListSOPsInput)
 def list_sops(category: str = "") -> str:
@@ -160,4 +214,4 @@ def search_sops(keyword: str) -> str:
         }, ensure_ascii=False)
 
 # 导出工具列表
-sop_tools = [get_sop_detail, list_sops, search_sops] 
+sop_tools = [get_sop_detail, get_sop_content, list_sops, search_sops] 
