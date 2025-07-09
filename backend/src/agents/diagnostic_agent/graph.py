@@ -208,7 +208,7 @@ def sop_extraction(state: DiagnosticOverallState, config: RunnableConfig) -> Dia
 
 # 节点：工具节点（包含SOP选择和工具规划）
 def tools(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
-    """工具节点：如有SOP则选择SOP，否则自动生成排查规划。"""
+    """工具节点：生成工具调用计划。"""
     configurable = Configuration.from_runnable_config(config)
     llm = ChatDeepSeek(
         model=configurable.query_generator_model,
@@ -216,50 +216,16 @@ def tools(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOv
         max_retries=2,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
     )
-    messages = state.get("messages", [])
-    # 检查是否有SOP可用（可根据业务实际调整）
-    sop_available = False
-    sop_list = []
-    try:
-        sop_response = sop_tool.list_sops({"category": "system"})
-        if sop_response and sop_response.get("sops"):
-            sop_available = True
-            sop_list = sop_response["sops"]
-    except Exception:
-        sop_available = False
-    if sop_available:
-        system_prompt = "你是专业的故障诊断专家，请根据用户问题和SOP列表选择最相关的SOP，并给出理由。"
-        user_question = messages[-1].content if messages else ""
-        prompt = system_prompt + "\nSOP列表：" + str(sop_list) + "\n用户问题：" + user_question
-        response = llm.invoke([SystemMessage(content=prompt)])
-        return {
-            "messages": [response],
-            "sop_state": "selected",
-            "current_step": "tools"
-        }
-    else:
-        system_prompt = "你是专业的故障诊断专家，请根据用户问题自动生成排查规划（无需SOP）。"
-        user_question = messages[-1].content if messages else ""
-        prompt = system_prompt + "\n用户问题：" + user_question
-        response = llm.invoke([SystemMessage(content=prompt)])
-        return {
-            "messages": [response],
-            "sop_state": "none",
-            "current_step": "tools"
-        }
-
-# 节点：执行诊断工具
-def execute_diagnostic_tools(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
-    """LangGraph 节点，执行诊断工具。"""
-    configurable = Configuration.from_runnable_config(config)
     
-    # 初始化 DeepSeek Chat
-    llm = ChatDeepSeek(
-        model=configurable.query_generator_model,
-        temperature=1.0,
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-    )
+    # 绑定工具到LLM
+    ssh_tools = [
+        ssh_tool.get_system_info,
+        ssh_tool.analyze_processes,
+        ssh_tool.check_service_status,
+        ssh_tool.analyze_system_logs,
+        ssh_tool.execute_system_command
+    ]
+    llm_with_tools = llm.bind_tools(ssh_tools)
     
     # 构建系统提示
     system_prompt = """你是专业的故障诊断专家，需要执行诊断工具来收集系统信息。
@@ -276,31 +242,22 @@ def execute_diagnostic_tools(state: DiagnosticOverallState, config: RunnableConf
 - analyze_system_logs: 分析系统日志
 - execute_system_command: 执行系统命令
 
-请根据SOP步骤执行相应的诊断工具。"""
+请根据当前情况选择合适的诊断工具执行。"""
 
     # 构建消息
     messages = state.get("messages", [])
     if not any(isinstance(msg, SystemMessage) for msg in messages):
         messages = [SystemMessage(content=system_prompt)] + messages
     
-    # 绑定工具到LLM
-    ssh_tools = [
-        ssh_tool.get_system_info,
-        ssh_tool.analyze_processes,
-        ssh_tool.check_service_status,
-        ssh_tool.analyze_system_logs,
-        ssh_tool.execute_system_command
-    ]
-    llm_with_tools = llm.bind_tools(ssh_tools)
-    
-    # 调用LLM
+    # 调用LLM生成工具调用
     response = llm_with_tools.invoke(messages)
     
     return {
         "messages": [response],
-        "current_step": "tool_execution",
-        "diagnosis_step_count": [1]  # 每次工具执行增加1步
+        "current_step": "tools"
     }
+
+
 
 # 节点：工具执行审批
 def approval_node(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
@@ -418,7 +375,18 @@ builder.add_node("question_analysis", question_analysis)
 builder.add_node("sop_extraction", sop_extraction)
 builder.add_node("tools", tools)
 builder.add_node("approval", approval_node)
-builder.add_node("execute_tool", execute_diagnostic_tools)
+
+# 使用 ToolNode 来处理工具调用
+ssh_tools = [
+    ssh_tool.get_system_info,
+    ssh_tool.analyze_processes,
+    ssh_tool.check_service_status,
+    ssh_tool.analyze_system_logs,
+    ssh_tool.execute_system_command
+]
+tool_node = ToolNode(ssh_tools)
+builder.add_node("execute_tool", tool_node)
+
 builder.add_node("reflection", reflect_diagnosis)
 builder.add_node("finalize_answer", finalize_diagnosis)
 
@@ -430,7 +398,10 @@ builder.add_conditional_edges("question_analysis", lambda state, config: (
 builder.add_edge("sop_extraction", "tools")
 builder.add_edge("tools", "approval")
 builder.add_edge("approval", "execute_tool")
-builder.add_edge("execute_tool", "reflection")
+builder.add_conditional_edges("execute_tool", tools_condition, {
+    "tools": "execute_tool",
+    "__end__": "reflection"
+})
 builder.add_conditional_edges("reflection", evaluate_diagnosis_progress, {
     "continue_diagnosis": "tools",
     "finalize_answer": "finalize_answer"
