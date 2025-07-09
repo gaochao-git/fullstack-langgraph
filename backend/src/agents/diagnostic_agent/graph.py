@@ -141,6 +141,71 @@ def question_analysis(state: DiagnosticOverallState, config: RunnableConfig) -> 
             "info_sufficient": False
         }
 
+# 节点：SOP提取和验证
+def sop_extraction(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
+    """SOP提取节点：根据sop_id获取SOP详情并更新状态"""
+    configurable = Configuration.from_runnable_config(config)
+    
+    # 从消息中提取sop_id
+    messages = state.get("messages", [])
+    sop_id = None
+    
+    # 从最后一条消息中提取sop_id
+    if messages:
+        last_message = messages[-1].content if hasattr(messages[-1], 'content') else str(messages[-1])
+        # 从格式化的消息中提取sop_id
+        # 根据 default_diagnosis_plan_prompt 的格式提取
+        import re
+        sop_match = re.search(r'排查SOP编号：(\S+)', last_message)
+        if sop_match:
+            sop_id = sop_match.group(1)
+        else:
+            # 如果没有找到，尝试其他可能的格式
+            sop_match = re.search(r'SOP编号[：:]\s*(\S+)', last_message)
+            if sop_match:
+                sop_id = sop_match.group(1)
+            else:
+                sop_id = None
+    
+    # 尝试根据sop_id获取SOP详情
+    sop_detail = None
+    sop_state = "none"
+    sop_message = ""
+    
+    if sop_id and sop_id.strip() and sop_id != "待提取":
+        try:
+            # 使用sop_tool获取SOP详情，注意参数名是sop_key
+            sop_response_str = sop_tool.get_sop_detail({"sop_key": sop_id})
+            # 解析JSON响应
+            import json
+            sop_response = json.loads(sop_response_str)
+            
+            if sop_response and sop_response.get("success"):
+                sop_detail = sop_response.get("sop")
+                sop_state = "loaded"
+                sop_message = f"SOP加载成功：{sop_id}"
+            else:
+                sop_state = "invalid"
+                error_msg = sop_response.get("error", "SOP不存在或ID错误")
+                sop_message = f"SOP验证失败：{sop_id} - {error_msg}"
+        except Exception as e:
+            sop_state = "error"
+            sop_message = f"SOP验证异常：{sop_id} - {str(e)}"
+    else:
+        sop_message = "未提供有效的SOP ID"
+    
+    # 构建响应消息
+    response_content = f"SOP提取结果：{sop_message}"
+    if sop_detail:
+        response_content += f"\n\nSOP详情：{sop_detail}"
+    
+    return {
+        "messages": [AIMessage(content=response_content)],
+        "current_step": "sop_extraction",
+        "sop_state": sop_state,
+        "sop_detail": sop_detail
+    }
+
 # 节点：工具节点（包含SOP选择和工具规划）
 def tools(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
     """工具节点：如有SOP则选择SOP，否则自动生成排查规划。"""
@@ -350,6 +415,7 @@ builder = StateGraph(DiagnosticOverallState, config_schema=Configuration)
 
 # 添加节点
 builder.add_node("question_analysis", question_analysis)
+builder.add_node("sop_extraction", sop_extraction)
 builder.add_node("tools", tools)
 builder.add_node("approval", approval_node)
 builder.add_node("execute_tool", execute_diagnostic_tools)
@@ -359,8 +425,9 @@ builder.add_node("finalize_answer", finalize_diagnosis)
 # 添加边
 builder.add_edge(START, "question_analysis")
 builder.add_conditional_edges("question_analysis", lambda state, config: (
-    "tools" if state.get("info_sufficient") else END
-), ["tools", END])
+    "sop_extraction" if state.get("info_sufficient") else END
+), ["sop_extraction", END])
+builder.add_edge("sop_extraction", "tools")
 builder.add_edge("tools", "approval")
 builder.add_edge("approval", "execute_tool")
 builder.add_edge("execute_tool", "reflection")

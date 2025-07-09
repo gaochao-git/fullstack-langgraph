@@ -13,6 +13,7 @@ class DiagnosticOverallState(TypedDict):
     """诊断代理的总体状态"""
     messages: Annotated[list, add_messages]  # 消息历史
     sop_state: str  # SOP状态: "none", "selected", "validated", "loaded", "completed"
+    sop_detail: Optional[dict]  # SOP详细信息，根据sop_id获取
     tools_used: Annotated[list, operator.add]  # 已使用的工具列表
     diagnosis_results: Annotated[list, operator.add]  # 诊断结果累积
     current_step: str  # 当前诊断步骤
