@@ -12,7 +12,6 @@ import logging
 
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
