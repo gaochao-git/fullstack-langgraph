@@ -39,6 +39,11 @@ class Configuration(BaseModel):
         metadata={"description": "The maximum number of research loops to perform."},
     )
 
+    max_diagnosis_steps: int = Field(
+        default=10,
+        metadata={"description": "The maximum number of diagnosis steps to perform."},
+    )
+
     @classmethod
     def from_runnable_config(
         cls, config: Optional[RunnableConfig] = None
