@@ -10,7 +10,7 @@ import operator
 
 
 class DiagnosticOverallState(TypedDict):
-    """诊断代理的主状态 - 类似调研agent的OverallState"""
+    """诊断代理的主状态 - 严格按照SOP执行"""
     messages: Annotated[list, add_messages]  # 消息历史
     
     # 核心诊断信息
@@ -28,6 +28,9 @@ class DiagnosticOverallState(TypedDict):
     # SOP相关状态
     sop_state: str  # SOP状态: "none", "selected", "validated", "loaded", "completed"
     sop_detail: Optional[dict]  # SOP详细信息
+    sop_steps_completed: Annotated[list, operator.add]  # 已完成的SOP步骤
+    sop_steps_remaining: Annotated[list, operator.add]  # 剩余的SOP步骤
+    current_sop_step: Optional[str]  # 当前正在执行的SOP步骤
     
     # 配置信息
     reasoning_model: str  # 推理模型名称
@@ -44,12 +47,16 @@ class QuestionAnalysisState(TypedDict):
 
 
 class DiagnosisReflectionState(TypedDict):
-    """诊断反思状态 - 类似调研agent的ReflectionState"""
-    is_complete: bool  # 诊断是否完成
-    confidence_score: float  # 当前置信度
-    next_steps: List[str]  # 下一步操作列表
-    knowledge_gaps: List[str]  # 知识缺口
-    recommendations: List[str]  # 建议列表
+    """诊断反思状态 - 按SOP顺序执行，找到根因可提前结束"""
+    is_complete: bool  # 是否可以结束诊断（找到根因或完成所有SOP步骤）
+    confidence_score: float  # 对当前诊断结果的置信度
+    sop_steps_completed: List[str]  # 已完成的SOP步骤
+    sop_steps_remaining: List[str]  # 还需执行的SOP步骤
+    root_cause_found: bool  # 是否找到了明确的根因
+    root_cause_analysis: str  # 根因分析结果
+    next_steps: List[str]  # 下一个需要执行的SOP步骤
+    user_recommendations: List[str]  # 基于当前结果给用户的建议
+    termination_reason: str  # 结束原因：root_cause_found或sop_completed或continue
     diagnosis_step_count: int  # 当前步骤数
 
 
