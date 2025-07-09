@@ -87,7 +87,13 @@ interface ToolCallsProps {
 
 // 工具调用列表组件
 const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
-  const toolCalls = (message as any).tool_calls || [];
+  const allToolCalls = (message as any).tool_calls || [];
+  
+  // 过滤掉 QuestionInfoExtraction 和没有工具名的调用
+  const toolCalls = allToolCalls.filter((call: any) => {
+    const toolName = call.name || call.function?.name;
+    return toolName && toolName !== 'QuestionInfoExtraction' && toolName !== 'DiagnosisReflectionOutput';
+  });
   
   if (!toolCalls.length) return null;
   
