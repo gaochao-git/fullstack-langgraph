@@ -3,29 +3,23 @@
 重构版本：参考调研agent的结构，优化状态管理和节点职责
 """
 
-import os
 import json
 import logging
-from typing import Dict, Any, List, Optional
-from datetime import datetime
+from typing import Dict, Any
 from langgraph.graph import StateGraph, END, START
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.types import Send, interrupt
-from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
+from langgraph.prebuilt import ToolNode
+from langgraph.types import interrupt
+from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
 from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
-from agents.diagnostic_agent.prompts import (get_current_date,question_analysis_instructions,tool_planning_instructions,reflection_instructions,final_diagnosis_instructions,diagnosis_report_instructions)
+from agents.diagnostic_agent.prompts import (get_current_date,question_analysis_instructions,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
 
 # 导入工具
 from tools import ssh_tool, sop_tool
 from dotenv import load_dotenv
 load_dotenv()
-if os.getenv("DEEPSEEK_API_KEY") is None:
-    raise ValueError("DEEPSEEK_API_KEY is not set")
 logger = logging.getLogger(__name__)
 
 
@@ -33,12 +27,9 @@ logger = logging.getLogger(__name__)
 def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """问题分析节点 - 类似调研agent的generate_query"""
     configurable = Configuration.from_runnable_config(config)
-    llm = ChatOpenAI(
-        model=configurable.query_generator_model,
-        temperature=1.0,
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
+    llm = configurable.create_llm(
+        model_name=configurable.query_generator_model,
+        temperature=configurable.question_analysis_temperature
     )
     
     messages = state.get("messages", [])
@@ -92,12 +83,9 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
 def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具规划节点 - 严格按照SOP执行"""
     configurable = Configuration.from_runnable_config(config)
-    llm = ChatOpenAI(
-        model=configurable.query_generator_model,
-        temperature=0.1,  # 降低温度，确保严格执行
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
+    llm = configurable.create_llm(
+        model_name=configurable.query_generator_model,
+        temperature=configurable.tool_planning_temperature
     )
     
     # 绑定工具到LLM
@@ -142,11 +130,7 @@ def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict
     # 检查是否生成了工具调用
     has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
     logger.info(f"工具规划结果: 生成了 {len(response.tool_calls) if has_tool_calls else 0} 个工具调用")
-    
-    if has_tool_calls:
-        for i, tool_call in enumerate(response.tool_calls):
-            logger.info(f"工具调用 {i+1}: {tool_call.get('name', 'unknown')}")
-    else:
+    if not has_tool_calls:
         logger.warning("LLM没有生成任何工具调用，这可能导致诊断提前结束")
     
     # 返回新的消息，LangGraph会将其添加到状态中
@@ -168,8 +152,6 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
         question_analysis = state.get("question_analysis", QuestionAnalysis())
         sop_detail = state.get("sop_detail", SOPDetail())
         diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
-        
-        logger.info(f"审批节点检查: SOP已加载={state.get('sop_loaded', False)}, SOP步骤数={len(sop_detail.steps)}, 当前步骤={diagnosis_progress.current_step}")
         
         # 从工具调用中找到匹配的SOP步骤
         current_step_info = None
@@ -197,7 +179,6 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
             
             # 跳过SOP加载相关的工具调用
             if tool_name in ["get_sop_content", "get_sop_detail", "list_sops", "search_sops"]:
-                logger.info(f"跳过SOP工具调用: {tool_name}")
                 continue
                 
             # 在原始SOP步骤中查找匹配的工具和命令
@@ -217,7 +198,6 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
                                 requires_approval=sop_step.get("requires_approval", False),
                                 status="pending"
                             )
-                            logger.info(f"找到匹配的SOP步骤: {sop_step.get('step', 'N/A')}, 动作: {current_step_info.action}, 需要审批: {current_step_info.requires_approval}")
                             break
                     else:
                         # 没有具体命令参数，只根据工具匹配
@@ -228,16 +208,12 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
                             requires_approval=sop_step.get("requires_approval", False),
                             status="pending"
                         )
-                        logger.info(f"找到匹配的SOP步骤: {sop_step.get('step', 'N/A')}, 动作: {current_step_info.action}, 需要审批: {current_step_info.requires_approval}")
                         break
             
             # 找到匹配的步骤就退出
             if current_step_info:
                 break
         
-        if not current_step_info:
-            logger.info(f"未找到匹配的SOP步骤，工具调用: {[tc.get('name') for tc in tool_calls]}")
-
         # 检查当前步骤是否需要审批
         if current_step_info and current_step_info.requires_approval:
             logger.info(f"触发审批流程: SOP {question_analysis.sop_id}, 步骤: {current_step_info.action}")
@@ -339,11 +315,9 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
             logger.info(f"检测到诊断工具执行: {last_tool_name}，步骤数更新为: {current_step}")
         else:
             current_step = diagnosis_progress.current_step
-            logger.info(f"检测到SOP工具执行: {last_tool_name}，步骤数保持: {current_step}")
     else:
         # 没有新的工具执行，保持原步骤数
         current_step = diagnosis_progress.current_step
-        logger.info(f"没有检测到工具执行，步骤数保持: {current_step}")
     
     # 从最新的ToolMessage中提取诊断结果
     diagnosis_results = list(state.get("diagnosis_results", []))
@@ -424,12 +398,9 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
     configurable = Configuration.from_runnable_config(config)
     
     # 初始化推理模型
-    llm = ChatOpenAI(
-        model=configurable.answer_model,
-        temperature=0,
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
+    llm = configurable.create_llm(
+        model_name=configurable.answer_model,
+        temperature=configurable.final_report_temperature
     )
     
     # 获取状态信息
