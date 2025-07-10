@@ -372,23 +372,20 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
     is_complete = False
     termination_reason = "continue"
     
-    # 只有在达到真正的上限时才强制退出
-    max_steps = max(diagnosis_progress.max_steps, 15)  # 增加到至少15步
+    # 使用配置的max_steps进行退出判断
+    max_steps = diagnosis_progress.max_steps
+    
+    # 达到最大步骤限制
     if current_step >= max_steps:
         is_complete = True
         termination_reason = "max_steps_reached"
         logger.warning(f"达到最大步骤限制退出: {current_step}/{max_steps}")
-    # 只有当SOP步骤完全执行完毕且至少执行了5步诊断时才退出
-    elif updated_sop_detail.steps and len(updated_sop_detail.steps) > 0 and current_step > len(updated_sop_detail.steps) + 3:
-        # 允许在SOP步骤基础上再执行几步额外诊断
+    # 检查SOP是否已完全执行
+    elif (updated_sop_detail.steps and len(updated_sop_detail.steps) > 0 and 
+          current_step >= len(updated_sop_detail.steps) and current_step >= 3):
         is_complete = True
         termination_reason = "sop_completed"
-        logger.info(f"SOP步骤完成退出: {current_step} > {len(updated_sop_detail.steps)} + 3")
-    # 安全退出：如果没有SOP步骤且已执行了8步，才结束
-    elif (not updated_sop_detail.steps or len(updated_sop_detail.steps) == 0) and current_step >= 8:
-        is_complete = True
-        termination_reason = "no_sop_fallback"
-        logger.info(f"无SOP退出: {current_step} >= 8")
+        logger.info(f"SOP步骤完成退出: {current_step} >= {len(updated_sop_detail.steps)}")
     
     # 更新诊断进度
     updated_progress = DiagnosisProgress(
@@ -471,20 +468,19 @@ def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) 
     """评估诊断进度，根据执行情况决定下一步"""
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     
-    # 安全检查：使用动态最大步骤限制
-    max_steps = max(diagnosis_progress.max_steps, 20)  # 动态设置，至少20步
-    if diagnosis_progress.current_step >= max_steps:
-        logger.warning(f"强制终止：步骤数达到安全上限 {diagnosis_progress.current_step}/{max_steps}")
-        return "finalize_answer"
-    
-    # 如果诊断完成，生成最终报告
+    # 如果诊断已标记为完成，直接结束
     if diagnosis_progress.is_complete:
         logger.info(f"诊断完成: {diagnosis_progress.termination_reason}")
         return "finalize_answer"
-    else:
-        # 继续执行下一步
-        logger.info(f"继续执行，当前步骤: {diagnosis_progress.current_step}")
-        return "plan_tools"
+    
+    # 安全检查：防止无限循环
+    if diagnosis_progress.current_step >= diagnosis_progress.max_steps:
+        logger.warning(f"达到最大步骤限制，强制结束: {diagnosis_progress.current_step}/{diagnosis_progress.max_steps}")
+        return "finalize_answer"
+    
+    # 继续执行下一步
+    logger.info(f"继续执行，当前步骤: {diagnosis_progress.current_step}")
+    return "plan_tools"
 
 
 # 创建诊断Agent图 - 简化版本

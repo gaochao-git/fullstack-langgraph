@@ -25,6 +25,9 @@ const markdownStyles = `
   .markdown-body {
     color: #374151;
     line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
   }
   .markdown-body h1 { 
     @apply text-2xl font-bold mt-6 mb-4;
@@ -45,6 +48,9 @@ const markdownStyles = `
   .markdown-body p { 
     @apply mb-4 leading-7;
     color: #4B5563;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
   }
   .markdown-body a {
     color: #2563EB;
