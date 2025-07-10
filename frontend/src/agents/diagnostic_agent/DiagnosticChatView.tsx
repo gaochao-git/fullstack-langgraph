@@ -209,7 +209,7 @@ export function DiagnosticChatView({
             <div key={round.user.id || idx}>
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
-                <div className="flex items-center gap-2 justify-end max-w-[100%] sm:max-w-[90%]">
+                <div className="flex items-center gap-2 justify-end max-w-[85%] sm:max-w-[80%]">
                   <div className="text-gray-800 rounded-2xl break-words min-h-7 bg-blue-50 overflow-x-auto min-w-fit px-4 pt-3 pb-2">
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
@@ -223,7 +223,7 @@ export function DiagnosticChatView({
               {/* 助手合并输出区域 */}
               {round.assistant.length > 0 && (
                 <div className="flex flex-col items-start mb-6">
-                  <div className="flex items-start gap-2 w-full min-w-0">
+                  <div className="flex items-start gap-2 max-w-[85%] sm:max-w-[80%] min-w-0">
                     <div className="rounded-full bg-gray-200 p-2 flex-shrink-0 flex items-center justify-center">
                       <Bot className="h-5 w-5 text-gray-600" />
                     </div>
