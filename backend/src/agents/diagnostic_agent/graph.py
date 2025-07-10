@@ -156,6 +156,16 @@ def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict
     # 调用LLM生成工具调用
     response = llm_with_tools.invoke(messages_with_system)
     
+    # 检查是否生成了工具调用
+    has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
+    logger.info(f"工具规划结果: 生成了 {len(response.tool_calls) if has_tool_calls else 0} 个工具调用")
+    
+    if has_tool_calls:
+        for i, tool_call in enumerate(response.tool_calls):
+            logger.info(f"工具调用 {i+1}: {tool_call.get('name', 'unknown')}")
+    else:
+        logger.warning("LLM没有生成任何工具调用，这可能导致诊断提前结束")
+    
     # 返回新的消息，LangGraph会将其添加到状态中
     return {"messages": [response]}
 
@@ -274,12 +284,21 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
         except (json.JSONDecodeError, TypeError) as e:
             logger.error(f"解析SOP内容失败: {e}")
     
-    # 更新步骤计数
-    current_step = diagnosis_progress.current_step + 1
+    # 检查是否有新的工具执行
+    has_new_tool_execution = False
+    if messages and isinstance(messages[-1], ToolMessage):
+        # 有新的工具执行，更新步骤计数
+        current_step = diagnosis_progress.current_step + 1
+        has_new_tool_execution = True
+        logger.info(f"检测到工具执行，步骤数更新为: {current_step}")
+    else:
+        # 没有新的工具执行，保持原步骤数
+        current_step = diagnosis_progress.current_step
+        logger.info(f"没有检测到工具执行，步骤数保持: {current_step}")
     
     # 从最新的ToolMessage中提取诊断结果
     diagnosis_results = list(state.get("diagnosis_results", []))
-    if messages and isinstance(messages[-1], ToolMessage):
+    if has_new_tool_execution:
         last_message = messages[-1]
         diagnosis_results.append(f"Tool: {last_message.name}, Result: {last_message.content}")
     
@@ -445,7 +464,7 @@ builder.add_conditional_edges(
     tools_condition,
     {
         "tools": "approval",
-        "__end__": "finalize_answer"  # 如果没有工具调用，直接结束
+        "continue": "reflection"  # 如果没有工具调用，也进入反思环节
     }
 )
 
