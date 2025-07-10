@@ -8,32 +8,16 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-
 from langgraph.graph import StateGraph, END, START
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Send, interrupt
-
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_deepseek import ChatDeepSeek
-
-from agents.diagnostic_agent.state import (
-    DiagnosticState,
-    QuestionAnalysis,
-    DiagnosisProgress,
-    SOPDetail,
-    SOPStep,
-)
 from agents.diagnostic_agent.configuration import Configuration
-from agents.diagnostic_agent.prompts import (
-    get_current_date,
-    question_analysis_instructions,
-    tool_planning_instructions,
-    reflection_instructions,
-    final_diagnosis_instructions,
-    diagnosis_report_instructions,
-)
+from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
+from agents.diagnostic_agent.prompts import (get_current_date,question_analysis_instructions,tool_planning_instructions,reflection_instructions,final_diagnosis_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
 
 # 导入工具
