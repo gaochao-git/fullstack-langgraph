@@ -23,12 +23,8 @@ from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
 # 导入工具
 from tools import ssh_tool, sop_tool
 from dotenv import load_dotenv
-
 load_dotenv()
-
-if os.getenv("DEEPSEEK_API_KEY") is None:
-    raise ValueError("DEEPSEEK_API_KEY is not set")
-
+if os.getenv("DEEPSEEK_API_KEY") is None:raise ValueError("DEEPSEEK_API_KEY is not set")
 logger = logging.getLogger(__name__)
 
 
