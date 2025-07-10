@@ -18,28 +18,40 @@ export interface ProcessedEvent {
 interface ToolCallProps {
   toolCall: any;
   toolResult?: any;
+  isPending?: boolean; // 是否为待确认状态
+  onApprove?: () => void; // 确认回调
+  onReject?: () => void; // 拒绝回调
 }
 
 // 工具调用组件
-const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject }) => {
+  const [isExpanded, setIsExpanded] = useState(isPending || false); // 待确认状态默认展开
   
   const toolName = toolCall?.name || "Unknown Tool";
   const toolArgs = toolCall?.args || {};
   const toolResultContent = toolResult?.content || "";
   
+  // 调试日志
+  console.log('🔍 [DEBUG] ToolCall render:', { 
+    toolName, 
+    isPending, 
+    isExpanded,
+    hasOnApprove: !!onApprove,
+    hasOnReject: !!onReject
+  });
+  
   return (
-    <div className="border border-gray-300 rounded-lg mb-3 bg-gray-50">
+    <div className={`border rounded-lg mb-3 ${isPending ? 'border-orange-300 bg-orange-50' : 'border-gray-300 bg-gray-50'}`}>
       {/* 工具调用头部 */}
       <div 
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100"
+        className={`flex items-center justify-between p-3 cursor-pointer ${isPending ? 'hover:bg-orange-100' : 'hover:bg-gray-100'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
-          <Settings className="h-4 w-4 text-blue-500" />
-          <span className="font-mono text-sm text-blue-600">{toolName}</span>
-          <Badge variant="secondary" className="text-xs">
-            {toolCall?.id ? `ID: ${toolCall.id}` : "Tool Call"}
+          <Settings className={`h-4 w-4 ${isPending ? 'text-orange-500' : 'text-blue-500'}`} />
+          <span className={`font-mono text-sm ${isPending ? 'text-orange-700' : 'text-blue-600'}`}>{toolName}</span>
+          <Badge variant={isPending ? "destructive" : "secondary"} className="text-xs">
+            {isPending ? "待确认" : (toolCall?.id ? `ID: ${toolCall.id}` : "Tool Call")}
           </Badge>
         </div>
         <div className="flex items-center gap-2">
@@ -53,14 +65,59 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
       
       {/* 展开的内容 */}
       {isExpanded && (
-        <div className="border-t border-gray-300 p-3 space-y-3 overflow-x-auto">
+        <div className={`border-t p-3 space-y-3 overflow-x-auto ${isPending ? 'border-orange-300' : 'border-gray-300'}`}>
           {/* 参数 */}
           <div className="min-w-fit max-w-full">
             <h4 className="text-sm font-semibold text-gray-700 mb-2">参数:</h4>
-            <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto text-gray-800 whitespace-pre max-w-full">
+            <pre className={`p-2 rounded text-xs overflow-x-auto text-gray-800 whitespace-pre max-w-full ${isPending ? 'bg-orange-100' : 'bg-gray-100'}`}>
               {JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
+          
+          {/* 待确认状态的操作按钮 */}
+          {isPending && (
+            <div className="flex gap-2 pt-2 border-t border-orange-200 mt-3 pt-3">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('🔍 [DEBUG] Approve button clicked');
+                  onApprove?.();
+                }}
+                className="bg-green-500 hover:bg-green-600 text-white"
+              >
+                确认执行
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('🔍 [DEBUG] Reject button clicked');
+                  onReject?.();
+                }}
+              >
+                取消
+              </Button>
+            </div>
+          )}
+          
+          {/* 临时调试按钮 - 总是显示 */}
+          {(isPending || true) && (
+            <div className="flex gap-2 pt-2 border-t border-gray-200 mt-3 pt-3">
+              <div className="text-xs text-gray-500">
+                Debug: isPending={isPending ? 'true' : 'false'}, 
+                hasApprove={!!onApprove ? 'true' : 'false'},
+                hasReject={!!onReject ? 'true' : 'false'}
+              </div>
+              {isPending && (
+                <div className="text-xs text-orange-600 font-semibold">
+                  待确认状态
+                </div>
+              )}
+            </div>
+          )}
           
           {/* 输出结果 */}
           {toolResultContent && (
@@ -83,10 +140,12 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult }) => {
 interface ToolCallsProps {
   message: Message;
   allMessages: Message[];
+  interrupt?: any; // 添加interrupt数据
+  onInterruptResume?: (approved: boolean) => void; // 添加interrupt处理函数
 }
 
 // 工具调用列表组件
-const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
+const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, onInterruptResume }) => {
   const allToolCalls = (message as any).tool_calls || [];
   
   // 过滤掉 QuestionInfoExtraction 和没有工具名的调用
@@ -112,6 +171,31 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
     return null;
   };
   
+  // 检查工具调用是否为待确认状态
+  const isPendingToolCall = (toolCall: any) => {
+    if (!interrupt) {
+      console.log('🔍 [DEBUG] No interrupt');
+      return false;
+    }
+    
+    // 检查是否为最新的消息且有interrupt
+    const isLatestMessage = allMessages.length > 0 && allMessages[allMessages.length - 1].id === message.id;
+    
+    if (!isLatestMessage) {
+      console.log('🔍 [DEBUG] Not latest message, no pending state');
+      return false;
+    }
+    
+    console.log('🔍 [DEBUG] Latest message has interrupt, marking tool as pending:', { 
+      toolCall: toolCall.name,
+      messageId: message.id,
+      isLatestMessage
+    });
+    
+    // 如果是最新消息且有interrupt，则标记为待确认
+    return true;
+  };
+  
   return (
     <div className="mb-3">
       <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -121,11 +205,15 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages }) => {
       <div className="space-y-2">
         {toolCalls.map((toolCall: any, index: number) => {
           const toolResult = findToolResult(toolCall.id);
+          const isPending = isPendingToolCall(toolCall);
           return (
             <ToolCall 
               key={toolCall.id || index} 
               toolCall={toolCall}
               toolResult={toolResult}
+              isPending={isPending}
+              onApprove={() => onInterruptResume?.(true)}
+              onReject={() => onInterruptResume?.(false)}
             />
           );
         })}
@@ -142,6 +230,8 @@ interface DiagnosticChatViewProps {
   onCancel: () => void;
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
+  interrupt?: any; // 添加interrupt属性
+  onInterruptResume?: (approved: boolean) => void; // 添加interrupt处理函数
 }
 
 // 新增：对话轮分组（每轮：用户消息+本轮所有助手消息）
@@ -158,9 +248,18 @@ export function DiagnosticChatView({
   onCancel,
   liveActivityEvents,
   historicalActivities,
+  interrupt,
+  onInterruptResume,
 }: DiagnosticChatViewProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  
+  // 调试日志
+  console.log('🔍 [DEBUG] DiagnosticChatView props:', { 
+    hasInterrupt: !!interrupt, 
+    interrupt,
+    messagesCount: messages.length 
+  });
   const handleCopy = async (text: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -254,7 +353,13 @@ export function DiagnosticChatView({
                               {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
                                 <div className="overflow-x-auto">
                                   <div className="min-w-fit">
-                                    <ToolCalls key={msg.id || i} message={msg} allMessages={messages} />
+                                    <ToolCalls 
+                                      key={msg.id || i} 
+                                      message={msg} 
+                                      allMessages={messages} 
+                                      interrupt={interrupt}
+                                      onInterruptResume={onInterruptResume}
+                                    />
                                   </div>
                                 </div>
                               )}
@@ -298,6 +403,7 @@ export function DiagnosticChatView({
               诊断中...
             </div>
           )}
+          
           {/* 保证自动滚动到底部 */}
           <div id="chat-messages-end" />
         </div>
@@ -317,13 +423,13 @@ export function DiagnosticChatView({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="请描述您遇到的问题..."
+            placeholder={interrupt ? "请先确认或取消工具执行..." : "请描述您遇到的问题..."}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled={isLoading}
+            disabled={isLoading || !!interrupt}
           />
           <Button
             type="submit"
-            disabled={isLoading || !inputValue.trim()}
+            disabled={isLoading || !inputValue.trim() || !!interrupt}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
           >
             {isLoading ? "诊断中..." : "发送"}

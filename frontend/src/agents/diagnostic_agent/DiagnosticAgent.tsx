@@ -93,41 +93,10 @@ export default function DiagnosticAgent() {
     window.location.reload();
   }, [thread]);
 
-  if (thread.interrupt) {
-    return (
-      <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
-        <main className="h-full w-full max-w-4xl mx-auto">
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
-              <h1 className="text-2xl text-orange-500 font-bold">对话已中断</h1>
-              <p className="text-orange-600 text-center">
-                需要您的确认才能继续
-              </p>
-              <div className="flex gap-4">
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    thread.submit(undefined, { command: { resume: true } });
-                  }}
-                  className="bg-green-500 hover:bg-green-600 text-white"
-                >
-                  继续
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    thread.submit(undefined, { command: { resume: false } });
-                  }}
-                >
-                  取消
-                </Button>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const handleInterruptResume = useCallback((approved: boolean) => {
+    thread.submit(undefined, { command: { resume: approved } });
+  }, [thread]);
+
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
@@ -153,6 +122,8 @@ export default function DiagnosticAgent() {
             onCancel={handleCancel}
             liveActivityEvents={processedEventsTimeline}
             historicalActivities={historicalActivities}
+            interrupt={thread.interrupt}
+            onInterruptResume={handleInterruptResume}
           />
         )}
       </main>
