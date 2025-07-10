@@ -19,10 +19,11 @@ from langchain_core.runnables import RunnableConfig
 from langchain_deepseek import ChatDeepSeek
 
 from agents.diagnostic_agent.state import (
-    DiagnosticOverallState,
-    QuestionAnalysisState,
-    DiagnosisReflectionState,
-    ToolPlanningState,
+    DiagnosticState,
+    QuestionAnalysis,
+    DiagnosisProgress,
+    SOPDetail,
+    SOPStep,
 )
 from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.prompts import (
@@ -47,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 # 节点函数 - 参考调研agent的清晰结构
-def analyze_question(state: DiagnosticOverallState, config: RunnableConfig) -> QuestionAnalysisState:
+def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """问题分析节点 - 类似调研agent的generate_query"""
     configurable = Configuration.from_runnable_config(config)
     llm = ChatDeepSeek(
@@ -89,17 +90,23 @@ def analyze_question(state: DiagnosticOverallState, config: RunnableConfig) -> Q
     if not result.sop_id or result.sop_id.strip() == "" or result.sop_id == "待提取":
         missing_fields.append("排查SOP编号")
     
+    # 创建QuestionAnalysis对象
+    question_analysis = QuestionAnalysis(
+        fault_ip=result.fault_ip,
+        fault_time=result.fault_time,
+        fault_info=result.fault_info,
+        sop_id=result.sop_id,
+        missing_fields=missing_fields,
+        info_sufficient=info_sufficient
+    )
+    
     return {
-        "fault_ip": result.fault_ip,
-        "fault_time": result.fault_time,
-        "fault_info": result.fault_info,
-        "sop_id": result.sop_id,
-        "info_sufficient": info_sufficient,
-        "missing_fields": missing_fields,
+        "user_question": user_question,
+        "question_analysis": question_analysis
     }
 
 
-def plan_diagnosis_tools(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
+def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具规划节点 - 严格按照SOP执行"""
     configurable = Configuration.from_runnable_config(config)
     llm = ChatDeepSeek(
@@ -127,16 +134,17 @@ def plan_diagnosis_tools(state: DiagnosticOverallState, config: RunnableConfig) 
     llm_with_tools = llm.bind_tools(all_tools)
     
     # 构建工具规划提示
-    sop_content = state.get("sop_detail", "")
-    sop_state = state.get("sop_state", "none")
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    sop_detail = state.get("sop_detail", SOPDetail())
+    sop_state = "loaded" if state.get("sop_loaded", False) else "none"
     
     formatted_prompt = tool_planning_instructions.format(
-        fault_ip=state.get("fault_ip", ""),
-        fault_time=state.get("fault_time", ""),
-        fault_info=state.get("fault_info", ""),
-        sop_id=state.get("sop_id", ""),
+        fault_ip=question_analysis.fault_ip or "",
+        fault_time=question_analysis.fault_time or "",
+        fault_info=question_analysis.fault_info or "",
+        sop_id=question_analysis.sop_id or "",
         sop_state=sop_state,
-        sop_content=sop_content
+        sop_content=sop_detail.description if sop_detail else ""
     )
 
     # 构建消息
@@ -151,7 +159,7 @@ def plan_diagnosis_tools(state: DiagnosticOverallState, config: RunnableConfig) 
     return {"messages": [response]}
 
 
-def approval_node(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
+def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """SOP执行确认节点 - 确认每个SOP步骤的执行"""
     # 获取最新的工具调用消息
     messages = state.get("messages", [])
@@ -163,19 +171,17 @@ def approval_node(state: DiagnosticOverallState, config: RunnableConfig) -> Diag
     # 如果有工具调用，检查是否符合SOP要求
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         tool_calls = last_message.tool_calls
-        sop_id = state.get("sop_id", "")
-        sop_detail = state.get("sop_detail", {})
-        diagnosis_step_count = state.get("diagnosis_step_count", 0)
+        question_analysis = state.get("question_analysis", QuestionAnalysis())
+        sop_detail = state.get("sop_detail", SOPDetail())
+        diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
         
         # 从SOP详情中获取当前步骤
         current_step_info = None
-        if sop_detail and isinstance(sop_detail, dict):
-            steps = sop_detail.get("steps", [])
-            if 0 <= diagnosis_step_count < len(steps):
-                current_step_info = steps[diagnosis_step_count]
+        if sop_detail.steps and 0 <= diagnosis_progress.current_step < len(sop_detail.steps):
+            current_step_info = sop_detail.steps[diagnosis_progress.current_step]
 
         # 检查当前步骤是否需要审批
-        if current_step_info and current_step_info.get("requires_approval", False):
+        if current_step_info and current_step_info.requires_approval:
             tool_descriptions = []
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "")
@@ -184,13 +190,13 @@ def approval_node(state: DiagnosticOverallState, config: RunnableConfig) -> Diag
             
             # 中断并请求用户确认
             interrupt_info = {
-                "message": f"按照SOP '{sop_id}' 要求，即将执行需要审批的步骤:\n\n"
-                           f"**步骤详情:** {current_step_info.get('action', 'N/A')}\n"
+                "message": f"按照SOP '{question_analysis.sop_id}' 要求，即将执行需要审批的步骤:\n\n"
+                           f"**步骤详情:** {current_step_info.action}\n"
                            f"**计划操作:**\n" + "\n".join(tool_descriptions) +
                            f"\n\n确认执行？",
                 "tool_calls": tool_calls,
-                "sop_id": sop_id,
-                "current_sop_step": current_step_info.get('action', ''),
+                "sop_id": question_analysis.sop_id,
+                "current_sop_step": current_step_info.action,
                 "suggestion_type": "sop_execution"
             }
             return interrupt(interrupt_info)
@@ -199,84 +205,65 @@ def approval_node(state: DiagnosticOverallState, config: RunnableConfig) -> Diag
     return {}
 
 
-def execute_diagnosis_tools(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
+def execute_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具执行节点 - 使用ToolNode执行工具"""
     # 这个节点会被ToolNode替代，但我们需要在这里处理工具执行后的状态更新
     # 增加一个空返回，因为所有节点都需要返回一个字典
     return {}
 
 
-def reflect_diagnosis_progress(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosisReflectionState:
-    """诊断反思节点 - 按SOP顺序执行，找到根因可提前结束"""
-    # 1. 同步SOP状态并更新步骤计数器
-    updated_state = sync_sop_state_from_messages(state)
-    diagnosis_step_count = updated_state.get("diagnosis_step_count", 0)
-    
-    # 为下一步执行增加步骤计数
-    updated_state["diagnosis_step_count"] = diagnosis_step_count + 1
-
-    # 2. 准备反思
+def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+    """诊断反思节点 - 简化版本，直接更新诊断进度"""
     configurable = Configuration.from_runnable_config(config)
     
-    # 初始化推理模型
-    llm = ChatDeepSeek(
-        model=configurable.reflection_model,
-        temperature=0.1,  # 降低温度，确保严格检查
-        max_retries=2,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-    )
+    # 获取当前状态
+    diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
+    sop_detail = state.get("sop_detail", SOPDetail())
+    messages = state.get("messages", [])
+    
+    # 更新步骤计数
+    current_step = diagnosis_progress.current_step + 1
     
     # 从最新的ToolMessage中提取诊断结果
-    diagnosis_results = updated_state.get("diagnosis_results", [])
-    last_message = updated_state.get("messages", [])[-1]
-    if isinstance(last_message, ToolMessage):
+    diagnosis_results = list(state.get("diagnosis_results", []))
+    if messages and isinstance(messages[-1], ToolMessage):
+        last_message = messages[-1]
         diagnosis_results.append(f"Tool: {last_message.name}, Result: {last_message.content}")
-
-    # 格式化反思提示
-    formatted_prompt = reflection_instructions.format(
-        diagnosis_step_count=diagnosis_step_count, # 使用当前步骤数进行反思
-        max_diagnosis_steps=updated_state.get("max_diagnosis_steps", 10),
-        fault_info=updated_state.get("fault_info", ""),
-        sop_state=updated_state.get("sop_state", "none"),
-        diagnosis_results="\n".join(diagnosis_results)
+    
+    # 检查是否完成诊断
+    is_complete = False
+    termination_reason = "continue"
+    
+    # 检查是否达到最大步骤数 (设置安全默认值)
+    max_steps = max(diagnosis_progress.max_steps, 5)  # 至少5步
+    if current_step >= max_steps:
+        is_complete = True
+        termination_reason = "max_steps_reached"
+    # 检查是否完成所有SOP步骤 (添加安全检查)
+    elif sop_detail.steps and len(sop_detail.steps) > 0 and current_step >= len(sop_detail.steps):
+        is_complete = True
+        termination_reason = "sop_completed"
+    # 安全退出：如果没有SOP步骤且已执行了3步，也要结束
+    elif (not sop_detail.steps or len(sop_detail.steps) == 0) and current_step >= 3:
+        is_complete = True
+        termination_reason = "no_sop_fallback"
+    
+    # 更新诊断进度
+    updated_progress = DiagnosisProgress(
+        current_step=current_step,
+        max_steps=diagnosis_progress.max_steps,
+        is_complete=is_complete,
+        confidence_score=min(current_step / max(sop_detail.total_steps, 1), 1.0),
+        termination_reason=termination_reason
     )
     
-    # 调用LLM进行SOP执行检查和根因分析
-    try:
-        from agents.diagnostic_agent.tools_and_schemas import DiagnosisReflectionOutput
-        result = llm.with_structured_output(DiagnosisReflectionOutput).invoke(formatted_prompt)
-    
-        return {
-            "is_complete": result.is_complete,
-            "confidence_score": result.confidence_score,
-            "sop_steps_completed": result.sop_steps_completed,
-            "sop_steps_remaining": result.sop_steps_remaining,
-            "root_cause_found": result.root_cause_found,
-            "root_cause_analysis": result.root_cause_analysis,
-            "next_steps": result.next_steps,
-            "user_recommendations": result.user_recommendations,
-            "termination_reason": result.termination_reason,
-            "diagnosis_step_count": updated_state["diagnosis_step_count"], # 返回更新后的步骤数
-            "diagnosis_results": diagnosis_results
-        }
-    except Exception as e:
-        logger.error(f"诊断反思失败: {e}")
-        # 降级处理 - 如果分析失败，要求重新按照SOP执行
-        return {
-            "is_complete": False,
-            "confidence_score": 0.0,
-            "sop_steps_completed": [],
-            "sop_steps_remaining": ["重新按照SOP执行"],
-            "root_cause_found": False,
-            "root_cause_analysis": "反思分析异常",
-            "next_steps": ["重新获取SOP内容并严格执行"],
-            "user_recommendations": ["请重新提交诊断请求"],
-            "termination_reason": "continue",
-            "diagnosis_step_count": updated_state["diagnosis_step_count"] # 返回更新后的步骤数
-        }
+    return {
+        "diagnosis_progress": updated_progress,
+        "diagnosis_results": diagnosis_results
+    }
 
 
-def finalize_diagnosis_report(state: DiagnosticOverallState, config: RunnableConfig) -> DiagnosticOverallState:
+def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """完成诊断报告节点 - 基于严格的SOP执行结果"""
     configurable = Configuration.from_runnable_config(config)
     
@@ -288,10 +275,11 @@ def finalize_diagnosis_report(state: DiagnosticOverallState, config: RunnableCon
         api_key=os.getenv("DEEPSEEK_API_KEY"),
     )
     
-    # 获取SOP执行状态
-    sop_id = state.get("sop_id", "")
-    sop_steps_completed = state.get("sop_steps_completed", [])
-    sop_steps_remaining = state.get("sop_steps_remaining", [])
+    # 获取状态信息
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    sop_detail = state.get("sop_detail", SOPDetail())
+    diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
+    diagnosis_results = state.get("diagnosis_results", [])
     
     # 构建SOP执行报告
     current_date = get_current_date()
@@ -301,145 +289,72 @@ def finalize_diagnosis_report(state: DiagnosticOverallState, config: RunnableCon
 诊断日期：{current_date}
 
 基本信息：
-- 故障IP：{state.get('fault_ip', '未提供')}
-- 故障时间：{state.get('fault_time', '未提供')}
-- 故障现象：{state.get('fault_info', '未提供')}
-- 使用SOP：{sop_id}
+- 故障IP：{question_analysis.fault_ip or '未提供'}
+- 故障时间：{question_analysis.fault_time or '未提供'}
+- 故障现象：{question_analysis.fault_info or '未提供'}
+- 使用SOP：{question_analysis.sop_id or '未指定'}
 
-SOP执行情况：
-已完成步骤：{chr(10).join(sop_steps_completed) if sop_steps_completed else '无'}
-剩余步骤：{chr(10).join(sop_steps_remaining) if sop_steps_remaining else '无'}
+执行进度：
+- 当前步骤：{diagnosis_progress.current_step}/{sop_detail.total_steps}
+- 完成状态：{'已完成' if diagnosis_progress.is_complete else '进行中'}
+- 置信度：{diagnosis_progress.confidence_score:.2f}
 
 诊断过程：
-{chr(10).join(state.get('diagnosis_results', ['未进行诊断']))}
+{chr(10).join(diagnosis_results) if diagnosis_results else '未进行诊断'}
 
-请基于以上SOP执行结果，生成最终的诊断报告，包括：
-1. SOP执行完整性评估
-2. 故障根因分析（如已确定）
-3. 解决方案建议
-4. 预防措施建议
-5. 后续监控建议
-
-注意：所有建议必须基于SOP执行结果，不得偏离SOP要求。
+请基于以上执行结果，生成最终的诊断报告。
 """
     
     # 调用LLM生成最终诊断报告
     response = llm.invoke(sop_execution_report)
     
-    # 根据SOP执行完整性生成不同的报告
-    if len(sop_steps_remaining) == 0:
-        # SOP完全执行完毕
-        final_message = f"""
+    final_message = f"""
 {response.content}
 
-✅ SOP执行状态：已完成
-- 使用SOP：{sop_id}
-- 已完成步骤：{len(sop_steps_completed)}个
-- 剩余步骤：0个
+📊 诊断执行摘要：
+- 使用SOP：{question_analysis.sop_id}
+- 执行步骤：{diagnosis_progress.current_step}/{sop_detail.total_steps}
+- 完成状态：{'✅ 已完成' if diagnosis_progress.is_complete else '🔄 进行中'}
+- 置信度：{diagnosis_progress.confidence_score:.1%}
 
 ⚠️ 重要提醒：
-以上诊断结果基于严格的SOP {sop_id} 执行。在执行任何操作前，请：
-1. 确认当前系统状态
-2. 评估操作风险
-3. 备份重要数据
-4. 在非生产环境测试
-
-如需执行建议的解决方案，请严格按照SOP要求操作。
-"""
-    else:
-        # SOP未完全执行
-        final_message = f"""
-{response.content}
-
-⚠️ SOP执行状态：未完成
-- 使用SOP：{sop_id}
-- 已完成步骤：{len(sop_steps_completed)}个
-- 剩余步骤：{len(sop_steps_remaining)}个
-
-📋 未完成的SOP步骤：
-{chr(10).join(sop_steps_remaining)}
-
-重要说明：
-由于SOP未完全执行，当前诊断结果可能不完整。建议：
-1. 继续执行剩余的SOP步骤
-2. 或联系技术专家进行进一步诊断
-3. 避免在SOP未完成时执行修复操作
-
-请确保严格按照SOP要求完成所有步骤后再进行故障修复。
+以上诊断结果基于SOP执行。在执行任何操作前，请确认系统状态并评估风险。
 """
     
     return {
         "messages": [AIMessage(content=final_message)],
-        "diagnosis_step_count": state.get("diagnosis_step_count", 0),
-        "sop_steps_completed": sop_steps_completed,
-        "sop_steps_remaining": sop_steps_remaining
+        "final_diagnosis": response.content
     }
 
 
-# 辅助函数
-def sync_sop_state_from_messages(state: DiagnosticOverallState) -> DiagnosticOverallState:
-    """同步SOP状态 - 从ToolMessage中提取SOP内容"""
-    messages = state.get("messages", [])
-    # 创建一个可变副本以进行修改
-    mutable_state = dict(state)
-
-    for msg in reversed(messages):
-        # 检查是否为ToolMessage以及工具名称是否正确
-        if isinstance(msg, ToolMessage) and msg.name == "get_sop_content":
-            try:
-                result = json.loads(msg.content)
-                mutable_state["sop_state"] = result.get("sop_state", "none")
-                mutable_state["sop_detail"] = result.get("sop_content")
-                # 找到后即可退出循环
-                break
-            except (json.JSONDecodeError, TypeError) as e:
-                logger.error(f"解析SOP内容失败: {e}, 内容: {msg.content}")
-                mutable_state["sop_state"] = "error"
-                mutable_state["sop_detail"] = {"error": "Failed to parse SOP content"}
-                break
-    return mutable_state
-
-
-# 路由函数 - 参考调研agent的条件路由
-def check_info_sufficient(state: QuestionAnalysisState, config: RunnableConfig) -> str:
+# 路由函数 - 简化版本
+def check_info_sufficient(state: DiagnosticState, config: RunnableConfig) -> str:
     """检查信息是否充足"""
-    return "plan_tools" if state.get("info_sufficient") else "finalize_answer"
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    return "plan_tools" if question_analysis.info_sufficient else "finalize_answer"
 
 
-def evaluate_diagnosis_progress(state: DiagnosisReflectionState, config: RunnableConfig) -> str:
-    """评估诊断进度，根据SOP执行情况和根因发现情况决定下一步"""
-    configurable = Configuration.from_runnable_config(config)
-    max_steps = configurable.max_diagnosis_steps
+def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> str:
+    """评估诊断进度，根据执行情况决定下一步"""
+    diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     
-    current_steps = state.get("diagnosis_step_count", 0)
-    termination_reason = state.get("termination_reason", "continue")
-    root_cause_found = state.get("root_cause_found", False)
-    
-    # 检查是否达到最大步骤数
-    if current_steps >= max_steps:
-        logger.warning(f"已达到最大步骤数 {max_steps}，强制结束诊断")
+    # 安全检查：强制最大步骤限制
+    if diagnosis_progress.current_step >= 10:  # 硬编码最大步骤数
+        logger.warning(f"强制终止：步骤数达到安全上限 {diagnosis_progress.current_step}")
         return "finalize_answer"
     
-    # 根据终止原因决定下一步
-    if termination_reason == "root_cause_found" and root_cause_found:
-        logger.info("已找到根因，可以提前结束诊断")
-        return "finalize_answer"
-    elif termination_reason == "sop_completed":
-        logger.info("已完成所有SOP步骤，结束诊断")
-        return "finalize_answer"
-    elif state.get("is_complete", False):
-        # 兼容处理：如果is_complete为True，也可以结束
-        logger.info("诊断完成，结束诊断")
+    # 如果诊断完成，生成最终报告
+    if diagnosis_progress.is_complete:
+        logger.info(f"诊断完成: {diagnosis_progress.termination_reason}")
         return "finalize_answer"
     else:
-        # 继续执行下一个SOP步骤
-        sop_steps_remaining = state.get("sop_steps_remaining", [])
-        logger.info(f"继续执行SOP步骤，剩余步骤: {sop_steps_remaining}")
+        # 继续执行下一步
+        logger.info(f"继续执行，当前步骤: {diagnosis_progress.current_step}")
         return "plan_tools"
 
 
-# 创建诊断Agent图 - 参考调研agent的图构建方式
-builder = StateGraph(DiagnosticOverallState, config_schema=Configuration)
+# 创建诊断Agent图 - 简化版本
+builder = StateGraph(DiagnosticState, config_schema=Configuration)
 
 # 添加节点
 builder.add_node("analyze_question", analyze_question)
@@ -475,11 +390,17 @@ builder.add_conditional_edges(
     ["plan_tools", "finalize_answer"]
 )
 
-# 新的流程: plan -> approval -> execute -> reflect
-builder.add_edge("plan_tools", "approval")
-builder.add_edge("approval", "execute_tools")
+# 修复：使用tools_condition来决定是否有工具调用
+builder.add_conditional_edges(
+    "plan_tools",
+    tools_condition,
+    {
+        "tools": "approval",
+        "__end__": "finalize_answer"  # 如果没有工具调用，直接结束
+    }
+)
 
-# ToolNode会自动将ToolMessage附加到状态中
+builder.add_edge("approval", "execute_tools")
 builder.add_edge("execute_tools", "reflection")
 
 builder.add_conditional_edges(

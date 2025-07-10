@@ -1,68 +1,79 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypedDict, Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
 
-from langgraph.graph import add_messages
-from typing_extensions import Annotated
-import operator
+from langgraph.graph import MessagesState
+from pydantic import BaseModel, Field
 
 
-class DiagnosticOverallState(TypedDict):
-    """诊断代理的主状态 - 严格按照SOP执行"""
-    messages: Annotated[list, add_messages]  # 消息历史
-    question: QuestionAnalysisState  # 问题四要素分析
-    diagnosis_results: Annotated[list, operator.add]  # 诊断结果累积
-    tools_used: Annotated[list, operator.add]  # 已使用的工具列表
-    diagnosis_step_count: int  # 当前诊断步骤数
-    max_diagnosis_steps: int  # 最大诊断步骤数
-    sop_detail: List[Step] = [] # SOP详细信息    
-    reasoning_model: str  # 推理模型名称
-
-class Step(TypedDict):
-    """SOP步骤"""
+class SOPStep(BaseModel):
+    """SOP步骤 - 使用Pydantic模型管理"""
     title: str = ""
     description: str = ""
-    status: Literal["pending", "completed"] = "pending"
+    action: str = ""
+    requires_approval: bool = False
+    status: Literal["pending", "in_progress", "completed"] = "pending"
 
-class QuestionAnalysisState(TypedDict):
+
+class SOPDetail(BaseModel):
+    """SOP详细信息"""
+    sop_id: str = ""
+    title: str = ""
+    description: str = ""
+    steps: List[SOPStep] = Field(default_factory=list)
+    total_steps: int = 0
+
+
+class QuestionAnalysis(BaseModel):
     """问题四要素分析"""
-    fault_ip: Optional[str]
-    fault_time: Optional[str]
-    fault_info: Optional[str]
-    sop_id: Optional[str]
-    missing_fields: List[str]
+    fault_ip: Optional[str] = None
+    fault_time: Optional[str] = None
+    fault_info: Optional[str] = None
+    sop_id: Optional[str] = None
+    missing_fields: List[str] = Field(default_factory=list)
+    info_sufficient: bool = False
 
 
-class DiagnosisReflectionState(TypedDict):
-    """诊断反思状态 - 按SOP顺序执行，找到根因可提前结束"""
-    is_complete: bool  # 是否可以结束诊断（找到根因或完成所有SOP步骤）
-    confidence_score: float  # 对当前诊断结果的置信度
-    sop_steps_completed: List[str]  # 已完成的SOP步骤
-    sop_steps_remaining: List[str]  # 还需执行的SOP步骤
-    root_cause_found: bool  # 是否找到了明确的根因
-    root_cause_analysis: str  # 根因分析结果
-    next_steps: List[str]  # 下一个需要执行的SOP步骤
-    user_recommendations: List[str]  # 基于当前结果给用户的建议
-    termination_reason: str  # 结束原因：root_cause_found或sop_completed或continue
-    diagnosis_step_count: int  # 当前步骤数
+class DiagnosisProgress(BaseModel):
+    """诊断进度跟踪"""
+    current_step: int = 0
+    max_steps: int = 5
+    is_complete: bool = False
+    confidence_score: float = 0.0
+    root_cause_found: bool = False
+    root_cause_analysis: str = ""
+    termination_reason: Literal["continue", "root_cause_found", "sop_completed", "max_steps_reached"] = "continue"
 
 
-class ToolPlanningState(TypedDict):
-    """工具规划状态 - 专门用于工具选择和规划"""
-    planned_tools: List[str]  # 计划使用的工具
-    tool_sequence: List[dict]  # 工具执行序列
-    sop_loaded: bool  # SOP是否已加载
+class DiagnosticState(MessagesState):
+    """诊断代理的主状态 - 简化版本，参考优化实现"""
+    # 基础信息
+    user_question: str = ""
+    question_analysis: QuestionAnalysis = Field(default_factory=QuestionAnalysis)
+    
+    # SOP管理
+    sop_detail: SOPDetail = Field(default_factory=SOPDetail)
+    sop_loaded: bool = False
+    
+    # 诊断进度
+    diagnosis_progress: DiagnosisProgress = Field(default_factory=DiagnosisProgress)
+    
+    # 诊断结果
+    diagnosis_results: List[str] = Field(default_factory=list)
+    tools_used: List[str] = Field(default_factory=list)
+    
+    # 最终报告
+    final_diagnosis: str = ""
 
 
-@dataclass(kw_only=True)
-class DiagnosticStateOutput:
-    """诊断状态输出 - 类似调研agent的SearchStateOutput"""
-    final_diagnosis: str = field(default="")  # 最终诊断结果
-    sop_used: str = field(default="")  # 使用的SOP
-    tools_executed: list = field(default_factory=list)  # 执行的工具列表
-    confidence_score: float = field(default=0.0)  # 最终置信度
-    recommendations: list = field(default_factory=list)  # 建议列表
-    execution_time: str = field(default="")  # 总执行时间
-    step_count: int = field(default=0)  # 总步骤数
+class DiagnosticOutput(BaseModel):
+    """诊断输出结果"""
+    final_diagnosis: str = ""
+    sop_used: str = ""
+    tools_executed: List[str] = Field(default_factory=list)
+    confidence_score: float = 0.0
+    recommendations: List[str] = Field(default_factory=list)
+    execution_time: str = ""
+    step_count: int = 0
