@@ -60,50 +60,46 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
 
 请从用户输入中提取或更新故障诊断信息。如果用户提供了新信息，请更新对应字段；如果没有提供新信息，保持原有值。
 
-请按照以下JSON格式返回：
-{{
-    "fault_ip": "故障IP地址（如果无法提取或用户未提供，填写'待提取'）",
-    "fault_time": "故障时间（如果无法提取或用户未提供，填写'待提取'）",
-    "fault_info": "故障现象描述（如果无法提取或用户未提供，填写'待提取'）",
-    "sop_id": "SOP编号（如果无法提取或用户未提供，填写'待提取'）"
-}}"""
+对于每个字段：
+- fault_ip: 提取IP地址，如192.168.1.100或82.156.146.51
+- fault_time: 提取时间信息，支持各种格式
+- fault_info: 提取故障现象描述，如"磁盘空间满"、"内存不足"等
+- sop_id: 提取SOP编号，如sop_101、SOP-001等
+
+如果某个字段无法从用户输入中提取，请填写'待提取'。"""
     
-    # 使用JSON模式兼容DeepSeek
-    response = llm.invoke(enhanced_prompt)
-    
-    # 解析JSON响应
-    import json
-    import re
-    try:
-        result_dict = json.loads(response.content)
-        result = QuestionInfoExtraction(**result_dict)
-    except (json.JSONDecodeError, ValueError) as e:
-        logger.warning(f"JSON解析失败，使用正则提取: {e}")
-        # 备用：正则表达式提取
-        ip_match = re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', user_question)
-        time_match = re.search(r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}', user_question)
-        sop_match = re.search(r'sop[_-]?\d+', user_question, re.IGNORECASE)
-        
-        result = QuestionInfoExtraction(
-            fault_ip=ip_match.group() if ip_match else (current_analysis.fault_ip or "待提取"),
-            fault_time=time_match.group() if time_match else (current_analysis.fault_time or "待提取"),
-            fault_info="磁盘空间满" if "磁盘" in user_question or "空间" in user_question else (current_analysis.fault_info or "待提取"),
-            sop_id=sop_match.group() if sop_match else (current_analysis.sop_id or "待提取")
-        )
+    # 使用结构化输出
+    structured_llm = llm.with_structured_output(QuestionInfoExtraction)
+    result = structured_llm.invoke(enhanced_prompt)
     
     # 调试：打印提取结果
-    print(f"📤 [DEBUG] LLM/正则提取结果:")
+    print(f"📤 [DEBUG] LLM结构化输出结果:")
     print(f"  - fault_ip: {result.fault_ip}")
     print(f"  - fault_time: {result.fault_time}")
     print(f"  - fault_info: {result.fault_info}")
     print(f"  - sop_id: {result.sop_id}")
     
     # 合并信息：优先使用新信息，无新信息时保持原值
+    # 修复：改进IP提取逻辑，确保新的有效IP能够覆盖原有值
+    def merge_field(new_value, old_value, field_name=""):
+        # 如果新值有效且不是待提取，使用新值
+        if new_value and new_value != "待提取" and new_value.strip():
+            print(f"  合并 {field_name}: 使用新值 '{new_value}'")
+            return new_value
+        # 如果旧值有效且不是待提取，保持旧值
+        elif old_value and old_value != "待提取" and old_value.strip():
+            print(f"  合并 {field_name}: 保持旧值 '{old_value}'")
+            return old_value
+        # 否则返回待提取
+        else:
+            print(f"  合并 {field_name}: 设为待提取")
+            return "待提取"
+    
     merged_analysis = QuestionAnalysis(
-        fault_ip=result.fault_ip if result.fault_ip != "待提取" else (current_analysis.fault_ip or "待提取"),
-        fault_time=result.fault_time if result.fault_time != "待提取" else (current_analysis.fault_time or "待提取"),
-        fault_info=result.fault_info if result.fault_info != "待提取" else (current_analysis.fault_info or "待提取"),
-        sop_id=result.sop_id if result.sop_id != "待提取" else (current_analysis.sop_id or "待提取")
+        fault_ip=merge_field(result.fault_ip, current_analysis.fault_ip, "故障IP"),
+        fault_time=merge_field(result.fault_time, current_analysis.fault_time, "故障时间"),
+        fault_info=merge_field(result.fault_info, current_analysis.fault_info, "故障现象"),
+        sop_id=merge_field(result.sop_id, current_analysis.sop_id, "SOP编号")
     )
     
     # 调试：打印合并结果
