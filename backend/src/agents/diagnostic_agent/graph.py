@@ -188,11 +188,72 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
         
         logger.info(f"审批节点检查: SOP已加载={state.get('sop_loaded', False)}, SOP步骤数={len(sop_detail.steps)}, 当前步骤={diagnosis_progress.current_step}")
         
-        # 从SOP详情中获取当前步骤
+        # 从工具调用中找到匹配的SOP步骤
         current_step_info = None
-        if sop_detail.steps and 0 <= diagnosis_progress.current_step < len(sop_detail.steps):
-            current_step_info = sop_detail.steps[diagnosis_progress.current_step]
-            logger.info(f"当前步骤: {diagnosis_progress.current_step}, 步骤信息: {current_step_info.action}, 需要审批: {current_step_info.requires_approval}")
+        
+        # 获取原始SOP数据（从最近的get_sop_content工具消息中）
+        raw_sop_data = None
+        for msg in reversed(messages):
+            if isinstance(msg, ToolMessage) and msg.name == "get_sop_content":
+                try:
+                    result = json.loads(msg.content)
+                    if result.get("success") and result.get("sop_content"):
+                        raw_sop_data = result["sop_content"]
+                        break
+                except (json.JSONDecodeError, TypeError):
+                    continue
+        
+        if not raw_sop_data:
+            logger.warning("无法获取原始SOP数据，跳过审批检查")
+            return {}
+        
+        # 查找匹配的SOP步骤
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("name", "")
+            tool_args = tool_call.get("args", {})
+            
+            # 跳过SOP加载相关的工具调用
+            if tool_name in ["get_sop_content", "get_sop_detail", "list_sops", "search_sops"]:
+                logger.info(f"跳过SOP工具调用: {tool_name}")
+                continue
+                
+            # 在原始SOP步骤中查找匹配的工具和命令
+            for sop_step in raw_sop_data.get("steps", []):
+                step_tool = sop_step.get("tool", "")
+                step_command = sop_step.get("command", "")
+                
+                # 检查工具名称是否匹配
+                if tool_name == step_tool:
+                    # 如果有命令参数，检查命令是否匹配
+                    if "command" in tool_args:
+                        if tool_args["command"] == step_command:
+                            current_step_info = SOPStep(
+                                title=sop_step.get("action", ""),
+                                description=sop_step.get("description", ""),
+                                action=sop_step.get("action", ""),
+                                requires_approval=sop_step.get("requires_approval", False),
+                                status="pending"
+                            )
+                            logger.info(f"找到匹配的SOP步骤: {sop_step.get('step', 'N/A')}, 动作: {current_step_info.action}, 需要审批: {current_step_info.requires_approval}")
+                            break
+                    else:
+                        # 没有具体命令参数，只根据工具匹配
+                        current_step_info = SOPStep(
+                            title=sop_step.get("action", ""),
+                            description=sop_step.get("description", ""),
+                            action=sop_step.get("action", ""),
+                            requires_approval=sop_step.get("requires_approval", False),
+                            status="pending"
+                        )
+                        logger.info(f"找到匹配的SOP步骤: {sop_step.get('step', 'N/A')}, 动作: {current_step_info.action}, 需要审批: {current_step_info.requires_approval}")
+                        break
+            
+            # 找到匹配的步骤就退出
+            if current_step_info:
+                break
+        
+        if not current_step_info:
+            logger.info(f"未找到匹配的SOP步骤，工具调用: {[tc.get('name') for tc in tool_calls]}")
 
         # 检查当前步骤是否需要审批
         if current_step_info and current_step_info.requires_approval:
@@ -284,13 +345,18 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
         except (json.JSONDecodeError, TypeError) as e:
             logger.error(f"解析SOP内容失败: {e}")
     
-    # 检查是否有新的工具执行
-    has_new_tool_execution = False
+    # 检查是否有新的诊断工具执行（排除SOP工具）
+    has_new_diagnostic_execution = False
     if messages and isinstance(messages[-1], ToolMessage):
-        # 有新的工具执行，更新步骤计数
-        current_step = diagnosis_progress.current_step + 1
-        has_new_tool_execution = True
-        logger.info(f"检测到工具执行，步骤数更新为: {current_step}")
+        last_tool_name = messages[-1].name
+        # 只有非SOP工具才算诊断步骤
+        if last_tool_name not in ["get_sop_content", "get_sop_detail", "list_sops", "search_sops"]:
+            current_step = diagnosis_progress.current_step + 1
+            has_new_diagnostic_execution = True
+            logger.info(f"检测到诊断工具执行: {last_tool_name}，步骤数更新为: {current_step}")
+        else:
+            current_step = diagnosis_progress.current_step
+            logger.info(f"检测到SOP工具执行: {last_tool_name}，步骤数保持: {current_step}")
     else:
         # 没有新的工具执行，保持原步骤数
         current_step = diagnosis_progress.current_step
@@ -298,7 +364,7 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
     
     # 从最新的ToolMessage中提取诊断结果
     diagnosis_results = list(state.get("diagnosis_results", []))
-    if has_new_tool_execution:
+    if has_new_diagnostic_execution:
         last_message = messages[-1]
         diagnosis_results.append(f"Tool: {last_message.name}, Result: {last_message.content}")
     
