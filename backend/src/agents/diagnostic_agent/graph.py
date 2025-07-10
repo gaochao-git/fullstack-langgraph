@@ -483,14 +483,18 @@ def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) 
     return "plan_tools"
 
 
-# 创建诊断Agent图 - 简化版本
-builder = StateGraph(DiagnosticState, config_schema=Configuration)
-
-# 添加节点
-builder.add_node("analyze_question", analyze_question)
-builder.add_node("plan_tools", plan_diagnosis_tools)
-builder.add_node("approval", approval_node)
-
+# 修复：自定义条件函数来决定是否有工具调用
+def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
+    """检查是否有工具调用"""
+    messages = state.get("messages", [])
+    if not messages:
+        return "reflection"
+    
+    last_message = messages[-1]
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        return "approval"
+    else:
+        return "reflection"
 # 创建工具执行节点
 ssh_tools = [
     ssh_tool.get_system_info,
@@ -507,47 +511,28 @@ sop_tools = [
 ]
 all_tools = ssh_tools + sop_tools
 tool_node = ToolNode(all_tools)
+
+
+# 创建诊断Agent图 - 简化版本
+builder = StateGraph(DiagnosticState, config_schema=Configuration)
+# 添加节点
+builder.add_node("analyze_question", analyze_question)
+builder.add_node("plan_tools", plan_diagnosis_tools)
+builder.add_node("approval", approval_node)
 builder.add_node("execute_tools", tool_node)
 builder.add_node("reflection", reflect_diagnosis_progress)
 builder.add_node("finalize_answer", finalize_diagnosis_report)
-# 添加边 - 参考调研agent的清晰边连接
 builder.add_edge(START, "analyze_question")
 builder.add_conditional_edges("analyze_question", check_info_sufficient, ["plan_tools", "finalize_answer"])
-# 修复：自定义条件函数来决定是否有工具调用
-def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
-    """检查是否有工具调用"""
-    messages = state.get("messages", [])
-    if not messages:
-        return "reflection"
-    
-    last_message = messages[-1]
-    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        return "approval"
-    else:
-        return "reflection"
-
-builder.add_conditional_edges(
-    "plan_tools",
-    check_tool_calls,
-    {
-        "approval": "approval",
-        "reflection": "reflection"
-    }
-)
-
+builder.add_conditional_edges("plan_tools",check_tool_calls,{"approval": "approval","reflection": "reflection"})
 builder.add_edge("approval", "execute_tools")
 builder.add_edge("execute_tools", "reflection")
-
-builder.add_conditional_edges(
-    "reflection", 
-    evaluate_diagnosis_progress, 
-    ["plan_tools", "finalize_answer"]
-)
+builder.add_conditional_edges("reflection", evaluate_diagnosis_progress, ["plan_tools", "finalize_answer"])
 builder.add_edge("finalize_answer", END)
+
 
 # 编译图
 graph = builder.compile(name="diagnostic-agent")
-
 # 保存图像
 graph_image = graph.get_graph().draw_mermaid_png()
 with open("diagnostic_agent_graph.png", "wb") as f: 
