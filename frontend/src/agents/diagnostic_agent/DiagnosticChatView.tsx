@@ -3,7 +3,7 @@ import type { Message } from "@langchain/langgraph-sdk";
 import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings, User, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, ReactNode } from "react";
+import { useState, ReactNode, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
@@ -13,6 +13,31 @@ export interface ProcessedEvent {
   title: string;
   data: any;
 }
+
+
+// 动态按钮文字组件
+const DiagnosisButtonText: React.FC = () => {
+  const [dots, setDots] = useState("");
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => {
+        if (prev.length >= 3) return "";
+        return prev + ".";
+      });
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <span className="flex items-center gap-2">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      诊断中
+      <span className="inline-block w-6 text-left">{dots}</span>
+    </span>
+  );
+};
 
 // 工具调用组件 props
 interface ToolCallProps {
@@ -393,7 +418,7 @@ export function DiagnosticChatView({
             disabled={isLoading || !inputValue.trim() || !!interrupt}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
           >
-            {isLoading ? "诊断中..." : "发送"}
+            {isLoading ? <DiagnosisButtonText /> : "发送"}
           </Button>
           {isLoading && (
             <Button
