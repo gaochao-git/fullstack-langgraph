@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # 节点函数 - 参考调研agent的清晰结构
 def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """问题分析节点 - 类似调研agent的generate_query"""
+    """问题分析节点 - 支持多轮补充四要素"""
     configurable = Configuration.from_runnable_config(config)
     llm = configurable.create_llm(
         model_name=configurable.query_generator_model,
@@ -35,48 +35,89 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     messages = state.get("messages", [])
     user_question = messages[-1].content if messages else ""
     
-    # 格式化提示词
+    # 获取当前已有的四要素信息
+    current_analysis = state.get("question_analysis", QuestionAnalysis())
+    
+    # 构建包含当前信息的提示词
     current_date = get_current_date()
-    formatted_prompt = question_analysis_instructions.format(
-        current_date=current_date,
-        user_question=user_question
+    enhanced_prompt = f"""当前时间：{current_date}
+
+用户最新输入：{user_question}
+
+当前已有信息：
+- 故障IP: {current_analysis.fault_ip or '待提取'}
+- 故障时间: {current_analysis.fault_time or '待提取'}
+- 故障现象: {current_analysis.fault_info or '待提取'}
+- SOP编号: {current_analysis.sop_id or '待提取'}
+
+请从用户输入中提取或更新故障诊断信息。如果用户提供了新信息，请更新对应字段；如果没有提供新信息，保持原有值。
+
+请按照以下JSON格式返回：
+{{
+    "fault_ip": "故障IP地址（如果无法提取或用户未提供，填写'待提取'）",
+    "fault_time": "故障时间（如果无法提取或用户未提供，填写'待提取'）",
+    "fault_info": "故障现象描述（如果无法提取或用户未提供，填写'待提取'）",
+    "sop_id": "SOP编号（如果无法提取或用户未提供，填写'待提取'）"
+}}"""
+    
+    # 使用JSON模式兼容DeepSeek
+    response = llm.invoke(enhanced_prompt)
+    
+    # 解析JSON响应
+    import json
+    import re
+    try:
+        result_dict = json.loads(response.content)
+        result = QuestionInfoExtraction(**result_dict)
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning(f"JSON解析失败，使用正则提取: {e}")
+        # 备用：正则表达式提取
+        ip_match = re.search(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', user_question)
+        time_match = re.search(r'\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}', user_question)
+        sop_match = re.search(r'sop[_-]?\d+', user_question, re.IGNORECASE)
+        
+        result = QuestionInfoExtraction(
+            fault_ip=ip_match.group() if ip_match else (current_analysis.fault_ip or "待提取"),
+            fault_time=time_match.group() if time_match else (current_analysis.fault_time or "待提取"),
+            fault_info="磁盘空间满" if "磁盘" in user_question or "空间" in user_question else (current_analysis.fault_info or "待提取"),
+            sop_id=sop_match.group() if sop_match else (current_analysis.sop_id or "待提取")
+        )
+    
+    # 合并信息：优先使用新信息，无新信息时保持原值
+    merged_analysis = QuestionAnalysis(
+        fault_ip=result.fault_ip if result.fault_ip != "待提取" else (current_analysis.fault_ip or "待提取"),
+        fault_time=result.fault_time if result.fault_time != "待提取" else (current_analysis.fault_time or "待提取"),
+        fault_info=result.fault_info if result.fault_info != "待提取" else (current_analysis.fault_info or "待提取"),
+        sop_id=result.sop_id if result.sop_id != "待提取" else (current_analysis.sop_id or "待提取")
     )
     
-    # 使用结构化输出解析用户输入
-    result = llm.with_structured_output(QuestionInfoExtraction).invoke(formatted_prompt)
-    
-    # 检查四要素是否都有有效值
+    # 检查四要素是否都完整
     info_sufficient = (
-        result.fault_ip and result.fault_ip.strip() and result.fault_ip != "待提取" and
-        result.fault_time and result.fault_time.strip() and result.fault_time != "待提取" and
-        result.fault_info and result.fault_info.strip() and result.fault_info != "待提取" and
-        result.sop_id and result.sop_id.strip() and result.sop_id != "待提取"
+        merged_analysis.fault_ip and merged_analysis.fault_ip != "待提取" and
+        merged_analysis.fault_time and merged_analysis.fault_time != "待提取" and
+        merged_analysis.fault_info and merged_analysis.fault_info != "待提取" and
+        merged_analysis.sop_id and merged_analysis.sop_id != "待提取"
     )
     
     # 生成缺失字段列表
     missing_fields = []
-    if not result.fault_ip or result.fault_ip.strip() == "" or result.fault_ip == "待提取":
+    if not merged_analysis.fault_ip or merged_analysis.fault_ip == "待提取":
         missing_fields.append("故障IP")
-    if not result.fault_time or result.fault_time.strip() == "" or result.fault_time == "待提取":
+    if not merged_analysis.fault_time or merged_analysis.fault_time == "待提取":
         missing_fields.append("故障时间")
-    if not result.fault_info or result.fault_info.strip() == "" or result.fault_info == "待提取":
+    if not merged_analysis.fault_info or merged_analysis.fault_info == "待提取":
         missing_fields.append("故障现象")
-    if not result.sop_id or result.sop_id.strip() == "" or result.sop_id == "待提取":
+    if not merged_analysis.sop_id or merged_analysis.sop_id == "待提取":
         missing_fields.append("排查SOP编号")
     
-    # 创建QuestionAnalysis对象
-    question_analysis = QuestionAnalysis(
-        fault_ip=result.fault_ip,
-        fault_time=result.fault_time,
-        fault_info=result.fault_info,
-        sop_id=result.sop_id,
-        missing_fields=missing_fields,
-        info_sufficient=info_sufficient
-    )
+    merged_analysis.missing_fields = missing_fields
+    merged_analysis.info_sufficient = info_sufficient
+    
+    logger.info(f"四要素分析: 充足={info_sufficient}, 缺失={missing_fields}")
     
     return {
         "user_question": user_question,
-        "question_analysis": question_analysis
+        "question_analysis": merged_analysis
     }
 
 
@@ -365,28 +406,41 @@ def handle_insufficient_info(state: DiagnosticState, config: RunnableConfig) -> 
     """处理信息不足的情况，提示用户补充缺失信息"""
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     
-    # 构建缺失信息提示
-    missing_info_prompt = "❗ 故障诊断信息不完整，请补充以下必要信息：\n\n"
+    # 显示当前信息状态
+    info_status = []
+    info_status.append(f"✅ 故障IP: {question_analysis.fault_ip}" if question_analysis.fault_ip and question_analysis.fault_ip != '待提取' else "❌ 故障IP: 待提取")
+    info_status.append(f"✅ 故障时间: {question_analysis.fault_time}" if question_analysis.fault_time and question_analysis.fault_time != '待提取' else "❌ 故障时间: 待提取")
+    info_status.append(f"✅ 故障现象: {question_analysis.fault_info}" if question_analysis.fault_info and question_analysis.fault_info != '待提取' else "❌ 故障现象: 待提取")
+    info_status.append(f"✅ SOP编号: {question_analysis.sop_id}" if question_analysis.sop_id and question_analysis.sop_id != '待提取' else "❌ SOP编号: 待提取")
     
-    field_descriptions = {
-        "故障IP": "故障服务器的IP地址（如：192.168.1.100）",
-        "故障时间": "故障发生的具体时间（如：2024-01-15 14:30）",
-        "故障现象": "具体的故障表现和症状描述",
-        "排查SOP编号": "对应的标准作业程序编号（如：SOP-001）"
-    }
+    # 构建提示信息
+    missing_info_prompt = "❗ 故障诊断信息不完整，当前状态：\n\n"
+    missing_info_prompt += "\n".join(info_status) + "\n\n"
     
-    for i, field in enumerate(question_analysis.missing_fields, 1):
-        description = field_descriptions.get(field, "")
-        missing_info_prompt += f"{i}. **{field}**：{description}\n"
+    if question_analysis.missing_fields:
+        missing_info_prompt += "📋 还需要补充以下信息：\n\n"
+        field_descriptions = {
+            "故障IP": "故障服务器的IP地址（如：192.168.1.100）",
+            "故障时间": "故障发生的具体时间（如：2024-01-15 14:30）",
+            "故障现象": "具体的故障表现和症状描述",
+            "排查SOP编号": "对应的标准作业程序编号（如：SOP-001）"
+        }
+        
+        for i, field in enumerate(question_analysis.missing_fields, 1):
+            description = field_descriptions.get(field, "")
+            missing_info_prompt += f"{i}. **{field}**：{description}\n"
     
-    missing_info_prompt += "\n📝 请按以下格式提供完整信息：\n"
+    missing_info_prompt += "\n📝 您可以通过以下方式提供信息：\n"
+    missing_info_prompt += "**方式一：自然语言**\n"
+    missing_info_prompt += "例如：\"故障IP是192.168.1.100，时间是今天下午2点\"\n\n"
+    missing_info_prompt += "**方式二：结构化格式**\n"
     missing_info_prompt += "```\n"
-    missing_info_prompt += f"故障IP: {question_analysis.fault_ip if question_analysis.fault_ip and question_analysis.fault_ip != '待提取' else '[请填写]'}\n"
-    missing_info_prompt += f"故障时间: {question_analysis.fault_time if question_analysis.fault_time and question_analysis.fault_time != '待提取' else '[请填写]'}\n"
-    missing_info_prompt += f"故障现象: {question_analysis.fault_info if question_analysis.fault_info and question_analysis.fault_info != '待提取' else '[请填写]'}\n"
-    missing_info_prompt += f"SOP编号: {question_analysis.sop_id if question_analysis.sop_id and question_analysis.sop_id != '待提取' else '[请填写]'}\n"
+    missing_info_prompt += "故障IP: [请填写]\n"
+    missing_info_prompt += "故障时间: [请填写]\n"
+    missing_info_prompt += "故障现象: [请填写]\n"
+    missing_info_prompt += "SOP编号: [请填写]\n"
     missing_info_prompt += "```\n\n"
-    missing_info_prompt += "💡 提供完整信息后，我将为您执行专业的故障诊断流程。"
+    missing_info_prompt += "💡 您可以分多次补充，信息完整后将自动开始诊断。"
     
     return {
         "messages": [AIMessage(content=missing_info_prompt)]
@@ -516,6 +570,7 @@ builder.add_node("reflection", reflect_diagnosis_progress)
 builder.add_node("finalize_answer", finalize_diagnosis_report)
 builder.add_edge(START, "analyze_question")
 builder.add_conditional_edges("analyze_question", check_info_sufficient, ["plan_tools", "handle_insufficient_info"])
+# 修改：信息不足时等待用户补充，用户补充后重新回到analyze_question分析
 builder.add_edge("handle_insufficient_info", END)
 builder.add_conditional_edges("plan_tools",check_tool_calls,{"approval": "approval","reflection": "reflection"})
 builder.add_edge("approval", "execute_tools")
