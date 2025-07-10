@@ -44,7 +44,7 @@ class DiagnosisProgress(BaseModel):
     confidence_score: float = 0.0
     root_cause_found: bool = False
     root_cause_analysis: str = ""
-    termination_reason: Literal["continue", "root_cause_found", "sop_completed", "max_steps_reached", "no_sop_fallback"] = "continue"
+    termination_reason: Literal["continue", "root_cause_found", "sop_completed", "max_steps_reached", "no_sop_fallback", "user_cancelled"] = "continue"
 
 
 class DiagnosticState(MessagesState):

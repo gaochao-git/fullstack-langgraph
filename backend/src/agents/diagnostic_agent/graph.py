@@ -176,13 +176,17 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
         sop_detail = state.get("sop_detail", SOPDetail())
         diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
         
+        logger.info(f"审批节点检查: SOP已加载={state.get('sop_loaded', False)}, SOP步骤数={len(sop_detail.steps)}, 当前步骤={diagnosis_progress.current_step}")
+        
         # 从SOP详情中获取当前步骤
         current_step_info = None
         if sop_detail.steps and 0 <= diagnosis_progress.current_step < len(sop_detail.steps):
             current_step_info = sop_detail.steps[diagnosis_progress.current_step]
+            logger.info(f"当前步骤: {diagnosis_progress.current_step}, 步骤信息: {current_step_info.action}, 需要审批: {current_step_info.requires_approval}")
 
         # 检查当前步骤是否需要审批
         if current_step_info and current_step_info.requires_approval:
+            logger.info(f"触发审批流程: SOP {question_analysis.sop_id}, 步骤: {current_step_info.action}")
             tool_descriptions = []
             for tool_call in tool_calls:
                 tool_name = tool_call.get("name", "")
@@ -200,7 +204,26 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
                 "current_sop_step": current_step_info.action,
                 "suggestion_type": "sop_execution"
             }
-            return interrupt(interrupt_info)
+            
+            # 调用interrupt并处理用户确认结果
+            user_approved = interrupt(interrupt_info)
+            logger.info(f"用户审批结果: {user_approved}")
+            
+            # 根据用户确认结果返回相应状态
+            if user_approved:
+                # 用户确认，允许继续执行
+                return {}
+            else:
+                # 用户取消，中止执行并跳转到报告
+                return {
+                    "messages": [AIMessage(content="用户取消了SOP步骤执行，诊断流程已中止。")],
+                    "diagnosis_progress": DiagnosisProgress(
+                        current_step=diagnosis_progress.current_step,
+                        max_steps=diagnosis_progress.max_steps,
+                        is_complete=True,
+                        termination_reason="user_cancelled"
+                    )
+                }
         
         # 如果不需要审批，则不返回任何内容，直接继续
     return {}
@@ -215,6 +238,42 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
     sop_detail = state.get("sop_detail", SOPDetail())
     messages = state.get("messages", [])
     
+    # 处理SOP加载结果
+    updated_sop_detail = sop_detail
+    sop_loaded = state.get("sop_loaded", False)
+    
+    if messages and isinstance(messages[-1], ToolMessage) and messages[-1].name == "get_sop_content":
+        try:
+            # 解析SOP内容
+            result = json.loads(messages[-1].content)
+            if result.get("success") and result.get("sop_content"):
+                sop_content = result["sop_content"]
+                
+                # 解析步骤并创建SOPStep对象
+                steps = []
+                for step_data in sop_content.get("steps", []):
+                    sop_step = SOPStep(
+                        title=step_data.get("title", ""),
+                        description=step_data.get("description", ""),
+                        action=step_data.get("action", ""),
+                        requires_approval=step_data.get("requires_approval", False),
+                        status="pending"
+                    )
+                    steps.append(sop_step)
+                
+                # 创建SOPDetail对象
+                updated_sop_detail = SOPDetail(
+                    sop_id=sop_content.get("id", ""),
+                    title=sop_content.get("title", ""),
+                    description=sop_content.get("description", ""),
+                    steps=steps,
+                    total_steps=len(steps)
+                )
+                sop_loaded = True
+                logger.info(f"SOP加载成功: {updated_sop_detail.sop_id}, 步骤数: {len(steps)}")
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.error(f"解析SOP内容失败: {e}")
+    
     # 更新步骤计数
     current_step = diagnosis_progress.current_step + 1
     
@@ -224,36 +283,42 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
         last_message = messages[-1]
         diagnosis_results.append(f"Tool: {last_message.name}, Result: {last_message.content}")
     
-    # 检查是否完成诊断
+    # 检查是否完成诊断 - 放宽条件，让诊断能够充分执行
     is_complete = False
     termination_reason = "continue"
     
-    # 检查是否达到最大步骤数 (设置安全默认值)
-    max_steps = max(diagnosis_progress.max_steps, 5)  # 至少5步
+    # 只有在达到真正的上限时才强制退出
+    max_steps = max(diagnosis_progress.max_steps, 15)  # 增加到至少15步
     if current_step >= max_steps:
         is_complete = True
         termination_reason = "max_steps_reached"
-    # 检查是否完成所有SOP步骤 (添加安全检查)
-    elif sop_detail.steps and len(sop_detail.steps) > 0 and current_step >= len(sop_detail.steps):
+        logger.warning(f"达到最大步骤限制退出: {current_step}/{max_steps}")
+    # 只有当SOP步骤完全执行完毕且至少执行了5步诊断时才退出
+    elif updated_sop_detail.steps and len(updated_sop_detail.steps) > 0 and current_step > len(updated_sop_detail.steps) + 3:
+        # 允许在SOP步骤基础上再执行几步额外诊断
         is_complete = True
         termination_reason = "sop_completed"
-    # 安全退出：如果没有SOP步骤且已执行了3步，也要结束
-    elif (not sop_detail.steps or len(sop_detail.steps) == 0) and current_step >= 3:
+        logger.info(f"SOP步骤完成退出: {current_step} > {len(updated_sop_detail.steps)} + 3")
+    # 安全退出：如果没有SOP步骤且已执行了8步，才结束
+    elif (not updated_sop_detail.steps or len(updated_sop_detail.steps) == 0) and current_step >= 8:
         is_complete = True
         termination_reason = "no_sop_fallback"
+        logger.info(f"无SOP退出: {current_step} >= 8")
     
     # 更新诊断进度
     updated_progress = DiagnosisProgress(
         current_step=current_step,
         max_steps=diagnosis_progress.max_steps,
         is_complete=is_complete,
-        confidence_score=min(current_step / max(sop_detail.total_steps, 1), 1.0),
+        confidence_score=min(current_step / max(updated_sop_detail.total_steps, 1), 1.0),
         termination_reason=termination_reason
     )
     
     return {
         "diagnosis_progress": updated_progress,
-        "diagnosis_results": diagnosis_results
+        "diagnosis_results": diagnosis_results,
+        "sop_detail": updated_sop_detail,
+        "sop_loaded": sop_loaded
     }
 
 
@@ -321,9 +386,10 @@ def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) 
     """评估诊断进度，根据执行情况决定下一步"""
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     
-    # 安全检查：强制最大步骤限制
-    if diagnosis_progress.current_step >= 10:  # 硬编码最大步骤数
-        logger.warning(f"强制终止：步骤数达到安全上限 {diagnosis_progress.current_step}")
+    # 安全检查：使用动态最大步骤限制
+    max_steps = max(diagnosis_progress.max_steps, 20)  # 动态设置，至少20步
+    if diagnosis_progress.current_step >= max_steps:
+        logger.warning(f"强制终止：步骤数达到安全上限 {diagnosis_progress.current_step}/{max_steps}")
         return "finalize_answer"
     
     # 如果诊断完成，生成最终报告
