@@ -39,7 +39,7 @@ class QuestionAnalysis(BaseModel):
 class DiagnosisProgress(BaseModel):
     """诊断进度跟踪"""
     current_step: int = 0
-    max_steps: int = 5
+    max_steps: int = 50
     is_complete: bool = False
     confidence_score: float = 0.0
     root_cause_found: bool = False

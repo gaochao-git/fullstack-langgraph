@@ -205,13 +205,6 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
     return {}
 
 
-def execute_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """工具执行节点 - 使用ToolNode执行工具"""
-    # 这个节点会被ToolNode替代，但我们需要在这里处理工具执行后的状态更新
-    # 增加一个空返回，因为所有节点都需要返回一个字典
-    return {}
-
-
 def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """诊断反思节点 - 简化版本，直接更新诊断进度"""
     configurable = Configuration.from_runnable_config(config)
