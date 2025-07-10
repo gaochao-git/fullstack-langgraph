@@ -508,18 +508,11 @@ sop_tools = [
 all_tools = ssh_tools + sop_tools
 tool_node = ToolNode(all_tools)
 builder.add_node("execute_tools", tool_node)
-
 builder.add_node("reflection", reflect_diagnosis_progress)
 builder.add_node("finalize_answer", finalize_diagnosis_report)
-
 # 添加边 - 参考调研agent的清晰边连接
 builder.add_edge(START, "analyze_question")
-builder.add_conditional_edges(
-    "analyze_question", 
-    check_info_sufficient, 
-    ["plan_tools", "finalize_answer"]
-)
-
+builder.add_conditional_edges("analyze_question", check_info_sufficient, ["plan_tools", "finalize_answer"])
 # 修复：自定义条件函数来决定是否有工具调用
 def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
     """检查是否有工具调用"""
