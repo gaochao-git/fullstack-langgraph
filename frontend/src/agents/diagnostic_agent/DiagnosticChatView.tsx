@@ -16,7 +16,7 @@ export interface ProcessedEvent {
 
 
 // 动态按钮文字组件
-const DiagnosisButtonText: React.FC = () => {
+const DiagnosisButtonText: React.FC<{ text?: string }> = ({ text = "诊断中" }) => {
   const [dots, setDots] = useState("");
 
   useEffect(() => {
@@ -33,7 +33,7 @@ const DiagnosisButtonText: React.FC = () => {
   return (
     <span className="flex items-center gap-2">
       <Loader2 className="h-4 w-4 animate-spin" />
-      诊断中
+      {text}
       <span className="inline-block w-6 text-left">{dots}</span>
     </span>
   );
@@ -382,8 +382,8 @@ export function DiagnosticChatView({
               )}
             </div>
           ))}
-          {/* 加载状态 - 包括等待工具确认期间 */}
-          {(isLoading || interrupt) && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
+          {/* 加载状态 */}
+          {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
             <div className="flex items-center gap-2 text-gray-600 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
               诊断中...
@@ -418,9 +418,9 @@ export function DiagnosticChatView({
             disabled={isLoading || !inputValue.trim() || !!interrupt}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
           >
-            {isLoading ? <DiagnosisButtonText /> : "发送"}
+            {interrupt ? <DiagnosisButtonText text="工具确认" /> : isLoading ? <DiagnosisButtonText /> : "发送"}
           </Button>
-          {isLoading && (
+          {(isLoading || interrupt) && (
             <Button
               type="button"
               variant="outline"
