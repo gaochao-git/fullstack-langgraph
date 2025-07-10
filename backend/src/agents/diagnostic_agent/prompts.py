@@ -4,7 +4,88 @@ from datetime import datetime
 def get_current_date():
     return datetime.now().strftime("%Y年%m月%d日")
 
-# 问题分析提示词 - 类似调研agent的query_writer_instructions
+# 问题分析提示词函数
+def get_question_analysis_prompt(current_date: str, user_question: str, current_analysis=None):
+    """生成问题分析提示词"""
+    # 构建当前已有信息的显示
+    current_info = ""
+    if current_analysis:
+        current_info = f"""
+当前已有信息：
+- 故障IP: {current_analysis.fault_ip or '待提取'}
+- 故障时间: {current_analysis.fault_time or '待提取'}
+- 故障现象: {current_analysis.fault_info or '待提取'}
+- SOP编号: {current_analysis.sop_id or '待提取'}
+"""
+    
+    return f"""当前时间：{current_date}
+
+用户最新输入：{user_question}
+{current_info}
+请从用户输入中提取或更新故障诊断信息。如果用户提供了新信息，请更新对应字段；如果没有提供新信息，保持原有值。
+
+对于每个字段：
+- fault_ip: 提取IP地址，如192.168.1.100或82.156.146.51
+- fault_time: 提取时间信息，支持各种格式
+- fault_info: 提取故障现象描述，如"磁盘空间满"、"内存不足"等
+- sop_id: 提取SOP编号，如sop_101、SOP-001等
+
+如果某个字段无法从用户输入中提取，请填写'待提取'。"""
+
+# 缺失信息提示词函数
+def get_missing_info_prompt(question_analysis):
+    """生成缺失信息提示词"""
+    # 显示当前信息状态
+    info_status = []
+    info_status.append(f"✅ 故障IP: {question_analysis.fault_ip}" if question_analysis.fault_ip and question_analysis.fault_ip != '待提取' else "❌ 故障IP: 待提取")
+    info_status.append(f"✅ 故障时间: {question_analysis.fault_time}" if question_analysis.fault_time and question_analysis.fault_time != '待提取' else "❌ 故障时间: 待提取")
+    info_status.append(f"✅ 故障现象: {question_analysis.fault_info}" if question_analysis.fault_info and question_analysis.fault_info != '待提取' else "❌ 故障现象: 待提取")
+    info_status.append(f"✅ SOP编号: {question_analysis.sop_id}" if question_analysis.sop_id and question_analysis.sop_id != '待提取' else "❌ SOP编号: 待提取")
+    
+    # 构建基础状态信息
+    status_info = "\n".join(info_status)
+    
+    # 构建缺失字段信息
+    missing_fields_info = ""
+    if question_analysis.missing_fields:
+        field_descriptions = {
+            "故障IP": "故障服务器的IP地址（如：192.168.1.100）",
+            "故障时间": "故障发生的具体时间（如：2024-01-15 14:30）",
+            "故障现象": "具体的故障表现和症状描述",
+            "排查SOP编号": "对应的标准作业程序编号（如：SOP-001）"
+        }
+        
+        missing_items = []
+        for i, field in enumerate(question_analysis.missing_fields, 1):
+            description = field_descriptions.get(field, "")
+            missing_items.append(f"{i}. **{field}**：{description}")
+        
+        missing_fields_info = f"""📋 还需要补充以下信息：
+
+{'\n'.join(missing_items)}"""
+    
+    # 使用f-string构建完整提示词
+    return f"""❗ 故障诊断信息不完整，当前状态：
+
+{status_info}
+
+{missing_fields_info}
+
+📝 您可以通过以下方式提供信息：
+**方式一：自然语言**
+例如："故障IP是192.168.1.100，时间是今天下午2点"
+
+**方式二：结构化格式**
+```
+故障IP: [请填写]
+故障时间: [请填写]
+故障现象: [请填写]
+SOP编号: [请填写]
+```
+
+💡 您可以分多次补充，信息完整后将自动开始诊断。"""
+
+# 问题分析提示词 - 类似调研agent的query_writer_instructions（保留兼容性）
 question_analysis_instructions = """您是专业的故障诊断助手，负责分析用户输入并提取关键诊断信息。
 
 目标：

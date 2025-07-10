@@ -13,7 +13,7 @@ from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
-from agents.diagnostic_agent.prompts import (get_current_date,question_analysis_instructions,tool_planning_instructions,diagnosis_report_instructions)
+from agents.diagnostic_agent.prompts import (get_current_date,get_question_analysis_prompt,get_missing_info_prompt,question_analysis_instructions,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
 
 # 导入工具
@@ -38,31 +38,13 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     # 获取当前已有的四要素信息
     current_analysis = state.get("question_analysis", QuestionAnalysis())
     
-    # 构建包含当前信息的提示词
+    # 使用提示词模板函数生成提示词
     current_date = get_current_date()
-    enhanced_prompt = f"""当前时间：{current_date}
-
-用户最新输入：{user_question}
-
-当前已有信息：
-- 故障IP: {current_analysis.fault_ip or '待提取'}
-- 故障时间: {current_analysis.fault_time or '待提取'}
-- 故障现象: {current_analysis.fault_info or '待提取'}
-- SOP编号: {current_analysis.sop_id or '待提取'}
-
-请从用户输入中提取或更新故障诊断信息。如果用户提供了新信息，请更新对应字段；如果没有提供新信息，保持原有值。
-
-对于每个字段：
-- fault_ip: 提取IP地址，如192.168.1.100或82.156.146.51
-- fault_time: 提取时间信息，支持各种格式
-- fault_info: 提取故障现象描述，如"磁盘空间满"、"内存不足"等
-- sop_id: 提取SOP编号，如sop_101、SOP-001等
-
-如果某个字段无法从用户输入中提取，请填写'待提取'。"""
+    prompt = get_question_analysis_prompt(current_date, user_question, current_analysis)
     
     # 使用结构化输出
     structured_llm = llm.with_structured_output(QuestionInfoExtraction)
-    result = structured_llm.invoke(enhanced_prompt)
+    result = structured_llm.invoke(prompt)
     
     # 合并信息：优先使用新信息，无新信息时保持原值
     def merge_field(new_value, old_value):
@@ -398,41 +380,8 @@ def handle_insufficient_info(state: DiagnosticState, config: RunnableConfig) -> 
     """处理信息不足的情况，提示用户补充缺失信息"""
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     
-    # 显示当前信息状态
-    info_status = []
-    info_status.append(f"✅ 故障IP: {question_analysis.fault_ip}" if question_analysis.fault_ip and question_analysis.fault_ip != '待提取' else "❌ 故障IP: 待提取")
-    info_status.append(f"✅ 故障时间: {question_analysis.fault_time}" if question_analysis.fault_time and question_analysis.fault_time != '待提取' else "❌ 故障时间: 待提取")
-    info_status.append(f"✅ 故障现象: {question_analysis.fault_info}" if question_analysis.fault_info and question_analysis.fault_info != '待提取' else "❌ 故障现象: 待提取")
-    info_status.append(f"✅ SOP编号: {question_analysis.sop_id}" if question_analysis.sop_id and question_analysis.sop_id != '待提取' else "❌ SOP编号: 待提取")
-    
-    # 构建提示信息
-    missing_info_prompt = "❗ 故障诊断信息不完整，当前状态：\n\n"
-    missing_info_prompt += "\n".join(info_status) + "\n\n"
-    
-    if question_analysis.missing_fields:
-        missing_info_prompt += "📋 还需要补充以下信息：\n\n"
-        field_descriptions = {
-            "故障IP": "故障服务器的IP地址（如：192.168.1.100）",
-            "故障时间": "故障发生的具体时间（如：2024-01-15 14:30）",
-            "故障现象": "具体的故障表现和症状描述",
-            "排查SOP编号": "对应的标准作业程序编号（如：SOP-001）"
-        }
-        
-        for i, field in enumerate(question_analysis.missing_fields, 1):
-            description = field_descriptions.get(field, "")
-            missing_info_prompt += f"{i}. **{field}**：{description}\n"
-    
-    missing_info_prompt += "\n📝 您可以通过以下方式提供信息：\n"
-    missing_info_prompt += "**方式一：自然语言**\n"
-    missing_info_prompt += "例如：\"故障IP是192.168.1.100，时间是今天下午2点\"\n\n"
-    missing_info_prompt += "**方式二：结构化格式**\n"
-    missing_info_prompt += "```\n"
-    missing_info_prompt += "故障IP: [请填写]\n"
-    missing_info_prompt += "故障时间: [请填写]\n"
-    missing_info_prompt += "故障现象: [请填写]\n"
-    missing_info_prompt += "SOP编号: [请填写]\n"
-    missing_info_prompt += "```\n\n"
-    missing_info_prompt += "💡 您可以分多次补充，信息完整后将自动开始诊断。"
+    # 使用提示词模板函数生成缺失信息提示
+    missing_info_prompt = get_missing_info_prompt(question_analysis)
     
     return {
         "messages": [AIMessage(content=missing_info_prompt)]
