@@ -38,14 +38,6 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     # 获取当前已有的四要素信息
     current_analysis = state.get("question_analysis", QuestionAnalysis())
     
-    # 调试：打印当前状态
-    print(f"🔍 [DEBUG] 当前状态获取:")
-    print(f"  - fault_ip: {current_analysis.fault_ip}")
-    print(f"  - fault_time: {current_analysis.fault_time}")
-    print(f"  - fault_info: {current_analysis.fault_info}")
-    print(f"  - sop_id: {current_analysis.sop_id}")
-    print(f"  - 用户输入: {user_question}")
-    
     # 构建包含当前信息的提示词
     current_date = get_current_date()
     enhanced_prompt = f"""当前时间：{current_date}
@@ -72,42 +64,24 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     structured_llm = llm.with_structured_output(QuestionInfoExtraction)
     result = structured_llm.invoke(enhanced_prompt)
     
-    # 调试：打印提取结果
-    print(f"📤 [DEBUG] LLM结构化输出结果:")
-    print(f"  - fault_ip: {result.fault_ip}")
-    print(f"  - fault_time: {result.fault_time}")
-    print(f"  - fault_info: {result.fault_info}")
-    print(f"  - sop_id: {result.sop_id}")
-    
     # 合并信息：优先使用新信息，无新信息时保持原值
-    # 修复：改进IP提取逻辑，确保新的有效IP能够覆盖原有值
-    def merge_field(new_value, old_value, field_name=""):
+    def merge_field(new_value, old_value):
         # 如果新值有效且不是待提取，使用新值
         if new_value and new_value != "待提取" and new_value.strip():
-            print(f"  合并 {field_name}: 使用新值 '{new_value}'")
             return new_value
         # 如果旧值有效且不是待提取，保持旧值
         elif old_value and old_value != "待提取" and old_value.strip():
-            print(f"  合并 {field_name}: 保持旧值 '{old_value}'")
             return old_value
         # 否则返回待提取
         else:
-            print(f"  合并 {field_name}: 设为待提取")
             return "待提取"
     
     merged_analysis = QuestionAnalysis(
-        fault_ip=merge_field(result.fault_ip, current_analysis.fault_ip, "故障IP"),
-        fault_time=merge_field(result.fault_time, current_analysis.fault_time, "故障时间"),
-        fault_info=merge_field(result.fault_info, current_analysis.fault_info, "故障现象"),
-        sop_id=merge_field(result.sop_id, current_analysis.sop_id, "SOP编号")
+        fault_ip=merge_field(result.fault_ip, current_analysis.fault_ip),
+        fault_time=merge_field(result.fault_time, current_analysis.fault_time),
+        fault_info=merge_field(result.fault_info, current_analysis.fault_info),
+        sop_id=merge_field(result.sop_id, current_analysis.sop_id)
     )
-    
-    # 调试：打印合并结果
-    print(f"🔄 [DEBUG] 合并后状态:")
-    print(f"  - fault_ip: {merged_analysis.fault_ip}")
-    print(f"  - fault_time: {merged_analysis.fault_time}")
-    print(f"  - fault_info: {merged_analysis.fault_info}")
-    print(f"  - sop_id: {merged_analysis.sop_id}")
     
     # 检查四要素是否都完整
     info_sufficient = (
