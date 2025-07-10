@@ -382,8 +382,8 @@ export function DiagnosticChatView({
               )}
             </div>
           ))}
-          {/* 加载状态 */}
-          {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
+          {/* 加载状态 - 包括等待工具确认期间 */}
+          {(isLoading || interrupt) && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
             <div className="flex items-center gap-2 text-gray-600 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
               诊断中...

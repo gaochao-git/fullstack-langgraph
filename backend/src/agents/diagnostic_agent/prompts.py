@@ -185,7 +185,6 @@ reflection_instructions = """您是专业的故障诊断专家，负责检查SOP
 请将响应格式化为包含以下确切键的JSON对象：
 {{
     "is_complete": true/false,  // 是否可以结束诊断（找到根因或完成所有SOP步骤）
-    "confidence_score": 0.0-1.0,  // 对当前诊断结果的置信度
     "sop_steps_completed": ["已完成的SOP步骤"],
     "sop_steps_remaining": ["还需执行的SOP步骤"],
     "root_cause_found": true/false,  // 是否找到了明确的根因
@@ -247,7 +246,6 @@ diagnosis_report_instructions = """您是专业的故障诊断专家，负责基
 执行进度：
 - 当前步骤：{current_step}/{total_steps}
 - 完成状态：{completion_status}
-- 置信度：{confidence_score}
 
 诊断过程：
 {diagnosis_results}

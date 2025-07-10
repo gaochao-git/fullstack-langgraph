@@ -41,7 +41,6 @@ class DiagnosisProgress(BaseModel):
     current_step: int = 0
     max_steps: int = 50
     is_complete: bool = False
-    confidence_score: float = 0.0
     root_cause_found: bool = False
     root_cause_analysis: str = ""
     termination_reason: Literal["continue", "root_cause_found", "sop_completed", "max_steps_reached", "no_sop_fallback", "user_cancelled"] = "continue"
@@ -73,7 +72,6 @@ class DiagnosticOutput(BaseModel):
     final_diagnosis: str = ""
     sop_used: str = ""
     tools_executed: List[str] = Field(default_factory=list)
-    confidence_score: float = 0.0
     recommendations: List[str] = Field(default_factory=list)
     execution_time: str = ""
     step_count: int = 0

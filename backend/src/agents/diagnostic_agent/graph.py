@@ -364,7 +364,6 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
         current_step=current_step,
         max_steps=diagnosis_progress.max_steps,
         is_complete=is_complete,
-        confidence_score=min(current_step / max(updated_sop_detail.total_steps, 1), 1.0),
         termination_reason=termination_reason
     )
     
@@ -414,7 +413,6 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
         current_step=diagnosis_progress.current_step,
         total_steps=sop_detail.total_steps,
         completion_status='已完成' if diagnosis_progress.is_complete else '进行中',
-        confidence_score=f"{diagnosis_progress.confidence_score:.2f}",
         diagnosis_results='\n'.join(diagnosis_results) if diagnosis_results else '未进行诊断'
     )
     
@@ -427,7 +425,6 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
 - 使用SOP：{question_analysis.sop_id}
 - 执行步骤：{diagnosis_progress.current_step}/{sop_detail.total_steps}
 - 完成状态：{'✅ 已完成' if diagnosis_progress.is_complete else '🔄 进行中'}
-- 置信度：{diagnosis_progress.confidence_score:.1%}
 
 ⚠️ 重要提醒：
 以上诊断结果基于SOP执行。在执行任何操作前，请确认系统状态并评估风险。
