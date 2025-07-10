@@ -14,7 +14,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.types import Send, interrupt
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_deepseek import ChatDeepSeek
+from langchain_openai import ChatOpenAI
 from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
 from agents.diagnostic_agent.prompts import (get_current_date,question_analysis_instructions,tool_planning_instructions,reflection_instructions,final_diagnosis_instructions,diagnosis_report_instructions)
@@ -24,7 +24,8 @@ from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
 from tools import ssh_tool, sop_tool
 from dotenv import load_dotenv
 load_dotenv()
-if os.getenv("DEEPSEEK_API_KEY") is None:raise ValueError("DEEPSEEK_API_KEY is not set")
+if os.getenv("DEEPSEEK_API_KEY") is None:
+    raise ValueError("DEEPSEEK_API_KEY is not set")
 logger = logging.getLogger(__name__)
 
 
@@ -32,11 +33,12 @@ logger = logging.getLogger(__name__)
 def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """问题分析节点 - 类似调研agent的generate_query"""
     configurable = Configuration.from_runnable_config(config)
-    llm = ChatDeepSeek(
+    llm = ChatOpenAI(
         model=configurable.query_generator_model,
         temperature=1.0,
         max_retries=2,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url="https://api.deepseek.com",
     )
     
     messages = state.get("messages", [])
@@ -90,11 +92,12 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
 def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具规划节点 - 严格按照SOP执行"""
     configurable = Configuration.from_runnable_config(config)
-    llm = ChatDeepSeek(
+    llm = ChatOpenAI(
         model=configurable.query_generator_model,
         temperature=0.1,  # 降低温度，确保严格执行
         max_retries=2,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url="https://api.deepseek.com",
     )
     
     # 绑定工具到LLM
@@ -421,11 +424,12 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
     configurable = Configuration.from_runnable_config(config)
     
     # 初始化推理模型
-    llm = ChatDeepSeek(
+    llm = ChatOpenAI(
         model=configurable.answer_model,
         temperature=0,
         max_retries=2,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
+        base_url="https://api.deepseek.com",
     )
     
     # 获取状态信息
