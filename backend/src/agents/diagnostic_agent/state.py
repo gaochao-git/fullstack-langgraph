@@ -42,7 +42,6 @@ class QuestionAnalysisState(TypedDict):
     fault_time: Optional[str]
     fault_info: Optional[str]
     sop_id: Optional[str]
-    info_sufficient: bool
     missing_fields: List[str]
 
 
