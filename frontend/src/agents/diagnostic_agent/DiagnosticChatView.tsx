@@ -31,14 +31,6 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   const toolArgs = toolCall?.args || {};
   const toolResultContent = toolResult?.content || "";
   
-  // 调试日志
-  console.log('🔍 [DEBUG] ToolCall render:', { 
-    toolName, 
-    isPending, 
-    isExpanded,
-    hasOnApprove: !!onApprove,
-    hasOnReject: !!onReject
-  });
   
   return (
     <div className={`border rounded-lg mb-3 ${isPending ? 'border-orange-300 bg-orange-50' : 'border-gray-300 bg-gray-50'}`}>
@@ -82,7 +74,6 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  console.log('🔍 [DEBUG] Approve button clicked');
                   onApprove?.();
                 }}
                 className="bg-green-500 hover:bg-green-600 text-white"
@@ -94,7 +85,6 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
-                  console.log('🔍 [DEBUG] Reject button clicked');
                   onReject?.();
                 }}
               >
@@ -103,21 +93,6 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
             </div>
           )}
           
-          {/* 临时调试按钮 - 总是显示 */}
-          {(isPending || true) && (
-            <div className="flex gap-2 pt-2 border-t border-gray-200 mt-3 pt-3">
-              <div className="text-xs text-gray-500">
-                Debug: isPending={isPending ? 'true' : 'false'}, 
-                hasApprove={!!onApprove ? 'true' : 'false'},
-                hasReject={!!onReject ? 'true' : 'false'}
-              </div>
-              {isPending && (
-                <div className="text-xs text-orange-600 font-semibold">
-                  待确认状态
-                </div>
-              )}
-            </div>
-          )}
           
           {/* 输出结果 */}
           {toolResultContent && (
@@ -174,7 +149,6 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
   // 检查工具调用是否为待确认状态
   const isPendingToolCall = (toolCall: any) => {
     if (!interrupt) {
-      console.log('🔍 [DEBUG] No interrupt');
       return false;
     }
     
@@ -182,15 +156,8 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
     const isLatestMessage = allMessages.length > 0 && allMessages[allMessages.length - 1].id === message.id;
     
     if (!isLatestMessage) {
-      console.log('🔍 [DEBUG] Not latest message, no pending state');
       return false;
     }
-    
-    console.log('🔍 [DEBUG] Latest message has interrupt, marking tool as pending:', { 
-      toolCall: toolCall.name,
-      messageId: message.id,
-      isLatestMessage
-    });
     
     // 如果是最新消息且有interrupt，则标记为待确认
     return true;
@@ -254,12 +221,6 @@ export function DiagnosticChatView({
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   
-  // 调试日志
-  console.log('🔍 [DEBUG] DiagnosticChatView props:', { 
-    hasInterrupt: !!interrupt, 
-    interrupt,
-    messagesCount: messages.length 
-  });
   const handleCopy = async (text: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(text);
