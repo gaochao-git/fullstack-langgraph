@@ -13,11 +13,9 @@ from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
-from agents.diagnostic_agent.prompts import (get_current_date,get_question_analysis_prompt,get_missing_info_prompt,question_analysis_instructions,tool_planning_instructions,diagnosis_report_instructions)
-from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
-
-# 导入工具
-from tools import ssh_tool, sop_tool
+from agents.diagnostic_agent.prompts import (get_current_date,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
+from agents.diagnostic_agent.schemas import QuestionInfoExtraction
+from agents.diagnostic_agent.tools import all_tools
 from dotenv import load_dotenv
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -107,20 +105,6 @@ def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict
     )
     
     # 绑定工具到LLM
-    ssh_tools = [
-        ssh_tool.get_system_info,
-        ssh_tool.analyze_processes,
-        ssh_tool.check_service_status,
-        ssh_tool.analyze_system_logs,
-        ssh_tool.execute_system_command
-    ]
-    sop_tools = [
-        sop_tool.get_sop_content,
-        sop_tool.get_sop_detail,
-        sop_tool.list_sops,
-        sop_tool.search_sops
-    ]
-    all_tools = ssh_tools + sop_tools
     llm_with_tools = llm.bind_tools(all_tools)
     
     # 构建工具规划提示
@@ -279,8 +263,6 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
 
 def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """诊断反思节点 - 简化版本，直接更新诊断进度"""
-    configurable = Configuration.from_runnable_config(config)
-    
     # 获取当前状态
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     sop_detail = state.get("sop_detail", SOPDetail())
@@ -482,20 +464,6 @@ def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
     else:
         return "reflection"
 # 创建工具执行节点
-ssh_tools = [
-    ssh_tool.get_system_info,
-    ssh_tool.analyze_processes,
-    ssh_tool.check_service_status,
-    ssh_tool.analyze_system_logs,
-    ssh_tool.execute_system_command
-]
-sop_tools = [
-    sop_tool.get_sop_content,
-    sop_tool.get_sop_detail,
-    sop_tool.list_sops,
-    sop_tool.search_sops
-]
-all_tools = ssh_tools + sop_tools
 tool_node = ToolNode(all_tools)
 
 
@@ -522,8 +490,12 @@ builder.add_edge("finalize_answer", END)
 
 # 编译图
 graph = builder.compile(name="diagnostic-agent")
+
 # 保存图像
-graph_image = graph.get_graph().draw_mermaid_png()
-with open("diagnostic_agent_graph.png", "wb") as f: 
-    f.write(graph_image)
-print("图已保存到: diagnostic_agent_graph.png")
+try:
+    graph_image = graph.get_graph().draw_mermaid_png()
+    with open("diagnostic_agent_graph.png", "wb") as f: 
+        f.write(graph_image)
+    print("图已保存到: diagnostic_agent_graph.png")
+except Exception as e:
+    print(f"生成图失败: {e}")

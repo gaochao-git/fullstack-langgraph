@@ -1,5 +1,9 @@
+"""
+故障诊断代理数据模型定义模块
+包含所有Pydantic模型和数据结构
+"""
 from typing import List
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 
 class QuestionInfoExtraction(BaseModel):
