@@ -79,16 +79,16 @@ def analyze_question(state: DiagnosticOverallState, config: RunnableConfig) -> Q
     )
     
     # 生成缺失字段列表
-        missing_fields = []
-        if not result.fault_ip or result.fault_ip.strip() == "" or result.fault_ip == "待提取":
-            missing_fields.append("故障IP")
-        if not result.fault_time or result.fault_time.strip() == "" or result.fault_time == "待提取":
-            missing_fields.append("故障时间")
-        if not result.fault_info or result.fault_info.strip() == "" or result.fault_info == "待提取":
-            missing_fields.append("故障现象")
-        if not result.sop_id or result.sop_id.strip() == "" or result.sop_id == "待提取":
-            missing_fields.append("排查SOP编号")
-        
+    missing_fields = []
+    if not result.fault_ip or result.fault_ip.strip() == "" or result.fault_ip == "待提取":
+        missing_fields.append("故障IP")
+    if not result.fault_time or result.fault_time.strip() == "" or result.fault_time == "待提取":
+        missing_fields.append("故障时间")
+    if not result.fault_info or result.fault_info.strip() == "" or result.fault_info == "待提取":
+        missing_fields.append("故障现象")
+    if not result.sop_id or result.sop_id.strip() == "" or result.sop_id == "待提取":
+        missing_fields.append("排查SOP编号")
+    
     return {
         "fault_ip": result.fault_ip,
         "fault_time": result.fault_time,
@@ -246,7 +246,7 @@ def reflect_diagnosis_progress(state: DiagnosticOverallState, config: RunnableCo
         from agents.diagnostic_agent.tools_and_schemas import DiagnosisReflectionOutput
         result = llm.with_structured_output(DiagnosisReflectionOutput).invoke(formatted_prompt)
     
-    return {
+        return {
             "is_complete": result.is_complete,
             "confidence_score": result.confidence_score,
             "sop_steps_completed": result.sop_steps_completed,
@@ -493,10 +493,7 @@ builder.add_edge("finalize_answer", END)
 graph = builder.compile(name="diagnostic-agent")
 
 # 保存图像
-try:
 graph_image = graph.get_graph().draw_mermaid_png()
 with open("diagnostic_agent_graph.png", "wb") as f: 
     f.write(graph_image)
 print("图已保存到: diagnostic_agent_graph.png")
-except Exception as e:
-    logger.error(f"保存图像失败: {e}")
