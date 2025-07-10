@@ -32,6 +32,7 @@ from agents.diagnostic_agent.prompts import (
     tool_planning_instructions,
     reflection_instructions,
     final_diagnosis_instructions,
+    diagnosis_report_instructions,
 )
 from agents.diagnostic_agent.tools_and_schemas import QuestionInfoExtraction
 
@@ -274,32 +275,21 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     diagnosis_results = state.get("diagnosis_results", [])
     
-    # 构建SOP执行报告
-    current_date = get_current_date()
+    # 使用提示词模板生成最终诊断报告
+    formatted_prompt = diagnosis_report_instructions.format(
+        current_date=get_current_date(),
+        fault_ip=question_analysis.fault_ip or '未提供',
+        fault_time=question_analysis.fault_time or '未提供',
+        fault_info=question_analysis.fault_info or '未提供',
+        sop_id=question_analysis.sop_id or '未指定',
+        current_step=diagnosis_progress.current_step,
+        total_steps=sop_detail.total_steps,
+        completion_status='已完成' if diagnosis_progress.is_complete else '进行中',
+        confidence_score=f"{diagnosis_progress.confidence_score:.2f}",
+        diagnosis_results='\n'.join(diagnosis_results) if diagnosis_results else '未进行诊断'
+    )
     
-    sop_execution_report = f"""
-【故障诊断报告】
-诊断日期：{current_date}
-
-基本信息：
-- 故障IP：{question_analysis.fault_ip or '未提供'}
-- 故障时间：{question_analysis.fault_time or '未提供'}
-- 故障现象：{question_analysis.fault_info or '未提供'}
-- 使用SOP：{question_analysis.sop_id or '未指定'}
-
-执行进度：
-- 当前步骤：{diagnosis_progress.current_step}/{sop_detail.total_steps}
-- 完成状态：{'已完成' if diagnosis_progress.is_complete else '进行中'}
-- 置信度：{diagnosis_progress.confidence_score:.2f}
-
-诊断过程：
-{chr(10).join(diagnosis_results) if diagnosis_results else '未进行诊断'}
-
-请基于以上执行结果，生成最终的诊断报告。
-"""
-    
-    # 调用LLM生成最终诊断报告
-    response = llm.invoke(sop_execution_report)
+    response = llm.invoke(formatted_prompt)
     
     final_message = f"""
 {response.content}

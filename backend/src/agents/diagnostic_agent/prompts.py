@@ -140,6 +140,44 @@ final_diagnosis_instructions = """基于收集到的诊断信息和工具执行�
 
 报告应基于实际的诊断结果，不要编造信息。"""
 
+# 最终诊断报告生成提示词
+diagnosis_report_instructions = """您是专业的故障诊断专家，负责基于诊断执行结果生成最终的诊断报告。
+
+任务目标：
+基于提供的故障信息、SOP执行进度和诊断过程，生成一份专业、准确的故障诊断报告。
+
+【故障诊断报告】
+诊断日期：{current_date}
+
+基本信息：
+- 故障IP：{fault_ip}
+- 故障时间：{fault_time}
+- 故障现象：{fault_info}
+- 使用SOP：{sop_id}
+
+执行进度：
+- 当前步骤：{current_step}/{total_steps}
+- 完成状态：{completion_status}
+- 置信度：{confidence_score}
+
+诊断过程：
+{diagnosis_results}
+
+报告要求：
+1. **故障原因分析**：基于诊断过程中收集的信息，分析可能的故障原因
+2. **诊断结论**：根据执行的SOP步骤和收集的证据，给出明确的诊断结论
+3. **解决方案建议**：提供具体可行的解决方案和操作步骤
+4. **风险评估**：评估修复操作的风险和注意事项
+5. **预防措施**：提供避免类似故障的预防建议
+
+注意事项：
+- 所有分析必须基于实际的诊断数据，不得编造信息
+- 如果诊断不完整，应明确说明需要进一步执行的步骤
+- 提供的解决方案应考虑系统安全性和业务连续性
+- 使用专业术语，但确保清晰易懂
+
+请生成结构化的诊断报告。"""
+
 # 保留原有的兼容性接口
 default_info_insufficient_prompt = question_analysis_instructions
 default_diagnosis_plan_prompt = final_diagnosis_instructions
