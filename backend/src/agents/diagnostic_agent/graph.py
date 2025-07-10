@@ -404,6 +404,38 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
     }
 
 
+def handle_insufficient_info(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+    """处理信息不足的情况，提示用户补充缺失信息"""
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    
+    # 构建缺失信息提示
+    missing_info_prompt = "❗ 故障诊断信息不完整，请补充以下必要信息：\n\n"
+    
+    field_descriptions = {
+        "故障IP": "故障服务器的IP地址（如：192.168.1.100）",
+        "故障时间": "故障发生的具体时间（如：2024-01-15 14:30）",
+        "故障现象": "具体的故障表现和症状描述",
+        "排查SOP编号": "对应的标准作业程序编号（如：SOP-001）"
+    }
+    
+    for i, field in enumerate(question_analysis.missing_fields, 1):
+        description = field_descriptions.get(field, "")
+        missing_info_prompt += f"{i}. **{field}**：{description}\n"
+    
+    missing_info_prompt += "\n📝 请按以下格式提供完整信息：\n"
+    missing_info_prompt += "```\n"
+    missing_info_prompt += f"故障IP: {question_analysis.fault_ip if question_analysis.fault_ip and question_analysis.fault_ip != '待提取' else '[请填写]'}\n"
+    missing_info_prompt += f"故障时间: {question_analysis.fault_time if question_analysis.fault_time and question_analysis.fault_time != '待提取' else '[请填写]'}\n"
+    missing_info_prompt += f"故障现象: {question_analysis.fault_info if question_analysis.fault_info and question_analysis.fault_info != '待提取' else '[请填写]'}\n"
+    missing_info_prompt += f"SOP编号: {question_analysis.sop_id if question_analysis.sop_id and question_analysis.sop_id != '待提取' else '[请填写]'}\n"
+    missing_info_prompt += "```\n\n"
+    missing_info_prompt += "💡 提供完整信息后，我将为您执行专业的故障诊断流程。"
+    
+    return {
+        "messages": [AIMessage(content=missing_info_prompt)]
+    }
+
+
 def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """完成诊断报告节点 - 基于严格的SOP执行结果"""
     configurable = Configuration.from_runnable_config(config)
@@ -461,7 +493,11 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
 def check_info_sufficient(state: DiagnosticState, config: RunnableConfig) -> str:
     """检查信息是否充足"""
     question_analysis = state.get("question_analysis", QuestionAnalysis())
-    return "plan_tools" if question_analysis.info_sufficient else "finalize_answer"
+    if question_analysis.info_sufficient:
+        return "plan_tools"
+    else:
+        # 信息不足时，提示用户补充
+        return "handle_insufficient_info"
 
 
 def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> str:
@@ -517,13 +553,15 @@ tool_node = ToolNode(all_tools)
 builder = StateGraph(DiagnosticState, config_schema=Configuration)
 # 添加节点
 builder.add_node("analyze_question", analyze_question)
+builder.add_node("handle_insufficient_info", handle_insufficient_info)
 builder.add_node("plan_tools", plan_diagnosis_tools)
 builder.add_node("approval", approval_node)
 builder.add_node("execute_tools", tool_node)
 builder.add_node("reflection", reflect_diagnosis_progress)
 builder.add_node("finalize_answer", finalize_diagnosis_report)
 builder.add_edge(START, "analyze_question")
-builder.add_conditional_edges("analyze_question", check_info_sufficient, ["plan_tools", "finalize_answer"])
+builder.add_conditional_edges("analyze_question", check_info_sufficient, ["plan_tools", "handle_insufficient_info"])
+builder.add_edge("handle_insufficient_info", END)
 builder.add_conditional_edges("plan_tools",check_tool_calls,{"approval": "approval","reflection": "reflection"})
 builder.add_edge("approval", "execute_tools")
 builder.add_edge("execute_tools", "reflection")
