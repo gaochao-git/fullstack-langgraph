@@ -524,13 +524,25 @@ builder.add_conditional_edges(
     ["plan_tools", "finalize_answer"]
 )
 
-# 修复：使用tools_condition来决定是否有工具调用
+# 修复：自定义条件函数来决定是否有工具调用
+def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
+    """检查是否有工具调用"""
+    messages = state.get("messages", [])
+    if not messages:
+        return "reflection"
+    
+    last_message = messages[-1]
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        return "approval"
+    else:
+        return "reflection"
+
 builder.add_conditional_edges(
     "plan_tools",
-    tools_condition,
+    check_tool_calls,
     {
-        "tools": "approval",
-        "continue": "reflection"  # 如果没有工具调用，也进入反思环节
+        "approval": "approval",
+        "reflection": "reflection"
     }
 )
 

@@ -61,6 +61,7 @@ const markdownStyles = `
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 0.875em;
     border: 1px solid #E5E7EB;
+    white-space: nowrap;
   }
   .markdown-body pre { 
     background-color: #F9FAFB;
@@ -69,6 +70,7 @@ const markdownStyles = `
     padding: 16px;
     overflow-x: auto;
     margin: 16px 0;
+    white-space: pre;
   }
   .markdown-body pre code {
     color: #1F2937;
@@ -76,6 +78,7 @@ const markdownStyles = `
     background: transparent;
     padding: 0;
     border: none;
+    white-space: pre;
   }
   .markdown-body ul {
     @apply list-disc list-inside mb-4;

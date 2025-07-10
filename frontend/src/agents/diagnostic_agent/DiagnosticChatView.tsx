@@ -223,11 +223,11 @@ export function DiagnosticChatView({
               {/* 助手合并输出区域 */}
               {round.assistant.length > 0 && (
                 <div className="flex flex-col items-start mb-6">
-                  <div className="flex items-start gap-2 max-w-[100%] sm:max-w-[90%]">
+                  <div className="flex items-start gap-2 max-w-[100%] sm:max-w-[90%] min-w-0">
                     <div className="rounded-full bg-gray-200 p-2 flex-shrink-0 flex items-center justify-center">
                       <Bot className="h-5 w-5 text-gray-600" />
                     </div>
-                    <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 w-full">
+                    <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 w-full overflow-x-auto max-w-none">
                       {round.assistant.map((msg, i) => {
                         // 活动事件和 AI 内容
                         if (msg.type === 'ai') {
@@ -244,8 +244,8 @@ export function DiagnosticChatView({
                               )}
                               {/* AI 内容 */}
                               {msg.content && (
-                                <div className="mb-2 overflow-x-auto">
-                                  <div className="min-w-fit">
+                                <div className="mb-2 overflow-x-auto min-w-0">
+                                  <div className="min-w-fit max-w-none">
                                     <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
                                   </div>
                                 </div>
