@@ -38,6 +38,14 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     # 获取当前已有的四要素信息
     current_analysis = state.get("question_analysis", QuestionAnalysis())
     
+    # 调试：打印当前状态
+    print(f"🔍 [DEBUG] 当前状态获取:")
+    print(f"  - fault_ip: {current_analysis.fault_ip}")
+    print(f"  - fault_time: {current_analysis.fault_time}")
+    print(f"  - fault_info: {current_analysis.fault_info}")
+    print(f"  - sop_id: {current_analysis.sop_id}")
+    print(f"  - 用户输入: {user_question}")
+    
     # 构建包含当前信息的提示词
     current_date = get_current_date()
     enhanced_prompt = f"""当前时间：{current_date}
@@ -83,6 +91,13 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
             sop_id=sop_match.group() if sop_match else (current_analysis.sop_id or "待提取")
         )
     
+    # 调试：打印提取结果
+    print(f"📤 [DEBUG] LLM/正则提取结果:")
+    print(f"  - fault_ip: {result.fault_ip}")
+    print(f"  - fault_time: {result.fault_time}")
+    print(f"  - fault_info: {result.fault_info}")
+    print(f"  - sop_id: {result.sop_id}")
+    
     # 合并信息：优先使用新信息，无新信息时保持原值
     merged_analysis = QuestionAnalysis(
         fault_ip=result.fault_ip if result.fault_ip != "待提取" else (current_analysis.fault_ip or "待提取"),
@@ -90,6 +105,13 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
         fault_info=result.fault_info if result.fault_info != "待提取" else (current_analysis.fault_info or "待提取"),
         sop_id=result.sop_id if result.sop_id != "待提取" else (current_analysis.sop_id or "待提取")
     )
+    
+    # 调试：打印合并结果
+    print(f"🔄 [DEBUG] 合并后状态:")
+    print(f"  - fault_ip: {merged_analysis.fault_ip}")
+    print(f"  - fault_time: {merged_analysis.fault_time}")
+    print(f"  - fault_info: {merged_analysis.fault_info}")
+    print(f"  - sop_id: {merged_analysis.sop_id}")
     
     # 检查四要素是否都完整
     info_sufficient = (
