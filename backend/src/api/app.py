@@ -68,9 +68,10 @@ class RunCreate(BaseModel):
     input: Dict[str, Any]
     config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
-    stream_mode: Optional[str] = "values"
+    stream_mode: Optional[List[str]] = ["values"]  # 修改为数组类型
     interrupt_before: Optional[List[str]] = None
     interrupt_after: Optional[List[str]] = None
+    on_disconnect: Optional[str] = None  # 添加前端发送的字段
 
 class RunResponse(BaseModel):
     run_id: str
@@ -120,6 +121,91 @@ async def update_thread_state(thread_id: str, state: Dict[str, Any]):
         raise HTTPException(status_code=404, detail="Thread not found")
     threads_store[thread_id]["state"] = state
     return {"success": True}
+
+@app.get("/threads/{thread_id}/history")
+async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[str] = None):
+    """Get all past states for a thread"""
+    if thread_id not in threads_store:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
+    # TODO: Implement proper history tracking with checkpoints
+    # For now, return a simple history based on stored state
+    thread_data = threads_store[thread_id]
+    
+    # Mock history response - in real implementation this would come from checkpoints
+    history = [
+        {
+            "checkpoint": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": str(uuid.uuid4()),
+                "checkpoint_map": {}
+            },
+            "metadata": {
+                "step": 0,
+                "writes": {},
+                "parents": {}
+            },
+            "values": thread_data.get("state", {}),
+            "next": [],
+            "config": {
+                "configurable": {
+                    "thread_id": thread_id,
+                    "checkpoint_ns": ""
+                }
+            },
+            "created_at": thread_data.get("created_at"),
+            "parent_config": None
+        }
+    ]
+    
+    return history[:limit]
+
+@app.post("/threads/{thread_id}/history")
+async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
+    """Get all past states for a thread (POST version)"""
+    if thread_id not in threads_store:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
+    # Extract parameters from request body if provided
+    limit = 10
+    before = None
+    if request_body:
+        limit = request_body.get("limit", 10)
+        before = request_body.get("before", None)
+    
+    # TODO: Implement proper history tracking with checkpoints
+    # For now, return a simple history based on stored state
+    thread_data = threads_store[thread_id]
+    
+    # Mock history response - in real implementation this would come from checkpoints
+    history = [
+        {
+            "checkpoint": {
+                "thread_id": thread_id,
+                "checkpoint_ns": "",
+                "checkpoint_id": str(uuid.uuid4()),
+                "checkpoint_map": {}
+            },
+            "metadata": {
+                "step": 0,
+                "writes": {},
+                "parents": {}
+            },
+            "values": thread_data.get("state", {}),
+            "next": [],
+            "config": {
+                "configurable": {
+                    "thread_id": thread_id,
+                    "checkpoint_ns": ""
+                }
+            },
+            "created_at": thread_data.get("created_at"),
+            "parent_config": None
+        }
+    ]
+    
+    return history[:limit]
 
 # Run Management Endpoints
 @app.post("/threads/{thread_id}/runs", response_model=RunResponse)
