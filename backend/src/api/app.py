@@ -292,6 +292,15 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                         # Handle tuples (like from LangGraph messages)
                         if isinstance(val, tuple):
                             return [serialize_value(item) for item in val]
+                        # Handle LangGraph Interrupt objects
+                        elif hasattr(val, 'value') and hasattr(val, 'resumable') and hasattr(val, 'ns'):
+                            # This is a LangGraph Interrupt object
+                            return {
+                                "value": serialize_value(val.value),
+                                "resumable": val.resumable,
+                                "ns": val.ns,
+                                "when": getattr(val, 'when', 'during')
+                            }
                         elif hasattr(val, 'dict'):
                             # Pydantic models
                             return val.dict()
@@ -335,7 +344,13 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                         
                         yield f"id: {event_id}\n"
                         yield f"event: {event_type}\n"
-                        yield f"data: {json.dumps(serialized_data)}\n\n"
+                        yield f"data: {json.dumps(serialized_data, ensure_ascii=False)}\n\n"
+                        
+                        # Check for interrupts and stop streaming if found
+                        if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
+                            logger.info(f"Interrupt detected, stopping stream: {data}")
+                            # Don't send end event - wait for user approval
+                            return
                     else:
                         # Handle dict format (fallback)
                         serializable_chunk = {}
@@ -346,24 +361,24 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                         event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
                         yield f"id: {event_id}\n"
                         yield f"event: {event_type}\n"
-                        yield f"data: {json.dumps(serializable_chunk[event_type])}\n\n"
+                        yield f"data: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n"
                 except Exception as e:
                     logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}")
                     event_id += 1
                     yield f"id: {event_id}\n"
                     yield f"event: error\n"
-                    yield f"data: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)})}\n\n"
+                    yield f"data: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
                 
             # End event
             event_id += 1
             yield f"id: {event_id}\n"
             yield f"event: end\n"
-            yield f"data: {json.dumps({'status': 'completed'})}\n\n"
+            yield f"data: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
             
         except Exception as e:
             logger.error(f"Error in streaming: {e}")
             yield f"event: error\n"
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
         generate(),
@@ -412,19 +427,19 @@ async def stream_run(thread_id: str, run_id: str):
                         else:
                             # Primitive types
                             serializable_chunk[key] = value
-                    yield f"data: {json.dumps(serializable_chunk)}\n\n"
+                    yield f"data: {json.dumps(serializable_chunk, ensure_ascii=False)}\n\n"
                 except Exception as e:
                     logger.error(f"Serialization error: {e}")
-                    yield f"data: {json.dumps({'type': 'chunk', 'data': str(chunk)})}\n\n"
+                    yield f"data: {json.dumps({'type': 'chunk', 'data': str(chunk)}, ensure_ascii=False)}\n\n"
                 
             # Update run status
             runs_store[run_id]["status"] = "completed"
-            yield f"data: {json.dumps({'type': 'end', 'run_id': run_id})}\n\n"
+            yield f"data: {json.dumps({'type': 'end', 'run_id': run_id}, ensure_ascii=False)}\n\n"
             
         except Exception as e:
             logger.error(f"Error in run {run_id}: {e}")
             runs_store[run_id]["status"] = "failed"
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
         generate(),
