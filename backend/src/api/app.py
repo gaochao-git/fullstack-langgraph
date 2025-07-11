@@ -276,7 +276,10 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                     event_id += 1
                     # Convert chunk to JSON-serializable format
                     def serialize_value(val):
-                        if hasattr(val, 'dict'):
+                        # Handle tuples (like from LangGraph messages)
+                        if isinstance(val, tuple):
+                            return [serialize_value(item) for item in val]
+                        elif hasattr(val, 'dict'):
                             # Pydantic models
                             return val.dict()
                         elif hasattr(val, 'to_dict'):
@@ -305,24 +308,28 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                     
                     # Handle tuple format from LangGraph streaming
                     if isinstance(chunk, tuple) and len(chunk) == 2:
-                        key, value = chunk
-                        serializable_chunk = {key: serialize_value(value)}
+                        event_type, data = chunk
+                        serialized_data = serialize_value(data)
+                        yield f"id: {event_id}\n"
+                        yield f"event: {event_type}\n"
+                        yield f"data: {json.dumps(serialized_data)}\n\n"
                     else:
-                        # Handle dict format
+                        # Handle dict format (fallback)
                         serializable_chunk = {}
                         for key, value in chunk.items():
                             serializable_chunk[key] = serialize_value(value)
-                    
-                    # Format as proper SSE
-                    yield f"id: {event_id}\n"
-                    yield f"event: data\n"
-                    yield f"data: {json.dumps(serializable_chunk)}\n\n"
+                        
+                        # Format as proper SSE with event type based on chunk key
+                        event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
+                        yield f"id: {event_id}\n"
+                        yield f"event: {event_type}\n"
+                        yield f"data: {json.dumps(serializable_chunk[event_type])}\n\n"
                 except Exception as e:
-                    logger.error(f"Serialization error: {e}")
+                    logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}")
                     event_id += 1
                     yield f"id: {event_id}\n"
                     yield f"event: error\n"
-                    yield f"data: {json.dumps({'error': str(e), 'chunk': str(chunk)})}\n\n"
+                    yield f"data: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)})}\n\n"
                 
             # End event
             event_id += 1
