@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 # In-memory storage for threads and runs (TODO: replace with persistent storage)
 threads_store: Dict[str, Dict[str, Any]] = {}
 runs_store: Dict[str, Dict[str, Any]] = {}
+# Store message history for each thread
+thread_messages: Dict[str, List[Dict[str, Any]]] = {}
 
 # Available assistants based on langgraph.json
 ASSISTANTS = {
@@ -97,6 +99,7 @@ async def create_thread(thread_create: ThreadCreate):
         "state": {}
     }
     threads_store[thread_id] = thread_data
+    thread_messages[thread_id] = []  # Initialize empty message history
     logger.info(f"Created thread: {thread_id}")
     return ThreadResponse(**thread_data)
 
@@ -128,11 +131,10 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
     if thread_id not in threads_store:
         raise HTTPException(status_code=404, detail="Thread not found")
     
-    # TODO: Implement proper history tracking with checkpoints
-    # For now, return a simple history based on stored state
     thread_data = threads_store[thread_id]
+    messages = thread_messages.get(thread_id, [])
     
-    # Mock history response - in real implementation this would come from checkpoints
+    # Return history with actual messages
     history = [
         {
             "checkpoint": {
@@ -146,7 +148,10 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
                 "writes": {},
                 "parents": {}
             },
-            "values": thread_data.get("state", {}),
+            "values": {
+                "messages": messages,
+                **thread_data.get("state", {})
+            },
             "next": [],
             "config": {
                 "configurable": {
@@ -174,11 +179,10 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
         limit = request_body.get("limit", 10)
         before = request_body.get("before", None)
     
-    # TODO: Implement proper history tracking with checkpoints
-    # For now, return a simple history based on stored state
     thread_data = threads_store[thread_id]
+    messages = thread_messages.get(thread_id, [])
     
-    # Mock history response - in real implementation this would come from checkpoints
+    # Return history with actual messages
     history = [
         {
             "checkpoint": {
@@ -192,7 +196,10 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 "writes": {},
                 "parents": {}
             },
-            "values": thread_data.get("state", {}),
+            "values": {
+                "messages": messages,
+                **thread_data.get("state", {})
+            },
             "next": [],
             "config": {
                 "configurable": {
@@ -263,15 +270,21 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             assistant = ASSISTANTS[request_body.assistant_id]
             graph = assistant["graph"]
             
-            # Build config
+            # Build config with thread_id for memory
             config = {
-                "configurable": request_body.config or {},
-                "thread_id": thread_id
+                "configurable": {
+                    "thread_id": thread_id,
+                    **(request_body.config or {})
+                }
             }
+            
+            # LangGraph will handle memory automatically via thread_id in config
+            # Just pass the input directly to the graph
+            graph_input = request_body.input
             
             # Stream the graph execution in proper SSE format
             event_id = 0
-            async for chunk in graph.astream(request_body.input, config=config,stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
+            async for chunk in graph.astream(graph_input, config=config, stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
                 try:
                     event_id += 1
                     # Convert chunk to JSON-serializable format
@@ -310,6 +323,16 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                     if isinstance(chunk, tuple) and len(chunk) == 2:
                         event_type, data = chunk
                         serialized_data = serialize_value(data)
+                        
+                        # Save messages to thread history from LangGraph state
+                        if event_type == "values" and isinstance(data, dict) and "messages" in data:
+                            if thread_id not in thread_messages:
+                                thread_messages[thread_id] = []
+                            
+                            # Update message history from LangGraph's state
+                            # This reflects the actual conversation state managed by LangGraph
+                            thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
+                        
                         yield f"id: {event_id}\n"
                         yield f"event: {event_type}\n"
                         yield f"data: {json.dumps(serialized_data)}\n\n"
