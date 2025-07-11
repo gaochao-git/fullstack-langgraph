@@ -16,6 +16,7 @@ from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,Diag
 from agents.diagnostic_agent.prompts import (get_current_date,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
+from agents.diagnostic_agent.utils import merge_field
 logger = logging.getLogger(__name__)
 
 
@@ -44,22 +45,6 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     # 避免 DeepSeek API 的兼容性问题
     structured_llm = llm.with_structured_output(QuestionInfoExtraction)
     result = structured_llm.invoke(prompt)
-    
-    # 合并信息：优先使用新信息，无新信息时保持原值
-    def merge_field(new_value, old_value, field_name=None):
-        # 如果新值有效且不是待提取，使用新值
-        if new_value and new_value != "待提取" and new_value.strip():
-            return new_value
-        # 如果旧值有效且不是待提取，保持旧值
-        elif old_value and old_value != "待提取" and old_value.strip():
-            return old_value
-        # 特殊处理：如果是时间字段且没有明确时间，使用当前时间
-        elif field_name == "fault_time":
-            return current_date
-        # 否则返回待提取
-        else:
-            return "待提取"
-    
     merged_analysis = QuestionAnalysis(
         fault_ip=merge_field(result.fault_ip, current_analysis.fault_ip),
         fault_time=merge_field(result.fault_time, current_analysis.fault_time, "fault_time"),
@@ -74,21 +59,14 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
         merged_analysis.fault_info and merged_analysis.fault_info != "待提取" and
         merged_analysis.sop_id and merged_analysis.sop_id != "待提取"
     )
-    
     # 生成缺失字段列表
     missing_fields = []
-    if not merged_analysis.fault_ip or merged_analysis.fault_ip == "待提取":
-        missing_fields.append("故障IP")
-    if not merged_analysis.fault_time or merged_analysis.fault_time == "待提取":
-        missing_fields.append("故障时间")
-    if not merged_analysis.fault_info or merged_analysis.fault_info == "待提取":
-        missing_fields.append("故障现象")
-    if not merged_analysis.sop_id or merged_analysis.sop_id == "待提取":
-        missing_fields.append("排查SOP编号")
-    
+    if not merged_analysis.fault_ip or merged_analysis.fault_ip == "待提取": missing_fields.append("故障IP")
+    if not merged_analysis.fault_time or merged_analysis.fault_time == "待提取": missing_fields.append("故障时间")
+    if not merged_analysis.fault_info or merged_analysis.fault_info == "待提取": missing_fields.append("故障现象")
+    if not merged_analysis.sop_id or merged_analysis.sop_id == "待提取": missing_fields.append("排查SOP编号")
     merged_analysis.missing_fields = missing_fields
     merged_analysis.info_sufficient = info_sufficient
-    
     logger.info(f"四要素分析: 充足={info_sufficient}, 缺失={missing_fields}")
     
     return {
@@ -126,16 +104,12 @@ def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict
     messages = state.get("messages", [])
     system_message = SystemMessage(content=formatted_prompt)
     messages_with_system = [system_message] + messages
-    
     # 调用LLM生成工具调用
     response = llm_with_tools.invoke(messages_with_system)
-    
     # 检查是否生成了工具调用
     has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
     logger.info(f"工具规划结果: 生成了 {len(response.tool_calls) if has_tool_calls else 0} 个工具调用")
-    if not has_tool_calls:
-        logger.warning("LLM没有生成任何工具调用，这可能导致诊断提前结束")
-    
+    if not has_tool_calls: logger.warning("LLM没有生成任何工具调用，这可能导致诊断提前结束")
     # 返回新的消息，LangGraph会将其添加到状态中
     return {"messages": [response]}
 
@@ -144,11 +118,8 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
     """SOP执行确认节点 - 确认每个SOP步骤的执行"""
     # 获取最新的工具调用消息
     messages = state.get("messages", [])
-    if not messages:
-        return {}
-    
+    if not messages:return {}
     last_message = messages[-1]
-    
     # 如果有工具调用，检查是否符合SOP要求
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         tool_calls = last_message.tool_calls
