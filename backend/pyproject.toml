@@ -17,8 +17,8 @@ dependencies = [
     "langgraph-cli",
     "langgraph-api",
     "fastapi",
-    "psycopg[binary,pool]",
-    "langgraph-checkpoint-postgres==2.0.21",
+    "aiomysql",
+    "langgraph-checkpoint-mysql",
 ]
 
 
