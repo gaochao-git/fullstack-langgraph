@@ -1,4 +1,4 @@
-from agents.diagnostic_agent.utils import get_current_datetime
+from .utils import get_current_datetime
 # 问题分析提示词函数
 def get_question_analysis_prompt(user_question: str, current_analysis=None):
     """生成问题分析提示词"""

@@ -11,12 +11,12 @@ from langgraph.prebuilt import ToolNode
 from langgraph.types import interrupt
 from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
-from agents.diagnostic_agent.configuration import Configuration
-from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
-from agents.diagnostic_agent.prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
-from agents.diagnostic_agent.schemas import QuestionInfoExtraction
-from agents.diagnostic_agent.tools import all_tools
-from agents.diagnostic_agent.utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls)
+from .configuration import Configuration
+from .state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
+from .prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
+from .schemas import QuestionInfoExtraction
+from .tools import all_tools
+from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls)
 logger = logging.getLogger(__name__)
 
 

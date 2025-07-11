@@ -4,7 +4,7 @@
 """
 
 # 导入工具模块
-from tools import ssh_tool, sop_tool
+from src.tools import ssh_tool, sop_tool
 
 # SSH诊断工具列表
 ssh_tools = [

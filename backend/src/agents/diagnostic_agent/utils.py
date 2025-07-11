@@ -7,7 +7,7 @@ import json
 import logging
 from datetime import datetime
 from langchain_core.messages import ToolMessage
-from agents.diagnostic_agent.state import SOPStep
+from .state import SOPStep
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ def process_sop_loading(messages, current_sop_detail):
         return current_sop_detail, False
     
     try:
-        from agents.diagnostic_agent.state import SOPDetail, SOPStep
+        from .state import SOPDetail, SOPStep
         result = json.loads(messages[-1].content)
         if not (result.get("success") and result.get("sop_content")):
             return current_sop_detail, False
@@ -277,7 +277,7 @@ def check_diagnosis_completion(current_step, max_steps, sop_detail):
 
 def check_info_sufficient(state):
     """检查信息是否充足"""
-    from agents.diagnostic_agent.state import QuestionAnalysis
+    from .state import QuestionAnalysis
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     if question_analysis.info_sufficient:
         return "plan_tools"
