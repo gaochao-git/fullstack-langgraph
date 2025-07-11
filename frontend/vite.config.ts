@@ -13,6 +13,7 @@ export default defineConfig({
     },
   },
   server: {
+    port: 3000,    // vite默认端口为5173，这里修改为3000
     proxy: {
       // Proxy API requests to the backend server
       "/api": {
