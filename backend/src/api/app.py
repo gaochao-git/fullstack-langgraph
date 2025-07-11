@@ -271,7 +271,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             
             # Stream the graph execution in proper SSE format
             event_id = 0
-            async for chunk in graph.astream(run_data["input"], config=config,stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
+            async for chunk in graph.astream(request_body.input, config=config,stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
                 try:
                     event_id += 1
                     # Convert chunk to JSON-serializable format
@@ -303,9 +303,15 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                             except (TypeError, ValueError):
                                 return str(val)
                     
-                    serializable_chunk = {}
-                    for key, value in chunk.items():
-                        serializable_chunk[key] = serialize_value(value)
+                    # Handle tuple format from LangGraph streaming
+                    if isinstance(chunk, tuple) and len(chunk) == 2:
+                        key, value = chunk
+                        serializable_chunk = {key: serialize_value(value)}
+                    else:
+                        # Handle dict format
+                        serializable_chunk = {}
+                        for key, value in chunk.items():
+                            serializable_chunk[key] = serialize_value(value)
                     
                     # Format as proper SSE
                     yield f"id: {event_id}\n"

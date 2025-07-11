@@ -20,6 +20,7 @@ export default function DiagnosticAgent() {
     assistantId: "diagnostic_agent",
     messagesKey: "messages",
     onUpdateEvent: (event: any) => {
+      console.log("event", event);
       let processedEvent: ProcessedEvent | null = null;
       if (event.diagnostic_step) {
         processedEvent = {
