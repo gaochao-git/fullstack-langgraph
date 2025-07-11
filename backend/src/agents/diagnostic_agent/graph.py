@@ -16,8 +16,6 @@ from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,Diag
 from agents.diagnostic_agent.prompts import (get_current_date,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
-from dotenv import load_dotenv
-load_dotenv()
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +39,9 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     prompt = get_question_analysis_prompt(current_date, user_question, current_analysis)
     
     # 使用结构化输出
+    # 注意：配合 schemas.py 中的 pydantic_v1 使用
+    # 这样 LangChain 会自动降级使用提示词方式而不是 response_format
+    # 避免 DeepSeek API 的兼容性问题
     structured_llm = llm.with_structured_output(QuestionInfoExtraction)
     result = structured_llm.invoke(prompt)
     

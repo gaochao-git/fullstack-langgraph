@@ -3,7 +3,13 @@
 包含所有Pydantic模型和数据结构
 """
 from typing import List
-from pydantic import BaseModel, Field
+# 注意：使用 langchain_core.pydantic_v1 而不是 pydantic
+# 原因：DeepSeek API 不支持 OpenAI 标准的 response_format，当使用 pydantic v2 时
+# with_structured_output 会尝试使用 response_format 导致 422 错误
+# 使用 pydantic_v1 可以让 LangChain 降级使用提示词方式获取结构化输出
+# 虽然会有 deprecation 警告，但功能稳定可用
+# 如需升级到 v2，需要确保 LLM 提供商完全支持 OpenAI 兼容的 response_format
+from langchain_core.pydantic_v1 import BaseModel, Field
 
 
 class QuestionInfoExtraction(BaseModel):
