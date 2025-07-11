@@ -271,7 +271,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             
             # Stream the graph execution in proper SSE format
             event_id = 0
-            async for chunk in graph.astream(request_body.input, config=config):
+            async for chunk in graph.astream(run_data["input"], config=config,stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
                 try:
                     event_id += 1
                     # Convert chunk to JSON-serializable format
@@ -362,7 +362,7 @@ async def stream_run(thread_id: str, run_id: str):
             }
             
             # Stream the graph execution
-            async for chunk in graph.astream(run_data["input"], config=config):
+            async for chunk in graph.astream(run_data["input"], config=config,stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
                 try:
                     # Convert chunk to JSON-serializable format
                     serializable_chunk = {}
