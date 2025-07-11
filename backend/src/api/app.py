@@ -162,7 +162,64 @@ async def get_run(thread_id: str, run_id: str):
     
     return run_data
 
-@app.get("/threads/{thread_id}/runs/{run_id}/stream")
+# LangGraph标准的流媒体端点
+@app.post("/threads/{thread_id}/runs/stream")
+async def stream_run_standard(thread_id: str, request_body: RunCreate):
+    """Standard LangGraph streaming endpoint"""
+    if thread_id not in threads_store:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    
+    if request_body.assistant_id not in ASSISTANTS:
+        raise HTTPException(status_code=400, detail="Invalid assistant_id")
+    
+    async def generate():
+        try:
+            assistant = ASSISTANTS[request_body.assistant_id]
+            graph = assistant["graph"]
+            
+            # Build config
+            config = {
+                "configurable": request_body.config or {},
+                "thread_id": thread_id
+            }
+            
+            # Stream the graph execution
+            async for chunk in graph.astream(request_body.input, config=config):
+                try:
+                    # Convert chunk to JSON-serializable format
+                    serializable_chunk = {}
+                    for key, value in chunk.items():
+                        if hasattr(value, 'dict'):
+                            # Pydantic models
+                            serializable_chunk[key] = value.dict()
+                        elif hasattr(value, '__dict__'):
+                            # Regular objects with __dict__
+                            serializable_chunk[key] = value.__dict__
+                        else:
+                            # Primitive types
+                            serializable_chunk[key] = value
+                    yield f"data: {json.dumps(serializable_chunk)}\n\n"
+                except Exception as e:
+                    logger.error(f"Serialization error: {e}")
+                    yield f"data: {json.dumps({'type': 'chunk', 'data': str(chunk)})}\n\n"
+                
+            yield f"data: {json.dumps({'type': 'end'})}\n\n"
+            
+        except Exception as e:
+            logger.error(f"Error in streaming: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
+
+@app.post("/threads/{thread_id}/runs/{run_id}/stream")
 async def stream_run(thread_id: str, run_id: str):
     """Stream run results"""
     if run_id not in runs_store:
@@ -185,7 +242,23 @@ async def stream_run(thread_id: str, run_id: str):
             
             # Stream the graph execution
             async for chunk in graph.astream(run_data["input"], config=config):
-                yield f"data: {json.dumps(chunk)}\n\n"
+                try:
+                    # Convert chunk to JSON-serializable format
+                    serializable_chunk = {}
+                    for key, value in chunk.items():
+                        if hasattr(value, 'dict'):
+                            # Pydantic models
+                            serializable_chunk[key] = value.dict()
+                        elif hasattr(value, '__dict__'):
+                            # Regular objects with __dict__
+                            serializable_chunk[key] = value.__dict__
+                        else:
+                            # Primitive types
+                            serializable_chunk[key] = value
+                    yield f"data: {json.dumps(serializable_chunk)}\n\n"
+                except Exception as e:
+                    logger.error(f"Serialization error: {e}")
+                    yield f"data: {json.dumps({'type': 'chunk', 'data': str(chunk)})}\n\n"
                 
             # Update run status
             runs_store[run_id]["status"] = "completed"
