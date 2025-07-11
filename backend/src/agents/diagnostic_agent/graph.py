@@ -16,12 +16,16 @@ from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,Diag
 from agents.diagnostic_agent.prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
-from agents.diagnostic_agent.utils import merge_field, check_approval_needed, is_already_approved
+from agents.diagnostic_agent.utils import (
+    merge_field, check_approval_needed, is_already_approved,
+    process_sop_loading, update_diagnosis_step, check_diagnosis_completion,
+    check_info_sufficient, check_tool_calls
+)
 logger = logging.getLogger(__name__)
 
 
 # 节点函数 - 参考调研agent的清晰结构
-def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+def analyze_question_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """问题分析节点 - 支持多轮补充四要素"""
     configurable = Configuration.from_runnable_config(config)
     llm = configurable.create_llm(
@@ -74,7 +78,7 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     }
 
 
-def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+def plan_diagnosis_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具规划节点 - 严格按照SOP执行"""
     configurable = Configuration.from_runnable_config(config)
     llm = configurable.create_llm(
@@ -131,11 +135,6 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
         return {}  # 已审批，直接继续
     
     # 3. 执行审批流程
-    return _execute_approval_process(state, approval_info)
-
-
-def _execute_approval_process(state: DiagnosticState, approval_info: Dict[str, Any]) -> Dict[str, Any]:
-    """执行审批流程的辅助函数"""
     step_info = approval_info["step_info"]
     step_id = approval_info["step_id"]
     tool_calls = approval_info["tool_calls"]
@@ -184,90 +183,35 @@ def _execute_approval_process(state: DiagnosticState, approval_info: Dict[str, A
         }
 
 
-def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """诊断反思节点 - 简化版本，直接更新诊断进度"""
+def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+    """诊断反思节点 - 简化版本"""
     # 获取当前状态
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     sop_detail = state.get("sop_detail", SOPDetail())
     messages = state.get("messages", [])
     
-    # 处理SOP加载结果
-    updated_sop_detail = sop_detail
-    sop_loaded = state.get("sop_loaded", False)
+    # 1. 处理SOP加载结果
+    updated_sop_detail, sop_loaded = process_sop_loading(messages, sop_detail)
+    if not sop_loaded:
+        sop_loaded = state.get("sop_loaded", False)
     
-    if messages and isinstance(messages[-1], ToolMessage) and messages[-1].name == "get_sop_content":
-        try:
-            # 解析SOP内容
-            result = json.loads(messages[-1].content)
-            if result.get("success") and result.get("sop_content"):
-                sop_content = result["sop_content"]
-                
-                # 解析步骤并创建SOPStep对象
-                steps = []
-                for step_data in sop_content.get("steps", []):
-                    sop_step = SOPStep(
-                        title=step_data.get("title", ""),
-                        description=step_data.get("description", ""),
-                        action=step_data.get("action", ""),
-                        requires_approval=step_data.get("requires_approval", False),
-                        status="pending"
-                    )
-                    steps.append(sop_step)
-                
-                # 创建SOPDetail对象
-                updated_sop_detail = SOPDetail(
-                    sop_id=sop_content.get("id", ""),
-                    title=sop_content.get("title", ""),
-                    description=sop_content.get("description", ""),
-                    steps=steps,
-                    total_steps=len(steps)
-                )
-                sop_loaded = True
-                logger.info(f"SOP加载成功: {updated_sop_detail.sop_id}, 步骤数: {len(steps)}")
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.error(f"解析SOP内容失败: {e}")
+    # 2. 更新诊断步骤
+    current_step, has_new_execution, tool_name = update_diagnosis_step(
+        messages, diagnosis_progress.current_step
+    )
     
-    # 检查是否有新的诊断工具执行（排除SOP工具）
-    has_new_diagnostic_execution = False
-    if messages and isinstance(messages[-1], ToolMessage):
-        last_tool_name = messages[-1].name
-        # 只有非SOP工具才算诊断步骤
-        if last_tool_name not in ["get_sop_content", "get_sop_detail", "list_sops", "search_sops"]:
-            current_step = diagnosis_progress.current_step + 1
-            has_new_diagnostic_execution = True
-            logger.info(f"检测到诊断工具执行: {last_tool_name}，步骤数更新为: {current_step}")
-        else:
-            current_step = diagnosis_progress.current_step
-    else:
-        # 没有新的工具执行，保持原步骤数
-        current_step = diagnosis_progress.current_step
-    
-    # 从最新的ToolMessage中提取诊断结果
+    # 3. 更新诊断结果
     diagnosis_results = list(state.get("diagnosis_results", []))
-    if has_new_diagnostic_execution:
+    if has_new_execution and messages:
         last_message = messages[-1]
         diagnosis_results.append(f"Tool: {last_message.name}, Result: {last_message.content}")
     
-    # 检查是否完成诊断 - 放宽条件，让诊断能够充分执行
-    is_complete = False
-    termination_reason = "continue"
+    # 4. 检查诊断完成状态
+    is_complete, termination_reason = check_diagnosis_completion(
+        current_step, diagnosis_progress.max_steps, updated_sop_detail
+    )
     
-    # 使用配置的max_steps进行退出判断
-    max_steps = diagnosis_progress.max_steps
-    
-    # 达到最大步骤限制
-    if current_step >= max_steps:
-        is_complete = True
-        termination_reason = "max_steps_reached"
-        logger.warning(f"达到最大步骤限制退出: {current_step}/{max_steps}")
-    # 检查SOP是否已完全执行
-    elif (updated_sop_detail.steps and len(updated_sop_detail.steps) > 0 and 
-          current_step >= len(updated_sop_detail.steps) and current_step >= 3):
-        is_complete = True
-        termination_reason = "sop_completed"
-        logger.info(f"SOP步骤完成退出: {current_step} >= {len(updated_sop_detail.steps)}")
-    
-    # 更新诊断进度
+    # 5. 构建更新后的进度
     updated_progress = DiagnosisProgress(
         current_step=current_step,
         max_steps=diagnosis_progress.max_steps,
@@ -283,7 +227,7 @@ def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -
     }
 
 
-def handle_insufficient_info(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+def handle_insufficient_info_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """处理信息不足的情况，提示用户补充缺失信息"""
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     
@@ -295,7 +239,7 @@ def handle_insufficient_info(state: DiagnosticState, config: RunnableConfig) -> 
     }
 
 
-def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """完成诊断报告节点 - 基于严格的SOP执行结果"""
     configurable = Configuration.from_runnable_config(config)
     
@@ -345,16 +289,6 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
 
 
 # 路由函数 - 简化版本
-def check_info_sufficient(state: DiagnosticState, config: RunnableConfig) -> str:
-    """检查信息是否充足"""
-    question_analysis = state.get("question_analysis", QuestionAnalysis())
-    if question_analysis.info_sufficient:
-        return "plan_tools"
-    else:
-        # 信息不足时，提示用户补充
-        return "handle_insufficient_info"
-
-
 def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> str:
     """评估诊断进度，根据执行情况决定下一步"""
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
@@ -374,29 +308,18 @@ def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) 
     return "plan_tools"
 
 
-# 修复：自定义条件函数来决定是否有工具调用
-def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
-    """检查是否有工具调用"""
-    messages = state.get("messages", [])
-    if not messages: return "reflection"
-    last_message = messages[-1]
-    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        return "approval"
-    else:
-        return "reflection"
-
 # 创建工具执行节点
 tool_node = ToolNode(all_tools)
 # 创建诊断Agent图 - 简化版本
 builder = StateGraph(DiagnosticState, config_schema=Configuration)
 # 添加节点
-builder.add_node("analyze_question", analyze_question)
-builder.add_node("handle_insufficient_info", handle_insufficient_info)
-builder.add_node("plan_tools", plan_diagnosis_tools)
+builder.add_node("analyze_question", analyze_question_node)
+builder.add_node("handle_insufficient_info", handle_insufficient_info_node)
+builder.add_node("plan_tools", plan_diagnosis_tools_node)
 builder.add_node("approval", approval_node)
 builder.add_node("execute_tools", tool_node)
-builder.add_node("reflection", reflect_diagnosis_progress)
-builder.add_node("finalize_answer", finalize_diagnosis_report)
+builder.add_node("reflection", reflect_diagnosis_progress_node)
+builder.add_node("finalize_answer", finalize_diagnosis_report_node)
 builder.add_edge(START, "analyze_question")
 builder.add_conditional_edges("analyze_question", check_info_sufficient, ["plan_tools", "handle_insufficient_info"])
 # 修改：信息不足时等待用户补充，用户补充后重新回到analyze_question分析

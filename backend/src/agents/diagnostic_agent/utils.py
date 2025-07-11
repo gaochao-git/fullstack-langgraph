@@ -5,10 +5,14 @@
 
 import json
 import logging
+from datetime import datetime
 from langchain_core.messages import ToolMessage
 from agents.diagnostic_agent.state import SOPStep
 
 logger = logging.getLogger(__name__)
+
+def get_current_datetime():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # 排除的SOP工具名常量
 EXCLUDED_SOP_TOOLS = {"get_sop_content", "get_sop_detail", "list_sops", "search_sops"}
@@ -34,7 +38,7 @@ def merge_field(new_value, old_value, field_name=None):
         return old_value
     # 特殊处理：如果是时间字段且没有明确时间，使用当前时间
     elif field_name == "fault_time":
-        return current_date
+        return get_current_datetime()
     # 否则返回待提取
     else:
         return "待提取"
@@ -179,3 +183,116 @@ def is_already_approved(state, approval_info):
     """检查步骤是否已经审批过"""
     approved_steps = state.get("approved_steps", [])
     return approval_info["step_id"] in approved_steps
+
+
+def process_sop_loading(messages, current_sop_detail):
+    """
+    处理SOP加载结果
+    
+    Returns:
+        tuple: (updated_sop_detail, sop_loaded)
+    """
+    if not (messages and isinstance(messages[-1], ToolMessage) and 
+            messages[-1].name == "get_sop_content"):
+        return current_sop_detail, False
+    
+    try:
+        from agents.diagnostic_agent.state import SOPDetail, SOPStep
+        result = json.loads(messages[-1].content)
+        if not (result.get("success") and result.get("sop_content")):
+            return current_sop_detail, False
+            
+        sop_content = result["sop_content"]
+        
+        # 解析步骤
+        steps = [
+            SOPStep(
+                title=step_data.get("title", ""),
+                description=step_data.get("description", ""),
+                action=step_data.get("action", ""),
+                requires_approval=step_data.get("requires_approval", False),
+                status="pending"
+            )
+            for step_data in sop_content.get("steps", [])
+        ]
+        
+        # 创建SOPDetail对象
+        updated_sop_detail = SOPDetail(
+            sop_id=sop_content.get("id", ""),
+            title=sop_content.get("title", ""),
+            description=sop_content.get("description", ""),
+            steps=steps,
+            total_steps=len(steps)
+        )
+        
+        logger.info(f"SOP加载成功: {updated_sop_detail.sop_id}, 步骤数: {len(steps)}")
+        return updated_sop_detail, True
+        
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"解析SOP内容失败: {e}")
+        return current_sop_detail, False
+
+
+def update_diagnosis_step(messages, current_step):
+    """
+    更新诊断步骤计数
+    
+    Returns:
+        tuple: (new_step, has_new_execution, tool_name)
+    """
+    if not (messages and isinstance(messages[-1], ToolMessage)):
+        return current_step, False, None
+    
+    last_tool_name = messages[-1].name
+    
+    # 只有非SOP工具才算诊断步骤
+    if last_tool_name not in EXCLUDED_SOP_TOOLS:
+        new_step = current_step + 1
+        logger.info(f"检测到诊断工具执行: {last_tool_name}，步骤数更新为: {new_step}")
+        return new_step, True, last_tool_name
+    else:
+        return current_step, False, last_tool_name
+
+
+def check_diagnosis_completion(current_step, max_steps, sop_detail):
+    """
+    检查诊断是否完成
+    
+    Returns:
+        tuple: (is_complete, termination_reason)
+    """
+    # 达到最大步骤限制
+    if current_step >= max_steps:
+        logger.warning(f"达到最大步骤限制退出: {current_step}/{max_steps}")
+        return True, "max_steps_reached"
+    
+    # 检查SOP是否已完全执行
+    if (sop_detail.steps and len(sop_detail.steps) > 0 and 
+        current_step >= len(sop_detail.steps) and current_step >= 3):
+        logger.info(f"SOP步骤完成退出: {current_step} >= {len(sop_detail.steps)}")
+        return True, "sop_completed"
+    
+    return False, "continue"
+
+
+def check_info_sufficient(state):
+    """检查信息是否充足"""
+    from agents.diagnostic_agent.state import QuestionAnalysis
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    if question_analysis.info_sufficient:
+        return "plan_tools"
+    else:
+        return "handle_insufficient_info"
+
+
+def check_tool_calls(state):
+    """检查是否有工具调用"""
+    messages = state.get("messages", [])
+    if not messages:
+        return "reflection"
+    
+    last_message = messages[-1]
+    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        return "approval"
+    else:
+        return "reflection"

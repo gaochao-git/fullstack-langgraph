@@ -1,9 +1,4 @@
-from datetime import datetime
-
-# Get current date in a readable format
-def get_current_datetime():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+from agents.diagnostic_agent.utils import get_current_datetime
 # 问题分析提示词函数
 def get_question_analysis_prompt(user_question: str, current_analysis=None):
     """生成问题分析提示词"""
@@ -70,19 +65,6 @@ def get_missing_info_prompt(question_analysis):
 {status_info}
 
 {missing_fields_info}
-
-📝 您可以通过以下方式提供信息：
-**方式一：自然语言**
-例如："故障IP是192.168.1.100，时间是今天下午2点"
-
-**方式二：结构化格式**
-```
-故障IP: [请填写]
-故障时间: [请填写]
-故障现象: [请填写]
-SOP编号: [请填写]
-```
-
 💡 您可以分多次补充，信息完整后将自动开始诊断。"""
 
 # 问题分析提示词 - 类似调研agent的query_writer_instructions（保留兼容性）
