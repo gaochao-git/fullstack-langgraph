@@ -1,11 +1,11 @@
 from datetime import datetime
 
 # Get current date in a readable format
-def get_current_date():
-    return datetime.now().strftime("%Y年%m月%d日")
+def get_current_datetime():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 # 问题分析提示词函数
-def get_question_analysis_prompt(current_date: str, user_question: str, current_analysis=None):
+def get_question_analysis_prompt(user_question: str, current_analysis=None):
     """生成问题分析提示词"""
     # 构建当前已有信息的显示
     current_info = ""
@@ -18,7 +18,7 @@ def get_question_analysis_prompt(current_date: str, user_question: str, current_
 - SOP编号: {current_analysis.sop_id or '待提取'}
 """
     
-    return f"""当前时间：{current_date}
+    return f"""当前时间：{get_current_datetime()}
 
 用户最新输入：{user_question}
 {current_info}

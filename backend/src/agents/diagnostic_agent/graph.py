@@ -13,7 +13,7 @@ from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 from agents.diagnostic_agent.configuration import Configuration
 from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail,SOPStep)
-from agents.diagnostic_agent.prompts import (get_current_date,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
+from agents.diagnostic_agent.prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
 from agents.diagnostic_agent.utils import merge_field
@@ -36,8 +36,7 @@ def analyze_question(state: DiagnosticState, config: RunnableConfig) -> Dict[str
     current_analysis = state.get("question_analysis", QuestionAnalysis())
     
     # 使用提示词模板函数生成提示词
-    current_date = get_current_date()
-    prompt = get_question_analysis_prompt(current_date, user_question, current_analysis)
+    prompt = get_question_analysis_prompt(user_question, current_analysis)
     
     # 使用结构化输出
     # 注意：配合 schemas.py 中的 pydantic_v1 使用
@@ -362,7 +361,7 @@ def finalize_diagnosis_report(state: DiagnosticState, config: RunnableConfig) ->
     
     # 使用提示词模板生成最终诊断报告
     formatted_prompt = diagnosis_report_instructions.format(
-        current_date=get_current_date(),
+        current_date=get_current_datetime(),
         fault_ip=question_analysis.fault_ip or '未提供',
         fault_time=question_analysis.fault_time or '未提供',
         fault_info=question_analysis.fault_info or '未提供',
