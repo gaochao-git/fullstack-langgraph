@@ -224,8 +224,25 @@ def handle_insufficient_info_node(state: DiagnosticState, config: RunnableConfig
 
 
 def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """完成诊断报告节点 - 基于严格的SOP执行结果"""
+    """智能最终回答节点 - 支持SOP诊断、运维问答、普通聊天"""
     configurable = Configuration.from_runnable_config(config)
+    
+    # 获取状态信息
+    messages = state.get("messages", [])
+    user_question = state.get("user_question", "")
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    sop_detail = state.get("sop_detail", SOPDetail())
+    diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
+    diagnosis_results = state.get("diagnosis_results", [])
+    sop_loaded = state.get("sop_loaded", False)
+    
+    # 判断对话类型和回答策略
+    response_type = determine_response_type(
+        user_question, messages, question_analysis, 
+        diagnosis_progress, sop_loaded, diagnosis_results
+    )
+    
+    logger.info(f"响应类型判断: {response_type}")
     
     # 初始化推理模型
     llm = configurable.create_llm(
@@ -233,28 +250,23 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
         temperature=configurable.final_report_temperature
     )
     
-    # 获取状态信息
-    question_analysis = state.get("question_analysis", QuestionAnalysis())
-    sop_detail = state.get("sop_detail", SOPDetail())
-    diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
-    diagnosis_results = state.get("diagnosis_results", [])
-    
-    # 使用提示词模板生成最终诊断报告
-    formatted_prompt = diagnosis_report_instructions.format(
-        current_date=get_current_datetime(),
-        fault_ip=question_analysis.fault_ip or '未提供',
-        fault_time=question_analysis.fault_time or '未提供',
-        fault_info=question_analysis.fault_info or '未提供',
-        sop_id=question_analysis.sop_id or '未指定',
-        current_step=diagnosis_progress.current_step,
-        total_steps=sop_detail.total_steps,
-        completion_status='已完成' if diagnosis_progress.is_complete else '进行中',
-        diagnosis_results='\n'.join(diagnosis_results) if diagnosis_results else '未进行诊断'
-    )
-    
-    response = llm.invoke(formatted_prompt)
-    
-    final_message = f"""
+    if response_type == "diagnosis_report":
+        # 生成完整的SOP诊断报告
+        formatted_prompt = diagnosis_report_instructions.format(
+            current_date=get_current_datetime(),
+            fault_ip=question_analysis.fault_ip or '未提供',
+            fault_time=question_analysis.fault_time or '未提供',
+            fault_info=question_analysis.fault_info or '未提供',
+            sop_id=question_analysis.sop_id or '未指定',
+            current_step=diagnosis_progress.current_step,
+            total_steps=sop_detail.total_steps,
+            completion_status='已完成' if diagnosis_progress.is_complete else '进行中',
+            diagnosis_results='\n'.join(diagnosis_results) if diagnosis_results else '未进行诊断'
+        )
+        
+        response = llm.invoke(formatted_prompt)
+        
+        final_message = f"""
 {response.content}
 
 📊 诊断执行摘要：
@@ -265,11 +277,82 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
 ⚠️ 重要提醒：
 以上诊断结果基于SOP执行。在执行任何操作前，请确认系统状态并评估风险。
 """
+        
+        return {
+            "messages": [AIMessage(content=final_message)],
+            "final_diagnosis": response.content
+        }
     
-    return {
-        "messages": [AIMessage(content=final_message)],
-        "final_diagnosis": response.content
-    }
+    else:
+        # 运维问答或普通聊天
+        conversation_context = build_conversation_context(messages, diagnosis_results)
+        
+        prompt = f"""您是专业的运维技术助手，支持故障诊断、运维问答和日常交流。
+
+用户问题：{user_question}
+
+对话历史上下文：
+{conversation_context}
+
+请根据用户问题类型回答：
+- 如果是运维技术问题，提供专业的技术指导
+- 如果是普通聊天，自然友好地回应
+- 如果涉及之前的诊断内容，可以引用相关信息
+- 保持简洁明了，不需要生成报告格式
+
+请直接回答用户的问题。"""
+        
+        response = llm.invoke(prompt)
+        
+        return {
+            "messages": [AIMessage(content=response.content)]
+        }
+
+
+def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_loaded, diagnosis_results):
+    """判断回答类型：是否需要生成诊断报告"""
+    
+    # 1. 用户明确要求生成报告
+    report_keywords = ["生成报告", "诊断报告", "故障报告", "输出报告", "总结报告"]
+    if any(keyword in user_question for keyword in report_keywords):
+        return "diagnosis_report"
+    
+    # 2. 完成了完整的SOP诊断流程且未生成过报告
+    if (diagnosis_progress and diagnosis_progress.is_complete and 
+        sop_loaded and len(diagnosis_results) >= 2):
+        
+        # 检查是否已生成过报告
+        has_report = any(
+            "📊 诊断执行摘要" in getattr(msg, 'content', '')
+            for msg in messages
+        )
+        
+        if not has_report:
+            return "diagnosis_report"
+    
+    # 3. 其他情况都是普通回答
+    return "general_answer"
+
+
+def build_conversation_context(messages, diagnosis_results):
+    """构建对话上下文"""
+    context_parts = []
+    
+    # 添加诊断历史（如果有）
+    if diagnosis_results:
+        context_parts.append("诊断历史：")
+        context_parts.extend(diagnosis_results[-3:])  # 最近3个诊断结果
+    
+    # 添加最近对话
+    if messages and len(messages) > 1:
+        context_parts.append("\n最近对话：")
+        recent_messages = messages[-4:] if len(messages) > 4 else messages[:-1]
+        for i, msg in enumerate(recent_messages):
+            role = "用户" if i % 2 == 0 else "助手"
+            content = getattr(msg, 'content', str(msg))[:100]
+            context_parts.append(f"{role}: {content}")
+    
+    return "\n".join(context_parts) if context_parts else "无历史对话"
 
 
 # 路由函数 - 简化版本
