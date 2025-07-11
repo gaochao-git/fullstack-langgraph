@@ -269,39 +269,74 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                 "thread_id": thread_id
             }
             
-            # Stream the graph execution
+            # Stream the graph execution in proper SSE format
+            event_id = 0
             async for chunk in graph.astream(request_body.input, config=config):
                 try:
+                    event_id += 1
                     # Convert chunk to JSON-serializable format
+                    def serialize_value(val):
+                        if hasattr(val, 'dict'):
+                            # Pydantic models
+                            return val.dict()
+                        elif hasattr(val, 'to_dict'):
+                            # Objects with to_dict method
+                            return val.to_dict()
+                        elif hasattr(val, '__dict__'):
+                            # Regular objects - recursively serialize
+                            result = {}
+                            for k, v in val.__dict__.items():
+                                if not k.startswith('_'):  # Skip private attributes
+                                    result[k] = serialize_value(v)
+                            return result
+                        elif isinstance(val, list):
+                            # Lists - recursively serialize each item
+                            return [serialize_value(item) for item in val]
+                        elif isinstance(val, dict):
+                            # Dictionaries - recursively serialize values
+                            return {k: serialize_value(v) for k, v in val.items()}
+                        else:
+                            # Primitive types or fallback to string
+                            try:
+                                json.dumps(val)  # Test if serializable
+                                return val
+                            except (TypeError, ValueError):
+                                return str(val)
+                    
                     serializable_chunk = {}
                     for key, value in chunk.items():
-                        if hasattr(value, 'dict'):
-                            # Pydantic models
-                            serializable_chunk[key] = value.dict()
-                        elif hasattr(value, '__dict__'):
-                            # Regular objects with __dict__
-                            serializable_chunk[key] = value.__dict__
-                        else:
-                            # Primitive types
-                            serializable_chunk[key] = value
+                        serializable_chunk[key] = serialize_value(value)
+                    
+                    # Format as proper SSE
+                    yield f"id: {event_id}\n"
+                    yield f"event: data\n"
                     yield f"data: {json.dumps(serializable_chunk)}\n\n"
                 except Exception as e:
                     logger.error(f"Serialization error: {e}")
-                    yield f"data: {json.dumps({'type': 'chunk', 'data': str(chunk)})}\n\n"
+                    event_id += 1
+                    yield f"id: {event_id}\n"
+                    yield f"event: error\n"
+                    yield f"data: {json.dumps({'error': str(e), 'chunk': str(chunk)})}\n\n"
                 
-            yield f"data: {json.dumps({'type': 'end'})}\n\n"
+            # End event
+            event_id += 1
+            yield f"id: {event_id}\n"
+            yield f"event: end\n"
+            yield f"data: {json.dumps({'status': 'completed'})}\n\n"
             
         except Exception as e:
             logger.error(f"Error in streaming: {e}")
+            yield f"event: error\n"
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
     
     return StreamingResponse(
         generate(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*"
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "text/event-stream"
         }
     )
 
@@ -357,11 +392,12 @@ async def stream_run(thread_id: str, run_id: str):
     
     return StreamingResponse(
         generate(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*"
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "text/event-stream"
         }
     )
 
