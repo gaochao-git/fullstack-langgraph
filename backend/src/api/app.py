@@ -39,6 +39,8 @@ threads_store: Dict[str, Dict[str, Any]] = {}
 runs_store: Dict[str, Dict[str, Any]] = {}
 # Store message history for each thread
 thread_messages: Dict[str, List[Dict[str, Any]]] = {}
+# Store interrupt information for each thread
+thread_interrupts: Dict[str, List[Dict[str, Any]]] = {}
 
 # Available assistants based on langgraph.json
 ASSISTANTS = {
@@ -74,6 +76,7 @@ class RunCreate(BaseModel):
     interrupt_before: Optional[List[str]] = None
     interrupt_after: Optional[List[str]] = None
     on_disconnect: Optional[str] = None  # 添加前端发送的字段
+    command: Optional[Dict[str, Any]] = None  # 添加command字段用于resume
 
 class RunResponse(BaseModel):
     run_id: str
@@ -100,6 +103,7 @@ async def create_thread(thread_create: ThreadCreate):
     }
     threads_store[thread_id] = thread_data
     thread_messages[thread_id] = []  # Initialize empty message history
+    thread_interrupts[thread_id] = []  # Initialize empty interrupt history
     logger.info(f"Created thread: {thread_id}")
     return ThreadResponse(**thread_data)
 
@@ -133,8 +137,9 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
     
     thread_data = threads_store[thread_id]
     messages = thread_messages.get(thread_id, [])
+    interrupts = thread_interrupts.get(thread_id, [])
     
-    # Return history with actual messages
+    # Return history with actual messages and interrupt information
     history = [
         {
             "checkpoint": {
@@ -153,6 +158,14 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
                 **thread_data.get("state", {})
             },
             "next": [],
+            "tasks": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "current_task",
+                    "interrupts": interrupts,
+                    "error": None
+                }
+            ] if interrupts else [],
             "config": {
                 "configurable": {
                     "thread_id": thread_id,
@@ -181,8 +194,9 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
     
     thread_data = threads_store[thread_id]
     messages = thread_messages.get(thread_id, [])
+    interrupts = thread_interrupts.get(thread_id, [])
     
-    # Return history with actual messages
+    # Return history with actual messages and interrupt information
     history = [
         {
             "checkpoint": {
@@ -201,6 +215,14 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 **thread_data.get("state", {})
             },
             "next": [],
+            "tasks": [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "current_task",
+                    "interrupts": interrupts,
+                    "error": None
+                }
+            ] if interrupts else [],
             "config": {
                 "configurable": {
                     "thread_id": thread_id,
@@ -278,12 +300,23 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                 }
             }
             
-            # LangGraph will handle memory automatically via thread_id in config
-            # Just pass the input directly to the graph
-            graph_input = request_body.input
+            # Handle resume command for interrupted execution
+            if request_body.command and "resume" in request_body.command:
+                # Resume interrupted execution with the resume value
+                from langgraph.types import Command
+                graph_input = Command(resume=request_body.command["resume"])
+                logger.info(f"Resuming execution with command: {request_body.command}")
+                # Clear interrupt information when resuming
+                if thread_id in thread_interrupts:
+                    thread_interrupts[thread_id] = []
+            else:
+                # LangGraph will handle memory automatically via thread_id in config
+                # Just pass the input directly to the graph
+                graph_input = request_body.input
             
             # Stream the graph execution in proper SSE format
             event_id = 0
+            has_interrupt = False
             async for chunk in graph.astream(graph_input, config=config, stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
                 try:
                     event_id += 1
@@ -346,11 +379,14 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                         yield f"event: {event_type}\n"
                         yield f"data: {json.dumps(serialized_data, ensure_ascii=False)}\n\n"
                         
-                        # Check for interrupts and stop streaming if found
+                        # Check for interrupts - continue streaming but don't send end event
                         if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
-                            logger.info(f"Interrupt detected, stopping stream: {data}")
-                            # Don't send end event - wait for user approval
-                            return
+                            logger.info(f"Interrupt detected: {data}")
+                            # Store interrupt information for thread history
+                            if thread_id not in thread_interrupts:
+                                thread_interrupts[thread_id] = []
+                            thread_interrupts[thread_id].append(data["__interrupt__"][0])
+                            has_interrupt = True
                     else:
                         # Handle dict format (fallback)
                         serializable_chunk = {}
@@ -369,11 +405,14 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                     yield f"event: error\n"
                     yield f"data: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
                 
-            # End event
-            event_id += 1
-            yield f"id: {event_id}\n"
-            yield f"event: end\n"
-            yield f"data: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            # End event - only send if no interrupt occurred
+            if not has_interrupt:
+                event_id += 1
+                yield f"id: {event_id}\n"
+                yield f"event: end\n"
+                yield f"data: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            else:
+                logger.info("Skipping end event due to interrupt - waiting for user approval")
             
         except Exception as e:
             logger.error(f"Error in streaming: {e}")
