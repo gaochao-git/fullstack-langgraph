@@ -63,6 +63,9 @@ class DiagnosticState(MessagesState):
     diagnosis_results: List[str] = Field(default_factory=list)
     tools_used: List[str] = Field(default_factory=list)
     
+    # 审批状态
+    approved_steps: List[str] = Field(default_factory=list)  # 已审批的步骤列表
+    
     # 最终报告
     final_diagnosis: str = ""
 

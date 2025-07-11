@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 # 排除的SOP工具名常量
 EXCLUDED_SOP_TOOLS = {"get_sop_content", "get_sop_detail", "list_sops", "search_sops"}
 
+# 白名单工具：无需审批的安全工具
+SAFE_TOOLS_WHITELIST = {
+    "get_sop_content", "get_sop_detail", "list_sops", "search_sops",  # SOP相关工具
+    "ping", "nslookup", "dig",  # 基础网络查询工具
+    "get_system_info", "get_process_info",  # 只读系统信息工具
+    "check_port_status", "get_network_status",  # 网络状态查询
+    "get_log_info", "search_logs",  # 日志查询工具
+    # 可以根据实际需求添加更多安全工具
+}
+
 
 def merge_field(new_value, old_value, field_name=None):
     # 合并信息：优先使用新信息，无新信息时保持原值
@@ -108,3 +118,64 @@ def extract_raw_sop_data(messages):
             except (json.JSONDecodeError, TypeError):
                 continue
     return None
+
+
+def check_approval_needed(state):
+    """
+    检查是否需要审批，返回审批信息或None
+    
+    Returns:
+        dict: 包含审批信息的字典，或None表示无需审批
+    """
+    messages = state.get("messages", [])
+    if not messages:
+        return None
+    
+    last_message = messages[-1]
+    if not (hasattr(last_message, 'tool_calls') and last_message.tool_calls):
+        return None
+    
+    tool_calls = last_message.tool_calls
+    question_analysis = state.get("question_analysis")
+    
+    # 获取原始SOP数据
+    raw_sop_data = extract_raw_sop_data(messages)
+    current_step_info = None
+    
+    if raw_sop_data:
+        # 有SOP数据，查找匹配的SOP步骤
+        current_step_info = find_matching_sop_step(tool_calls, raw_sop_data)
+    else:
+        # 无SOP数据，检查白名单
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("name", "")
+            if tool_name not in SAFE_TOOLS_WHITELIST:
+                # 创建虚拟审批步骤
+                current_step_info = SOPStep(
+                    title=f"执行工具: {tool_name}",
+                    description=f"由于无法获取SOP数据且工具不在白名单中，为安全起见需要审批",
+                    action=f"execute_{tool_name}",
+                    requires_approval=True,
+                    status="pending"
+                )
+                break
+    
+    # 检查是否需要审批
+    if current_step_info and current_step_info.requires_approval:
+        sop_id = question_analysis.sop_id if question_analysis else "no_sop"
+        step_id = f"{sop_id}:{current_step_info.action}"
+        
+        return {
+            "step_info": current_step_info,
+            "step_id": step_id,
+            "tool_calls": tool_calls,
+            "sop_id": sop_id
+        }
+    
+    return None
+
+
+def is_already_approved(state, approval_info):
+    """检查步骤是否已经审批过"""
+    approved_steps = state.get("approved_steps", [])
+    return approval_info["step_id"] in approved_steps

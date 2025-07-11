@@ -16,7 +16,7 @@ from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,Diag
 from agents.diagnostic_agent.prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
-from agents.diagnostic_agent.utils import merge_field, find_matching_sop_step, extract_raw_sop_data
+from agents.diagnostic_agent.utils import merge_field, check_approval_needed, is_already_approved
 logger = logging.getLogger(__name__)
 
 
@@ -114,71 +114,74 @@ def plan_diagnosis_tools(state: DiagnosticState, config: RunnableConfig) -> Dict
 
 
 def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """SOP执行确认节点 - 确认每个SOP步骤的执行"""
-    # 获取最新的工具调用消息
-    messages = state.get("messages", [])
-    if not messages:
-        return {}
+    """
+    SOP执行确认节点 - 简化版本
+    1. 检查是否需要审批
+    2. 检查是否已审批过  
+    3. 执行审批流程
+    """
+    # 1. 检查是否需要审批
+    approval_info = check_approval_needed(state)
+    if not approval_info:
+        return {}  # 无需审批，直接继续
     
-    last_message = messages[-1]
-    # 如果有工具调用，检查是否符合SOP要求
-    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        tool_calls = last_message.tool_calls
-        question_analysis = state.get("question_analysis", QuestionAnalysis())
+    # 2. 检查是否已审批过
+    if is_already_approved(state, approval_info):
+        logger.info(f"步骤已审批过，跳过: {approval_info['step_id']}")
+        return {}  # 已审批，直接继续
+    
+    # 3. 执行审批流程
+    return _execute_approval_process(state, approval_info)
+
+
+def _execute_approval_process(state: DiagnosticState, approval_info: Dict[str, Any]) -> Dict[str, Any]:
+    """执行审批流程的辅助函数"""
+    step_info = approval_info["step_info"]
+    step_id = approval_info["step_id"]
+    tool_calls = approval_info["tool_calls"]
+    sop_id = approval_info["sop_id"]
+    
+    logger.info(f"触发审批流程: SOP {sop_id}, 步骤: {step_info.action}")
+    
+    # 构建工具描述
+    tool_descriptions = [
+        f"工具: {tc.get('name', '')}, 参数: {tc.get('args', {})}"
+        for tc in tool_calls
+    ]
+    
+    # 中断并请求用户确认
+    interrupt_info = {
+        "message": f"按照SOP '{sop_id}' 要求，即将执行需要审批的步骤:\n\n"
+                   f"**步骤详情:** {step_info.action}\n"
+                   f"**计划操作:**\n" + "\n".join(tool_descriptions) +
+                   f"\n\n确认执行？",
+        "tool_calls": tool_calls,
+        "sop_id": sop_id,
+        "current_sop_step": step_info.action,
+        "suggestion_type": "sop_execution"
+    }
+    
+    # 调用interrupt并处理用户确认结果
+    user_approved = interrupt(interrupt_info)
+    logger.info(f"用户审批结果: {user_approved}")
+    
+    if user_approved:
+        # 审批通过，添加到已审批列表
+        approved_steps = state.get("approved_steps", []) + [step_id]
+        logger.info(f"步骤审批通过，添加到已审批列表: {step_id}")
+        return {"approved_steps": approved_steps}
+    else:
+        # 用户取消，中止执行
         diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
-        
-        # 获取原始SOP数据
-        raw_sop_data = extract_raw_sop_data(messages)
-        if not raw_sop_data:
-            logger.warning("无法获取原始SOP数据，跳过审批检查")
-            return {}
-        
-        # 查找匹配的SOP步骤
-        current_step_info = find_matching_sop_step(tool_calls, raw_sop_data)
-        
-        # 检查当前步骤是否需要审批
-        if current_step_info and current_step_info.requires_approval:
-            logger.info(f"触发审批流程: SOP {question_analysis.sop_id}, 步骤: {current_step_info.action}")
-            tool_descriptions = []
-            for tool_call in tool_calls:
-                tool_name = tool_call.get("name", "")
-                tool_args = tool_call.get("args", {})
-                tool_descriptions.append(f"工具: {tool_name}, 参数: {tool_args}")
-            
-            # 中断并请求用户确认
-            interrupt_info = {
-                "message": f"按照SOP '{question_analysis.sop_id}' 要求，即将执行需要审批的步骤:\n\n"
-                           f"**步骤详情:** {current_step_info.action}\n"
-                           f"**计划操作:**\n" + "\n".join(tool_descriptions) +
-                           f"\n\n确认执行？",
-                "tool_calls": tool_calls,
-                "sop_id": question_analysis.sop_id,
-                "current_sop_step": current_step_info.action,
-                "suggestion_type": "sop_execution"
-            }
-            
-            # 调用interrupt并处理用户确认结果
-            user_approved = interrupt(interrupt_info)
-            logger.info(f"用户审批结果: {user_approved}")
-            
-            # 根据用户确认结果返回相应状态
-            if user_approved:
-                # 用户确认，允许继续执行
-                return {}
-            else:
-                # 用户取消，中止执行并跳转到报告
-                return {
-                    "messages": [AIMessage(content="用户取消了SOP步骤执行，诊断流程已中止。")],
-                    "diagnosis_progress": DiagnosisProgress(
-                        current_step=diagnosis_progress.current_step,
-                        max_steps=diagnosis_progress.max_steps,
-                        is_complete=True,
-                        termination_reason="user_cancelled"
-                    )
-                }
-        
-        # 如果不需要审批，则不返回任何内容，直接继续
-    return {}
+        return {
+            "messages": [AIMessage(content="用户取消了SOP步骤执行，诊断流程已中止。")],
+            "diagnosis_progress": DiagnosisProgress(
+                current_step=diagnosis_progress.current_step,
+                max_steps=diagnosis_progress.max_steps,
+                is_complete=True,
+                termination_reason="user_cancelled"
+            )
+        }
 
 
 def reflect_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
@@ -375,18 +378,15 @@ def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) 
 def check_tool_calls(state: DiagnosticState, config: RunnableConfig) -> str:
     """检查是否有工具调用"""
     messages = state.get("messages", [])
-    if not messages:
-        return "reflection"
-    
+    if not messages: return "reflection"
     last_message = messages[-1]
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         return "approval"
     else:
         return "reflection"
+
 # 创建工具执行节点
 tool_node = ToolNode(all_tools)
-
-
 # 创建诊断Agent图 - 简化版本
 builder = StateGraph(DiagnosticState, config_schema=Configuration)
 # 添加节点
