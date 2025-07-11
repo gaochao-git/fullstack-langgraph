@@ -16,7 +16,7 @@ from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,Diag
 from agents.diagnostic_agent.prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
-from agents.diagnostic_agent.utils import merge_field
+from agents.diagnostic_agent.utils import merge_field, find_matching_sop_step, extract_raw_sop_data
 logger = logging.getLogger(__name__)
 
 
@@ -117,75 +117,24 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
     """SOP执行确认节点 - 确认每个SOP步骤的执行"""
     # 获取最新的工具调用消息
     messages = state.get("messages", [])
-    if not messages:return {}
+    if not messages:
+        return {}
+    
     last_message = messages[-1]
     # 如果有工具调用，检查是否符合SOP要求
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
         tool_calls = last_message.tool_calls
         question_analysis = state.get("question_analysis", QuestionAnalysis())
-        sop_detail = state.get("sop_detail", SOPDetail())
         diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
         
-        # 从工具调用中找到匹配的SOP步骤
-        current_step_info = None
-        
-        # 获取原始SOP数据（从最近的get_sop_content工具消息中）
-        raw_sop_data = None
-        for msg in reversed(messages):
-            if isinstance(msg, ToolMessage) and msg.name == "get_sop_content":
-                try:
-                    result = json.loads(msg.content)
-                    if result.get("success") and result.get("sop_content"):
-                        raw_sop_data = result["sop_content"]
-                        break
-                except (json.JSONDecodeError, TypeError):
-                    continue
-        
+        # 获取原始SOP数据
+        raw_sop_data = extract_raw_sop_data(messages)
         if not raw_sop_data:
             logger.warning("无法获取原始SOP数据，跳过审批检查")
             return {}
         
         # 查找匹配的SOP步骤
-        for tool_call in tool_calls:
-            tool_name = tool_call.get("name", "")
-            tool_args = tool_call.get("args", {})
-            
-            # 跳过SOP加载相关的工具调用
-            if tool_name in ["get_sop_content", "get_sop_detail", "list_sops", "search_sops"]:
-                continue
-                
-            # 在原始SOP步骤中查找匹配的工具和命令
-            for sop_step in raw_sop_data.get("steps", []):
-                step_tool = sop_step.get("tool", "")
-                step_command = sop_step.get("command", "")
-                
-                # 检查工具名称是否匹配
-                if tool_name == step_tool:
-                    # 如果有命令参数，检查命令是否匹配
-                    if "command" in tool_args:
-                        if tool_args["command"] == step_command:
-                            current_step_info = SOPStep(
-                                title=sop_step.get("action", ""),
-                                description=sop_step.get("description", ""),
-                                action=sop_step.get("action", ""),
-                                requires_approval=sop_step.get("requires_approval", False),
-                                status="pending"
-                            )
-                            break
-                    else:
-                        # 没有具体命令参数，只根据工具匹配
-                        current_step_info = SOPStep(
-                            title=sop_step.get("action", ""),
-                            description=sop_step.get("description", ""),
-                            action=sop_step.get("action", ""),
-                            requires_approval=sop_step.get("requires_approval", False),
-                            status="pending"
-                        )
-                        break
-            
-            # 找到匹配的步骤就退出
-            if current_step_info:
-                break
+        current_step_info = find_matching_sop_step(tool_calls, raw_sop_data)
         
         # 检查当前步骤是否需要审批
         if current_step_info and current_step_info.requires_approval:
