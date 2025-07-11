@@ -16,11 +16,7 @@ from agents.diagnostic_agent.state import (DiagnosticState,QuestionAnalysis,Diag
 from agents.diagnostic_agent.prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions)
 from agents.diagnostic_agent.schemas import QuestionInfoExtraction
 from agents.diagnostic_agent.tools import all_tools
-from agents.diagnostic_agent.utils import (
-    merge_field, check_approval_needed, is_already_approved,
-    process_sop_loading, update_diagnosis_step, check_diagnosis_completion,
-    check_info_sufficient, check_tool_calls
-)
+from agents.diagnostic_agent.utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls)
 logger = logging.getLogger(__name__)
 
 
@@ -28,17 +24,11 @@ logger = logging.getLogger(__name__)
 def analyze_question_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """问题分析节点 - 支持多轮补充四要素"""
     configurable = Configuration.from_runnable_config(config)
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=configurable.question_analysis_temperature
-    )
-    
+    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=configurable.question_analysis_temperature)
     messages = state.get("messages", [])
     user_question = messages[-1].content if messages else ""
-    
     # 获取当前已有的四要素信息
     current_analysis = state.get("question_analysis", QuestionAnalysis())
-    
     # 使用提示词模板函数生成提示词
     prompt = get_question_analysis_prompt(user_question, current_analysis)
     
@@ -81,14 +71,9 @@ def analyze_question_node(state: DiagnosticState, config: RunnableConfig) -> Dic
 def plan_diagnosis_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具规划节点 - 严格按照SOP执行"""
     configurable = Configuration.from_runnable_config(config)
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=configurable.tool_planning_temperature
-    )
-    
+    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=configurable.tool_planning_temperature)
     # 绑定工具到LLM
     llm_with_tools = llm.bind_tools(all_tools)
-    
     # 构建工具规划提示
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     sop_detail = state.get("sop_detail", SOPDetail())
@@ -126,8 +111,7 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
     """
     # 1. 检查是否需要审批
     approval_info = check_approval_needed(state)
-    if not approval_info:
-        return {}  # 无需审批，直接继续
+    if not approval_info: return {}  # 无需审批，直接继续
     
     # 2. 检查是否已审批过
     if is_already_approved(state, approval_info):
