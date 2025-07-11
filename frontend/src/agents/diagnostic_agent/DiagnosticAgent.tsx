@@ -15,7 +15,7 @@ export default function DiagnosticAgent() {
     messages: Message[];
   }>({
     apiUrl: import.meta.env.DEV
-      ? "http://localhost:2024"
+      ? "http://localhost:8000"
       : "http://localhost:8123",
     assistantId: "diagnostic_agent",
     messagesKey: "messages",

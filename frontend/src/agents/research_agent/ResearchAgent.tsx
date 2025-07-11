@@ -26,7 +26,7 @@ export default function ResearchAgent() {
     [key: string]: any;
   }>({
     apiUrl: import.meta.env.DEV
-      ? "http://localhost:2024"
+      ? "http://localhost:8000"
       : "http://localhost:8123",
     assistantId: "research_agent",
     messagesKey: "messages",
