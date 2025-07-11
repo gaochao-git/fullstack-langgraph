@@ -315,8 +315,10 @@ builder.add_conditional_edges("reflection", evaluate_diagnosis_progress, ["plan_
 builder.add_edge("finalize_answer", END)
 
 
-# 编译图
-graph = builder.compile(name="diagnostic-agent")
+# 编译图 - 添加内存checkpointer以支持中断和恢复
+from langgraph.checkpoint.memory import MemorySaver
+checkpointer = MemorySaver()
+graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
 
 # 保存图像
 try:

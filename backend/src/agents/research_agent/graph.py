@@ -300,4 +300,7 @@ builder.add_conditional_edges(
 # 完成答案
 builder.add_edge("finalize_answer", END)
 
-graph = builder.compile(name="pro-search-agent")
+# 编译图 - 添加内存checkpointer以支持中断和恢复
+from langgraph.checkpoint.memory import MemorySaver
+checkpointer = MemorySaver()
+graph = builder.compile(checkpointer=checkpointer, name="pro-search-agent")

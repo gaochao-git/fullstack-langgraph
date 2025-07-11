@@ -69,7 +69,7 @@ class ThreadResponse(BaseModel):
 
 class RunCreate(BaseModel):
     assistant_id: str
-    input: Dict[str, Any]
+    input: Optional[Dict[str, Any]] = None  # 改为可选，resume时不需要input
     config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
     stream_mode: Optional[List[str]] = ["values"]  # 修改为数组类型
@@ -77,6 +77,7 @@ class RunCreate(BaseModel):
     interrupt_after: Optional[List[str]] = None
     on_disconnect: Optional[str] = None  # 添加前端发送的字段
     command: Optional[Dict[str, Any]] = None  # 添加command字段用于resume
+    checkpoint: Optional[Dict[str, Any]] = None  # 添加checkpoint字段
 
 class RunResponse(BaseModel):
     run_id: str
@@ -296,7 +297,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             config = {
                 "configurable": {
                     "thread_id": thread_id,
-                    **(request_body.config or {})
+                    **(request_body.config or {}).get("configurable", {})
                 }
             }
             
@@ -309,15 +310,30 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                 # Clear interrupt information when resuming
                 if thread_id in thread_interrupts:
                     thread_interrupts[thread_id] = []
-            else:
+            elif request_body.input is not None:
                 # LangGraph will handle memory automatically via thread_id in config
                 # Just pass the input directly to the graph
                 graph_input = request_body.input
+            else:
+                # No input provided and no resume command, this shouldn't happen
+                raise HTTPException(status_code=400, detail="Either 'input' or 'command' must be provided")
+            
+            # Use checkpoint from request if provided  
+            checkpoint = request_body.checkpoint
+            if checkpoint and "thread_id" in checkpoint:
+                del checkpoint["thread_id"]  # Remove thread_id from checkpoint
+            
+            # Combine stream modes
+            stream_modes = list(set([
+                "values", "messages", "updates", "custom", "checkpoints", "tasks"
+            ] + (request_body.stream_mode or [])))
+            
+            logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
             
             # Stream the graph execution in proper SSE format
             event_id = 0
             has_interrupt = False
-            async for chunk in graph.astream(graph_input, config=config, stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
+            async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes):
                 try:
                     event_id += 1
                     # Convert chunk to JSON-serializable format
