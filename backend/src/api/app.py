@@ -11,7 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import asyncio
 import json
-
+import os
 # Import graphs
 from src.agents.diagnostic_agent.graph import graph as diagnostic_graph
 from src.agents.research_agent.graph import graph as research_graph
@@ -282,19 +282,14 @@ async def get_run(thread_id: str, run_id: str):
 @app.post("/threads/{thread_id}/runs/stream")
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint"""
-    if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
-    
-    if request_body.assistant_id not in ASSISTANTS:
-        raise HTTPException(status_code=400, detail="Invalid assistant_id")
+    if thread_id not in threads_store: raise HTTPException(status_code=404, detail="Thread not found")
+    if request_body.assistant_id not in ASSISTANTS: raise HTTPException(status_code=400, detail="Invalid assistant_id")
     
     async def generate():
         try:
             assistant = ASSISTANTS[request_body.assistant_id]
             graph = assistant["graph"]
-            
             # 如果是诊断代理且使用PostgreSQL，需要用async with创建图
-            import os
             checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
             
             if request_body.assistant_id == "diagnostic_agent" and checkpointer_type == "postgres":
@@ -612,66 +607,6 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
         }
     )
 
-@app.post("/threads/{thread_id}/runs/{run_id}/stream")
-async def stream_run(thread_id: str, run_id: str):
-    """Stream run results"""
-    if run_id not in runs_store:
-        raise HTTPException(status_code=404, detail="Run not found")
-    
-    run_data = runs_store[run_id]
-    if run_data["thread_id"] != thread_id:
-        raise HTTPException(status_code=404, detail="Run not found in thread")
-    
-    async def generate():
-        try:
-            assistant = ASSISTANTS[run_data["assistant_id"]]
-            graph = assistant["graph"]
-            
-            # Build config
-            config = {
-                "configurable": run_data.get("config", {}),
-                "thread_id": thread_id
-            }
-            
-            # Stream the graph execution
-            async for chunk in graph.astream(run_data["input"], config=config,stream_mode=["values", "messages", "updates","custom","checkpoints","tasks"]):
-                try:
-                    # Convert chunk to JSON-serializable format
-                    serializable_chunk = {}
-                    for key, value in chunk.items():
-                        if hasattr(value, 'dict'):
-                            # Pydantic models
-                            serializable_chunk[key] = value.dict()
-                        elif hasattr(value, '__dict__'):
-                            # Regular objects with __dict__
-                            serializable_chunk[key] = value.__dict__
-                        else:
-                            # Primitive types
-                            serializable_chunk[key] = value
-                    yield f"data: {json.dumps(serializable_chunk, ensure_ascii=False)}\n\n"
-                except Exception as e:
-                    logger.error(f"Serialization error: {e}")
-                    yield f"data: {json.dumps({'type': 'chunk', 'data': str(chunk)}, ensure_ascii=False)}\n\n"
-                
-            # Update run status
-            runs_store[run_id]["status"] = "completed"
-            yield f"data: {json.dumps({'type': 'end', 'run_id': run_id}, ensure_ascii=False)}\n\n"
-            
-        except Exception as e:
-            logger.error(f"Error in run {run_id}: {e}")
-            runs_store[run_id]["status"] = "failed"
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
-    
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "text/event-stream"
-        }
-    )
 
 @app.post("/threads/{thread_id}/runs/{run_id}/interrupt")
 async def interrupt_run(thread_id: str, run_id: str):
