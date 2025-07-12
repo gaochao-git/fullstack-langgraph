@@ -21,6 +21,11 @@ from src.agents.research_agent.configuration import Configuration as ResearchCon
 # Define the FastAPI app
 app = FastAPI(title="LangGraph Server", version="1.0.0")
 
+# 应用启动时初始化全局checkpointer
+@app.on_event("startup")
+async def startup_event():
+    await init_global_checkpointer()
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -34,6 +39,9 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 全局checkpointer实例 - 按照官方推荐方式
+global_checkpointer = None
+
 # In-memory storage for threads and runs (TODO: replace with persistent storage)
 threads_store: Dict[str, Dict[str, Any]] = {}
 runs_store: Dict[str, Dict[str, Any]] = {}
@@ -42,70 +50,83 @@ thread_messages: Dict[str, List[Dict[str, Any]]] = {}
 # Store interrupt information for each thread
 thread_interrupts: Dict[str, List[Dict[str, Any]]] = {}
 
+# 初始化全局checkpointer
+async def init_global_checkpointer():
+    """初始化全局PostgreSQL checkpointer - 按照官方推荐方式"""
+    global global_checkpointer
+    
+    checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
+    if checkpointer_type == "postgres":
+        try:
+            from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+            connection_string = "postgresql://postgres:fffjjj@82.156.146.51:5432/langgraph_memory"
+            
+            # 按照官方推荐：使用连接池创建全局checkpointer
+            global_checkpointer = await AsyncPostgresSaver.from_conn_string(connection_string).__aenter__()
+            await global_checkpointer.setup()
+            logger.info("✅ 全局PostgreSQL checkpointer初始化成功")
+        except Exception as e:
+            logger.error(f"❌ 初始化全局checkpointer失败: {e}")
+            global_checkpointer = None
+
 # 线程恢复工具函数
 async def recover_thread_from_postgres(thread_id: str) -> bool:
     """从PostgreSQL checkpointer中恢复线程信息"""
     try:
         checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
-        if checkpointer_type != "postgres":
+        if checkpointer_type != "postgres" or global_checkpointer is None:
             return False
             
-        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-        connection_string = "postgresql://postgres:fffjjj@82.156.146.51:5432/langgraph_memory"
-        
-        async with AsyncPostgresSaver.from_conn_string(connection_string) as checkpointer:
-            await checkpointer.setup()
+        # 使用全局checkpointer获取该thread的checkpoint历史
+        config = {"configurable": {"thread_id": thread_id}}
+        try:
+            # 获取最新的checkpoint来验证thread存在
+            history = [c async for c in global_checkpointer.alist(config, limit=1)]
             
-            # 尝试获取该thread的checkpoint历史
-            config = {"configurable": {"thread_id": thread_id}}
-            try:
-                # 获取最新的checkpoint来验证thread存在
-                history = [c async for c in checkpointer.alist(config, limit=1)]
+            if history:
+                logger.info(f"✅ 从PostgreSQL恢复线程: {thread_id}")
+                checkpoint_tuple = history[0]
                 
-                if history:
-                    logger.info(f"✅ 从PostgreSQL恢复线程: {thread_id}")
-                    checkpoint_tuple = history[0]
-                    
-                    # 重建threads_store条目 - 使用正确的属性访问
-                    threads_store[thread_id] = {
-                        "thread_id": thread_id,
-                        "created_at": checkpoint_tuple.metadata.get("created_at", datetime.now().isoformat()) if checkpoint_tuple.metadata else datetime.now().isoformat(),
-                        "metadata": {},
-                        "state": {},
-                        "recovered_from_postgres": True
-                    }
-                    
-                    # 初始化相关存储
-                    if thread_id not in thread_messages:
-                        thread_messages[thread_id] = []
-                    if thread_id not in thread_interrupts:
-                        thread_interrupts[thread_id] = []
-                    
-                    # 从checkpoint恢复消息 - 使用官方结构
-                    try:
-                        if checkpoint_tuple.checkpoint and "channel_values" in checkpoint_tuple.checkpoint:
-                            channel_values = checkpoint_tuple.checkpoint["channel_values"]
-                            if "messages" in channel_values:
-                                thread_messages[thread_id] = channel_values["messages"]
-                                logger.info(f"恢复了 {len(thread_messages[thread_id])} 条消息")
-                            
-                            # 也尝试恢复其他状态
-                            if "diagnosis_progress" in channel_values:
-                                threads_store[thread_id]["state"]["diagnosis_progress"] = channel_values["diagnosis_progress"]
-                            logger.info(f"从checkpoint恢复的通道: {list(channel_values.keys())}")
-                        else:
-                            logger.info(f"Checkpoint结构: {list(checkpoint_tuple.checkpoint.keys()) if checkpoint_tuple.checkpoint else 'None'}")
-                    except Exception as e:
-                        logger.warning(f"恢复状态时出错，但线程恢复成功: {e}")
-                    
-                    return True
-                else:
-                    logger.info(f"❌ PostgreSQL中未找到线程: {thread_id}")
-                    return False
-                    
-            except Exception as e:
-                logger.error(f"从PostgreSQL检查线程时出错: {e}")
+                # 重建threads_store条目 - 使用正确的属性访问
+                threads_store[thread_id] = {
+                    "thread_id": thread_id,
+                    "created_at": checkpoint_tuple.metadata.get("created_at", datetime.now().isoformat()) if checkpoint_tuple.metadata else datetime.now().isoformat(),
+                    "metadata": {},
+                    "state": {},
+                    "recovered_from_postgres": True
+                }
+                
+                # 初始化相关存储
+                if thread_id not in thread_messages:
+                    thread_messages[thread_id] = []
+                if thread_id not in thread_interrupts:
+                    thread_interrupts[thread_id] = []
+                
+                # 从checkpoint恢复消息 - 使用官方结构
+                try:
+                    if checkpoint_tuple.checkpoint and "channel_values" in checkpoint_tuple.checkpoint:
+                        channel_values = checkpoint_tuple.checkpoint["channel_values"]
+                        if "messages" in channel_values:
+                            thread_messages[thread_id] = channel_values["messages"]
+                            logger.info(f"恢复了 {len(thread_messages[thread_id])} 条消息")
+                        
+                        # 也尝试恢复其他状态
+                        if "diagnosis_progress" in channel_values:
+                            threads_store[thread_id]["state"]["diagnosis_progress"] = channel_values["diagnosis_progress"]
+                        logger.info(f"从checkpoint恢复的通道: {list(channel_values.keys())}")
+                    else:
+                        logger.info(f"Checkpoint结构: {list(checkpoint_tuple.checkpoint.keys()) if checkpoint_tuple.checkpoint else 'None'}")
+                except Exception as e:
+                    logger.warning(f"恢复状态时出错，但线程恢复成功: {e}")
+                
+                return True
+            else:
+                logger.info(f"❌ PostgreSQL中未找到线程: {thread_id}")
                 return False
+                
+        except Exception as e:
+            logger.error(f"从PostgreSQL检查线程时出错: {e}")
+            return False
                 
     except Exception as e:
         logger.error(f"恢复线程失败: {e}")
