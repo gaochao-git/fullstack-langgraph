@@ -404,34 +404,46 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             raise HTTPException(status_code=404, detail="Thread not found")
     if request_body.assistant_id not in ASSISTANTS: raise HTTPException(status_code=400, detail="Invalid assistant_id")
     
+    def should_use_postgres_mode(assistant_id: str) -> bool:
+        """判断是否应该使用PostgreSQL模式"""
+        checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
+        return assistant_id == "diagnostic_agent" and checkpointer_type == "postgres"
+    
+    async def handle_postgres_streaming(request_body, thread_id):
+        """处理PostgreSQL模式的流式响应"""
+        from src.agents.diagnostic_agent.graph import builder
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        
+        logger.info(f"🔍 PostgreSQL模式 - 按照官方模式使用async with")
+        if thread_id in threads_store:
+            threads_store[thread_id]["streaming_status"] = "starting"
+        
+        # 按照官方模式：在async with内完成整个请求周期
+        async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
+            await checkpointer.setup()
+            graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+            
+            # 在同一个async with内执行完整的流式处理
+            async for item in stream_with_graph_postgres(graph, request_body, thread_id):
+                yield item
+    
+    async def handle_memory_streaming(request_body, thread_id):
+        """处理内存模式的流式响应"""
+        assistant = ASSISTANTS[request_body.assistant_id]
+        graph = assistant["graph"]
+        
+        # 使用现有图进行流式处理
+        async for item in stream_with_graph(graph, request_body, thread_id):
+            yield item
+
     async def generate():
         try:
-            assistant = ASSISTANTS[request_body.assistant_id]
-            graph = assistant["graph"]
-            # 如果是诊断代理且使用PostgreSQL，需要用async with创建图
-            checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
-            
-            # PostgreSQL模式：按照官方模式使用async with
-            if request_body.assistant_id == "diagnostic_agent" and checkpointer_type == "postgres":
-                from src.agents.diagnostic_agent.graph import builder
-                from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-                
-                # 记录线程状态
-                logger.info(f"🔍 PostgreSQL模式 - 按照官方模式使用async with")
-                if thread_id in threads_store:
-                    threads_store[thread_id]["streaming_status"] = "starting"
-                
-                # 按照官方模式：在async with内完成整个请求周期
-                async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
-                    await checkpointer.setup()
-                    graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
-                    
-                    # 在同一个async with内执行完整的流式处理
-                    async for item in stream_with_graph_postgres(graph, request_body, thread_id):
-                        yield item
+            # 根据助手类型和checkpointer类型选择处理策略
+            if should_use_postgres_mode(request_body.assistant_id):
+                async for item in handle_postgres_streaming(request_body, thread_id):
+                    yield item
             else:
-                # 非PostgreSQL模式，使用现有图
-                async for item in stream_with_graph(graph, request_body, thread_id):
+                async for item in handle_memory_streaming(request_body, thread_id):
                     yield item
                 
         except Exception as e:
@@ -439,9 +451,8 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             yield f"event: error\n"
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
-    async def stream_with_graph_postgres(graph, request_body, thread_id):
-        """PostgreSQL模式专用的图流媒体处理函数 - 在async with内执行"""
-        # Build config with thread_id
+    def prepare_graph_config(request_body, thread_id):
+        """准备图执行配置"""
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -451,7 +462,6 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
         
         # Handle resume command for interrupted execution
         if request_body.command and "resume" in request_body.command:
-            # Resume interrupted execution with the resume value
             from langgraph.types import Command
             graph_input = Command(resume=request_body.command["resume"])
             logger.info(f"Resuming execution with command: {request_body.command}")
@@ -459,261 +469,139 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             if thread_id in thread_interrupts:
                 thread_interrupts[thread_id] = []
         elif request_body.input is not None:
-            # LangGraph will handle memory automatically via thread_id in config
-            # Just pass the input directly to the graph
             graph_input = request_body.input
         else:
-            # No input provided and no resume command, this shouldn't happen
             raise HTTPException(status_code=400, detail="Either 'input' or 'command' must be provided")
         
         # Use checkpoint from request if provided  
         checkpoint = request_body.checkpoint
         if checkpoint and "thread_id" in checkpoint:
-            del checkpoint["thread_id"]  # Remove thread_id from checkpoint
+            del checkpoint["thread_id"]
         
         # Combine stream modes
         stream_modes = list(set([
             "values", "messages", "updates", "custom", "checkpoints", "tasks"
         ] + (request_body.stream_mode or [])))
         
+        return config, graph_input, stream_modes, checkpoint
+
+    def serialize_value(val):
+        """通用序列化函数"""
+        # Handle tuples (like from LangGraph messages)
+        if isinstance(val, tuple):
+            return [serialize_value(item) for item in val]
+        # Handle LangGraph Interrupt objects
+        elif hasattr(val, 'value') and hasattr(val, 'resumable') and hasattr(val, 'ns'):
+            return {
+                "value": serialize_value(val.value),
+                "resumable": val.resumable,
+                "ns": val.ns,
+                "when": getattr(val, 'when', 'during')
+            }
+        elif hasattr(val, 'dict'):
+            return val.dict()
+        elif hasattr(val, 'to_dict'):
+            return val.to_dict()
+        elif hasattr(val, '__dict__'):
+            result = {}
+            for k, v in val.__dict__.items():
+                if not k.startswith('_'):
+                    result[k] = serialize_value(v)
+            return result
+        elif isinstance(val, list):
+            return [serialize_value(item) for item in val]
+        elif isinstance(val, dict):
+            return {k: serialize_value(v) for k, v in val.items()}
+        else:
+            try:
+                json.dumps(val)
+                return val
+            except (TypeError, ValueError):
+                return str(val)
+
+    async def process_stream_chunk(chunk, event_id, thread_id):
+        """处理单个流式数据块"""
+        # Handle tuple format from LangGraph streaming
+        if isinstance(chunk, tuple) and len(chunk) == 2:
+            event_type, data = chunk
+            serialized_data = serialize_value(data)
+            
+            # Save messages to thread history from LangGraph state
+            if event_type == "values" and isinstance(data, dict) and "messages" in data:
+                if thread_id not in thread_messages:
+                    thread_messages[thread_id] = []
+                thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
+            
+            # Check for interrupts
+            has_interrupt = False
+            if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
+                logger.info(f"Interrupt detected: {data}")
+                if thread_id not in thread_interrupts:
+                    thread_interrupts[thread_id] = []
+                thread_interrupts[thread_id].append(data["__interrupt__"][0])
+                has_interrupt = True
+            
+            return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serialized_data, ensure_ascii=False)}\n\n", has_interrupt
+        else:
+            # Handle dict format (fallback)
+            serializable_chunk = {}
+            for key, value in chunk.items():
+                serializable_chunk[key] = serialize_value(value)
+            
+            event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
+            return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n", False
+
+    async def stream_with_graph_postgres(graph, request_body, thread_id):
+        """PostgreSQL模式专用的图流媒体处理函数 - 在async with内执行"""
+        config, graph_input, stream_modes, checkpoint = prepare_graph_config(request_body, thread_id)
         logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
         
-        # Stream the graph execution in proper SSE format
         event_id = 0
         has_interrupt = False
+        
         async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes):
             try:
                 event_id += 1
-                # Convert chunk to JSON-serializable format
-                def serialize_value(val):
-                    # Handle tuples (like from LangGraph messages)
-                    if isinstance(val, tuple):
-                        return [serialize_value(item) for item in val]
-                    # Handle LangGraph Interrupt objects
-                    elif hasattr(val, 'value') and hasattr(val, 'resumable') and hasattr(val, 'ns'):
-                        # This is a LangGraph Interrupt object
-                        return {
-                            "value": serialize_value(val.value),
-                            "resumable": val.resumable,
-                            "ns": val.ns,
-                            "when": getattr(val, 'when', 'during')
-                        }
-                    elif hasattr(val, 'dict'):
-                        # Pydantic models
-                        return val.dict()
-                    elif hasattr(val, 'to_dict'):
-                        # Objects with to_dict method
-                        return val.to_dict()
-                    elif hasattr(val, '__dict__'):
-                        # Regular objects - recursively serialize
-                        result = {}
-                        for k, v in val.__dict__.items():
-                            if not k.startswith('_'):  # Skip private attributes
-                                result[k] = serialize_value(v)
-                        return result
-                    elif isinstance(val, list):
-                        # Lists - recursively serialize each item
-                        return [serialize_value(item) for item in val]
-                    elif isinstance(val, dict):
-                        # Dictionaries - recursively serialize values
-                        return {k: serialize_value(v) for k, v in val.items()}
-                    else:
-                        # Primitive types or fallback to string
-                        try:
-                            json.dumps(val)  # Test if serializable
-                            return val
-                        except (TypeError, ValueError):
-                            return str(val)
-                
-                # Handle tuple format from LangGraph streaming
-                if isinstance(chunk, tuple) and len(chunk) == 2:
-                    event_type, data = chunk
-                    serialized_data = serialize_value(data)
-                    
-                    # Save messages to thread history from LangGraph state
-                    if event_type == "values" and isinstance(data, dict) and "messages" in data:
-                        if thread_id not in thread_messages:
-                            thread_messages[thread_id] = []
-                        
-                        # Update message history from LangGraph's state
-                        # This reflects the actual conversation state managed by LangGraph
-                        thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
-                    
-                    yield f"id: {event_id}\n"
-                    yield f"event: {event_type}\n"
-                    yield f"data: {json.dumps(serialized_data, ensure_ascii=False)}\n\n"
-                    
-                    # Check for interrupts - continue streaming but don't send end event
-                    if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
-                        logger.info(f"Interrupt detected: {data}")
-                        # Store interrupt information for thread history
-                        if thread_id not in thread_interrupts:
-                            thread_interrupts[thread_id] = []
-                        thread_interrupts[thread_id].append(data["__interrupt__"][0])
-                        has_interrupt = True
-                else:
-                    # Handle dict format (fallback)
-                    serializable_chunk = {}
-                    for key, value in chunk.items():
-                        serializable_chunk[key] = serialize_value(value)
-                    
-                    # Format as proper SSE with event type based on chunk key
-                    event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
-                    yield f"id: {event_id}\n"
-                    yield f"event: {event_type}\n"
-                    yield f"data: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n"
+                sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
+                yield sse_data
+                if chunk_has_interrupt:
+                    has_interrupt = True
             except Exception as e:
                 logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}")
                 event_id += 1
-                yield f"id: {event_id}\n"
-                yield f"event: error\n"
-                yield f"data: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
+                yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
         
         # End event - only send if no interrupt occurred
         if not has_interrupt:
             event_id += 1
-            yield f"id: {event_id}\n"
-            yield f"event: end\n"
-            yield f"data: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
         else:
             logger.info("Skipping end event due to interrupt - waiting for user approval")
 
     async def stream_with_graph(graph, request_body, thread_id):
         """通用的图流媒体处理函数"""
-        # Build config with thread_id
-        config = {
-            "configurable": {
-                "thread_id": thread_id,
-                **(request_body.config or {}).get("configurable", {})
-            }
-        }
-        
-        # Handle resume command for interrupted execution
-        if request_body.command and "resume" in request_body.command:
-            # Resume interrupted execution with the resume value
-            from langgraph.types import Command
-            graph_input = Command(resume=request_body.command["resume"])
-            logger.info(f"Resuming execution with command: {request_body.command}")
-            # Clear interrupt information when resuming
-            if thread_id in thread_interrupts:
-                thread_interrupts[thread_id] = []
-        elif request_body.input is not None:
-            # LangGraph will handle memory automatically via thread_id in config
-            # Just pass the input directly to the graph
-            graph_input = request_body.input
-        else:
-            # No input provided and no resume command, this shouldn't happen
-            raise HTTPException(status_code=400, detail="Either 'input' or 'command' must be provided")
-        
-        # Use checkpoint from request if provided  
-        checkpoint = request_body.checkpoint
-        if checkpoint and "thread_id" in checkpoint:
-            del checkpoint["thread_id"]  # Remove thread_id from checkpoint
-        
-        # Combine stream modes
-        stream_modes = list(set([
-            "values", "messages", "updates", "custom", "checkpoints", "tasks"
-        ] + (request_body.stream_mode or [])))
-        
+        config, graph_input, stream_modes, checkpoint = prepare_graph_config(request_body, thread_id)
         logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
         
-        # Stream the graph execution in proper SSE format
         event_id = 0
         has_interrupt = False
+        
         async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes):
             try:
                 event_id += 1
-                # Convert chunk to JSON-serializable format
-                def serialize_value(val):
-                    # Handle tuples (like from LangGraph messages)
-                    if isinstance(val, tuple):
-                        return [serialize_value(item) for item in val]
-                    # Handle LangGraph Interrupt objects
-                    elif hasattr(val, 'value') and hasattr(val, 'resumable') and hasattr(val, 'ns'):
-                        # This is a LangGraph Interrupt object
-                        return {
-                            "value": serialize_value(val.value),
-                            "resumable": val.resumable,
-                            "ns": val.ns,
-                            "when": getattr(val, 'when', 'during')
-                        }
-                    elif hasattr(val, 'dict'):
-                        # Pydantic models
-                        return val.dict()
-                    elif hasattr(val, 'to_dict'):
-                        # Objects with to_dict method
-                        return val.to_dict()
-                    elif hasattr(val, '__dict__'):
-                        # Regular objects - recursively serialize
-                        result = {}
-                        for k, v in val.__dict__.items():
-                            if not k.startswith('_'):  # Skip private attributes
-                                result[k] = serialize_value(v)
-                        return result
-                    elif isinstance(val, list):
-                        # Lists - recursively serialize each item
-                        return [serialize_value(item) for item in val]
-                    elif isinstance(val, dict):
-                        # Dictionaries - recursively serialize values
-                        return {k: serialize_value(v) for k, v in val.items()}
-                    else:
-                        # Primitive types or fallback to string
-                        try:
-                            json.dumps(val)  # Test if serializable
-                            return val
-                        except (TypeError, ValueError):
-                            return str(val)
-                
-                # Handle tuple format from LangGraph streaming
-                if isinstance(chunk, tuple) and len(chunk) == 2:
-                    event_type, data = chunk
-                    serialized_data = serialize_value(data)
-                    
-                    # Save messages to thread history from LangGraph state
-                    if event_type == "values" and isinstance(data, dict) and "messages" in data:
-                        if thread_id not in thread_messages:
-                            thread_messages[thread_id] = []
-                        
-                        # Update message history from LangGraph's state
-                        # This reflects the actual conversation state managed by LangGraph
-                        thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
-                    
-                    yield f"id: {event_id}\n"
-                    yield f"event: {event_type}\n"
-                    yield f"data: {json.dumps(serialized_data, ensure_ascii=False)}\n\n"
-                    
-                    # Check for interrupts - continue streaming but don't send end event
-                    if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
-                        logger.info(f"Interrupt detected: {data}")
-                        # Store interrupt information for thread history
-                        if thread_id not in thread_interrupts:
-                            thread_interrupts[thread_id] = []
-                        thread_interrupts[thread_id].append(data["__interrupt__"][0])
-                        has_interrupt = True
-                else:
-                    # Handle dict format (fallback)
-                    serializable_chunk = {}
-                    for key, value in chunk.items():
-                        serializable_chunk[key] = serialize_value(value)
-                    
-                    # Format as proper SSE with event type based on chunk key
-                    event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
-                    yield f"id: {event_id}\n"
-                    yield f"event: {event_type}\n"
-                    yield f"data: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n"
+                sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
+                yield sse_data
+                if chunk_has_interrupt:
+                    has_interrupt = True
             except Exception as e:
                 logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}")
                 event_id += 1
-                yield f"id: {event_id}\n"
-                yield f"event: error\n"
-                yield f"data: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
+                yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
         
         # End event - only send if no interrupt occurred
         if not has_interrupt:
             event_id += 1
-            yield f"id: {event_id}\n"
-            yield f"event: end\n"
-            yield f"data: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
         else:
             logger.info("Skipping end event due to interrupt - waiting for user approval")
     
