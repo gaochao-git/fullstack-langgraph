@@ -285,10 +285,11 @@ export function DiagnosticChatView({
       >
         <div className="flex flex-col">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-[40vh] text-gray-400 select-none">
-              <h1 className="text-4xl font-bold mb-2">故障诊断助手</h1>
-              <p className="text-lg mb-4">您希望我诊断什么问题？</p>
-              <p className="text-base">请在下方输入框描述您的问题并点击"诊断"</p>
+            <div className="w-full">
+              <FaultWelcomeSimple 
+                onDiagnose={() => {}} 
+                onContinueChat={() => {}}
+              />
             </div>
           )}
           {dialogRounds.map((round, idx) => (
