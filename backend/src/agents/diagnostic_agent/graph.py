@@ -411,15 +411,6 @@ else:
     from langgraph.checkpoint.memory import MemorySaver
     checkpointer = MemorySaver()
     graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+    graph_image = graph.get_graph().draw_mermaid_png()
+    with open("diagnostic_agent_graph.png", "wb") as f: f.write(graph_image)
     print("📝 内存模式：图已编译完成")
-# 保存图像（仅内存模式）
-if graph is not None:
-    try:
-        graph_image = graph.get_graph().draw_mermaid_png()
-        with open("diagnostic_agent_graph.png", "wb") as f: 
-            f.write(graph_image)
-        print("图已保存到: diagnostic_agent_graph.png")
-    except Exception as e:
-        print(f"生成图失败: {e}")
-else:
-    print("PostgreSQL模式：跳过图像生成")
