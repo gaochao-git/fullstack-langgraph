@@ -55,6 +55,7 @@ def create_saver():
         try:
             return get_postgres_checkpointer()
         except Exception as e:
+            print(f"PostgreSQL saver创建失败，回退到内存模式: {e}")
             logger.warning(f"PostgreSQL saver创建失败，回退到内存模式: {e}")
     
     # 默认内存saver
