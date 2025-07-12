@@ -7,6 +7,7 @@ import { useState, ReactNode, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
 
 // 诊断消息中的事件类型
 export interface ProcessedEvent {
