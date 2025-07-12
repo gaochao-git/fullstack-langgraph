@@ -9,6 +9,10 @@ langgraph==0.2.69
 langchain-core==0.3.25
 langchain-community==0.3.8
 
+# LangGraph PostgreSQL持久化支持
+langgraph-checkpoint-postgres[psycopg]==2.0.2
+psycopg[pool]
+
 # 模型和工具
 langchain-openai==0.2.14
 elasticsearch==8.12.0
