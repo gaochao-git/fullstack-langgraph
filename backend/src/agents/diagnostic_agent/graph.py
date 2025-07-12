@@ -3,6 +3,7 @@
 重构版本：参考调研agent的结构，优化状态管理和节点职责
 """
 
+import os
 import json
 import logging
 from typing import Dict, Any
@@ -399,7 +400,6 @@ builder.add_edge("finalize_answer", END)
 
 
 # 编译图 - 根据环境变量决定是否使用checkpointer
-import os
 checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
 
 if checkpointer_type == "postgres":
