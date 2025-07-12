@@ -247,6 +247,11 @@ export function DiagnosticChatView({
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   
+  // 处理故障诊断开始 - 将诊断消息设置到输入框
+  const handleStartDiagnosis = (message: string) => {
+    setInputValue(message);
+  };
+  
   const handleCopy = async (text: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -289,6 +294,7 @@ export function DiagnosticChatView({
               <FaultWelcomeSimple 
                 onDiagnose={() => {}} 
                 onContinueChat={() => {}}
+                onStartDiagnosis={handleStartDiagnosis}
               />
             </div>
           )}
