@@ -34,11 +34,11 @@ SOP_DATA = load_sop_data()
 # Tool Schemas
 class GetSOPDetailInput(BaseModel):
     """获取SOP详情工具的输入参数"""
-    sop_key: str = Field(description="SOP键名，如sop_101")
+    sop_key: str = Field(description="SOP键名，如SOP-SYS-101或SOP-DB-001")
 
 class GetSOPContentInput(BaseModel):
     """获取SOP内容工具的输入参数"""
-    sop_key: str = Field(description="SOP键名，如sop_101")
+    sop_key: str = Field(description="SOP键名，如SOP-SYS-101或SOP-DB-001")
 
 class ListSOPsInput(BaseModel):
     """列出所有SOP工具的输入参数"""
@@ -50,7 +50,7 @@ def get_sop_detail(sop_key: str) -> str:
     """获取SOP的详细信息
     
     Args:
-        sop_key: SOP的键名，如"sop_101"
+        sop_key: SOP的键名，如"SOP-SYS-101"或"SOP-DB-001"
     
     Returns:
         JSON格式的SOP详细信息
@@ -81,7 +81,7 @@ def get_sop_content(sop_key: str) -> str:
     """获取SOP内容并更新诊断状态
     
     Args:
-        sop_key: SOP的键名，如"sop_101"
+        sop_key: SOP的键名，如"SOP-SYS-101"或"SOP-DB-001"
     
     Returns:
         JSON格式的SOP内容和状态信息

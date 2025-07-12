@@ -23,7 +23,7 @@ def get_question_analysis_prompt(user_question: str, current_analysis=None):
 - fault_ip: 提取IP地址，如192.168.1.100或82.156.146.51
 - fault_time: 提取时间信息，支持各种格式
 - fault_info: 提取故障现象描述，如"磁盘空间满"、"内存不足"等
-- sop_id: 提取SOP编号，如sop_101、SOP-001等
+- sop_id: 提取SOP编号，如SOP-SYS-101、SOP-DB-001等
 
 如果某个字段无法从用户输入中提取，请填写'待提取'。"""
 
@@ -47,7 +47,7 @@ def get_missing_info_prompt(question_analysis):
             "故障IP": "故障服务器的IP地址（如：192.168.1.100）",
             "故障时间": "故障发生的具体时间（如：2024-01-15 14:30）",
             "故障现象": "具体的故障表现和症状描述",
-            "排查SOP编号": "对应的标准作业程序编号（如：SOP-001）"
+            "排查SOP编号": "对应的标准作业程序编号（如：SOP-SYS-101、SOP-DB-001）"
         }
         
         missing_items = []

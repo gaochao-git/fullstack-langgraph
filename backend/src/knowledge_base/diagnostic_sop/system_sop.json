@@ -1,5 +1,5 @@
 {
-  "sop_101": {
+  "SOP-SYS-101": {
     "id": "SOP-SYS-101",
     "title": "磁盘空间不足诊断",
     "category": "system",
@@ -64,7 +64,7 @@
       "监控大文件增长"
     ]
   },
-  "sop_102": {
+  "SOP-SYS-102": {
     "id": "SOP-SYS-102",
     "title": "系统负载过高诊断",
     "category": "system",
@@ -129,7 +129,7 @@
       "容量规划"
     ]
   },
-  "sop_103": {
+  "SOP-SYS-103": {
     "id": "SOP-SYS-103",
     "title": "内存不足诊断",
     "category": "system",

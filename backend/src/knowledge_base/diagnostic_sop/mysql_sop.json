@@ -1,5 +1,5 @@
 {
-  "sop_001": {
+  "SOP-DB-001": {
     "id": "SOP-DB-001",
     "title": "MySQL高CPU使用率诊断",
     "category": "database",
@@ -64,7 +64,7 @@
       "定期维护索引"
     ]
   },
-  "sop_002": {
+  "SOP-DB-002": {
     "id": "SOP-DB-002",
     "title": "MySQL连接问题诊断",
     "category": "database",
@@ -129,7 +129,7 @@
       "优化应用连接使用"
     ]
   },
-  "sop_003": {
+  "SOP-DB-003": {
     "id": "SOP-DB-003",
     "title": "MySQL慢查询分析",
     "category": "database", 
@@ -194,7 +194,7 @@
       "SQL代码审查"
     ]
   },
-  "sop_004": {
+  "SOP-DB-004": {
     "id": "SOP-DB-004",
     "title": "MySQL死锁问题分析",
     "category": "database",
