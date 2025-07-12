@@ -1,9 +1,9 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings, User, Bot } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings, User, Bot, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, ReactNode, useEffect } from "react";
+import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
@@ -246,6 +246,10 @@ export function DiagnosticChatView({
 }: DiagnosticChatViewProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
+  const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef<boolean>(false);
   
   // 处理故障诊断开始 - 将诊断消息设置到输入框
   const handleStartDiagnosis = (message: string) => {
@@ -268,6 +272,54 @@ export function DiagnosticChatView({
     }
   };
 
+  // 滚动到底部
+  const scrollToBottom = useCallback(() => {
+    if (messagesContainerRef.current) {
+      isScrollingRef.current = true;
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 100);
+    }
+  }, []);
+
+  // 检查是否已滚动到底部
+  const isAtBottom = useCallback(() => {
+    if (!messagesContainerRef.current) return true;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    return scrollHeight - scrollTop - clientHeight < 10; // 10px 容差
+  }, []);
+
+  // 处理手动滚动
+  const handleScroll = useCallback(() => {
+    if (isScrollingRef.current) return; // 忽略程序化滚动
+    
+    const atBottom = isAtBottom();
+    setIsAutoScrollEnabled(atBottom);
+    setShowScrollButton(!atBottom);
+  }, [isAtBottom]);
+
+  // 点击滚动按钮
+  const handleScrollButtonClick = useCallback(() => {
+    setIsAutoScrollEnabled(true);
+    setShowScrollButton(false);
+    scrollToBottom();
+  }, [scrollToBottom]);
+
+  // 监听消息变化，自动滚动
+  useEffect(() => {
+    if (isAutoScrollEnabled && messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages, isAutoScrollEnabled, scrollToBottom]);
+
+  // 监听加载状态变化，自动滚动
+  useEffect(() => {
+    if (isAutoScrollEnabled && isLoading) {
+      scrollToBottom();
+    }
+  }, [isLoading, isAutoScrollEnabled, scrollToBottom]);
+
   // 分组：每个人类消息+其后的所有助手消息为一轮
   const dialogRounds: DialogRound[] = [];
   let currentRound: DialogRound | null = null;
@@ -285,8 +337,10 @@ export function DiagnosticChatView({
     <div className="flex flex-col h-full bg-white" style={{ minHeight: 0 }}>
       {/* 消息区 */}
       <div
-        className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50"
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50 relative"
         style={{ minHeight: 0, maxHeight: 'calc(100vh - 180px)' }}
+        onScroll={handleScroll}
       >
         <div className="flex flex-col">
           {messages.length === 0 && (
@@ -401,7 +455,21 @@ export function DiagnosticChatView({
           {/* 保证自动滚动到底部 */}
           <div id="chat-messages-end" />
         </div>
+        
+        {/* 滚动到底部按钮 */}
+        {showScrollButton && (
+          <div className="absolute bottom-4 right-4">
+            <Button
+              onClick={handleScrollButtonClick}
+              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-12 h-12 p-0 shadow-lg flex items-center justify-center"
+              title="滚动到底部"
+            >
+              <ArrowDown className="h-5 w-5" />
+            </Button>
+          </div>
+        )}
       </div>
+      
       {/* 输入区固定底部 */}
       <div
         style={{
