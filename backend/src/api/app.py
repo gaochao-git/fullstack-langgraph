@@ -42,6 +42,75 @@ thread_messages: Dict[str, List[Dict[str, Any]]] = {}
 # Store interrupt information for each thread
 thread_interrupts: Dict[str, List[Dict[str, Any]]] = {}
 
+# 线程恢复工具函数
+async def recover_thread_from_postgres(thread_id: str) -> bool:
+    """从PostgreSQL checkpointer中恢复线程信息"""
+    try:
+        checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
+        if checkpointer_type != "postgres":
+            return False
+            
+        from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        connection_string = "postgresql://postgres:fffjjj@82.156.146.51:5432/langgraph_memory"
+        
+        async with AsyncPostgresSaver.from_conn_string(connection_string) as checkpointer:
+            await checkpointer.setup()
+            
+            # 尝试获取该thread的checkpoint历史
+            config = {"configurable": {"thread_id": thread_id}}
+            try:
+                # 获取最新的checkpoint来验证thread存在
+                history = [c async for c in checkpointer.alist(config, limit=1)]
+                
+                if history:
+                    logger.info(f"✅ 从PostgreSQL恢复线程: {thread_id}")
+                    checkpoint_tuple = history[0]
+                    
+                    # 重建threads_store条目 - 使用正确的属性访问
+                    threads_store[thread_id] = {
+                        "thread_id": thread_id,
+                        "created_at": checkpoint_tuple.metadata.get("created_at", datetime.now().isoformat()) if checkpoint_tuple.metadata else datetime.now().isoformat(),
+                        "metadata": {},
+                        "state": {},
+                        "recovered_from_postgres": True
+                    }
+                    
+                    # 初始化相关存储
+                    if thread_id not in thread_messages:
+                        thread_messages[thread_id] = []
+                    if thread_id not in thread_interrupts:
+                        thread_interrupts[thread_id] = []
+                    
+                    # 从checkpoint恢复消息 - 使用官方结构
+                    try:
+                        if checkpoint_tuple.checkpoint and "channel_values" in checkpoint_tuple.checkpoint:
+                            channel_values = checkpoint_tuple.checkpoint["channel_values"]
+                            if "messages" in channel_values:
+                                thread_messages[thread_id] = channel_values["messages"]
+                                logger.info(f"恢复了 {len(thread_messages[thread_id])} 条消息")
+                            
+                            # 也尝试恢复其他状态
+                            if "diagnosis_progress" in channel_values:
+                                threads_store[thread_id]["state"]["diagnosis_progress"] = channel_values["diagnosis_progress"]
+                            logger.info(f"从checkpoint恢复的通道: {list(channel_values.keys())}")
+                        else:
+                            logger.info(f"Checkpoint结构: {list(checkpoint_tuple.checkpoint.keys()) if checkpoint_tuple.checkpoint else 'None'}")
+                    except Exception as e:
+                        logger.warning(f"恢复状态时出错，但线程恢复成功: {e}")
+                    
+                    return True
+                else:
+                    logger.info(f"❌ PostgreSQL中未找到线程: {thread_id}")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"从PostgreSQL检查线程时出错: {e}")
+                return False
+                
+    except Exception as e:
+        logger.error(f"恢复线程失败: {e}")
+        return False
+
 # Available assistants based on langgraph.json
 ASSISTANTS = {
     "research_agent": {
@@ -112,29 +181,47 @@ async def create_thread(thread_create: ThreadCreate):
 async def get_thread(thread_id: str):
     """Get thread details"""
     if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            raise HTTPException(status_code=404, detail="Thread not found")
     return ThreadResponse(**threads_store[thread_id])
 
 @app.get("/threads/{thread_id}/state")
 async def get_thread_state(thread_id: str):
     """Get thread state"""
     if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            raise HTTPException(status_code=404, detail="Thread not found")
     return threads_store[thread_id].get("state", {})
 
 @app.post("/threads/{thread_id}/state")
 async def update_thread_state(thread_id: str, state: Dict[str, Any]):
     """Update thread state"""
     if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            raise HTTPException(status_code=404, detail="Thread not found")
     threads_store[thread_id]["state"] = state
     return {"success": True}
 
 @app.get("/threads/{thread_id}/history")
 async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[str] = None):
     """Get all past states for a thread"""
+    logger.info(f"请求history - thread_id: {thread_id}")
+    logger.info(f"当前threads_store中的thread_ids: {list(threads_store.keys())}")
+    
     if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
+        logger.warning(f"Thread {thread_id} 未找到在threads_store中，尝试从PostgreSQL恢复")
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            logger.error(f"Thread {thread_id} 无法从PostgreSQL恢复")
+            raise HTTPException(status_code=404, detail="Thread not found")
+        logger.info(f"✅ 成功从PostgreSQL恢复线程: {thread_id}")
     
     thread_data = threads_store[thread_id]
     messages = thread_messages.get(thread_id, [])
@@ -183,8 +270,17 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
 @app.post("/threads/{thread_id}/history")
 async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
     """Get all past states for a thread (POST version)"""
+    logger.info(f"请求history(POST) - thread_id: {thread_id}")
+    logger.info(f"当前threads_store中的thread_ids: {list(threads_store.keys())}")
+    
     if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
+        logger.warning(f"Thread {thread_id} 未找到在threads_store中，尝试从PostgreSQL恢复")
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            logger.error(f"Thread {thread_id} 无法从PostgreSQL恢复")
+            raise HTTPException(status_code=404, detail="Thread not found")
+        logger.info(f"✅ 成功从PostgreSQL恢复线程: {thread_id}")
     
     # Extract parameters from request body if provided
     limit = 10
@@ -242,7 +338,10 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
 async def create_run(thread_id: str, run_create: RunCreate):
     """Create and start a new run"""
     if thread_id not in threads_store:
-        raise HTTPException(status_code=404, detail="Thread not found")
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            raise HTTPException(status_code=404, detail="Thread not found")
     
     if run_create.assistant_id not in ASSISTANTS:
         raise HTTPException(status_code=400, detail="Invalid assistant_id")
@@ -282,7 +381,11 @@ async def get_run(thread_id: str, run_id: str):
 @app.post("/threads/{thread_id}/runs/stream")
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint"""
-    if thread_id not in threads_store: raise HTTPException(status_code=404, detail="Thread not found")
+    if thread_id not in threads_store:
+        # 尝试从PostgreSQL恢复线程
+        recovered = await recover_thread_from_postgres(thread_id)
+        if not recovered:
+            raise HTTPException(status_code=404, detail="Thread not found")
     if request_body.assistant_id not in ASSISTANTS: raise HTTPException(status_code=400, detail="Invalid assistant_id")
     
     async def generate():
@@ -298,6 +401,11 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                 from src.agents.diagnostic_agent.graph import builder
                 
                 connection_string = "postgresql://postgres:fffjjj@82.156.146.51:5432/langgraph_memory"
+                
+                # 在进入PostgreSQL上下文前确保线程存在且记录状态
+                logger.info(f"🔍 PostgreSQL模式 - 进入async with前，thread_id存在检查: {thread_id in threads_store}")
+                if thread_id in threads_store:
+                    threads_store[thread_id]["streaming_status"] = "starting"
                 
                 # 按照官方示例的结构
                 async with AsyncPostgresSaver.from_conn_string(connection_string) as checkpointer:
@@ -445,8 +553,35 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
                         yield f"data: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
                     else:
                         logger.info("Skipping end event due to interrupt - waiting for user approval")
+                    
+                    # 在退出async with前记录线程状态
+                    logger.info(f"🔍 PostgreSQL模式 - 即将退出async with，thread_id存在检查: {thread_id in threads_store}")
+                    if thread_id in threads_store:
+                        threads_store[thread_id]["streaming_status"] = "completing"
                         
                     return  # 重要：在async with结束前返回
+                
+                # 在退出async with后记录线程状态并确保线程仍然存在
+                logger.info(f"🔍 PostgreSQL模式 - 已退出async with，thread_id存在检查: {thread_id in threads_store}")
+                
+                # 如果线程在async with退出后消失了，重新创建它
+                if thread_id not in threads_store:
+                    logger.warning(f"⚠️ 线程 {thread_id} 在PostgreSQL上下文退出后消失，正在重新创建")
+                    threads_store[thread_id] = {
+                        "thread_id": thread_id,
+                        "created_at": datetime.now().isoformat(),
+                        "metadata": {},
+                        "state": {},
+                        "streaming_status": "completed"
+                    }
+                    # 确保消息历史也存在
+                    if thread_id not in thread_messages:
+                        thread_messages[thread_id] = []
+                    if thread_id not in thread_interrupts:
+                        thread_interrupts[thread_id] = []
+                else:
+                    # 更新状态为已完成
+                    threads_store[thread_id]["streaming_status"] = "completed"
             
             # 非PostgreSQL模式，使用现有图
             async for item in stream_with_graph(graph, request_body, thread_id):
