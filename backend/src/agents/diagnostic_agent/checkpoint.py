@@ -14,28 +14,16 @@ logger = logging.getLogger(__name__)
 
 def get_postgres_checkpointer():
     """
-    Initialize PostgreSQL checkpointer with proper setup
+    Initialize PostgreSQL async checkpointer - 按官方推荐的生产环境方式
     """
-    import psycopg
-    from psycopg_pool import ConnectionPool
-    from langgraph.checkpoint.postgres import PostgresSaver
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     
     connection_string = "postgresql://postgres:fffjjj@82.156.146.51:5432/langgraph_memory"
     
-    # Step 1: Setup database schema with autocommit connection
-    conn = psycopg.connect(connection_string, autocommit=True)
-    try:
-        checkpointer_setup = PostgresSaver(conn=conn)
-        checkpointer_setup.setup()
-        logger.info("PostgreSQL checkpoint表初始化成功")
-    finally:
-        conn.close()
+    # 官方推荐的生产环境用法：直接返回 AsyncPostgresSaver
+    checkpointer = AsyncPostgresSaver.from_conn_string(connection_string)
     
-    # Step 2: Create connection pool for production use
-    pool = ConnectionPool(conninfo=connection_string, max_size=20)
-    checkpointer = PostgresSaver(conn=pool)
-    
-    logger.info("使用PostgreSQL checkpoint saver")
+    logger.info("使用PostgreSQL async checkpoint saver")
     return checkpointer
 
 def get_memory_checkpointer():

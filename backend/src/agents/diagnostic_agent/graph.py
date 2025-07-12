@@ -398,15 +398,29 @@ builder.add_conditional_edges("reflection", evaluate_diagnosis_progress, ["plan_
 builder.add_edge("finalize_answer", END)
 
 
-# 编译图 - 使用checkpoint模块管理checkpointer
-from .checkpoint import create_saver
-checkpointer = create_saver()
-graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
-# 保存图像
-try:
-    graph_image = graph.get_graph().draw_mermaid_png()
-    with open("diagnostic_agent_graph.png", "wb") as f: 
-        f.write(graph_image)
-    print("图已保存到: diagnostic_agent_graph.png")
-except Exception as e:
-    print(f"生成图失败: {e}")
+# 编译图 - 根据环境变量决定是否使用checkpointer
+import os
+checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
+
+if checkpointer_type == "postgres":
+    # PostgreSQL模式：不在这里编译，在API请求时用async with编译
+    builder = builder  # 导出builder供API使用
+    graph = None
+    print("📝 PostgreSQL模式：图将在API请求时用async with编译")
+else:
+    # 内存模式：正常编译
+    from .checkpoint import create_saver
+    checkpointer = create_saver()
+    graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+    print("📝 内存模式：图已编译完成")
+# 保存图像（仅内存模式）
+if graph is not None:
+    try:
+        graph_image = graph.get_graph().draw_mermaid_png()
+        with open("diagnostic_agent_graph.png", "wb") as f: 
+            f.write(graph_image)
+        print("图已保存到: diagnostic_agent_graph.png")
+    except Exception as e:
+        print(f"生成图失败: {e}")
+else:
+    print("PostgreSQL模式：跳过图像生成")
