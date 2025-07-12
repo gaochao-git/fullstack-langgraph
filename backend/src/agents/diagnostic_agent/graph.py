@@ -404,13 +404,12 @@ checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
 
 if checkpointer_type == "postgres":
     # PostgreSQL模式：不在这里编译，在API请求时用async with编译
-    builder = builder  # 导出builder供API使用
     graph = None
     print("📝 PostgreSQL模式：图将在API请求时用async with编译")
 else:
-    # 内存模式：正常编译
-    from .checkpoint import create_saver
-    checkpointer = create_saver()
+    # 内存模式：直接使用MemorySaver
+    from langgraph.checkpoint.memory import MemorySaver
+    checkpointer = MemorySaver()
     graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
     print("📝 内存模式：图已编译完成")
 # 保存图像（仅内存模式）
