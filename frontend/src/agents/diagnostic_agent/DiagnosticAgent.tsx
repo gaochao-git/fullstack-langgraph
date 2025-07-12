@@ -6,6 +6,25 @@ import { DiagnosticChatView } from "./DiagnosticChatView";
 import type { ProcessedEvent } from "./DiagnosticChatView";
 
 export default function DiagnosticAgent() {
+  const [sessionKey, setSessionKey] = useState<number>(0); // 用于强制重新挂载组件
+  
+  // 新开会话功能 - 通过重新挂载组件完全重置所有状态
+  const handleNewSession = useCallback(() => {
+    setSessionKey(prev => prev + 1);
+    console.log('创建新会话 - 重新挂载组件');
+  }, []);
+
+  return (
+    <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
+      <main className="h-full w-full max-w-4xl mx-auto">
+        <DiagnosticSession key={sessionKey} onNewSession={handleNewSession} />
+      </main>
+    </div>
+  );
+}
+
+// 内部组件，管理单个会话的所有状态
+function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
   const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
   const hasFinalizeEventOccurredRef = useRef(false);
@@ -99,6 +118,30 @@ export default function DiagnosticAgent() {
   }, [thread]);
 
 
+  // 查看历史功能
+  const handleViewHistory = useCallback(() => {
+    const historyInfo = {
+      threadId: thread.threadId,
+      messageCount: thread.messages?.length || 0,
+      messages: thread.messages,
+      historicalActivities,
+      hasActivities: Object.keys(historicalActivities).length > 0
+    };
+    
+    console.log('当前会话历史:', historyInfo);
+    
+    // 构建更友好的信息显示
+    const infoText = `当前会话信息：
+• 会话ID: ${historyInfo.threadId || '新会话'}
+• 消息数量: ${historyInfo.messageCount}
+• 活动记录: ${historyInfo.hasActivities ? '有' : '无'}
+
+详细信息已输出到控制台。`;
+    
+    alert(infoText);
+  }, [thread.messages, thread.threadId, historicalActivities]);
+
+
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
       <main className="h-full w-full max-w-4xl mx-auto">
@@ -125,6 +168,8 @@ export default function DiagnosticAgent() {
             historicalActivities={historicalActivities}
             interrupt={thread.interrupt}
             onInterruptResume={handleInterruptResume}
+            onNewSession={onNewSession}
+            onViewHistory={handleViewHistory}
           />
         )}
       </main>

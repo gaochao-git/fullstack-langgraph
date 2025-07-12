@@ -414,7 +414,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
         </div>
 
         {/* 搜索框 */}
-        <div className="flex-1 relative ml-2 min-w-32">
+        <div className="relative ml-2 w-32">
           <Search className="absolute left-2 top-1.5 w-3 h-3 text-gray-400" />
           <input
             placeholder="搜索故障..."
