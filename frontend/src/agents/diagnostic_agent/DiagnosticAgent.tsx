@@ -49,7 +49,13 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   // 从URL参数中获取线程ID
   const getThreadIdFromUrl = () => {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('thread_id') || undefined;
+    return urlParams.get('thread_id') || null;
+  };
+
+  // 获取线程ID配置 - 只有当URL中有线程ID时才传递，否则让LangGraph自动生成
+  const getThreadIdConfig = () => {
+    const threadIdFromUrl = getThreadIdFromUrl();
+    return threadIdFromUrl ? { threadId: threadIdFromUrl } : {};
   };
 
   const thread = useStream<{
@@ -60,7 +66,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       : "http://localhost:8123",
     assistantId: "diagnostic_agent",
     messagesKey: "messages",
-    threadId: getThreadIdFromUrl(), // 使用URL中的线程ID
+    ...getThreadIdConfig(), // 只有历史会话才传递threadId
     onUpdateEvent: (event: any) => {
       console.log("event", event);
       let processedEvent: ProcessedEvent | null = null;
@@ -92,6 +98,16 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       setError(error.message);
     },
   });
+
+  // 当新线程创建时，将线程ID同步到URL
+  useEffect(() => {
+    if (thread.threadId && !getThreadIdFromUrl()) {
+      console.log('新线程创建，同步线程ID到URL:', thread.threadId);
+      const url = new URL(window.location.href);
+      url.searchParams.set('thread_id', thread.threadId);
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [thread.threadId]);
 
   useEffect(() => {
     if (
@@ -138,6 +154,10 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   }, [thread]);
 
   const handleInterruptResume = useCallback((approved: boolean) => {
+    console.log('🔧 处理中断恢复:', approved);
+    console.log('🔧 当前线程ID:', thread.threadId);
+    console.log('🔧 URL中的线程ID:', getThreadIdFromUrl());
+    
     thread.submit(undefined, { 
       command: { resume: approved },
       user_name: "zhangsan123" // 临时固定用户名，后续可从用户系统获取
