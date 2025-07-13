@@ -334,15 +334,15 @@ export function DiagnosticChatView({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col h-full bg-white relative w-full max-w-4xl mx-auto" style={{ minHeight: 0 }}>
+    <div className="flex flex-col h-full bg-white relative w-full overflow-x-hidden" style={{ minHeight: 0 }}>
       {/* 消息区 */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 bg-gray-50 relative"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 bg-gray-50 relative"
         style={{ minHeight: 0, maxHeight: 'calc(100vh - 140px)' }}
         onScroll={handleScroll}
       >
-        <div className="flex flex-col">
+        <div className="flex flex-col overflow-x-hidden">
           {messages.length === 0 && (
             <div className="w-full">
               <FaultWelcomeSimple 
@@ -356,7 +356,7 @@ export function DiagnosticChatView({
             <div key={round.user.id || idx}>
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
-                <div className="flex items-center gap-2 justify-end max-w-[85%] sm:max-w-[80%]">
+                <div className="flex items-center gap-2 justify-end max-w-[90%]">
                   <div className="text-gray-800 rounded-2xl break-words min-h-7 bg-blue-50 overflow-x-auto min-w-fit px-4 pt-3 pb-2">
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
@@ -370,11 +370,11 @@ export function DiagnosticChatView({
               {/* 助手合并输出区域 */}
               {round.assistant.length > 0 && (
                 <div className="flex flex-col items-start mb-6">
-                  <div className="flex items-start gap-2 max-w-[85%] sm:max-w-[80%] min-w-0">
+                  <div className="flex items-start gap-2 max-w-[90%] min-w-0 w-full">
                     <div className="rounded-full bg-gray-200 p-2 flex-shrink-0 flex items-center justify-center">
                       <Bot className="h-5 w-5 text-gray-600" />
                     </div>
-                    <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 flex-1 overflow-x-auto">
+                    <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 flex-1 overflow-hidden">
                       {round.assistant.map((msg, i) => {
                         // 活动事件和 AI 内容
                         if (msg.type === 'ai') {
