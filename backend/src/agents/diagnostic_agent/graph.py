@@ -414,6 +414,6 @@ else:
     graph_image = graph.get_graph().draw_mermaid_png()
     # 获取当前文件所在目录并保存图片
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    graph_image_path = os.path.join(current_dir, "diagnostic_agent_graph.png")
+    graph_image_path = os.path.join(current_dir, "graph.png")
     with open(graph_image_path, "wb") as f: f.write(graph_image)
     print(f"📝 内存模式：图已编译完成，已保存到 {graph_image_path}")
