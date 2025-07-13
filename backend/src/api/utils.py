@@ -11,8 +11,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 logger = logging.getLogger(__name__)
 
-# 全局连接字符串配置
-POSTGRES_CONNECTION_STRING = "postgresql://postgres:fffjjj@82.156.146.51:5432/langgraph_memory"
+# 全局连接字符串配置 - 从环境变量读取
+POSTGRES_CONNECTION_STRING = os.getenv("POSTGRES_CHECKPOINT_URI")
 
 # 存储引用 - 从app.py导入时设置
 threads_store = None
