@@ -227,6 +227,7 @@ interface DiagnosticChatViewProps {
   onInterruptResume?: (approved: boolean) => void; // 添加interrupt处理函数
   onNewSession?: () => void; // 新开会话回调
   onViewHistory?: () => void; // 查看历史会话回调
+  isHistoryOpen?: boolean; // 历史面板是否打开
 }
 
 // 新增：对话轮分组（每轮：用户消息+本轮所有助手消息）
@@ -247,6 +248,7 @@ export function DiagnosticChatView({
   onInterruptResume,
   onNewSession,
   onViewHistory,
+  isHistoryOpen = false,
 }: DiagnosticChatViewProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -359,7 +361,11 @@ export function DiagnosticChatView({
             variant="outline"
             size="sm"
             onClick={onViewHistory || (() => console.log('历史功能待实现'))}
-            className="flex items-center gap-0.5 text-gray-600 border-gray-300 hover:bg-gray-50 px-1.5 py-0.5 text-xs h-5"
+            className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xs h-5 ${
+              isHistoryOpen 
+                ? 'text-blue-600 border-blue-600 bg-blue-50 hover:bg-blue-100' 
+                : 'text-gray-600 border-gray-300 hover:bg-gray-50'
+            }`}
           >
             <History className="h-2.5 w-2.5" />
             历史

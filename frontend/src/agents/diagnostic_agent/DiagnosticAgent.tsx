@@ -10,6 +10,11 @@ export default function DiagnosticAgent() {
   
   // 新开会话功能 - 通过重新挂载组件完全重置所有状态
   const handleNewSession = useCallback(() => {
+    // 清除URL中的线程ID参数
+    const url = new URL(window.location.href);
+    url.searchParams.delete('thread_id');
+    window.history.replaceState({}, '', url.toString());
+    
     setSessionKey(prev => prev + 1);
     console.log('创建新会话 - 重新挂载组件');
   }, []);
@@ -23,12 +28,29 @@ export default function DiagnosticAgent() {
   );
 }
 
+// 历史会话类型定义
+interface HistoryThread {
+  thread_id: string;
+  thread_title: string;
+  create_at: string;
+  update_at: string;
+}
+
 // 内部组件，管理单个会话的所有状态
 function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
   const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
   const hasFinalizeEventOccurredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // 从URL参数中获取线程ID
+  const getThreadIdFromUrl = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('thread_id') || undefined;
+  };
 
   const thread = useStream<{
     messages: Message[];
@@ -38,6 +60,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       : "http://localhost:8123",
     assistantId: "diagnostic_agent",
     messagesKey: "messages",
+    threadId: getThreadIdFromUrl(), // 使用URL中的线程ID
     onUpdateEvent: (event: any) => {
       console.log("event", event);
       let processedEvent: ProcessedEvent | null = null;
@@ -124,64 +147,125 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
 
   // 查看历史功能
   const handleViewHistory = useCallback(async () => {
+    if (showHistory) {
+      setShowHistory(false);
+      return;
+    }
+    
+    setLoadingHistory(true);
     try {
       console.log('开始获取用户历史线程数据...');
       
       // 调用新的用户线程接口
       const response = await fetch(
         import.meta.env.DEV 
-          ? "http://localhost:8000/users/zhangsan123/threads?limit=10&offset=0" 
-          : "http://localhost:8123/users/zhangsan123/threads?limit=10&offset=0"
+          ? "http://localhost:8000/users/zhangsan123/threads?limit=20&offset=0" 
+          : "http://localhost:8123/users/zhangsan123/threads?limit=20&offset=0"
       );
 
       if (response.ok) {
         const data = await response.json();
         const threads = data.threads || [];
         console.log('获取到的用户历史线程:', data);
-        
-        // 构建当前会话信息
-        const currentInfo = {
-          threadId: thread.threadId,
-          messageCount: thread.messages?.length || 0,
-          messages: thread.messages,
-          historicalActivities,
-          hasActivities: Object.keys(historicalActivities).length > 0
-        };
-        
-        console.log('当前会话信息:', currentInfo);
-        
-        // 构建历史线程信息展示
-        const historyText = threads.length > 0 
-          ? threads.map((t: any, index: number) => 
-              `${index + 1}. ${t.thread_title || '未命名对话'}\n   线程ID: ${t.thread_id.substring(0, 8)}...\n   创建时间: ${t.create_at || '未知'}`
-            ).join('\n\n')
-          : '暂无历史线程';
-        
-        const infoText = `当前会话信息：
-• 会话ID: ${currentInfo.threadId || '新会话'}
-• 消息数量: ${currentInfo.messageCount}
-• 活动记录: ${currentInfo.hasActivities ? '有' : '无'}
-
-用户历史对话 (${threads.length}个):
-${historyText}
-
-详细信息已输出到控制台。`;
-        
-        alert(infoText);
+        setHistoryThreads(threads);
+        setShowHistory(true);
       } else {
         console.error('获取用户历史线程失败:', response.status, response.statusText);
-        alert('获取历史线程失败，请查看控制台错误信息。');
+        setError('获取历史线程失败');
       }
     } catch (error) {
       console.error('获取用户历史线程出错:', error);
-      alert('获取历史线程出错，请查看控制台错误信息。');
+      setError('获取历史线程出错');
+    } finally {
+      setLoadingHistory(false);
     }
-  }, [thread.messages, thread.threadId, historicalActivities]);
+  }, [showHistory]);
+
+  // 切换到历史会话
+  const handleSwitchToThread = useCallback((threadId: string) => {
+    console.log('切换到线程:', threadId);
+    
+    // 使用一个简单直接的方法：重新加载页面并传递线程ID
+    // 这样可以确保完全重新初始化到指定线程
+    const url = new URL(window.location.href);
+    url.searchParams.set('thread_id', threadId);
+    window.location.href = url.toString();
+  }, []);
 
 
   return (
     <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
-      <main className="h-full w-full max-w-4xl mx-auto">
+      {/* 历史会话侧边栏 */}
+      {showHistory && (
+        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">历史会话</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHistory(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-500">加载中...</div>
+              </div>
+            ) : historyThreads.length > 0 ? (
+              <div className="space-y-2">
+                {historyThreads.map((historyThread) => (
+                  <div
+                    key={historyThread.thread_id}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md ${
+                      thread.threadId === historyThread.thread_id 
+                        ? 'bg-blue-50 border-blue-200 shadow-sm' 
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => handleSwitchToThread(historyThread.thread_id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-800 truncate">
+                          {historyThread.thread_title || '未命名对话'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {new Date(historyThread.create_at).toLocaleString('zh-CN', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-1 font-mono">
+                          ID: {historyThread.thread_id.substring(0, 8)}...
+                        </div>
+                      </div>
+                      {thread.threadId === historyThread.thread_id && (
+                        <div className="text-xs text-blue-600 font-medium ml-2">
+                          当前
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                暂无历史会话
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* 主内容区域 */}
+      <main className={`h-full ${showHistory ? 'flex-1' : 'w-full max-w-4xl mx-auto'}`}>
         {error ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
@@ -207,6 +291,7 @@ ${historyText}
             onInterruptResume={handleInterruptResume}
             onNewSession={onNewSession}
             onViewHistory={handleViewHistory}
+            isHistoryOpen={showHistory}
           />
         )}
       </main>
