@@ -456,18 +456,6 @@ export function DiagnosticChatView({
           <div id="chat-messages-end" />
         </div>
         
-        {/* 滚动到底部按钮 */}
-        {showScrollButton && (
-          <div className="absolute bottom-4 right-4">
-            <Button
-              onClick={handleScrollButtonClick}
-              className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-12 h-12 p-0 shadow-lg flex items-center justify-center"
-              title="滚动到底部"
-            >
-              <ArrowDown className="h-5 w-5" />
-            </Button>
-          </div>
-        )}
       </div>
       
       {/* 输入区固定底部 */}
