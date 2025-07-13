@@ -42,9 +42,10 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
   const hasFinalizeEventOccurredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true); // 默认展开
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(260); // 侧边栏宽度状态
 
   // 从URL参数中获取线程ID
   const getThreadIdFromUrl = () => {
@@ -165,13 +166,13 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   }, [thread]);
 
 
-  // 查看历史功能
-  const handleViewHistory = useCallback(async () => {
-    if (showHistory) {
-      setShowHistory(false);
-      return;
-    }
-    
+  // 切换侧边栏显示/隐藏
+  const handleToggleSidebar = useCallback(() => {
+    setShowHistory(prev => !prev);
+  }, []);
+
+  // 加载历史线程数据
+  const loadHistoryThreads = useCallback(async () => {
     setLoadingHistory(true);
     try {
       console.log('开始获取用户历史线程数据...');
@@ -188,7 +189,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
         const threads = data.threads || [];
         console.log('获取到的用户历史线程:', data);
         setHistoryThreads(threads);
-        setShowHistory(true);
       } else {
         console.error('获取用户历史线程失败:', response.status, response.statusText);
         setError('获取历史线程失败');
@@ -199,7 +199,38 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
     } finally {
       setLoadingHistory(false);
     }
-  }, [showHistory]);
+  }, []);
+
+  // 组件加载时获取历史线程数据
+  useEffect(() => {
+    loadHistoryThreads();
+  }, [loadHistoryThreads]);
+
+  // 侧边栏拖动调整宽度功能
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = startWidth + (e.clientX - startX);
+      // 限制宽度范围：最小150px，最大400px
+      const clampedWidth = Math.max(150, Math.min(400, newWidth));
+      setSidebarWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [sidebarWidth]);
 
   // 切换到历史会话
   const handleSwitchToThread = useCallback((threadId: string) => {
@@ -210,6 +241,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
     const url = new URL(window.location.href);
     url.searchParams.set('thread_id', threadId);
     window.location.href = url.toString();
+    // 注意：这里不关闭侧边栏，让用户自己控制
   }, []);
 
 
@@ -217,19 +249,21 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
     <div className="flex h-screen bg-gray-50 text-gray-800 font-sans antialiased">
       {/* 历史会话侧边栏 */}
       {showHistory && (
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+        <div 
+          className="bg-white border-r border-gray-200 flex flex-col relative"
+          style={{ width: `${sidebarWidth}px` }}
+        >
           <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">历史会话</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowHistory(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </Button>
-            </div>
+            {/* 新对话按钮 */}
+            <Button
+              onClick={onNewSession}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              新对话
+            </Button>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4">
@@ -281,11 +315,42 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
               </div>
             )}
           </div>
+          
+          {/* 拖动区域 - 位于侧边栏右边界 */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-gray-300 hover:bg-blue-500 transition-colors duration-200 opacity-0 hover:opacity-100 z-50 group"
+            onMouseDown={handleMouseDown}
+            title="拖动调整宽度"
+          />
+          
+          {/* 折叠按钮 - 紧贴拖动线右边 */}
+          <button
+            onClick={handleToggleSidebar}
+            className="absolute top-4 -right-8 p-2 hover:bg-gray-100 rounded transition-colors duration-200 flex items-center justify-center bg-white shadow-sm border border-gray-200 z-50"
+            title="折叠侧边栏"
+          >
+            <svg className="w-4 h-4 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
         </div>
       )}
       
       {/* 主内容区域 */}
-      <main className={`h-full ${showHistory ? 'flex-1' : 'w-full max-w-4xl mx-auto'}`}>
+      <main className="h-full relative flex-1">
+        {/* 当侧边栏关闭时显示的打开按钮 */}
+        {!showHistory && (
+          <button
+            onClick={handleToggleSidebar}
+            className="absolute top-4 left-4 z-10 p-2 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200"
+            title="打开侧边栏"
+          >
+            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
+        
         {error ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
@@ -309,9 +374,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
             historicalActivities={historicalActivities}
             interrupt={thread.interrupt}
             onInterruptResume={handleInterruptResume}
-            onNewSession={onNewSession}
-            onViewHistory={handleViewHistory}
-            isHistoryOpen={showHistory}
           />
         )}
       </main>

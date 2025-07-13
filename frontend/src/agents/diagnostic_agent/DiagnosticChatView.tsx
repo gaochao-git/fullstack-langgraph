@@ -225,9 +225,6 @@ interface DiagnosticChatViewProps {
   historicalActivities: Record<string, ProcessedEvent[]>;
   interrupt?: any; // 添加interrupt属性
   onInterruptResume?: (approved: boolean) => void; // 添加interrupt处理函数
-  onNewSession?: () => void; // 新开会话回调
-  onViewHistory?: () => void; // 查看历史会话回调
-  isHistoryOpen?: boolean; // 历史面板是否打开
 }
 
 // 新增：对话轮分组（每轮：用户消息+本轮所有助手消息）
@@ -246,9 +243,6 @@ export function DiagnosticChatView({
   historicalActivities,
   interrupt,
   onInterruptResume,
-  onNewSession,
-  onViewHistory,
-  isHistoryOpen = false,
 }: DiagnosticChatViewProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -340,39 +334,7 @@ export function DiagnosticChatView({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col h-full bg-white" style={{ minHeight: 0 }}>
-      {/* 顶部导航栏 */}
-      <div className="flex justify-between items-center px-2 py-1 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-1">
-          <Bot className="h-3 w-3 text-blue-600" />
-          <h2 className="text-xs font-medium text-gray-800">诊断助手</h2>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onNewSession || (() => console.log('新对话功能待实现'))}
-            className="flex items-center gap-0.5 text-blue-600 border-blue-600 hover:bg-blue-50 px-1.5 py-0.5 text-xs h-5"
-          >
-            <Plus className="h-2.5 w-2.5" />
-            新对话
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onViewHistory || (() => console.log('历史功能待实现'))}
-            className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xs h-5 ${
-              isHistoryOpen 
-                ? 'text-blue-600 border-blue-600 bg-blue-50 hover:bg-blue-100' 
-                : 'text-gray-600 border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            <History className="h-2.5 w-2.5" />
-            历史
-          </Button>
-        </div>
-      </div>
-      
+    <div className="flex flex-col h-full bg-white relative w-full max-w-4xl mx-auto" style={{ minHeight: 0 }}>
       {/* 消息区 */}
       <div
         ref={messagesContainerRef}
