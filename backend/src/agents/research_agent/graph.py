@@ -304,3 +304,10 @@ builder.add_edge("finalize_answer", END)
 from langgraph.checkpoint.memory import MemorySaver
 checkpointer = MemorySaver()
 graph = builder.compile(checkpointer=checkpointer, name="pro-search-agent")
+
+# 生成并保存图片到当前代码文件所在目录
+graph_image = graph.get_graph().draw_mermaid_png()
+current_dir = os.path.dirname(os.path.abspath(__file__))
+graph_image_path = os.path.join(current_dir, "research_agent_graph.png")
+with open(graph_image_path, "wb") as f: f.write(graph_image)
+print(f"📝 研究代理图已保存到 {graph_image_path}")
