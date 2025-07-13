@@ -16,6 +16,11 @@ from .utils import (
     POSTGRES_CONNECTION_STRING,
     recover_thread_from_postgres
 )
+from .user_threads_db import (
+    check_user_thread_exists,
+    create_user_thread_mapping,
+    init_user_threads_db
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +49,7 @@ class RunCreate(BaseModel):
     on_disconnect: Optional[str] = None
     command: Optional[Dict[str, Any]] = None
     checkpoint: Optional[Dict[str, Any]] = None
+    user_name: Optional[str] = None  # 用户名，用于线程关联
 
 async def process_stream_chunk(chunk, event_id, thread_id):
     """处理单个流式数据块"""
@@ -167,6 +173,49 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             raise HTTPException(status_code=404, detail="Thread not found")
     if request_body.assistant_id not in ASSISTANTS: 
         raise HTTPException(status_code=400, detail="Invalid assistant_id")
+    
+    # 创建用户线程关联（如果提供了用户名且关联不存在）
+    # 用户名可能在 request_body.user_name 或 request_body.input.user_name 中
+    user_name = None
+    if request_body.user_name:
+        user_name = request_body.user_name
+    elif request_body.input and isinstance(request_body.input, dict) and "user_name" in request_body.input:
+        user_name = request_body.input["user_name"]
+    
+    if user_name:
+        logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
+        try:
+            exists = await check_user_thread_exists(user_name, thread_id)
+            logger.info(f"🔍 检查用户线程是否存在: {exists}")
+            if not exists:
+                # 尝试从输入内容中提取标题
+                thread_title = None
+                if request_body.input and "messages" in request_body.input:
+                    messages = request_body.input["messages"]
+                    if messages and len(messages) > 0:
+                        last_msg = messages[-1]
+                        if isinstance(last_msg, dict) and "content" in last_msg:
+                            content = str(last_msg["content"])
+                            # 取前20个字符作为标题
+                            thread_title = content[:20] + "..." if len(content) > 20 else content
+                
+                logger.info(f"🔍 准备创建用户线程关联，标题: {thread_title}")
+                success = await create_user_thread_mapping(
+                    user_name, 
+                    thread_id, 
+                    thread_title
+                )
+                if success:
+                    logger.info(f"✅ 已创建用户线程关联: {user_name} -> {thread_id}")
+                else:
+                    logger.warning(f"❌ 创建用户线程关联失败: {user_name} -> {thread_id}")
+            else:
+                logger.info(f"ℹ️ 用户线程关联已存在，跳过创建: {user_name} -> {thread_id}")
+        except Exception as e:
+            logger.error(f"处理用户线程关联时出错: {e}")
+            # 不影响主流程，继续执行
+    else:
+        logger.warning(f"⚠️ 请求中没有提供用户名，跳过用户线程关联创建")
 
     async def generate():
         try:

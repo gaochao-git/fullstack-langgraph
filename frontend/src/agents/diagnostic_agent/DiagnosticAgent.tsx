@@ -103,6 +103,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       ];
       thread.submit({
         messages: newMessages,
+        user_name: "zhangsan123", // 临时固定用户名，后续可从用户系统获取
       });
     },
     [thread]
@@ -114,31 +115,67 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   }, [thread]);
 
   const handleInterruptResume = useCallback((approved: boolean) => {
-    thread.submit(undefined, { command: { resume: approved } });
+    thread.submit(undefined, { 
+      command: { resume: approved },
+      user_name: "zhangsan123" // 临时固定用户名，后续可从用户系统获取
+    });
   }, [thread]);
 
 
   // 查看历史功能
-  const handleViewHistory = useCallback(() => {
-    const historyInfo = {
-      threadId: thread.threadId,
-      messageCount: thread.messages?.length || 0,
-      messages: thread.messages,
-      historicalActivities,
-      hasActivities: Object.keys(historicalActivities).length > 0
-    };
-    
-    console.log('当前会话历史:', historyInfo);
-    
-    // 构建更友好的信息显示
-    const infoText = `当前会话信息：
-• 会话ID: ${historyInfo.threadId || '新会话'}
-• 消息数量: ${historyInfo.messageCount}
-• 活动记录: ${historyInfo.hasActivities ? '有' : '无'}
+  const handleViewHistory = useCallback(async () => {
+    try {
+      console.log('开始获取用户历史线程数据...');
+      
+      // 调用新的用户线程接口
+      const response = await fetch(
+        import.meta.env.DEV 
+          ? "http://localhost:8000/users/zhangsan123/threads?limit=10&offset=0" 
+          : "http://localhost:8123/users/zhangsan123/threads?limit=10&offset=0"
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const threads = data.threads || [];
+        console.log('获取到的用户历史线程:', data);
+        
+        // 构建当前会话信息
+        const currentInfo = {
+          threadId: thread.threadId,
+          messageCount: thread.messages?.length || 0,
+          messages: thread.messages,
+          historicalActivities,
+          hasActivities: Object.keys(historicalActivities).length > 0
+        };
+        
+        console.log('当前会话信息:', currentInfo);
+        
+        // 构建历史线程信息展示
+        const historyText = threads.length > 0 
+          ? threads.map((t: any, index: number) => 
+              `${index + 1}. ${t.thread_title || '未命名对话'}\n   线程ID: ${t.thread_id.substring(0, 8)}...\n   创建时间: ${t.create_at || '未知'}`
+            ).join('\n\n')
+          : '暂无历史线程';
+        
+        const infoText = `当前会话信息：
+• 会话ID: ${currentInfo.threadId || '新会话'}
+• 消息数量: ${currentInfo.messageCount}
+• 活动记录: ${currentInfo.hasActivities ? '有' : '无'}
+
+用户历史对话 (${threads.length}个):
+${historyText}
 
 详细信息已输出到控制台。`;
-    
-    alert(infoText);
+        
+        alert(infoText);
+      } else {
+        console.error('获取用户历史线程失败:', response.status, response.statusText);
+        alert('获取历史线程失败，请查看控制台错误信息。');
+      }
+    } catch (error) {
+      console.error('获取用户历史线程出错:', error);
+      alert('获取历史线程出错，请查看控制台错误信息。');
+    }
   }, [thread.messages, thread.threadId, historicalActivities]);
 
 

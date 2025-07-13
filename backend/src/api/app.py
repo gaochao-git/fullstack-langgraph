@@ -42,6 +42,10 @@ async def startup_event():
     init_utils_refs(threads_store, thread_messages, thread_interrupts)
     init_threads_refs(threads_store, thread_messages, thread_interrupts)
     init_streaming_refs(threads_store, thread_messages, thread_interrupts, ASSISTANTS)
+    
+    # 初始化用户线程数据库连接
+    from .user_threads_db import init_user_threads_db
+    await init_user_threads_db()
 
 # Add CORS middleware
 app.add_middleware(
@@ -123,6 +127,28 @@ async def get_thread_history_post_endpoint(thread_id: str, request_body: Optiona
 @app.post("/threads/{thread_id}/runs/stream")
 async def stream_run_standard_endpoint(thread_id: str, request_body: RunCreate):
     return await stream_run_standard(thread_id, request_body)
+
+# 用户线程管理接口
+@app.get("/users/{user_name}/threads")
+async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int = 0):
+    """获取用户的所有线程"""
+    from .user_threads_db import get_user_threads
+    threads = await get_user_threads(user_name, limit, offset)
+    return {"user_name": user_name, "threads": threads, "total": len(threads)}
+
+@app.put("/users/{user_name}/threads/{thread_id}/title")
+async def update_thread_title_endpoint(user_name: str, thread_id: str, request_body: Dict[str, Any]):
+    """更新线程标题"""
+    from .user_threads_db import update_thread_title
+    new_title = request_body.get("title", "")
+    if not new_title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    
+    success = await update_thread_title(user_name, thread_id, new_title)
+    if success:
+        return {"success": True, "message": "Thread title updated successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Thread not found or update failed")
 
 # Run Management Endpoints
 @app.post("/threads/{thread_id}/runs", response_model=RunResponse)
