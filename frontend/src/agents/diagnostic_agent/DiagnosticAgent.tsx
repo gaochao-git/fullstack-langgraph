@@ -323,14 +323,14 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
             title="拖动调整宽度"
           />
           
-          {/* 折叠按钮 - 紧贴拖动线右边 */}
+          {/* 折叠按钮 - 参考设计样式 */}
           <button
             onClick={handleToggleSidebar}
-            className="absolute top-4 -right-8 p-2 hover:bg-gray-100 rounded transition-colors duration-200 flex items-center justify-center bg-white shadow-sm border border-gray-200 z-50"
+            className="absolute top-2 -right-6 w-6 h-8 hover:bg-gray-100 rounded-sm transition-colors duration-200 flex items-center justify-center bg-gray-50 border border-gray-200 z-50"
             title="折叠侧边栏"
           >
-            <svg className="w-4 h-4 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <svg className="w-3 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
         </div>
@@ -342,11 +342,11 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
         {!showHistory && (
           <button
             onClick={handleToggleSidebar}
-            className="absolute top-4 left-4 z-10 p-2 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 transition-all duration-200"
+            className="absolute top-2 left-2 z-10 w-6 h-8 bg-gray-50 border border-gray-200 rounded-sm hover:bg-gray-100 transition-all duration-200 flex items-center justify-center"
             title="打开侧边栏"
           >
-            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            <svg className="w-3 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         )}
