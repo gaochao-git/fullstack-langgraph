@@ -11,7 +11,7 @@
         "description": "获取慢查询日志配置和阈值设置",
         "ai_generated": false,
         "tool": "execute_mysql_query",
-        "args": "SHOW VARIABLES WHERE Variable_name IN ('long_query_time', 'slow_query_log', 'slow_query_log_file');",
+        "args": "SHOW VARIABLES WHERE Variable_name IN ('long_query_time', 'slow_query_log');",
         "requires_approval": false
       },
       {
