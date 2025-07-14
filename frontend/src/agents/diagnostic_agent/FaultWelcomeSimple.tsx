@@ -33,16 +33,16 @@ interface Fault {
 
 // 优先级和状态配置
 const PRIORITY_CONFIG = {
-  P1: { color: "bg-red-500", textColor: "text-red-500", borderColor: "border-red-200" },
-  P2: { color: "bg-orange-500", textColor: "text-orange-500", borderColor: "border-orange-200" },
-  P3: { color: "bg-yellow-500", textColor: "text-yellow-600", borderColor: "border-yellow-200" }
+  P1: { color: "bg-red-400", textColor: "text-red-300", borderColor: "border-red-600" },
+  P2: { color: "bg-orange-400", textColor: "text-orange-300", borderColor: "border-orange-600" },
+  P3: { color: "bg-yellow-400", textColor: "text-yellow-300", borderColor: "border-yellow-600" }
 };
 
 const STATUS_CONFIG = {
-  active: { label: "待处理", textColor: "text-red-600", tagBg: "bg-red-100", tagText: "text-red-600", tagBorder: "border-red-300" },
-  analyzing: { label: "分析中", textColor: "text-blue-600", tagBg: "bg-blue-100", tagText: "text-blue-600", tagBorder: "border-blue-300" },
-  analyzed: { label: "已分析", textColor: "text-green-600", tagBg: "bg-green-100", tagText: "text-green-600", tagBorder: "border-green-300" },
-  resolved: { label: "已解决", textColor: "text-purple-600", tagBg: "bg-purple-100", tagText: "text-purple-600", tagBorder: "border-purple-300" }
+  active: { label: "待处理", textColor: "text-red-300", tagBg: "bg-red-900/50", tagText: "text-red-300", tagBorder: "border-red-600" },
+  analyzing: { label: "分析中", textColor: "text-blue-300", tagBg: "bg-blue-900/50", tagText: "text-blue-300", tagBorder: "border-blue-600" },
+  analyzed: { label: "已分析", textColor: "text-green-300", tagBg: "bg-green-900/50", tagText: "text-green-300", tagBorder: "border-green-600" },
+  resolved: { label: "已解决", textColor: "text-purple-300", tagBg: "bg-purple-900/50", tagText: "text-purple-300", tagBorder: "border-purple-600" }
 };
 
 // Mock数据
@@ -273,11 +273,11 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
   }, [searchTerm, priorityFilter, statusFilter]);
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-3">
+    <div className="max-w-4xl mx-auto p-4 space-y-3" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
       {/* 欢迎标题 */}
       <div className="text-center">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">故障诊断助手</h1>
-        <p className="text-sm text-gray-600">选择故障开始诊断，或直接输入描述</p>
+        <h1 className="text-xl font-bold text-blue-200 mb-1">故障诊断助手</h1>
+        <p className="text-sm text-blue-300">选择故障开始诊断，或直接输入描述</p>
       </div>
 
       {/* 统计概览、搜索和过滤合并 */}
@@ -290,13 +290,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             statusFilter === "all" && priorityFilter === "all" 
-              ? "bg-gray-200 border-gray-400" 
-              : "bg-gray-50 border-gray-300 hover:bg-gray-100"
+              ? "bg-blue-800 border-blue-400 text-blue-200" 
+              : "bg-blue-900/50 border-blue-600 text-blue-300 hover:bg-blue-800"
           }`}
         >
-          <BarChart3 className="w-3 h-3 text-gray-500" />
-          <span className="text-gray-600">总数</span>
-          <span className="font-bold text-gray-900">{stats.total}</span>
+          <BarChart3 className="w-3 h-3 text-blue-300" />
+          <span className="text-blue-300">总数</span>
+          <span className="font-bold text-blue-200">{stats.total}</span>
         </div>
         
         <div 
@@ -306,13 +306,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             statusFilter === "active" 
-              ? "bg-red-200 border-red-400" 
-              : "bg-red-50 border-red-300 hover:bg-red-100"
+              ? "bg-red-800 border-red-400 text-red-200" 
+              : "bg-red-900/50 border-red-600 text-red-300 hover:bg-red-800"
           }`}
         >
-          <AlertTriangle className="w-3 h-3 text-red-500" />
-          <span className="text-red-600">待处理</span>
-          <span className="font-bold text-red-700">{stats.active}</span>
+          <AlertTriangle className="w-3 h-3 text-red-300" />
+          <span className="text-red-300">待处理</span>
+          <span className="font-bold text-red-200">{stats.active}</span>
         </div>
 
         <div 
@@ -322,13 +322,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             statusFilter === "analyzing" 
-              ? "bg-blue-200 border-blue-400" 
-              : "bg-blue-50 border-blue-300 hover:bg-blue-100"
+              ? "bg-blue-800 border-blue-400 text-blue-200" 
+              : "bg-blue-900/50 border-blue-600 text-blue-300 hover:bg-blue-800"
           }`}
         >
-          <Activity className="w-3 h-3 text-blue-500" />
-          <span className="text-blue-600">分析中</span>
-          <span className="font-bold text-blue-700">{stats.analyzing}</span>
+          <Activity className="w-3 h-3 text-blue-300" />
+          <span className="text-blue-300">分析中</span>
+          <span className="font-bold text-blue-200">{stats.analyzing}</span>
         </div>
 
         <div 
@@ -338,13 +338,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             statusFilter === "analyzed" 
-              ? "bg-green-200 border-green-400" 
-              : "bg-green-50 border-green-300 hover:bg-green-100"
+              ? "bg-green-800 border-green-400 text-green-200" 
+              : "bg-green-900/50 border-green-600 text-green-300 hover:bg-green-800"
           }`}
         >
-          <CheckCircle className="w-3 h-3 text-green-500" />
-          <span className="text-green-600">已分析</span>
-          <span className="font-bold text-green-700">{stats.analyzed}</span>
+          <CheckCircle className="w-3 h-3 text-green-300" />
+          <span className="text-green-300">已分析</span>
+          <span className="font-bold text-green-200">{stats.analyzed}</span>
         </div>
 
         <div 
@@ -354,13 +354,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             statusFilter === "resolved" 
-              ? "bg-purple-200 border-purple-400" 
-              : "bg-purple-50 border-purple-300 hover:bg-purple-100"
+              ? "bg-purple-800 border-purple-400 text-purple-200" 
+              : "bg-purple-900/50 border-purple-600 text-purple-300 hover:bg-purple-800"
           }`}
         >
-          <CheckCircle className="w-3 h-3 text-purple-500" />
-          <span className="text-purple-600">已解决</span>
-          <span className="font-bold text-purple-700">{stats.resolved}</span>
+          <CheckCircle className="w-3 h-3 text-purple-300" />
+          <span className="text-purple-300">已解决</span>
+          <span className="font-bold text-purple-200">{stats.resolved}</span>
         </div>
 
         <div 
@@ -370,13 +370,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             priorityFilter === "P1" 
-              ? "bg-red-200 border-red-400" 
-              : "bg-red-50 border-red-300 hover:bg-red-100"
+              ? "bg-red-800 border-red-400 text-red-200" 
+              : "bg-red-900/50 border-red-600 text-red-300 hover:bg-red-800"
           }`}
         >
-          <div className="w-2 h-2 rounded-full bg-red-500"></div>
-          <span className="text-red-600">P1</span>
-          <span className="font-bold text-red-700">{stats.p1}</span>
+          <div className="w-2 h-2 rounded-full bg-red-400"></div>
+          <span className="text-red-300">P1</span>
+          <span className="font-bold text-red-200">{stats.p1}</span>
         </div>
 
         <div 
@@ -386,13 +386,13 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             priorityFilter === "P2" 
-              ? "bg-orange-200 border-orange-400" 
-              : "bg-orange-50 border-orange-300 hover:bg-orange-100"
+              ? "bg-orange-800 border-orange-400 text-orange-200" 
+              : "bg-orange-900/50 border-orange-600 text-orange-300 hover:bg-orange-800"
           }`}
         >
-          <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-          <span className="text-orange-600">P2</span>
-          <span className="font-bold text-orange-700">{stats.p2}</span>
+          <div className="w-2 h-2 rounded-full bg-orange-400"></div>
+          <span className="text-orange-300">P2</span>
+          <span className="font-bold text-orange-200">{stats.p2}</span>
         </div>
 
         <div 
@@ -402,23 +402,24 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           }}
           className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
             priorityFilter === "P3" 
-              ? "bg-yellow-200 border-yellow-400" 
-              : "bg-yellow-50 border-yellow-300 hover:bg-yellow-100"
+              ? "bg-yellow-800 border-yellow-400 text-yellow-200" 
+              : "bg-yellow-900/50 border-yellow-600 text-yellow-300 hover:bg-yellow-800"
           }`}
         >
-          <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-          <span className="text-yellow-600">P3</span>
-          <span className="font-bold text-yellow-700">{stats.p3}</span>
+          <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+          <span className="text-yellow-300">P3</span>
+          <span className="font-bold text-yellow-200">{stats.p3}</span>
         </div>
 
         {/* 搜索框 */}
         <div className="relative ml-2 w-32">
-          <Search className="absolute left-2 top-1.5 w-3 h-3 text-gray-400" />
+          <Search className="absolute left-2 top-1.5 w-3 h-3 text-blue-300" />
           <input
             placeholder="搜索故障..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full pl-7 pr-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-cyan-400"
+            style={{ backgroundColor: '#1E293B', borderColor: '#475569', color: '#E2E8F0' }}
           />
         </div>
       </div>
@@ -426,19 +427,19 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       {/* 故障列表 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-800">
+          <h3 className="text-sm font-semibold text-blue-200">
             当前故障 ({filteredFaults.length})
           </h3>
           {filteredFaults.length >= 50 && (
-            <span className="text-xs text-gray-500">显示前50条</span>
+            <span className="text-xs text-blue-300">显示前50条</span>
           )}
         </div>
         
         {filteredFaults.length === 0 ? (
-          <div className="p-6 text-center border border-gray-200 rounded">
-            <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">暂无故障</h3>
-            <p className="text-gray-600">没有找到符合条件的故障</p>
+          <div className="p-6 text-center border border-blue-600 rounded" style={{ backgroundColor: '#1E293B' }}>
+            <AlertTriangle className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-blue-200 mb-2">暂无故障</h3>
+            <p className="text-blue-300">没有找到符合条件的故障</p>
           </div>
         ) : (
           <div className="grid gap-0.5">
@@ -452,17 +453,18 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
               return (
                 <div 
                   key={fault.id} 
-                  className={`flex items-center justify-between gap-1 px-2 py-1 hover:bg-gray-50 border-l-2 ${priorityConfig.borderColor} bg-white border border-gray-200 rounded text-xs`}
+                  className={`flex items-center justify-between gap-1 px-2 py-1 hover:bg-blue-800/50 border-l-2 ${priorityConfig.borderColor} border border-blue-600 rounded text-xs`}
+                  style={{ backgroundColor: '#1E293B' }}
                 >
                   <div className="flex items-center gap-1 flex-1 min-w-0">
                     <span className={`${statusConfig.tagBg} ${statusConfig.tagText} ${statusConfig.tagBorder} px-1.5 py-0.5 rounded border text-xs flex-shrink-0`}>
                       {statusConfig.label}
                     </span>
                     <div className={`w-2 h-2 rounded-full ${priorityConfig.color} flex-shrink-0`}></div>
-                    <span className="font-medium text-gray-800 truncate">{fault.title}</span>
-                    <span className="text-blue-600 font-mono text-xs">{fault.sopId}</span>
-                    <span className="text-gray-500 font-mono">{fault.ip}</span>
-                    <span className="text-gray-400 text-xs">{fault.time}</span>
+                    <span className="font-medium text-blue-200 truncate">{fault.title}</span>
+                    <span className="text-cyan-400 font-mono text-xs">{fault.sopId}</span>
+                    <span className="text-blue-300 font-mono">{fault.ip}</span>
+                    <span className="text-blue-400 text-xs">{fault.time}</span>
                   </div>
                   
                   <div className="flex gap-1 flex-shrink-0">
@@ -500,7 +502,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                         className={`px-2 py-0 rounded text-xs h-4 text-white ${
                           hasFourElements 
                             ? 'bg-red-600 hover:bg-red-700 cursor-pointer' 
-                            : 'bg-gray-400 cursor-not-allowed opacity-60'
+                            : 'bg-gray-600 cursor-not-allowed opacity-60'
                         }`}
                         disabled={!hasFourElements}
                         title={hasFourElements ? '开始排查' : '故障信息不完整，无法开始排查'}
@@ -557,8 +559,8 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
         )}
       </div>
 
-      <div className="text-center pt-2 border-t border-gray-200">
-        <p className="text-xs text-gray-500">
+      <div className="text-center pt-2 border-t border-blue-600">
+        <p className="text-xs text-blue-300">
           💡 也可直接在下方输入框描述新故障
         </p>
       </div>

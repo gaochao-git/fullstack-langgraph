@@ -246,14 +246,14 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
 
 
   return (
-    <div className="flex h-full bg-gray-50 text-gray-800 font-sans antialiased overflow-x-hidden">
+    <div className="flex h-full font-sans antialiased overflow-x-hidden" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
       {/* 历史会话侧边栏 */}
       {showHistory && (
         <div 
-          className="bg-white border-r border-gray-200 flex flex-col relative overflow-x-visible"
-          style={{ width: `${sidebarWidth}px` }}
+          className="border-r border-blue-600 flex flex-col relative overflow-x-visible"
+          style={{ width: `${sidebarWidth}px`, background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)' }}
         >
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-blue-600">
             {/* 新对话按钮 */}
             <Button
               onClick={onNewSession}
@@ -269,7 +269,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
             {loadingHistory ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-gray-500">加载中...</div>
+                <div className="text-blue-300">加载中...</div>
               </div>
             ) : historyThreads.length > 0 ? (
               <div className="space-y-2">
@@ -278,17 +278,18 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
                     key={historyThread.thread_id}
                     className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md ${
                       thread.threadId === historyThread.thread_id 
-                        ? 'bg-blue-50 border-blue-200 shadow-sm' 
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                        ? 'bg-blue-800/50 border-blue-400 shadow-sm' 
+                        : 'border-blue-600 hover:bg-blue-800/30'
                     }`}
+                    style={{ backgroundColor: thread.threadId === historyThread.thread_id ? '#1E40AF' : '#1E293B' }}
                     onClick={() => handleSwitchToThread(historyThread.thread_id)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">
+                        <div className="text-sm font-medium text-blue-200 truncate">
                           {historyThread.thread_title || '未命名对话'}
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-blue-300 mt-1">
                           {new Date(historyThread.create_at).toLocaleString('zh-CN', {
                             month: 'short',
                             day: 'numeric',
@@ -296,12 +297,12 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
                             minute: '2-digit'
                           })}
                         </div>
-                        <div className="text-xs text-gray-400 mt-1 font-mono">
+                        <div className="text-xs text-blue-400 mt-1 font-mono">
                           ID: {historyThread.thread_id.substring(0, 8)}...
                         </div>
                       </div>
                       {thread.threadId === historyThread.thread_id && (
-                        <div className="text-xs text-blue-600 font-medium ml-2">
+                        <div className="text-xs text-cyan-400 font-medium ml-2">
                           当前
                         </div>
                       )}
@@ -310,7 +311,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-blue-300">
                 暂无历史会话
               </div>
             )}
@@ -318,7 +319,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
           
           {/* 拖动区域 - 位于侧边栏右边界 */}
           <div
-            className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-gray-300 hover:bg-blue-500 transition-colors duration-200 opacity-0 hover:opacity-100 z-50 group"
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-blue-600 hover:bg-cyan-400 transition-colors duration-200 opacity-0 hover:opacity-100 z-50 group"
             onMouseDown={handleMouseDown}
             title="拖动调整宽度"
           />
@@ -326,10 +327,11 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
           {/* 折叠按钮 - 参考设计样式 */}
           <button
             onClick={handleToggleSidebar}
-            className="absolute top-2 -right-6 w-6 h-8 hover:bg-gray-100 rounded-sm transition-colors duration-200 flex items-center justify-center bg-gray-50 border border-gray-200 z-50"
+            className="absolute top-2 -right-6 w-6 h-8 hover:bg-blue-800 rounded-sm transition-colors duration-200 flex items-center justify-center border border-blue-600 z-50"
+            style={{ backgroundColor: '#1E293B' }}
             title="折叠侧边栏"
           >
-            <svg className="w-3 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
@@ -342,10 +344,11 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
         {!showHistory && (
           <button
             onClick={handleToggleSidebar}
-            className="absolute top-2 left-2 z-10 w-6 h-8 bg-gray-50 border border-gray-200 rounded-sm hover:bg-gray-100 transition-all duration-200 flex items-center justify-center"
+            className="absolute top-2 left-2 z-10 w-6 h-8 border border-blue-600 rounded-sm hover:bg-blue-800 transition-all duration-200 flex items-center justify-center"
+            style={{ backgroundColor: '#1E293B' }}
             title="打开侧边栏"
           >
-            <svg className="w-3 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-4 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -353,9 +356,9 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
         
         {error ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="flex flex-col items-center justify-center gap-4 bg-white p-8 rounded-lg shadow-lg">
-              <h1 className="text-2xl text-red-500 font-bold">错误</h1>
-              <p className="text-red-600">{JSON.stringify(error)}</p>
+            <div className="flex flex-col items-center justify-center gap-4 p-8 rounded-lg shadow-lg border border-red-600" style={{ backgroundColor: '#1E293B' }}>
+              <h1 className="text-2xl text-red-400 font-bold">错误</h1>
+              <p className="text-red-300">{JSON.stringify(error)}</p>
               <Button
                 variant="destructive"
                 onClick={() => window.location.reload()}

@@ -34,7 +34,7 @@ const DiagnosisButtonText: React.FC<{ text?: string }> = ({ text = "诊断中" }
 
   return (
     <span className="flex items-center gap-2">
-      <Loader2 className="h-4 w-4 animate-spin" />
+      <Loader2 className="h-4 w-4 animate-spin text-cyan-100" />
       {text}
       <span className="inline-block w-6 text-left">{dots}</span>
     </span>
@@ -382,7 +382,7 @@ export function DiagnosticChatView({
                     <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border-2 border-cyan-400" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
                       {(() => {
                         // 按时间顺序渲染所有消息和图表
-                        const renderItems = [];
+                        const renderItems: React.ReactNode[] = [];
                         
                         round.assistant.forEach((msg, i) => {
                           if (msg.type === 'ai') {
@@ -514,7 +514,7 @@ export function DiagnosticChatView({
           <Button
             type="submit"
             disabled={isLoading || !inputValue.trim() || !!interrupt}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="bg-cyan-500 text-white px-6 py-2 rounded-lg hover:bg-cyan-600 disabled:opacity-50 shadow-lg border border-cyan-400"
           >
             {interrupt ? <DiagnosisButtonText text="工具确认" /> : isLoading ? <DiagnosisButtonText /> : "发送"}
           </Button>
@@ -523,7 +523,7 @@ export function DiagnosticChatView({
               type="button"
               variant="outline"
               onClick={onCancel}
-              className="px-4 py-2 text-red-400 border-red-400 hover:bg-red-900/30"
+              className="px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30"
             >
               取消
             </Button>
