@@ -68,6 +68,7 @@ class DiagnosticState(MessagesState):
     
     # 最终报告
     final_diagnosis: str = ""
+    report_generated: bool = False
 
 
 class DiagnosticOutput(BaseModel):

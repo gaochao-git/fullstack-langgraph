@@ -236,11 +236,12 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     diagnosis_results = state.get("diagnosis_results", [])
     sop_loaded = state.get("sop_loaded", False)
+    report_generated = state.get("report_generated", False)
     
     # 判断对话类型和回答策略
     response_type = determine_response_type(
         user_question, messages, question_analysis, 
-        diagnosis_progress, sop_loaded, diagnosis_results
+        diagnosis_progress, sop_loaded, diagnosis_results, report_generated
     )
     
     logger.info(f"响应类型判断: {response_type}")
@@ -281,7 +282,8 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
         
         return {
             "messages": [AIMessage(content=final_message)],
-            "final_diagnosis": response.content
+            "final_diagnosis": response.content,
+            "report_generated": True
         }
     
     else:
@@ -310,7 +312,7 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
         }
 
 
-def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_loaded, diagnosis_results):
+def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_loaded, diagnosis_results, report_generated=False):
     """判断回答类型：是否需要生成诊断报告"""
     
     # 1. 用户明确要求生成报告
@@ -320,16 +322,8 @@ def determine_response_type(user_question, messages, question_analysis, diagnosi
     
     # 2. 完成了完整的SOP诊断流程且未生成过报告
     if (diagnosis_progress and diagnosis_progress.is_complete and 
-        sop_loaded and len(diagnosis_results) >= 2):
-        
-        # 检查是否已生成过报告
-        has_report = any(
-            "📊 诊断执行摘要" in getattr(msg, 'content', '')
-            for msg in messages
-        )
-        
-        if not has_report:
-            return "diagnosis_report"
+        sop_loaded and len(diagnosis_results) >= 2 and not report_generated):
+        return "diagnosis_report"
     
     # 3. 其他情况都是普通回答
     return "general_answer"

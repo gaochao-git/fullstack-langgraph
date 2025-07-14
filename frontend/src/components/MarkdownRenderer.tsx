@@ -18,7 +18,7 @@ const md: MarkdownIt = new MarkdownIt({
 md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="border-collapse w-full">';
 md.renderer.rules.table_close = () => '</table></div>';
 md.renderer.rules.th_open = () => '<th class="px-4 py-2 text-left font-bold" style="border: 1px solid #93C5FD; background-color: #3B82F6; color: #FFFFFF;">';
-md.renderer.rules.td_open = () => '<td class="px-4 py-2" style="border: 1px solid #93C5FD; color: #1E3A8A;">';
+md.renderer.rules.td_open = () => '<td class="px-4 py-2" style="border: 1px solid #93C5FD; color: #1F2937;">';
 
 // 添加自定义样式
 const markdownStyles = `
@@ -137,7 +137,7 @@ const markdownStyles = `
     border-bottom: 2px solid #2563EB;
   }
   .markdown-body td { 
-    color: #1E3A8A;
+    color: #1F2937;
     padding: 8px 12px;
     border-bottom: 1px solid #93C5FD;
   }
@@ -145,7 +145,16 @@ const markdownStyles = `
     border-bottom: none;
   }
   .markdown-body tr:nth-child(even) {
-    background-color: #EBF4FF;
+    background-color: #F8FAFC;
+  }
+  .markdown-body tr:nth-child(even) td {
+    color: #1F2937;
+  }
+  .markdown-body tr:nth-child(odd) {
+    background-color: #FFFFFF;
+  }
+  .markdown-body tr:nth-child(odd) td {
+    color: #1F2937;
   }
   .markdown-body strong {
     color: #FBBF24;
