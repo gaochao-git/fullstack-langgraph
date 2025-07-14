@@ -277,22 +277,29 @@ def check_diagnosis_completion(current_step, max_steps, sop_detail):
 
 def check_info_sufficient(state):
     """检查信息是否充足"""
+    print(f"✅ 执行路由函数: check_info_sufficient")
     from .state import QuestionAnalysis
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     if question_analysis.info_sufficient:
+        print(f"✅ 路由结果: plan_tools")
         return "plan_tools"
     else:
+        print(f"✅ 路由结果: handle_insufficient_info")
         return "handle_insufficient_info"
 
 
 def check_tool_calls(state):
     """检查是否有工具调用"""
+    print(f"✅ 执行路由函数: check_tool_calls")
     messages = state.get("messages", [])
     if not messages:
+        print(f"✅ 路由结果: reflection (无消息)")
         return "reflection"
     
     last_message = messages[-1]
     if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
+        print(f"✅ 路由结果: approval (有工具调用)")
         return "approval"
     else:
+        print(f"✅ 路由结果: reflection (无工具调用)")
         return "reflection"

@@ -21,12 +21,10 @@ class QuestionInfoExtraction(BaseModel):
 
 
 class DiagnosisReflectionOutput(BaseModel):
-    """诊断反思输出的结构化模式 - 按SOP顺序执行，找到根因可提前结束"""
-    is_complete: bool = Field(description="是否可以结束诊断（找到根因或完成所有SOP步骤）")
-    sop_steps_completed: List[str] = Field(description="已完成的SOP步骤")
-    sop_steps_remaining: List[str] = Field(description="还需执行的SOP步骤")
-    root_cause_found: bool = Field(description="是否找到了明确的根因")
-    root_cause_analysis: str = Field(description="根因分析结果")
-    next_steps: List[str] = Field(description="下一个需要执行的SOP步骤")
-    user_recommendations: List[str] = Field(description="基于当前结果给用户的建议")
-    termination_reason: str = Field(description="结束原因：root_cause_found（找到根因）或 sop_completed（完成所有SOP）或 continue（继续诊断）")
+    """诊断反思输出的结构化模式 - 智能决策下一步行动"""
+    action: str = Field(description="下一步行动：continue/generate_report/answer_question")
+    is_complete: bool = Field(description="诊断是否完成")
+    should_generate_report: bool = Field(description="是否需要生成报告")
+    root_cause_found: bool = Field(description="是否找到根因")
+    response_content: str = Field(description="具体回复内容（如果是answer_question）", default="")
+    termination_reason: str = Field(description="continue/sop_completed/root_cause_found")
