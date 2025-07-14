@@ -109,7 +109,8 @@ def prepare_graph_config(request_body, thread_id):
         "configurable": {
             "thread_id": thread_id,
             **(request_body.config or {}).get("configurable", {})
-        }
+        },
+        "recursion_limit": (request_body.config or {}).get("recursion_limit", 100)
     }
     
     # Handle resume command for interrupted execution
