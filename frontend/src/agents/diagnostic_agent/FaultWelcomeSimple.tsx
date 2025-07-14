@@ -61,17 +61,15 @@ const mockFaults: Fault[] = [
   },
   {
     id: "fault-002", 
-    title: "MySQL高CPU使用率",
-    description: "MySQL数据库CPU使用率过高，查询响应缓慢",
+    title: "MySQL写入耗时大于200ms",
+    description: "MySQL数据库写入耗时大于200ms，写入响应缓慢",
     ip: "192.168.1.102",
     time: "2025-01-12 13:15:10",
     priority: "P2",
-    status: "analyzed",
+    status: "active",
     sopId: "SOP-DB-001",
-    analysisResult: "慢查询导致CPU使用率过高，已优化相关SQL",
-    threadId: "thread-abc123",
     lastUpdated: "2025-01-12 15:20:00", 
-    tags: ["数据库", "CPU", "MySQL"]
+    tags: ["数据库", "响应耗时", "MySQL"]
   },
   {
     id: "fault-003",
