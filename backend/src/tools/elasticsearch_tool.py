@@ -72,17 +72,21 @@ def custom_elasticsearch_query(
         包含查询结果的JSON字符串
     """
     try:
-        # 处理时区问题
-        # 如果时间字符串没有时区信息，添加中国时区
-        if "+" not in start_time and "Z" not in start_time and "T" in start_time:
-            start_time_with_tz = start_time + "+08:00"
-        else:
-            start_time_with_tz = start_time
-            
-        if "+" not in end_time and "Z" not in end_time and "T" in end_time:
-            end_time_with_tz = end_time + "+08:00"
-        else:
-            end_time_with_tz = end_time
+        # 智能时区处理
+        def convert_time_with_fallback(time_str):
+            """智能时区转换，支持多种格式并提供回退方案"""
+            if "+" not in time_str and "Z" not in time_str and "T" in time_str:
+                # 没有时区信息，添加中国时区
+                return time_str + "+08:00"
+            elif time_str.endswith("Z"):
+                # UTC时间，先尝试直接使用，后续如果无结果会尝试转换
+                return time_str
+            else:
+                # 已有时区信息，直接使用
+                return time_str
+        
+        start_time_with_tz = convert_time_with_fallback(start_time)
+        end_time_with_tz = convert_time_with_fallback(end_time)
         
         # 如果没有提供查询体，使用默认查询（直接使用处理后的时间）
         if not query_body:
@@ -150,6 +154,70 @@ def custom_elasticsearch_query(
         # 执行查询
         response = _es_request("POST", f"/{index_name}/_search", data=query_body)
         
+        # 检查结果，如果是UTC时间且没有结果，尝试转换时区
+        total_hits = response.get("hits", {}).get("total", {}).get("value", 0)
+        
+        if total_hits == 0 and (start_time.endswith("Z") or end_time.endswith("Z")):
+            logger.info("UTC查询无结果，尝试转换为中国时区查询")
+            print("UTC查询无结果，尝试转换为中国时区查询")
+            
+            # 将UTC时间转换为中国时区（减8小时，因为UTC+8小时=中国时间）
+            from datetime import datetime, timedelta
+            try:
+                if start_time.endswith("Z"):
+                    start_dt = datetime.fromisoformat(start_time[:-1])  # 移除Z
+                    start_dt_china = start_dt - timedelta(hours=8)  # UTC转中国时间需要减8小时
+                    start_time_china = start_dt_china.isoformat() + "+08:00"
+                else:
+                    start_time_china = start_time_with_tz
+                    
+                if end_time.endswith("Z"):
+                    end_dt = datetime.fromisoformat(end_time[:-1])  # 移除Z
+                    end_dt_china = end_dt - timedelta(hours=8)  # UTC转中国时间需要减8小时
+                    end_time_china = end_dt_china.isoformat() + "+08:00"
+                else:
+                    end_time_china = end_time_with_tz
+                
+                # 更新查询体中的时间
+                if not query_body:
+                    query_body = {
+                        "query": {
+                            "bool": {
+                                "must": [
+                                    {
+                                        "range": {
+                                            "@timestamp": {
+                                                "gte": start_time_china,
+                                                "lte": end_time_china
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        "sort": [{"@timestamp": {"order": "desc"}}],
+                        "size": 100
+                    }
+                else:
+                    # 更新现有查询体中的时间过滤器
+                    for condition in query_body["query"]["bool"]["must"]:
+                        if isinstance(condition, dict) and "range" in condition and "@timestamp" in condition["range"]:
+                            condition["range"]["@timestamp"]["gte"] = start_time_china
+                            condition["range"]["@timestamp"]["lte"] = end_time_china
+                            break
+                
+                # 重新执行查询
+                logger.info(f"转换后的查询体: {json.dumps(query_body, indent=2)}")
+                print(f"转换后的查询体: {json.dumps(query_body, indent=2)}")
+                response = _es_request("POST", f"/{index_name}/_search", data=query_body)
+                
+                # 更新显示的时间范围
+                start_time_with_tz = start_time_china
+                end_time_with_tz = end_time_china
+                
+            except Exception as conv_error:
+                logger.error(f"时区转换失败: {conv_error}")
+        
         # 处理结果
         hits = response.get("hits", {}).get("hits", [])
         results = []
@@ -160,10 +228,12 @@ def custom_elasticsearch_query(
                 "source": hit["_source"]
             })
         
+        final_total = response.get("hits", {}).get("total", {}).get("value", 0)
         return json.dumps({
-            "total": response.get("hits", {}).get("total", {}).get("value", 0),
+            "total": final_total,
             "time_range": f"{start_time_with_tz} to {end_time_with_tz}",
             "original_time_range": f"{start_time} to {end_time}",
+            "timezone_converted": total_hits == 0 and final_total > 0,
             "results": results
         }, indent=2)
         
