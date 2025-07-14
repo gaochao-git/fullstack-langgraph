@@ -438,10 +438,111 @@ def get_service_health_summary(
         logger.error(f"Error getting service health summary: {e}")
         return json.dumps({"error": f"Failed to get service health summary: {str(e)}"})
 
+class CustomQueryInput(BaseModel):
+    """自定义查询输入参数"""
+    index_name: str = Field(description="索引名称")
+    start_time: str = Field(description="开始时间 (ISO格式)")
+    end_time: str = Field(description="结束时间 (ISO格式)")
+    query_body: Optional[Dict[str, Any]] = Field(default=None, description="查询体，如果为空则由AI生成")
+
+@tool("custom_elasticsearch_query", args_schema=CustomQueryInput)
+def custom_elasticsearch_query(
+    index_name: str,
+    start_time: str,
+    end_time: str,
+    query_body: Optional[Dict[str, Any]] = None
+) -> str:
+    """执行自定义Elasticsearch查询。支持指定索引名、时间范围和查询体。
+    
+    Args:
+        index_name: 索引名称
+        start_time: 开始时间 (ISO格式)
+        end_time: 结束时间 (ISO格式)
+        query_body: 自定义查询体，如果为空则生成默认查询
+    
+    Returns:
+        包含查询结果的JSON字符串
+    """
+    try:
+        es_client = _create_es_client()
+        
+        # 如果没有提供查询体，使用默认查询
+        if not query_body:
+            query_body = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "range": {
+                                    "@timestamp": {
+                                        "gte": start_time,
+                                        "lte": end_time
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "sort": [{"@timestamp": {"order": "desc"}}],
+                "size": 100
+            }
+        
+        # 确保查询体包含时间范围
+        if "query" not in query_body:
+            query_body["query"] = {"bool": {"must": []}}
+        
+        if "bool" not in query_body["query"]:
+            query_body["query"]["bool"] = {"must": []}
+        
+        if "must" not in query_body["query"]["bool"]:
+            query_body["query"]["bool"]["must"] = []
+        
+        # 添加时间范围过滤
+        time_filter = {
+            "range": {
+                "@timestamp": {
+                    "gte": start_time,
+                    "lte": end_time
+                }
+            }
+        }
+        
+        query_body["query"]["bool"]["must"].append(time_filter)
+        
+        # 执行查询
+        response = es_client.search(
+            index=index_name,
+            body=query_body
+        )
+        
+        # 处理结果
+        hits = response.get("hits", {}).get("hits", [])
+        results = []
+        
+        for hit in hits:
+            results.append({
+                "timestamp": hit["_source"].get("@timestamp"),
+                "source": hit["_source"]
+            })
+        
+        return json.dumps({
+            "total": response.get("hits", {}).get("total", {}).get("value", 0),
+            "time_range": f"{start_time} to {end_time}",
+            "results": results
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error executing custom query: {e}")
+        return json.dumps({"error": f"Failed to execute custom query: {str(e)}"})
+    finally:
+        if 'es_client' in locals():
+            es_client.close()
+
 # 导出所有工具
 elasticsearch_tools = [
     search_error_logs,
     analyze_log_patterns,
     search_by_correlation_id,
-    get_service_health_summary
+    get_service_health_summary,
+    custom_elasticsearch_query
 ] 
