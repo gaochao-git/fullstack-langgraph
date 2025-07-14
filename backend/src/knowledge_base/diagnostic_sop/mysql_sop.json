@@ -47,7 +47,7 @@
         "requires_approval": false
       }
     ],
-    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
     "escalation_criteria": "如果响应耗时升高且影响核心业务功能",
     "diagnostic_only": true,
     "recommendations": [
@@ -105,7 +105,7 @@
         "requires_approval": false
       }
     ],
-    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
     "escalation_criteria": "如果无法建立新连接且业务受影响",
     "diagnostic_only": true,
     "recommendations": [
@@ -163,7 +163,7 @@
         "requires_approval": false
       }
     ],
-    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
     "escalation_criteria": "如果活跃会话数持续过高且影响数据库性能",
     "diagnostic_only": true,
     "recommendations": [

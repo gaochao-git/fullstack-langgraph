@@ -191,13 +191,13 @@ def get_active_alerts(
 
 class HostMetricsInput(BaseModel):
     """主机监控指标输入参数"""
-    hostname: str = Field(description="主机名")
+    hostname: str = Field(default="127.0.0.1", description="主机名")
     metrics: Optional[List[str]] = Field(default=None, description="指标列表")
     time_range_hours: int = Field(default=1, description="时间范围(小时)")
 
 @tool("get_host_metrics", args_schema=HostMetricsInput)
 def get_host_metrics(
-    hostname: str,
+    hostname: str = "127.0.0.1",
     metrics: Optional[List[str]] = None,
     time_range_hours: int = 1
 ) -> str:
@@ -509,10 +509,10 @@ get_zabbix_metric_data = get_host_metrics
 
 class HostMetricsListInput(BaseModel):
     """获取主机可用指标输入参数"""
-    hostname: str = Field(description="主机名")
+    hostname: str = Field(default="127.0.0.1", description="主机名")
 
 @tool("get_zabbix_metrics", args_schema=HostMetricsListInput)
-def get_zabbix_metrics(hostname: str) -> str:
+def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
     """获取指定主机的所有可用监控指标。用于查看主机支持哪些监控指标。
     
     Args:
