@@ -12,6 +12,10 @@ import asyncio
 import json
 import os
 
+# 加载环境变量
+from dotenv import load_dotenv
+load_dotenv()
+
 # Import graphs
 from src.agents.diagnostic_agent.graph import graph as diagnostic_graph
 from src.agents.research_agent.graph import graph as research_graph
@@ -57,8 +61,32 @@ app.add_middleware(
 )
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+import os
+from datetime import datetime
+
+# 配置日志路径（可通过环境变量设置）
+log_dir = os.getenv("LOG_DIR", "logs")
+os.makedirs(log_dir, exist_ok=True)
+
+# 配置日志格式和输出
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# 配置日志文件名（按日期）
+log_filename = os.path.join(log_dir, f"backend_{datetime.now().strftime('%Y%m%d')}.log")
+
+# 同时输出到控制台和文件
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format=log_format,
+    handlers=[
+        logging.StreamHandler(),  # 控制台输出
+        logging.FileHandler(log_filename, encoding='utf-8')  # 文件输出
+    ]
+)
+
 logger = logging.getLogger(__name__)
+logger.info(f"📝 日志配置完成，级别: {log_level}, 文件: {log_filename}")
 
 
 # In-memory storage for threads and runs (TODO: replace with persistent storage)

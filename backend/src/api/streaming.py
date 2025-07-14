@@ -53,6 +53,8 @@ class RunCreate(BaseModel):
 
 async def process_stream_chunk(chunk, event_id, thread_id):
     """处理单个流式数据块"""
+    logger.info(f"🔍 处理流式数据块: event_id={event_id}, thread_id={thread_id}, chunk_type={type(chunk)}")
+    
     # Handle tuple format from LangGraph streaming
     if isinstance(chunk, tuple) and len(chunk) == 2:
         event_type, data = chunk
@@ -63,6 +65,19 @@ async def process_stream_chunk(chunk, event_id, thread_id):
             if thread_id not in thread_messages:
                 thread_messages[thread_id] = []
             thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
+            logger.info(f"💾 保存了 {len(data['messages'])} 条消息到线程 {thread_id}")
+        
+        # Also save messages from updates events (when nodes return message updates)
+        elif event_type == "updates" and isinstance(data, dict):
+            for node_name, node_data in data.items():
+                if isinstance(node_data, dict) and "messages" in node_data:
+                    if thread_id not in thread_messages:
+                        thread_messages[thread_id] = []
+                    # Append new messages instead of replacing
+                    new_messages = [serialize_value(msg) for msg in node_data["messages"]]
+                    thread_messages[thread_id].extend(new_messages)
+                    logger.info(f"💾 从节点 {node_name} 追加了 {len(new_messages)} 条消息到线程 {thread_id}")
+                    break  # Only process the first node with messages
         
         # Check for interrupts
         has_interrupt = False
