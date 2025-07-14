@@ -233,9 +233,16 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
     # 6. 根据LLM决策执行相应行动
     if reflection_result.action == "answer_question":
         # 基于历史信息回答用户追问
+        # 设置为完成状态，避免继续循环
+        completed_progress = DiagnosisProgress(
+            current_step=diagnosis_progress.current_step,
+            max_steps=diagnosis_progress.max_steps,
+            is_complete=True,
+            termination_reason="answer_completed"
+        )
         return {
             "messages": [AIMessage(content=reflection_result.response_content)],
-            "diagnosis_progress": diagnosis_progress,
+            "diagnosis_progress": completed_progress,
             "diagnosis_results": diagnosis_results,
             "sop_detail": updated_sop_detail,
             "sop_loaded": sop_loaded
