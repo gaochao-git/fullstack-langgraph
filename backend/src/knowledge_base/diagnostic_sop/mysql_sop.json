@@ -24,10 +24,10 @@
       },
       {
         "step": 3,
-        "description": "从ES中查询指定时间范围的慢查询日志，分析是写慢查询还是读慢查询，查看扫描行数和锁等待情况",
+        "description": "从ES中查询指定时间范围的慢查询日志，分析是写慢查询还是读慢查询，查看扫描行数和锁等待情况，如果要过滤先获取一条数据看看有哪些字段然后过滤",
         "ai_generated": true,
         "tool": "get_es_data",
-        "args": "index: mysql-slow-*, start_time: 动态生成, end_time: 动态生成, query: 动态生成",
+        "args": "index: mysql-slow-*, start_time: 动态生成, end_time: 动态生成, query: 动态生成,获取一条数据看看有哪些字段然后生成",
         "requires_approval": false
       },
       {

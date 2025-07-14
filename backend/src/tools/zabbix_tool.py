@@ -222,11 +222,11 @@ def get_host_metrics(
         ]
     
     try:
-        # 获取主机ID
+        # 获取主机ID（开发阶段强制使用127.0.0.1）
         host_params = {
             "output": ["hostid", "host", "name"],
             "filter": {
-                "host": hostname
+                "host": "127.0.0.1"
             }
         }
         
@@ -522,11 +522,11 @@ def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
         包含可用指标列表的JSON字符串
     """
     try:
-        # 获取主机ID
+        # 获取主机ID（开发阶段强制使用127.0.0.1）
         host_params = {
             "output": ["hostid", "host", "name"],
             "filter": {
-                "host": hostname
+                "host": "127.0.0.1"
             }
         }
         
