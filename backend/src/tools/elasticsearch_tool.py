@@ -538,11 +538,54 @@ def custom_elasticsearch_query(
         if 'es_client' in locals():
             es_client.close()
 
+# 重命名工具以匹配SOP配置
+get_es_data = custom_elasticsearch_query
+
+class IndicesListInput(BaseModel):
+    """获取所有索引输入参数"""
+    pass
+
+@tool("get_es_indices", args_schema=IndicesListInput)
+def get_es_indices() -> str:
+    """获取Elasticsearch所有索引列表。用于查看可用的索引。
+    
+    Returns:
+        包含索引列表的JSON字符串
+    """
+    try:
+        es_client = _create_es_client()
+        
+        # 获取所有索引
+        indices = es_client.cat.indices(format="json")
+        
+        # 格式化索引信息
+        index_data = []
+        for index in indices:
+            index_data.append({
+                "index": index["index"],
+                "status": index["status"], 
+                "health": index["health"],
+                "docs_count": index.get("docs.count", "0"),
+                "store_size": index.get("store.size", "0b")
+            })
+        
+        # 按索引名称排序
+        index_data.sort(key=lambda x: x["index"])
+        
+        return json.dumps({
+            "total_indices": len(index_data),
+            "indices": index_data
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error getting ES indices: {e}")
+        return json.dumps({"error": f"Failed to get ES indices: {str(e)}"})
+    finally:
+        if 'es_client' in locals():
+            es_client.close()
+
 # 导出所有工具
 elasticsearch_tools = [
-    search_error_logs,
-    analyze_log_patterns,
-    search_by_correlation_id,
-    get_service_health_summary,
-    custom_elasticsearch_query
+    get_es_data,
+    get_es_indices
 ] 

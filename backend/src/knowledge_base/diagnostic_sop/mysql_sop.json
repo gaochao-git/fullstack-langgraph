@@ -10,7 +10,7 @@
         "step": 1,
         "description": "获取慢查询日志配置和阈值设置",
         "ai_generated": false,
-        "tool": "mysql",
+        "tool": "execute_mysql_query",
         "args": "SHOW VARIABLES WHERE Variable_name IN ('long_query_time', 'slow_query_log', 'slow_query_log_file');",
         "requires_approval": false
       },
@@ -26,7 +26,7 @@
         "step": 3,
         "description": "从ES中查询指定时间范围的慢查询日志，分析是写慢查询还是读慢查询，查看扫描行数和锁等待情况",
         "ai_generated": true,
-        "tool": "es",
+        "tool": "get_es_data",
         "args": "index: mysql-slow-*, start_time: 动态生成, end_time: 动态生成, query: 动态生成",
         "requires_approval": false
       },
@@ -34,7 +34,7 @@
         "step": 4,
         "description": "获取指定时间范围内的磁盘IO使用率和CPU使用率，检查是否存在瓶颈或异常波动",
         "ai_generated": true,
-        "tool": "zabbix",
+        "tool": "get_zabbix_metric_data",
         "args": "metric: [vfs.dev.read.rate, vfs.dev.write.rate, system.cpu.util], start_time: 动态生成, end_time: 动态生成",
         "requires_approval": false
       },
@@ -42,12 +42,12 @@
         "step": 5,
         "description": "查看CPU和IO占用前5名进程，找到资源占用的具体进程",
         "ai_generated": false,
-        "tool": "ssh",
+        "tool": "execute_system_command",
         "args": "top -b -n1 | head -12; iotop -b -n1 | head -10",
         "requires_approval": false
       }
     ],
-    "tools_required": ["mysql", "es", "zabbix", "ssh"],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
     "escalation_criteria": "如果响应耗时升高且影响核心业务功能",
     "diagnostic_only": true,
     "recommendations": [
@@ -68,7 +68,7 @@
         "step": 1,
         "description": "查看当前活跃连接数量",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SHOW STATUS LIKE 'Threads_connected';",
         "requires_approval": false
       },
@@ -76,7 +76,7 @@
         "step": 2,
         "description": "确认最大连接数限制",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SHOW VARIABLES LIKE 'max_connections';",
         "requires_approval": false
       },
@@ -84,7 +84,7 @@
         "step": 3,
         "description": "分析连接来源分布",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT USER, HOST, COUNT(*) FROM information_schema.PROCESSLIST GROUP BY USER, HOST;",
         "requires_approval": false
       },
@@ -92,7 +92,7 @@
         "step": 4,
         "description": "分析连接状态分布",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT COMMAND, COUNT(*) FROM information_schema.PROCESSLIST GROUP BY COMMAND;",
         "requires_approval": false
       },
@@ -100,12 +100,12 @@
         "step": 5,
         "description": "查找长时间等待的连接",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT ID, USER, HOST, TIME, STATE FROM information_schema.PROCESSLIST WHERE TIME > 300;",
         "requires_approval": false
       }
     ],
-    "tools_required": ["mysql"],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
     "escalation_criteria": "如果无法建立新连接且业务受影响",
     "diagnostic_only": true,
     "recommendations": [
@@ -126,7 +126,7 @@
         "step": 1,
         "description": "统计当前活跃会话数量",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT COUNT(*) as active_sessions FROM information_schema.PROCESSLIST WHERE COMMAND != 'Sleep';",
         "requires_approval": false
       },
@@ -134,7 +134,7 @@
         "step": 2,
         "description": "查看所有活跃会话的详细状态",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT ID, USER, HOST, DB, COMMAND, TIME, STATE, INFO FROM information_schema.PROCESSLIST WHERE COMMAND != 'Sleep' ORDER BY TIME DESC;",
         "requires_approval": false
       },
@@ -142,7 +142,7 @@
         "step": 3,
         "description": "识别运行时间超过60秒的会话",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT ID, USER, HOST, TIME, STATE, INFO FROM information_schema.PROCESSLIST WHERE TIME > 60 AND COMMAND != 'Sleep';",
         "requires_approval": false
       },
@@ -150,7 +150,7 @@
         "step": 4,
         "description": "分析会话状态分布情况",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT STATE, COUNT(*) as session_count FROM information_schema.PROCESSLIST GROUP BY STATE ORDER BY session_count DESC;",
         "requires_approval": false
       },
@@ -158,12 +158,12 @@
         "step": 5,
         "description": "按用户统计会话数量",
         "ai_generated": false,
-        "tool": "execute_diagnostic_query",
+        "tool": "execute_mysql_query",
         "args": "SELECT USER, COUNT(*) as session_count FROM information_schema.PROCESSLIST GROUP BY USER ORDER BY session_count DESC;",
         "requires_approval": false
       }
     ],
-    "tools_required": ["mysql"],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
     "escalation_criteria": "如果活跃会话数持续过高且影响数据库性能",
     "diagnostic_only": true,
     "recommendations": [

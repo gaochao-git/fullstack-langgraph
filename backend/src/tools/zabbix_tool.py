@@ -211,8 +211,7 @@ def get_host_metrics(
     Returns:
         包含主机监控指标的JSON字符串
     """
-    if not _zabbix_config["auth_token"]:
-        return json.dumps({"error": "Zabbix client not initialized"})
+    # 连接检查已移至_zabbix_api_call中自动处理
     
     if not metrics:
         metrics = [
@@ -346,8 +345,7 @@ def get_problem_events(
     Returns:
         包含问题事件的JSON字符串
     """
-    if not _zabbix_config["auth_token"]:
-        return json.dumps({"error": "Zabbix client not initialized"})
+    # 连接检查已移至_zabbix_api_call中自动处理
     
     try:
         time_from = int((datetime.now() - timedelta(hours=time_range_hours)).timestamp())
@@ -445,8 +443,7 @@ def get_host_availability(hostnames: Optional[List[str]] = None) -> str:
     Returns:
         包含主机可用性状态的JSON字符串
     """
-    if not _zabbix_config["auth_token"]:
-        return json.dumps({"error": "Zabbix client not initialized"})
+    # 连接检查已移至_zabbix_api_call中自动处理
     
     try:
         params = {
@@ -507,10 +504,105 @@ def get_host_availability(hostnames: Optional[List[str]] = None) -> str:
         logger.error(f"Error getting host availability: {e}")
         return json.dumps({"error": f"Failed to get host availability: {str(e)}"})
 
+# 重命名工具以匹配SOP配置
+get_zabbix_metric_data = get_host_metrics
+
+class HostMetricsListInput(BaseModel):
+    """获取主机可用指标输入参数"""
+    hostname: str = Field(description="主机名")
+
+@tool("get_zabbix_metrics", args_schema=HostMetricsListInput)
+def get_zabbix_metrics(hostname: str) -> str:
+    """获取指定主机的所有可用监控指标。用于查看主机支持哪些监控指标。
+    
+    Args:
+        hostname: 主机名
+    
+    Returns:
+        包含可用指标列表的JSON字符串
+    """
+    try:
+        # 获取主机ID
+        host_params = {
+            "output": ["hostid", "host", "name"],
+            "filter": {
+                "host": hostname
+            }
+        }
+        
+        host_result = _zabbix_api_call("host.get", host_params)
+        
+        if "error" in host_result:
+            return json.dumps(host_result)
+        
+        hosts = host_result.get("result", [])
+        if not hosts:
+            return json.dumps({"error": f"Host {hostname} not found"})
+        
+        host_id = hosts[0]["hostid"]
+        
+        # 获取所有监控项
+        item_params = {
+            "output": ["itemid", "name", "key_", "units", "description", "status"],
+            "hostids": host_id,
+            "filter": {
+                "status": 0  # 启用的监控项
+            }
+        }
+        
+        item_result = _zabbix_api_call("item.get", item_params)
+        
+        if "error" in item_result:
+            return json.dumps(item_result)
+        
+        items = item_result.get("result", [])
+        
+        # 按类别分组指标
+        metrics_by_category = {}
+        
+        for item in items:
+            key = item["key_"]
+            
+            # 根据key确定类别
+            if key.startswith("system.cpu"):
+                category = "CPU"
+            elif key.startswith("vm.memory") or key.startswith("memory"):
+                category = "Memory"
+            elif key.startswith("vfs.fs") or key.startswith("disk"):
+                category = "Disk"
+            elif key.startswith("net.if") or key.startswith("network"):
+                category = "Network"
+            elif key.startswith("system."):
+                category = "System"
+            else:
+                category = "Other"
+            
+            if category not in metrics_by_category:
+                metrics_by_category[category] = []
+            
+            metrics_by_category[category].append({
+                "key": key,
+                "name": item["name"],
+                "units": item["units"],
+                "description": item.get("description", "")
+            })
+        
+        # 计算总数
+        total_metrics = sum(len(metrics) for metrics in metrics_by_category.values())
+        
+        return json.dumps({
+            "hostname": hostname,
+            "host_id": host_id,
+            "total_metrics": total_metrics,
+            "metrics_by_category": metrics_by_category
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error getting zabbix metrics: {e}")
+        return json.dumps({"error": f"Failed to get zabbix metrics: {str(e)}"})
+
 # 导出所有工具
 zabbix_tools = [
-    get_active_alerts,
-    get_host_metrics,
-    get_problem_events,
-    get_host_availability
+    get_zabbix_metric_data,
+    get_zabbix_metrics
 ] 
