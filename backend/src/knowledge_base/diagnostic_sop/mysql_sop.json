@@ -16,22 +16,30 @@
       },
       {
         "step": 2,
-        "description": "大模型判断是否需要分析慢查询日志",
+        "description": "确定分析范围",
         "ai_generated": true,
         "tool": "llm",
-        "args": "如果响应耗时小于慢查询阈值则跳过慢日志分析直接执行第4步，如果大于阈值则继续第3步",
+        "args": "根据用户描述的响应耗时和慢查询阈值，确定分析范围，如果用户告诉了范围用用户的，否则用报警时间前后5分钟",
         "requires_approval": false
       },
       {
         "step": 3,
-        "description": "从ES中查询指定时间范围的慢查询日志，分析是写慢查询还是读慢查询，查看扫描行数和锁等待情况，如果要过滤先获取一条数据看看有哪些字段然后过滤，要注意时区问题",
+        "description": "大模型判断是否需要分析慢查询日志",
+        "ai_generated": true,
+        "tool": "llm",
+        "args": "如果响应耗时小于慢查询阈值则跳过慢日志分析直接执行第5步，如果大于阈值则继续第4步",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "description": "从ES中查询指定时间范围的慢查询日志，分析是写慢查询还是读慢查询，查看扫描行数和锁等待情况，如果要过滤先获取一条数据看看有哪些字段然后过滤",
         "ai_generated": true,
         "tool": "get_es_data",
         "args": "index: mysql-slow-*, start_time: 动态生成, end_time: 动态生成, query: 动态生成,获取一条数据看看有哪些字段然后生成",
         "requires_approval": false
       },
       {
-        "step": 4,
+        "step": 5,
         "description": "获取指定时间范围内的磁盘IO使用率和CPU使用率，检查是否存在瓶颈或异常波动",
         "ai_generated": true,
         "tool": "get_zabbix_metric_data",
@@ -39,7 +47,7 @@
         "requires_approval": false
       },
       {
-        "step": 5,
+        "step": 6,
         "description": "查看CPU和IO占用前5名进程，找到资源占用的具体进程",
         "ai_generated": false,
         "tool": "execute_system_command",
