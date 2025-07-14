@@ -64,7 +64,7 @@ const mockFaults: Fault[] = [
     title: "MySQL写入耗时大于200ms",
     description: "MySQL数据库写入耗时大于200ms，写入响应缓慢",
     ip: "192.168.1.102",
-    time: "2025-01-12 13:15:10",
+    time: "2025-07-14 10:50:10",
     priority: "P2",
     status: "active",
     sopId: "SOP-DB-001",

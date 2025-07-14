@@ -72,7 +72,19 @@ def custom_elasticsearch_query(
         包含查询结果的JSON字符串
     """
     try:
-        # 如果没有提供查询体，使用默认查询
+        # 处理时区问题
+        # 如果时间字符串没有时区信息，添加中国时区
+        if "+" not in start_time and "Z" not in start_time and "T" in start_time:
+            start_time_with_tz = start_time + "+08:00"
+        else:
+            start_time_with_tz = start_time
+            
+        if "+" not in end_time and "Z" not in end_time and "T" in end_time:
+            end_time_with_tz = end_time + "+08:00"
+        else:
+            end_time_with_tz = end_time
+        
+        # 如果没有提供查询体，使用默认查询（直接使用处理后的时间）
         if not query_body:
             query_body = {
                 "query": {
@@ -81,8 +93,8 @@ def custom_elasticsearch_query(
                             {
                                 "range": {
                                     "@timestamp": {
-                                        "gte": start_time,
-                                        "lte": end_time
+                                        "gte": start_time_with_tz,
+                                        "lte": end_time_with_tz
                                     }
                                 }
                             }
@@ -92,28 +104,48 @@ def custom_elasticsearch_query(
                 "sort": [{"@timestamp": {"order": "desc"}}],
                 "size": 100
             }
-        
-        # 确保查询体包含时间范围
-        if "query" not in query_body:
-            query_body["query"] = {"bool": {"must": []}}
-        
-        if "bool" not in query_body["query"]:
-            query_body["query"]["bool"] = {"must": []}
-        
-        if "must" not in query_body["query"]["bool"]:
-            query_body["query"]["bool"]["must"] = []
-        
-        # 添加时间范围过滤
-        time_filter = {
-            "range": {
-                "@timestamp": {
-                    "gte": start_time,
-                    "lte": end_time
+        else:
+            # 确保查询体包含时间范围
+            if "query" not in query_body:
+                query_body["query"] = {"bool": {"must": []}}
+            
+            if "bool" not in query_body["query"]:
+                query_body["query"]["bool"] = {"must": []}
+            
+            if "must" not in query_body["query"]["bool"]:
+                query_body["query"]["bool"]["must"] = []
+            
+            # 检查是否已存在@timestamp的range查询，如果存在则更新，否则添加
+            timestamp_filter_found = False
+            for i, condition in enumerate(query_body["query"]["bool"]["must"]):
+                if isinstance(condition, dict) and "range" in condition and "@timestamp" in condition["range"]:
+                    # 更新现有的时间过滤器
+                    query_body["query"]["bool"]["must"][i] = {
+                        "range": {
+                            "@timestamp": {
+                                "gte": start_time_with_tz,
+                                "lte": end_time_with_tz
+                            }
+                        }
+                    }
+                    timestamp_filter_found = True
+                    break
+            
+            # 如果没有找到时间过滤器，则添加新的
+            if not timestamp_filter_found:
+                time_filter = {
+                    "range": {
+                        "@timestamp": {
+                            "gte": start_time_with_tz,
+                            "lte": end_time_with_tz
+                        }
+                    }
                 }
-            }
-        }
+                query_body["query"]["bool"]["must"].append(time_filter)
         
-        query_body["query"]["bool"]["must"].append(time_filter)
+        # 打印查询体用于调试
+        logger.info(f"ES查询体: {json.dumps(query_body, indent=2)}")
+        print(f"ES查询体: {json.dumps(query_body, indent=2)}")
         
         # 执行查询
         response = _es_request("POST", f"/{index_name}/_search", data=query_body)
@@ -130,7 +162,8 @@ def custom_elasticsearch_query(
         
         return json.dumps({
             "total": response.get("hits", {}).get("total", {}).get("value", 0),
-            "time_range": f"{start_time} to {end_time}",
+            "time_range": f"{start_time_with_tz} to {end_time_with_tz}",
+            "original_time_range": f"{start_time} to {end_time}",
             "results": results
         }, indent=2)
         
