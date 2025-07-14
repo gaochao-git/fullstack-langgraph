@@ -24,22 +24,48 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
         const minValue = Math.min(...values);
         const maxValue = Math.max(...values);
         const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+        
+        // 格式化统计值（保留2位小数）
+        const formatValue = (val) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        const statsText = `当前值: ${formatValue(values[values.length - 1])} ${firstItem.units} | 平均值: ${formatValue(avgValue)} ${firstItem.units} | 最大值: ${formatValue(maxValue)} ${firstItem.units} | 数据点: ${values.length}`;
+        
+        // 提取年月日部分
+        const extractDate = (timeRange) => {
+          if (!timeRange) return '';
+          // 假设时间格式包含日期，提取YYYY-MM-DD部分
+          const dateMatch = timeRange.match(/(\d{4}-\d{2}-\d{2})/);
+          return dateMatch ? dateMatch[1] : timeRange.split(' ')[0] || '';
+        };
+        const dateText = extractDate(firstItem.timeRange);
+        const leftText = `${dateText} | ${firstItem.hostname || ''} | ${firstItem.key_}`;
 
         // 确定是否从0开始
         const shouldStartFromZero = minValue <= maxValue * 0.1;  // 如果最小值小于最大值的10%，则从0开始
         const yAxisMin = shouldStartFromZero ? 0 : minValue * 0.95;
 
         return {
-            title: showHeader ? {
-                text: `${firstItem.key_}`,
-                left: 'center',
-                top: 2,
-                textStyle: {
-                    color: '#FCD34D',
-                    fontSize: 10,
-                    fontWeight: 'bold'
+            title: showHeader ? [
+                {
+                    text: `${leftText}`,
+                    left: 'left',
+                    top: 0,
+                    textStyle: {
+                        color: '#FCD34D',
+                        fontSize: 9,
+                        fontWeight: 'bold'
+                    }
+                },
+                {
+                    text: `${statsText}`,
+                    right: 'right',
+                    top: 0,
+                    textStyle: {
+                        color: '#FCD34D',
+                        fontSize: 8,
+                        fontWeight: 'bold'
+                    }
                 }
-            } : undefined,
+            ] : undefined,
             tooltip: {
                 trigger: 'axis',
                 formatter: function(params) {
@@ -57,7 +83,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 }
             },
             grid: {
-                top: showHeader ? 20 : 2,
+                top: showHeader ? 22 : 2,
                 left: '1%',
                 right: '1%',
                 bottom: '3%',

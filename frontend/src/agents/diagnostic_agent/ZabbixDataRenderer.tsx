@@ -97,24 +97,16 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
   const metricsEntries = Object.entries(metrics);
   
   return (
-    <div className="border-2 border-cyan-400 rounded-xl p-3 my-3 shadow-lg" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
-      <div className="text-xs mb-1 grid grid-cols-3 gap-2 leading-tight">
-        <div className="flex items-center gap-1">
-          <span className="text-cyan-300">📈</span>
-          <span className="font-semibold text-cyan-100">Zabbix 监控数据</span>
-        </div>
-        <p className="text-cyan-100"><strong className="text-yellow-400">主机:</strong> {data.hostname}</p>
-        <p className="truncate text-cyan-100" title={data.time_range}><strong className="text-yellow-400">时间:</strong> {data.time_range}</p>
-      </div>
-      
-      <div className="space-y-4">
+    <div className="space-y-4">
         {metricsEntries.map(([metricKey, metricData]: [string, any]) => {
           // 转换数据格式为ZabbixChart需要的格式
           const chartData = metricData.history?.map((item: any) => ({
             metric_time: item[0], // 时间戳
             value: item[1],       // 数值
             key_: metricKey,
-            units: metricData.units || ''
+            units: metricData.units || '',
+            hostname: data.hostname,
+            timeRange: data.time_range
           })) || [];
           
           if (chartData.length === 0) {
@@ -136,16 +128,9 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
                 showHeader={true}
                 style={{ height: '250px' }}
               />
-              <div className="mt-2 text-xs text-cyan-200 grid grid-cols-2 md:grid-cols-4 gap-2">
-                <span><strong className="text-yellow-400">当前值:</strong> {metricData.current_value} {metricData.units}</span>
-                <span><strong className="text-yellow-400">平均值:</strong> {metricData.avg_value} {metricData.units}</span>
-                <span><strong className="text-yellow-400">最大值:</strong> {metricData.max_value} {metricData.units}</span>
-                <span><strong className="text-yellow-400">数据点:</strong> {metricData.data_points}</span>
-              </div>
             </div>
           );
         })}
-      </div>
     </div>
   );
 };
