@@ -62,7 +62,7 @@ const mockFaults: Fault[] = [
   {
     id: "fault-002", 
     title: "MySQL写入耗时大于200ms",
-    description: "MySQL数据库写入耗时大于200ms，写入响应缓慢",
+    description: "MySQL数据库写入耗时大于200ms",
     ip: "192.168.1.102",
     time: "2025-07-14 10:50:10",
     priority: "P2",
@@ -213,7 +213,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       return `故障信息不完整，无法进行诊断排查。`;
     }
     
-    return `我需要排查一个故障：在${fault.time}，服务器${fault.ip}出现了${fault.description}，希望使用SOP编号${fault.sopId}进行诊断排查。`;
+    return `${fault.time}，服务器${fault.ip}出现了${fault.description}，请使用SOP编号${fault.sopId}进行诊断排查。`;
   };
 
   // 计算统计数据
