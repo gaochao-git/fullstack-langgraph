@@ -35,7 +35,7 @@
         "description": "获取指定时间范围内的磁盘IO使用率和CPU使用率，检查是否存在瓶颈或异常波动",
         "ai_generated": true,
         "tool": "get_zabbix_metric_data",
-        "args": "metric: [vfs.dev.read.rate, vfs.dev.write.rate, system.cpu.util], start_time: 动态生成, end_time: 动态生成",
+        "args": "metric: [system.cpu.util[,user], disk.io.util[vda]], start_time: 动态生成, end_time: 动态生成",
         "requires_approval": false
       },
       {

@@ -189,39 +189,47 @@ def get_active_alerts(
         logger.error(f"Error getting active alerts: {e}")
         return json.dumps({"error": f"Failed to get active alerts: {str(e)}"})
 
-class HostMetricsInput(BaseModel):
-    """主机监控指标输入参数"""
-    hostname: str = Field(default="127.0.0.1", description="主机名")
-    metrics: Optional[List[str]] = Field(default=None, description="指标列表")
-    time_range_hours: int = Field(default=1, description="时间范围(小时)")
+class ZabbixMetricDataInput(BaseModel):
+    """Zabbix指标数据输入参数"""
+    ip: str = Field(default="127.0.0.1", description="主机IP地址")
+    metric_key: str = Field(description="指标名称，例如：system.cpu.util")
+    start_time: str = Field(description="开始时间，格式：YYYY-MM-DD HH:MM:SS")
+    end_time: str = Field(description="结束时间，格式：YYYY-MM-DD HH:MM:SS")
 
-@tool("get_host_metrics", args_schema=HostMetricsInput)
-def get_host_metrics(
-    hostname: str = "127.0.0.1",
-    metrics: Optional[List[str]] = None,
-    time_range_hours: int = 1
+@tool("get_zabbix_metric_data", args_schema=ZabbixMetricDataInput)
+def get_zabbix_metric_data(
+    ip: str = "127.0.0.1",
+    metric_key: str = "system.cpu.util",
+    start_time: str = "",
+    end_time: str = ""
 ) -> str:
-    """获取主机监控指标。用于查看特定主机的性能指标数据。
+    """获取指定主机的特定监控指标历史数据。用于查看具体指标的时间序列数据。
     
     Args:
-        hostname: 主机名
-        metrics: 指标列表，默认为CPU、内存、磁盘使用率
-        time_range_hours: 时间范围(小时)
+        ip: 主机IP地址
+        metric_key: 指标名称，例如：system.cpu.util
+        start_time: 开始时间，格式：YYYY-MM-DD HH:MM:SS
+        end_time: 结束时间，格式：YYYY-MM-DD HH:MM:SS
     
     Returns:
-        包含主机监控指标的JSON字符串
+        包含指标历史数据的JSON字符串
     """
-    # 连接检查已移至_zabbix_api_call中自动处理
-    
-    if not metrics:
-        metrics = [
-            "system.cpu.util",
-            "vm.memory.util",
-            "vfs.fs.size[/,pused]",
-            "system.cpu.load[percpu,avg1]"
-        ]
-    
     try:
+        # 解析时间参数
+        if not start_time or not end_time:
+            # 默认为最近1小时
+            end_dt = datetime.now()
+            start_dt = end_dt - timedelta(hours=1)
+        else:
+            try:
+                start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return json.dumps({"error": "时间格式错误，请使用 YYYY-MM-DD HH:MM:SS 格式"})
+        
+        time_from = int(start_dt.timestamp())
+        time_till = int(end_dt.timestamp())
+        
         # 通过IP地址查找主机（强制使用127.0.0.1）
         host_interface_result = _zabbix_api_call('hostinterface.get', {
             'output': ['hostid'],
@@ -233,18 +241,17 @@ def get_host_metrics(
         
         interfaces = host_interface_result.get("result", [])
         if not interfaces:
-            return json.dumps({"error": f"No host found with IP 127.0.0.1 (input: {hostname})"})
+            return json.dumps({"error": f"No host found with IP 127.0.0.1 (input: {ip})"})
         
         host_id = interfaces[0]["hostid"]
         
-        # 获取监控项
+        # 获取指定的监控项
         item_params = {
             "output": ["itemid", "name", "key_", "lastvalue", "units"],
             "hostids": host_id,
-            "search": {
-                "key_": metrics
-            },
-            "searchByAny": True
+            "filter": {
+                "key_": metric_key
+            }
         }
         
         item_result = _zabbix_api_call("item.get", item_params)
@@ -253,74 +260,77 @@ def get_host_metrics(
             return json.dumps(item_result)
         
         items = item_result.get("result", [])
+        if not items:
+            return json.dumps({"error": f"Metric '{metric_key}' not found on host {ip}"})
+        
+        item = items[0]
         
         # 获取历史数据
-        time_from = int((datetime.now() - timedelta(hours=time_range_hours)).timestamp())
-        time_till = int(datetime.now().timestamp())
+        history_params = {
+            "output": "extend",
+            "itemids": item["itemid"],
+            "time_from": time_from,
+            "time_till": time_till,
+            "sortfield": "clock",
+            "sortorder": "ASC"
+        }
         
-        metrics_data = {}
+        # 根据数据类型选择history表
+        if item["key_"].startswith("system.cpu") or "util" in item["key_"]:
+            history_result = _zabbix_api_call("history.get", {**history_params, "history": 0})
+        else:
+            history_result = _zabbix_api_call("history.get", {**history_params, "history": 3})
         
-        for item in items:
-            # 获取历史数据
-            history_params = {
-                "output": "extend",
-                "itemids": item["itemid"],
-                "time_from": time_from,
-                "time_till": time_till,
-                "sortfield": "clock",
-                "sortorder": "DESC",
-                "limit": 100
+        if "error" in history_result:
+            return json.dumps(history_result)
+        
+        history_data = history_result.get("result", [])
+        
+        # 转换数据格式
+        formatted_history = []
+        values = []
+        
+        for point in history_data:
+            try:
+                value = float(point["value"])
+                timestamp = datetime.fromtimestamp(int(point["clock"])).strftime("%Y-%m-%d %H:%M:%S")
+                formatted_history.append([timestamp, value])
+                values.append(value)
+            except (ValueError, TypeError):
+                continue
+        
+        # 计算统计数据
+        if values:
+            avg_value = sum(values) / len(values)
+            max_value = max(values)
+            min_value = min(values)
+        else:
+            avg_value = max_value = min_value = 0
+        
+        metrics_data = {
+            item["key_"]: {
+                "name": item["name"],
+                "current_value": item["lastvalue"],
+                "units": item["units"],
+                "avg_value": round(avg_value, 2),
+                "max_value": round(max_value, 2),
+                "min_value": round(min_value, 2),
+                "data_points": len(values),
+                "history": formatted_history
             }
-            
-            # 根据数据类型选择history表
-            if item["key_"].startswith("system.cpu") or "util" in item["key_"]:
-                history_result = _zabbix_api_call("history.get", {**history_params, "history": 0})
-            else:
-                history_result = _zabbix_api_call("history.get", {**history_params, "history": 3})
-            
-            if "result" in history_result:
-                history_data = history_result["result"]
-                
-                # 转换时间戳并计算统计
-                values = []
-                timestamps = []
-                
-                for point in history_data:
-                    try:
-                        value = float(point["value"])
-                        values.append(value)
-                        timestamps.append(datetime.fromtimestamp(int(point["clock"])).isoformat())
-                    except (ValueError, TypeError):
-                        continue
-                
-                if values:
-                    avg_value = sum(values) / len(values)
-                    max_value = max(values)
-                    min_value = min(values)
-                else:
-                    avg_value = max_value = min_value = 0
-                
-                metrics_data[item["key_"]] = {
-                    "name": item["name"],
-                    "current_value": item["lastvalue"],
-                    "units": item["units"],
-                    "avg_value": round(avg_value, 2),
-                    "max_value": round(max_value, 2),
-                    "min_value": round(min_value, 2),
-                    "data_points": len(values),
-                    "history": list(zip(timestamps, values))[-20:]  # 最近20个点
-                }
+        }
         
         return json.dumps({
-            "hostname": hostname,
+            "hostname": ip,
             "host_id": host_id,
-            "time_range": f"Last {time_range_hours} hour(s)",
+            "metric_key": metric_key,
+            "time_range": f"{start_time} to {end_time}",
             "metrics": metrics_data
         }, indent=2)
         
     except Exception as e:
-        logger.error(f"Error getting host metrics: {e}")
-        return json.dumps({"error": f"Failed to get host metrics: {str(e)}"})
+        logger.error(f"Error getting zabbix metric data: {e}")
+        return json.dumps({"error": f"Failed to get zabbix metric data: {str(e)}"})
 
 class ProblemEventsInput(BaseModel):
     """问题事件查询输入参数"""
@@ -499,9 +509,6 @@ def get_host_availability(hostnames: Optional[List[str]] = None) -> str:
     except Exception as e:
         logger.error(f"Error getting host availability: {e}")
         return json.dumps({"error": f"Failed to get host availability: {str(e)}"})
-
-# 重命名工具以匹配SOP配置
-get_zabbix_metric_data = get_host_metrics
 
 class HostMetricsListInput(BaseModel):
     """获取主机可用指标输入参数"""

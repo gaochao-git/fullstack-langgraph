@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
+import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 
 // 诊断消息中的事件类型
 export interface ProcessedEvent {
@@ -124,6 +125,8 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           {toolResultContent && (
             <div className="min-w-fit max-w-full">
               <h4 className="text-sm font-semibold text-gray-700 mb-2">输出:</h4>
+              
+              {/* 工具展开后只显示原始JSON数据 */}
               <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto text-gray-800 whitespace-pre max-w-full">
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
@@ -375,52 +378,80 @@ export function DiagnosticChatView({
                       <Bot className="h-5 w-5 text-gray-600" />
                     </div>
                     <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 flex-1 overflow-hidden">
-                      {round.assistant.map((msg, i) => {
-                        // 活动事件和 AI 内容
-                        if (msg.type === 'ai') {
-                          const activityForThisMessage = historicalActivities[msg.id!] || [];
-                          return (
-                            <div key={msg.id || i} className="min-w-0 w-full">
-                              {activityForThisMessage.length > 0 && (
-                                <div className="mb-3 border-b border-gray-200 pb-3 text-xs overflow-x-auto">
-                                  <ActivityTimeline
-                                    processedEvents={activityForThisMessage}
-                                    isLoading={false}
-                                  />
-                                </div>
-                              )}
-                              {/* AI 内容 */}
-                              {msg.content && (
-                                <div className="mb-2 overflow-x-auto min-w-0">
-                                  <div className="min-w-fit max-w-none">
-                                    <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
-                                  </div>
-                                </div>
-                              )}
-                              {/* 工具调用（只渲染本条消息的 tool_calls） */}
-                              {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
-                                <div className="overflow-x-auto">
-                                  <div className="min-w-fit">
-                                    <ToolCalls 
-                                      key={msg.id || i} 
-                                      message={msg} 
-                                      allMessages={messages} 
-                                      interrupt={interrupt}
-                                      onInterruptResume={onInterruptResume}
+                      {(() => {
+                        // 按时间顺序渲染所有消息和图表
+                        const renderItems = [];
+                        
+                        round.assistant.forEach((msg, i) => {
+                          if (msg.type === 'ai') {
+                            const activityForThisMessage = historicalActivities[msg.id!] || [];
+                            
+                            // AI 消息内容
+                            renderItems.push(
+                              <div key={msg.id || `ai-${i}`} className="min-w-0 w-full mb-3">
+                                {activityForThisMessage.length > 0 && (
+                                  <div className="mb-3 border-b border-gray-200 pb-3 text-xs overflow-x-auto">
+                                    <ActivityTimeline
+                                      processedEvents={activityForThisMessage}
+                                      isLoading={false}
                                     />
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        }
-                        // 工具调用结果
-                        if (msg.type === 'tool') {
-                          // 不单独渲染，由 ToolCalls 负责
-                          return null;
-                        }
-                        return null;
-                      })}
+                                )}
+                                {/* AI 内容 */}
+                                {msg.content && (
+                                  <div className="mb-2 overflow-x-auto min-w-0">
+                                    <div className="min-w-fit max-w-none">
+                                      <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* 工具调用 */}
+                                {(msg as any).tool_calls && (msg as any).tool_calls.length > 0 && (
+                                  <div className="overflow-x-auto">
+                                    <div className="min-w-fit">
+                                      <ToolCalls 
+                                        key={msg.id || i} 
+                                        message={msg} 
+                                        allMessages={messages} 
+                                        interrupt={interrupt}
+                                        onInterruptResume={onInterruptResume}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                            
+                            // 为每个工具调用添加对应的图表
+                            const toolCalls = (msg as any).tool_calls || [];
+                            toolCalls.forEach((toolCall: any) => {
+                              if (toolCall.name === 'get_zabbix_metric_data') {
+                                // 查找工具调用的结果
+                                const messageIndex = messages.findIndex(m => m.id === msg.id);
+                                if (messageIndex !== -1) {
+                                  for (let j = messageIndex + 1; j < messages.length; j++) {
+                                    const nextMessage = messages[j];
+                                    if (nextMessage.type === 'tool' && (nextMessage as any).tool_call_id === toolCall.id) {
+                                      const toolResult = nextMessage.content;
+                                      if (canRenderChart(toolResult, toolCall.name)) {
+                                        renderItems.push(
+                                          <div key={`chart-${toolCall.id}`} className="min-w-0 w-full mb-3">
+                                            <ZabbixDataRenderer data={toolResult} toolName={toolCall.name} />
+                                          </div>
+                                        );
+                                      }
+                                      break;
+                                    }
+                                  }
+                                }
+                              }
+                            });
+                          }
+                        });
+                        
+                        return renderItems;
+                      })()}
                       {/* 合并区域只显示最后一条 AI 消息的复制按钮 */}
                       {(() => {
                         // 找到最后一条有内容的 AI 消息
