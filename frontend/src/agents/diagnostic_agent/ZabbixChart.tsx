@@ -43,9 +43,10 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
             tooltip: {
                 trigger: 'axis',
                 formatter: function(params) {
-                    const value = params[0].value;
+                    const value = parseFloat(params[0].value);
+                    const formattedValue = Number.isInteger(value) ? value.toString() : value.toFixed(2);
                     const time = params[0].axisValue;
-                    return `${time}<br/>${value}${firstItem.units}`;
+                    return `${time}<br/>${formattedValue}${firstItem.units}`;
                 },
                 axisPointer: {
                     type: 'line',
@@ -57,8 +58,8 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
             },
             grid: {
                 top: showHeader ? 20 : 2,
-                left: '3%',
-                right: '4%',
+                left: '1%',
+                right: '1%',
                 bottom: '3%',
                 containLabel: true
             },
@@ -95,7 +96,9 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                     color: '#E5E7EB',
                     fontSize: 11,
                     formatter: (value) => {
-                        return value + firstItem.units;
+                        const numValue = parseFloat(value);
+                        const formattedValue = Number.isInteger(numValue) ? numValue.toString() : numValue.toFixed(2);
+                        return formattedValue + firstItem.units;
                     }
                 },
                 axisLine: {
