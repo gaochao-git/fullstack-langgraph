@@ -52,9 +52,7 @@ class RunCreate(BaseModel):
     user_name: Optional[str] = None  # 用户名，用于线程关联
 
 async def process_stream_chunk(chunk, event_id, thread_id):
-    """处理单个流式数据块"""
-    logger.info(f"🔍 处理流式数据块: event_id={event_id}, thread_id={thread_id}, chunk_type={type(chunk)}")
-    
+    """处理单个流式数据块"""    
     # Handle tuple format from LangGraph streaming
     if isinstance(chunk, tuple) and len(chunk) == 2:
         event_type, data = chunk
