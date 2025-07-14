@@ -7,8 +7,8 @@ const md: MarkdownIt = new MarkdownIt({
   breaks: false,
   // 配置代码高亮
   highlight: function (str: string, lang: string): string {
-    return '<pre class="bg-neutral-800 p-3 rounded-md overflow-x-auto font-mono text-sm my-2">' +
-           '<code class="text-neutral-100">' +
+    return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-sm my-2" style="background-color: #DBEAFE; border: 1px solid #93C5FD;">' +
+           '<code style="color: #1E3A8A;">' +
            md.utils.escapeHtml(str) +
            '</code></pre>';
   }
@@ -17,13 +17,13 @@ const md: MarkdownIt = new MarkdownIt({
 // 自定义渲染规则
 md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="border-collapse w-full">';
 md.renderer.rules.table_close = () => '</table></div>';
-md.renderer.rules.th_open = () => '<th class="border border-neutral-700 bg-neutral-800 px-4 py-2 text-left font-bold text-neutral-100">';
-md.renderer.rules.td_open = () => '<td class="border border-neutral-700 px-4 py-2 text-neutral-300">';
+md.renderer.rules.th_open = () => '<th class="px-4 py-2 text-left font-bold" style="border: 1px solid #93C5FD; background-color: #3B82F6; color: #FFFFFF;">';
+md.renderer.rules.td_open = () => '<td class="px-4 py-2" style="border: 1px solid #93C5FD; color: #1E3A8A;">';
 
 // 添加自定义样式
 const markdownStyles = `
   .markdown-body {
-    color: #374151;
+    color: #E5E7EB;
     line-height: 1.5;
     white-space: normal;
     word-break: normal;
@@ -33,23 +33,23 @@ const markdownStyles = `
   }
   .markdown-body h1 { 
     @apply text-xl font-bold mt-3 mb-2;
-    color: #1F2937;
+    color: #FBBF24;
     border-bottom: 2px solid #3B82F6;
     padding-bottom: 4px;
   }
   .markdown-body h2 { 
     @apply text-lg font-bold mt-3 mb-2;
-    color: #1F2937;
+    color: #FCD34D;
     border-bottom: 1px solid #D1D5DB;
     padding-bottom: 2px;
   }
   .markdown-body h3 { 
     @apply text-base font-bold mt-2 mb-1;
-    color: #374151;
+    color: #FDE68A;
   }
   .markdown-body p { 
     @apply mb-2 leading-relaxed;
-    color: #4B5563;
+    color: #E5E7EB;
     white-space: normal;
     word-break: normal;
     overflow-wrap: break-word;
@@ -63,19 +63,19 @@ const markdownStyles = `
     color: #1D4ED8;
   }
   .markdown-body code:not(pre code) { 
-    background-color: #F3F4F6;
-    color: #DC2626;
-    padding: 2px 6px;
-    border-radius: 4px;
+    background-color: transparent;
+    color: inherit;
+    padding: 0;
+    border-radius: 0;
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 0.875em;
-    border: 1px solid #E5E7EB;
+    border: none;
     white-space: nowrap;
     overflow-wrap: break-word;
   }
   .markdown-body pre { 
-    background-color: #F9FAFB;
-    border: 1px solid #E5E7EB;
+    background-color: #DBEAFE;
+    border: 1px solid #93C5FD;
     border-radius: 6px;
     padding: 12px;
     overflow-x: auto;
@@ -84,7 +84,7 @@ const markdownStyles = `
     word-break: normal;
   }
   .markdown-body pre code {
-    color: #1F2937;
+    color: #1E3A8A;
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
     background: transparent;
     padding: 0;
@@ -94,65 +94,65 @@ const markdownStyles = `
   }
   .markdown-body ul {
     @apply list-disc list-inside mb-2;
-    color: #4B5563;
+    color: #E5E7EB;
     padding-left: 12px;
   }
   .markdown-body ol {
     @apply list-decimal list-inside mb-2;
-    color: #4B5563;
+    color: #E5E7EB;
     padding-left: 12px;
   }
   .markdown-body li {
     @apply mb-1;
-    color: #4B5563;
+    color: #E5E7EB;
   }
   .markdown-body blockquote {
     border-left: 4px solid #3B82F6;
     padding-left: 12px;
     margin: 8px 0;
-    color: #6B7280;
+    color: #1E3A8A;
     font-style: italic;
-    background-color: #F8FAFC;
+    background-color: #DBEAFE;
     padding: 8px 12px;
     border-radius: 4px;
   }
   .markdown-body hr {
     border: none;
     height: 1px;
-    background-color: #D1D5DB;
+    background-color: #93C5FD;
     margin: 12px 0;
   }
   .markdown-body table { 
     @apply border-collapse w-full my-2;
-    border: 1px solid #D1D5DB;
+    border: 1px solid #93C5FD;
     border-radius: 6px;
     overflow: hidden;
   }
   .markdown-body th { 
-    background-color: #F9FAFB;
-    color: #1F2937;
+    background-color: #3B82F6;
+    color: #FFFFFF;
     padding: 8px 12px;
     text-align: left;
     font-weight: 600;
-    border-bottom: 2px solid #D1D5DB;
+    border-bottom: 2px solid #2563EB;
   }
   .markdown-body td { 
-    color: #4B5563;
+    color: #1E3A8A;
     padding: 8px 12px;
-    border-bottom: 1px solid #E5E7EB;
+    border-bottom: 1px solid #93C5FD;
   }
   .markdown-body tr:last-child td {
     border-bottom: none;
   }
   .markdown-body tr:nth-child(even) {
-    background-color: #F9FAFB;
+    background-color: #EBF4FF;
   }
   .markdown-body strong {
-    color: #1F2937;
+    color: #FBBF24;
     font-weight: 600;
   }
   .markdown-body em {
-    color: #6B7280;
+    color: #A78BFA;
     font-style: italic;
   }
 `;

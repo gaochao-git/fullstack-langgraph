@@ -38,14 +38,14 @@ const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
   const categories = data.metrics_by_category || {};
   
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 my-2">
+    <div className="border-2 border-cyan-400 rounded-xl p-4 my-3 shadow-lg" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-blue-600">📊</span>
-        <h4 className="font-semibold text-blue-800">Zabbix 监控指标列表</h4>
+        <span className="text-cyan-300">📊</span>
+        <h4 className="font-semibold text-cyan-100">Zabbix 监控指标列表</h4>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-        <div className="space-y-2">
+        <div className="space-y-2 text-cyan-100">
           <p><strong>输入主机:</strong> {data.input_hostname}</p>
           <p><strong>实际主机:</strong> {data.actual_hostname}</p>
           <p><strong>主机名称:</strong> {data.host_name}</p>
@@ -53,11 +53,11 @@ const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
         </div>
         
         <div className="space-y-2">
-          <h5 className="font-medium text-gray-700">指标分类统计:</h5>
+          <h5 className="font-medium text-yellow-400">指标分类统计:</h5>
           {Object.entries(categories).map(([category, metrics]: [string, any]) => (
             <div key={category} className="flex justify-between">
-              <span className="text-gray-600">{category}:</span>
-              <span className="font-medium">{metrics.length}个</span>
+              <span className="text-cyan-200">{category}:</span>
+              <span className="font-medium text-yellow-400">{metrics.length}个</span>
             </div>
           ))}
         </div>
@@ -65,20 +65,20 @@ const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
       
       <div className="mt-4">
         <details className="cursor-pointer">
-          <summary className="text-sm font-medium text-blue-700 hover:text-blue-800">
+          <summary className="text-sm font-medium text-cyan-300 hover:text-cyan-200">
             📋 查看详细指标列表
           </summary>
           <div className="mt-2 max-h-60 overflow-y-auto space-y-3">
             {Object.entries(categories).map(([category, metrics]: [string, any]) => (
-              <div key={category} className="border-l-2 border-blue-300 pl-3">
-                <h6 className="font-medium text-gray-700 mb-1">{category} ({metrics.length}个)</h6>
+              <div key={category} className="border-l-2 border-cyan-400 pl-3">
+                <h6 className="font-medium text-yellow-400 mb-1">{category} ({metrics.length}个)</h6>
                 <div className="space-y-1 text-xs">
                   {metrics.map((metric: any, index: number) => (
                     <div key={index} className="flex justify-between items-start">
-                      <code className="text-blue-600 bg-blue-100 px-1 rounded mr-2 flex-shrink-0">
+                      <code className="text-cyan-300 bg-gray-900 px-1 rounded mr-2 flex-shrink-0">
                         {metric.key}
                       </code>
-                      <span className="text-gray-600 text-right">{metric.name}</span>
+                      <span className="text-cyan-200 text-right">{metric.name}</span>
                     </div>
                   ))}
                 </div>
@@ -97,14 +97,14 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
   const metricsEntries = Object.entries(metrics);
   
   return (
-    <div className="bg-green-50 border border-green-100 rounded-lg p-1 my-1">
+    <div className="border-2 border-cyan-400 rounded-xl p-3 my-3 shadow-lg" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
       <div className="text-xs mb-1 grid grid-cols-3 gap-2 leading-tight">
         <div className="flex items-center gap-1">
-          <span className="text-green-600">📈</span>
-          <span className="font-semibold text-green-800">Zabbix 监控数据</span>
+          <span className="text-cyan-300">📈</span>
+          <span className="font-semibold text-cyan-100">Zabbix 监控数据</span>
         </div>
-        <p><strong>主机:</strong> {data.hostname}</p>
-        <p className="truncate" title={data.time_range}><strong>时间:</strong> {data.time_range}</p>
+        <p className="text-cyan-100"><strong className="text-yellow-400">主机:</strong> {data.hostname}</p>
+        <p className="truncate text-cyan-100" title={data.time_range}><strong className="text-yellow-400">时间:</strong> {data.time_range}</p>
       </div>
       
       <div className="space-y-4">
@@ -119,9 +119,9 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
           
           if (chartData.length === 0) {
             return (
-              <div key={metricKey} className="bg-white border border-gray-200 rounded p-3">
-                <h5 className="font-medium text-gray-700 mb-2">{metricData.name}</h5>
-                <div className="text-center text-gray-500 py-4">
+              <div key={metricKey} className="border border-cyan-500 rounded-lg p-3" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+                <h5 className="font-medium text-cyan-100 mb-2">{metricData.name}</h5>
+                <div className="text-center text-cyan-200 py-4">
                   <p>当前值: {metricData.current_value} {metricData.units}</p>
                   <p className="text-sm">暂无历史数据</p>
                 </div>
@@ -130,17 +130,17 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
           }
           
           return (
-            <div key={metricKey} className="bg-white border border-gray-200 rounded p-2">
+            <div key={metricKey} className="border border-cyan-500 rounded-lg p-3" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
               <ZabbixChart 
                 data={chartData}
                 showHeader={true}
                 style={{ height: '250px' }}
               />
-              <div className="mt-2 text-xs text-gray-600 grid grid-cols-2 md:grid-cols-4 gap-2">
-                <span><strong>当前值:</strong> {metricData.current_value} {metricData.units}</span>
-                <span><strong>平均值:</strong> {metricData.avg_value} {metricData.units}</span>
-                <span><strong>最大值:</strong> {metricData.max_value} {metricData.units}</span>
-                <span><strong>数据点:</strong> {metricData.data_points}</span>
+              <div className="mt-2 text-xs text-cyan-200 grid grid-cols-2 md:grid-cols-4 gap-2">
+                <span><strong className="text-yellow-400">当前值:</strong> {metricData.current_value} {metricData.units}</span>
+                <span><strong className="text-yellow-400">平均值:</strong> {metricData.avg_value} {metricData.units}</span>
+                <span><strong className="text-yellow-400">最大值:</strong> {metricData.max_value} {metricData.units}</span>
+                <span><strong className="text-yellow-400">数据点:</strong> {metricData.data_points}</span>
               </div>
             </div>
           );

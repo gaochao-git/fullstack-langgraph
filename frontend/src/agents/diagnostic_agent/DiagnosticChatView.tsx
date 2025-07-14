@@ -60,42 +60,44 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border rounded-lg mb-3 ${isPending ? 'border-orange-300 bg-orange-50' : 'border-gray-300 bg-gray-50'}`}>
+    <div className={`border-2 rounded-xl mb-3 shadow-lg transition-all duration-300 ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-yellow-50 shadow-orange-200' : 'border-cyan-400 bg-gradient-to-r from-blue-900 to-indigo-900 shadow-cyan-200'}`}>
       {/* 工具调用头部 */}
       <div 
-        className={`flex items-center justify-between p-3 cursor-pointer ${isPending ? 'hover:bg-orange-100' : 'hover:bg-gray-100'}`}
+        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-100 hover:to-yellow-100' : 'hover:bg-gradient-to-r hover:from-blue-800 hover:to-indigo-800'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
-          <Settings className={`h-4 w-4 ${isPending ? 'text-orange-500' : 'text-blue-500'}`} />
-          <span className={`font-mono text-sm ${isPending ? 'text-orange-700' : 'text-blue-600'}`}>{toolName}</span>
-          <Badge variant={isPending ? "destructive" : "secondary"} className="text-xs">
-            {isPending ? "待确认" : (toolCall?.id ? `ID: ${toolCall.id}` : "Tool Call")}
-          </Badge>
+          <Settings className={`h-5 w-5 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
+          <span className={`font-mono text-sm font-semibold ${isPending ? 'text-orange-700' : 'text-cyan-100'}`}>{toolName}</span>
+          {isPending && (
+            <Badge variant="destructive" className="text-xs">
+              待确认
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+            <ChevronDown className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
           ) : (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
+            <ChevronRight className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
           )}
         </div>
       </div>
       
       {/* 展开的内容 */}
       {isExpanded && (
-        <div className={`border-t p-3 space-y-3 overflow-x-auto ${isPending ? 'border-orange-300' : 'border-gray-300'}`}>
+        <div className={`border-t-2 p-3 space-y-3 overflow-x-auto ${isPending ? 'border-orange-400' : 'border-cyan-400'}`}>
           {/* 参数 */}
           <div className="min-w-fit max-w-full">
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">参数:</h4>
-            <pre className={`p-2 rounded text-xs overflow-x-auto text-gray-800 whitespace-pre max-w-full ${isPending ? 'bg-orange-100' : 'bg-gray-100'}`}>
+            <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-orange-700' : 'text-cyan-300'}`}>参数:</h4>
+            <pre className={`p-3 rounded-lg text-xs overflow-x-auto whitespace-pre max-w-full border ${isPending ? 'bg-orange-50 text-orange-800 border-orange-300' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
               {JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
           
           {/* 待确认状态的操作按钮 */}
           {isPending && (
-            <div className="flex gap-2 pt-2 border-t border-orange-200 mt-3 pt-3">
+            <div className="flex gap-2 pt-1.5 border-t border-orange-200 mt-2 pt-2">
               <Button
                 variant="default"
                 size="sm"
@@ -124,10 +126,10 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           {/* 输出结果 */}
           {toolResultContent && (
             <div className="min-w-fit max-w-full">
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">输出:</h4>
+              <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-orange-700' : 'text-cyan-300'}`}>输出:</h4>
               
               {/* 工具展开后只显示原始JSON数据 */}
-              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto text-gray-800 whitespace-pre max-w-full">
+              <pre className={`p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre max-w-full border ${isPending ? 'bg-orange-50 text-orange-800 border-orange-300' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}
@@ -194,9 +196,9 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
   
   return (
     <div className="mb-3">
-      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-        <Settings className="h-4 w-4" />
-        工具调用 ({toolCalls.length})
+      <h4 className="text-sm font-bold text-yellow-400 mb-3 flex items-center gap-2">
+        <Settings className="h-5 w-5 text-yellow-400" />
+        <span className="text-yellow-400">工具调用</span> <span className="text-yellow-400 text-xs font-bold">({toolCalls.length})</span>
       </h4>
       <div className="space-y-2">
         {toolCalls.map((toolCall: any, index: number) => {
@@ -337,12 +339,12 @@ export function DiagnosticChatView({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col h-full bg-white relative w-full overflow-x-hidden" style={{ minHeight: 0 }}>
+    <div className="flex flex-col h-full relative w-full overflow-x-hidden" style={{ minHeight: 0, background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
       {/* 消息区 */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 bg-gray-50 relative"
-        style={{ minHeight: 0, maxHeight: 'calc(100vh - 140px)' }}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 relative"
+        style={{ background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', minHeight: 0, maxHeight: 'calc(100vh - 140px)' }}
         onScroll={handleScroll}
       >
         <div className="flex flex-col overflow-x-hidden">
@@ -360,13 +362,13 @@ export function DiagnosticChatView({
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
                 <div className="flex items-center gap-2 justify-end max-w-[90%]">
-                  <div className="text-gray-800 rounded-2xl break-words min-h-7 bg-blue-50 overflow-x-auto min-w-fit px-4 pt-3 pb-2">
+                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2 border-2 border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>
                   </div>
-                  <div className="rounded-full bg-blue-100 p-2 flex-shrink-0 flex items-center justify-center">
-                    <User className="h-5 w-5 text-blue-600" />
+                  <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#1E3A8A' }}>
+                    <User className="h-5 w-5 text-blue-200" />
                   </div>
                 </div>
               </div>
@@ -374,10 +376,10 @@ export function DiagnosticChatView({
               {round.assistant.length > 0 && (
                 <div className="flex flex-col items-start mb-6">
                   <div className="flex items-start gap-2 max-w-[90%] min-w-0 w-full">
-                    <div className="rounded-full bg-gray-200 p-2 flex-shrink-0 flex items-center justify-center">
-                      <Bot className="h-5 w-5 text-gray-600" />
+                    <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
+                      <Bot className="h-5 w-5 text-blue-200" />
                     </div>
-                    <div className="relative flex flex-col bg-gray-100 rounded-lg p-4 shadow min-w-0 flex-1 overflow-hidden">
+                    <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border-2 border-cyan-400" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
                       {(() => {
                         // 按时间顺序渲染所有消息和图表
                         const renderItems = [];
@@ -390,7 +392,7 @@ export function DiagnosticChatView({
                             renderItems.push(
                               <div key={msg.id || `ai-${i}`} className="min-w-0 w-full mb-3">
                                 {activityForThisMessage.length > 0 && (
-                                  <div className="mb-3 border-b border-gray-200 pb-3 text-xs overflow-x-auto">
+                                  <div className="mb-3 border-b border-blue-300 pb-3 text-xs overflow-x-auto">
                                     <ActivityTimeline
                                       processedEvents={activityForThisMessage}
                                       isLoading={false}
@@ -461,7 +463,7 @@ export function DiagnosticChatView({
                         return (
                           <Button
                             variant="default"
-                            className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
+                            className="cursor-pointer bg-blue-200 border-blue-300 text-blue-800 hover:bg-blue-300 self-end mt-2"
                             onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
                           >
                             {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
@@ -477,7 +479,7 @@ export function DiagnosticChatView({
           ))}
           {/* 加载状态 */}
           {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
-            <div className="flex items-center gap-2 text-gray-600 mb-6">
+            <div className="flex items-center gap-2 text-gray-300 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
               诊断中...
             </div>
@@ -494,9 +496,9 @@ export function DiagnosticChatView({
         style={{
           position: 'sticky',
           bottom: 0,
-          background: '#ffffff',
+          background: 'linear-gradient(90deg, #1E40AF 0%, #3B82F6 100%)',
           zIndex: 10,
-          borderTop: '1px solid #e5e7eb',
+          borderTop: '2px solid #60A5FA',
         }}
       >
         <form onSubmit={handleSubmit} className="flex gap-2 p-4">
@@ -505,13 +507,14 @@ export function DiagnosticChatView({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={interrupt ? "请先确认或取消工具执行..." : "请描述您遇到的问题..."}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            style={{ backgroundColor: '#F8FAFC', borderColor: '#60A5FA', borderWidth: '2px', color: '#1E293B' }}
             disabled={isLoading || !!interrupt}
           />
           <Button
             type="submit"
             disabled={isLoading || !inputValue.trim() || !!interrupt}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
             {interrupt ? <DiagnosisButtonText text="工具确认" /> : isLoading ? <DiagnosisButtonText /> : "发送"}
           </Button>
@@ -520,7 +523,7 @@ export function DiagnosticChatView({
               type="button"
               variant="outline"
               onClick={onCancel}
-              className="px-4 py-2 text-red-500 border-red-500 hover:bg-red-50"
+              className="px-4 py-2 text-red-400 border-red-400 hover:bg-red-900/30"
             >
               取消
             </Button>
