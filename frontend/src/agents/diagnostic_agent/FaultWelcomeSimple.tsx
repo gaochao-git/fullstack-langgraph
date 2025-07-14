@@ -53,7 +53,7 @@ const mockFaults: Fault[] = [
     description: "/var/log分区使用率达到95%，系统日志写入异常",
     ip: "192.168.1.101",
     time: "2025-01-12 14:30:25",
-    priority: "P1",
+    priority: "P3",
     status: "active",
     sopId: "SOP-SYS-101",
     lastUpdated: "2025-01-12 14:35:00",
@@ -77,7 +77,7 @@ const mockFaults: Fault[] = [
     description: "服务器内存使用率持续超过90%，应用响应缓慢",
     ip: "192.168.1.103", 
     time: "2025-01-12 12:45:30",
-    priority: "P2",
+    priority: "P3",
     status: "analyzing",
     sopId: "SOP-SYS-103",
     threadId: "thread-def456",
@@ -104,8 +104,8 @@ const mockFaults: Fault[] = [
     description: "MySQL数据库连接超时，Too many connections错误",
     ip: "192.168.1.105",
     time: "2025-01-12 10:30:45",
-    priority: "P2",
-    status: "active", 
+    priority: "P3",
+    status: "analyzed", 
     sopId: "SOP-DB-002",
     lastUpdated: "2025-01-12 10:35:00",
     tags: ["数据库", "连接", "MySQL"]
@@ -116,7 +116,7 @@ const mockFaults: Fault[] = [
     description: "MySQL数据库查询响应时间长，影响用户体验",
     ip: "192.168.1.106",
     time: "2025-01-12 09:15:20",
-    priority: "P2",
+    priority: "P3",
     status: "analyzed",
     sopId: "SOP-DB-003", 
     analysisResult: "多个复杂查询未使用索引，已优化SQL并添加索引",
@@ -130,8 +130,8 @@ const mockFaults: Fault[] = [
     description: "MySQL数据库发生死锁，事务超时影响业务",
     ip: "192.168.1.107",
     time: "2025-01-12 08:00:00",
-    priority: "P1",
-    status: "active",
+    priority: "P2",
+    status: "analyzed",
     sopId: "SOP-DB-004",
     lastUpdated: "2025-01-12 08:05:00",
     tags: ["数据库", "死锁", "MySQL"]
@@ -143,7 +143,7 @@ const mockFaults: Fault[] = [
     ip: "192.168.1.108", 
     time: "2025-01-12 16:45:10",
     priority: "P1",
-    status: "analyzing",
+    status: "analyzed",
     sopId: "SOP-SYS-102",
     threadId: "thread-mno345",
     lastUpdated: "2025-01-12 17:30:00",
@@ -218,6 +218,10 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
 
   // 计算统计数据
   const stats = useMemo(() => {
+    // 临时调试：打印当前mockFaults的实际内容
+    console.log('当前mockFaults数据:', mockFaults);
+    console.log('mockFaults长度:', mockFaults.length);
+    
     const activeFaults = mockFaults.filter(f => f.status === "active").length;
     const analyzingFaults = mockFaults.filter(f => f.status === "analyzing").length;
     const analyzedFaults = mockFaults.filter(f => f.status === "analyzed").length;
@@ -226,7 +230,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
     const p2Faults = mockFaults.filter(f => f.priority === "P2").length;
     const p3Faults = mockFaults.filter(f => f.priority === "P3").length;
     
-    return {
+    const result = {
       total: mockFaults.length,
       active: activeFaults,
       analyzing: analyzingFaults,
@@ -236,6 +240,9 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       p2: p2Faults,
       p3: p3Faults
     };
+    
+    console.log('统计结果:', result);
+    return result;
   }, []);
 
   // 过滤故障数据
