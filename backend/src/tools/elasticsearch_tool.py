@@ -53,8 +53,8 @@ class CustomQueryInput(BaseModel):
     end_time: str = Field(description="结束时间 (ISO格式)")
     query_body: Optional[Dict[str, Any]] = Field(default=None, description="查询体，如果为空则由AI生成")
 
-@tool("custom_elasticsearch_query", args_schema=CustomQueryInput)
-def custom_elasticsearch_query(
+@tool("get_es_data", args_schema=CustomQueryInput)
+def get_es_data(
     index_name: str,
     start_time: str,
     end_time: str,
@@ -241,8 +241,7 @@ def custom_elasticsearch_query(
         logger.error(f"Error executing custom query: {e}")
         return json.dumps({"error": f"Failed to execute custom query: {str(e)}"})
 
-# 重命名工具以匹配SOP配置
-get_es_data = custom_elasticsearch_query
+# 工具名称已改为get_es_data，无需额外别名
 
 class TrendsDataInput(BaseModel):
     """获取趋势数据输入参数"""
