@@ -34,6 +34,9 @@ def _es_request(method: str, endpoint: str, data: Dict = None, params: Dict = No
         
     except requests.exceptions.RequestException as e:
         logger.error(f"ES请求失败: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"响应内容: {e.response.text}")
+            print(f"ES错误响应: {e.response.text}")
         raise Exception(f"ES请求失败: {str(e)}")
 
 def _test_es_connection() -> bool:
@@ -72,23 +75,25 @@ def get_es_data(
         包含查询结果的JSON字符串
     """
     try:
-        # 简化时区处理：支持多种时间格式，统一转换为ES查询格式
+        # 简化时区处理：使用ES的time_zone参数，不需要手动添加时区
         def normalize_time_format(time_str):
             """统一时间格式转换，支持空格和T分隔符"""
             # 将空格格式转换为ISO格式：2025-07-14 10:45:00 -> 2025-07-14T10:45:00
             if " " in time_str and "T" not in time_str:
                 time_str = time_str.replace(" ", "T")
             
-            # 添加中国时区
-            if "+" not in time_str and "Z" not in time_str:
-                return time_str + "+08:00"
-            else:
-                return time_str
+            # 移除时区信息，让ES通过time_zone参数处理
+            if time_str.endswith("+08:00"):
+                time_str = time_str[:-6]
+            elif time_str.endswith("Z"):
+                time_str = time_str[:-1]
+                
+            return time_str
         
-        start_time_with_tz = normalize_time_format(start_time)
-        end_time_with_tz = normalize_time_format(end_time)
+        start_time_normalized = normalize_time_format(start_time)
+        end_time_normalized = normalize_time_format(end_time)
         
-        # 如果没有提供查询体，使用默认查询（直接使用处理后的时间）
+        # 如果没有提供查询体，使用默认查询（使用time_zone参数）
         if not query_body:
             query_body = {
                 "query": {
@@ -97,8 +102,9 @@ def get_es_data(
                             {
                                 "range": {
                                     "@timestamp": {
-                                        "gte": start_time_with_tz,
-                                        "lte": end_time_with_tz
+                                        "gte": start_time_normalized,
+                                        "lte": end_time_normalized,
+                                        "time_zone": "Asia/Shanghai"
                                     }
                                 }
                             }
@@ -123,12 +129,13 @@ def get_es_data(
             timestamp_filter_found = False
             for i, condition in enumerate(query_body["query"]["bool"]["must"]):
                 if isinstance(condition, dict) and "range" in condition and "@timestamp" in condition["range"]:
-                    # 更新现有的时间过滤器
+                    # 更新现有的时间过滤器，使用time_zone参数
                     query_body["query"]["bool"]["must"][i] = {
                         "range": {
                             "@timestamp": {
-                                "gte": start_time_with_tz,
-                                "lte": end_time_with_tz
+                                "gte": start_time_normalized,
+                                "lte": end_time_normalized,
+                                "time_zone": "Asia/Shanghai"
                             }
                         }
                     }
@@ -140,8 +147,9 @@ def get_es_data(
                 time_filter = {
                     "range": {
                         "@timestamp": {
-                            "gte": start_time_with_tz,
-                            "lte": end_time_with_tz
+                            "gte": start_time_normalized,
+                            "lte": end_time_normalized,
+                            "time_zone": "Asia/Shanghai"
                         }
                     }
                 }
@@ -166,7 +174,7 @@ def get_es_data(
         
         return json.dumps({
             "total": response.get("hits", {}).get("total", {}).get("value", 0),
-            "time_range": f"{start_time_with_tz} to {end_time_with_tz}",
+            "time_range": f"{start_time_normalized} to {end_time_normalized} (Asia/Shanghai)",
             "results": results
         }, indent=2)
         
