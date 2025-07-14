@@ -60,10 +60,10 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border-2 rounded-xl mb-3 shadow-lg transition-all duration-300 ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-yellow-50 shadow-orange-200' : 'border-cyan-400 bg-gradient-to-r from-blue-900 to-indigo-900 shadow-cyan-200'}`}>
+    <div className={`border-2 rounded-xl mb-3 shadow-sm transition-all duration-300 ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-yellow-50' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
       {/* 工具调用头部 */}
       <div 
-        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-100 hover:to-yellow-100' : 'hover:bg-gradient-to-r hover:from-blue-800 hover:to-indigo-800'}`}
+        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-100 hover:to-yellow-100' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2">
