@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Settings, User, Bot, ArrowDown, Plus, History } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -48,10 +48,11 @@ interface ToolCallProps {
   isPending?: boolean; // 是否为待确认状态
   onApprove?: () => void; // 确认回调
   onReject?: () => void; // 拒绝回调
+  toolCount?: number; // 新增：工具调用总数
 }
 
 // 工具调用组件
-const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject }) => {
+const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject, toolCount }) => {
   const [isExpanded, setIsExpanded] = useState(isPending || false); // 待确认状态默认展开
   
   const toolName = toolCall?.name || "Unknown Tool";
@@ -60,28 +61,27 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border-2 rounded-xl mb-3 shadow-sm transition-all duration-300 ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-yellow-50' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
-      {/* 工具调用头部 */}
+    <div className={`border-2 rounded-xl mb-1 shadow-sm transition-all duration-300 ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-yellow-50' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
+      {/* 工具调用头部（合并描述和折叠按钮） */}
       <div 
         className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-100 hover:to-yellow-100' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-2">
-          <Settings className={`h-5 w-5 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
-          <span className={`font-mono text-sm font-semibold ${isPending ? 'text-orange-700' : 'text-cyan-100'}`}>{toolName}</span>
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <Wrench className="h-5 w-5 text-cyan-300" />
+          <span className="font-mono text-sm font-semibold truncate text-white">{toolName}</span>
+          <span className="ml-2 text-xs text-yellow-400 font-bold flex-shrink-0">工具调用（{toolCount || 1}）</span>
           {isPending && (
-            <Badge variant="destructive" className="text-xs">
+            <Badge variant="destructive" className="text-xs ml-2">
               待确认
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {isExpanded ? (
-            <ChevronDown className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
-          ) : (
-            <ChevronRight className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
-          )}
-        </div>
+        {isExpanded ? (
+          <ChevronDown className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
+        ) : (
+          <ChevronRight className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
+        )}
       </div>
       
       {/* 展开的内容 */}
@@ -195,11 +195,7 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
   };
   
   return (
-    <div className="mb-3">
-      <h4 className="text-sm font-bold text-yellow-400 mb-3 flex items-center gap-2">
-        <Settings className="h-5 w-5 text-yellow-400" />
-        <span className="text-yellow-400">工具调用</span> <span className="text-yellow-400 text-xs font-bold">({toolCalls.length})</span>
-      </h4>
+    <div className="mb-1">
       <div className="space-y-2">
         {toolCalls.map((toolCall: any, index: number) => {
           const toolResult = findToolResult(toolCall.id);
@@ -212,6 +208,7 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
               isPending={isPending}
               onApprove={() => onInterruptResume?.(true)}
               onReject={() => onInterruptResume?.(false)}
+              toolCount={toolCalls.length}
             />
           );
         })}

@@ -27,7 +27,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
         
         // 格式化统计值（保留2位小数）
         const formatValue = (val) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
-        const statsText = `当前值: ${formatValue(values[values.length - 1])} ${firstItem.units} | 平均值: ${formatValue(avgValue)} ${firstItem.units} | 最大值: ${formatValue(maxValue)} ${firstItem.units} | 数据点: ${values.length}`;
+        const statsText = `当前值: ${formatValue(values[values.length - 1])} ${firstItem.units} | 最大值: ${formatValue(maxValue)} ${firstItem.units} | 数据点: ${values.length}`;
         
         // 提取年月日部分
         const extractDate = (timeRange) => {
@@ -51,7 +51,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                     top: 0,
                     textStyle: {
                         color: '#FCD34D',
-                        fontSize: 9,
+                        fontSize: 13,
                         fontWeight: 'bold'
                     }
                 },
@@ -61,7 +61,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                     top: 0,
                     textStyle: {
                         color: '#FCD34D',
-                        fontSize: 8,
+                        fontSize: 11,
                         fontWeight: 'bold'
                     }
                 }
@@ -83,7 +83,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 }
             },
             grid: {
-                top: showHeader ? 22 : 2,
+                top: showHeader ? 30 : 2,
                 left: '1%',
                 right: '1%',
                 bottom: '3%',

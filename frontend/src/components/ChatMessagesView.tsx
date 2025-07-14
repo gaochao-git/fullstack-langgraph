@@ -62,23 +62,19 @@ const ToolCall: React.FC<{
   const toolArgs = toolCall?.args || toolCall?.function?.arguments || {};
   const toolResultContent = toolResult?.content || "";
   return (
-    <div className="border border-gray-300 rounded-lg mb-3 bg-gray-50">
+    <div className="border border-gray-300 rounded-lg mb-1 bg-gray-50">
       <div 
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-100"
+        className="flex items-center justify-between p-2 cursor-pointer hover:bg-gray-100"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <Settings className="h-4 w-4 text-blue-500" />
+          <span className="text-xs text-gray-600">工具调用</span>
           <span className="font-mono text-sm text-blue-600">{toolName}</span>
-          <Badge variant="secondary" className="text-xs">
-            {toolCall?.id ? `ID: ${toolCall.id}` : "Tool Call"}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
           {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+            <ChevronDown className="h-4 w-4 text-gray-500 ml-auto" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-gray-500" />
+            <ChevronRight className="h-4 w-4 text-gray-500 ml-auto" />
           )}
         </div>
       </div>
