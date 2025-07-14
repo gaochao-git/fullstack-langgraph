@@ -126,7 +126,7 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
               <ZabbixChart 
                 data={chartData}
                 showHeader={true}
-                style={{ height: '250px' }}
+                style={{ height: '167px' }}
               />
             </div>
           );
