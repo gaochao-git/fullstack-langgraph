@@ -222,24 +222,20 @@ def get_host_metrics(
         ]
     
     try:
-        # 获取主机ID（开发阶段强制使用127.0.0.1）
-        host_params = {
-            "output": ["hostid", "host", "name"],
-            "filter": {
-                "host": "127.0.0.1"
-            }
-        }
+        # 通过IP地址查找主机（强制使用127.0.0.1）
+        host_interface_result = _zabbix_api_call('hostinterface.get', {
+            'output': ['hostid'],
+            'filter': {'ip': '127.0.0.1'}
+        })
         
-        host_result = _zabbix_api_call("host.get", host_params)
+        if "error" in host_interface_result:
+            return json.dumps(host_interface_result)
         
-        if "error" in host_result:
-            return json.dumps(host_result)
+        interfaces = host_interface_result.get("result", [])
+        if not interfaces:
+            return json.dumps({"error": f"No host found with IP 127.0.0.1 (input: {hostname})"})
         
-        hosts = host_result.get("result", [])
-        if not hosts:
-            return json.dumps({"error": f"Host {hostname} not found"})
-        
-        host_id = hosts[0]["hostid"]
+        host_id = interfaces[0]["hostid"]
         
         # 获取监控项
         item_params = {
@@ -522,22 +518,33 @@ def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
         包含可用指标列表的JSON字符串
     """
     try:
-        # 获取主机ID（开发阶段强制使用127.0.0.1）
-        host_params = {
-            "output": ["hostid", "host", "name"],
-            "filter": {
-                "host": "127.0.0.1"
-            }
-        }
+        # 通过IP地址查找主机（强制使用127.0.0.1）
+        host_interface_result = _zabbix_api_call('hostinterface.get', {
+            'output': ['hostid'],
+            'filter': {'ip': '127.0.0.1'}
+        })
         
-        host_result = _zabbix_api_call("host.get", host_params)
+        if "error" in host_interface_result:
+            return json.dumps(host_interface_result)
+        
+        interfaces = host_interface_result.get("result", [])
+        if not interfaces:
+            return json.dumps({"error": f"No host found with IP 127.0.0.1 (input: {hostname})"})
+        
+        host_id = interfaces[0]["hostid"]
+        
+        # 获取主机详细信息
+        host_result = _zabbix_api_call("host.get", {
+            "output": ["hostid", "host", "name"],
+            "hostids": host_id
+        })
         
         if "error" in host_result:
             return json.dumps(host_result)
         
         hosts = host_result.get("result", [])
         if not hosts:
-            return json.dumps({"error": f"Host {hostname} not found"})
+            return json.dumps({"error": f"Host details not found for ID {host_id}"})
         
         host_id = hosts[0]["hostid"]
         
@@ -591,7 +598,9 @@ def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
         total_metrics = sum(len(metrics) for metrics in metrics_by_category.values())
         
         return json.dumps({
-            "hostname": hostname,
+            "input_hostname": hostname,
+            "actual_hostname": hosts[0]["host"],
+            "host_name": hosts[0]["name"],
             "host_id": host_id,
             "total_metrics": total_metrics,
             "metrics_by_category": metrics_by_category
