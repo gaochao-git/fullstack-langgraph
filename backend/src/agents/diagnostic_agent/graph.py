@@ -17,7 +17,7 @@ from .state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail
 from .prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions,reflection_instructions)
 from .schemas import QuestionInfoExtraction, DiagnosisReflectionOutput
 from .tools import all_tools
-from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls)
+from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls, save_graph_image, compile_graph_with_checkpointer)
 logger = logging.getLogger(__name__)
 
 
@@ -490,6 +490,7 @@ tool_node = ToolNode(all_tools)
 def execute_tools_node(state, config):
     print(f"✅ 执行节点: execute_tools_node")
     return tool_node.invoke(state, config)
+
 # 创建诊断Agent图 - 简化版本
 builder = StateGraph(DiagnosticState, config_schema=Configuration)
 # 添加节点
@@ -512,24 +513,4 @@ builder.add_conditional_edges("reflection", evaluate_diagnosis_progress, ["plan_
 # 编译图 - 根据环境变量决定是否使用checkpointer
 checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
 
-if checkpointer_type == "postgres":
-    # PostgreSQL模式：不在这里编译，在API请求时用async with编译
-    graph = builder.compile( name="diagnostic-agent")
-    graph_image = graph.get_graph().draw_mermaid_png()
-    # 获取当前文件所在目录并保存图片
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    graph_image_path = os.path.join(current_dir, "graph.png")
-    with open(graph_image_path, "wb") as f: f.write(graph_image)
-    graph = None
-    print("📝 PostgreSQL模式：图将在API请求时用async with编译")
-else:
-    # 内存模式：直接使用MemorySaver
-    from langgraph.checkpoint.memory import MemorySaver
-    checkpointer = MemorySaver()
-    graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
-    graph_image = graph.get_graph().draw_mermaid_png()
-    # 获取当前文件所在目录并保存图片
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    graph_image_path = os.path.join(current_dir, "graph.png")
-    with open(graph_image_path, "wb") as f: f.write(graph_image)
-    print(f"📝 内存模式：图已编译完成，已保存到 {graph_image_path}")
+graph = compile_graph_with_checkpointer(builder, checkpointer_type)

@@ -61,18 +61,18 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border-2 rounded-xl mb-1 shadow-sm transition-all duration-300 ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-50 to-yellow-50' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
+    <div className={`border-2 rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-100 to-yellow-100' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
       {/* 工具调用头部（合并描述和折叠按钮） */}
       <div 
-        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-100 hover:to-yellow-100' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
+        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-200 hover:to-yellow-200' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Wrench className="h-5 w-5 text-cyan-300" />
-          <span className="font-mono text-sm font-semibold truncate text-white">{toolName}</span>
-          <span className="ml-2 text-xs text-yellow-400 font-bold flex-shrink-0">工具调用（{toolCount || 1}）</span>
+          <Wrench className={`h-5 w-5 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
+          <span className={`font-mono text-sm font-semibold truncate ${isPending ? 'text-orange-800' : 'text-yellow-400'}`}>{toolName}</span>
+          <span className={`ml-2 text-xs font-bold flex-shrink-0 ${isPending ? 'text-orange-700' : 'text-yellow-400'}`}>工具调用（{toolCount || 1}）</span>
           {isPending && (
-            <Badge variant="destructive" className="text-xs ml-2">
+            <Badge className="text-xs ml-2 bg-orange-500 hover:bg-orange-600 text-white border-orange-500">
               待确认
             </Badge>
           )}
@@ -89,8 +89,8 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
         <div className={`border-t-2 p-3 space-y-3 overflow-x-auto ${isPending ? 'border-orange-400' : 'border-cyan-400'}`}>
           {/* 参数 */}
           <div className="min-w-fit max-w-full">
-            <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-orange-700' : 'text-cyan-300'}`}>参数:</h4>
-            <pre className={`p-3 rounded-lg text-xs overflow-x-auto whitespace-pre max-w-full border ${isPending ? 'bg-orange-50 text-orange-800 border-orange-300' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
+            <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-cyan-300' : 'text-cyan-300'}`}>参数:</h4>
+            <pre className={`p-3 rounded-lg text-xs overflow-x-auto whitespace-pre max-w-full border ${isPending ? 'bg-gray-900 text-cyan-300 border-cyan-500' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
               {JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
@@ -110,12 +110,13 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
                 确认执行
               </Button>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
                 onClick={(e) => {
                   e.stopPropagation();
                   onReject?.();
                 }}
+                className="border-gray-400 text-gray-600 hover:bg-gray-100 rounded-md"
               >
                 取消
               </Button>
@@ -126,10 +127,10 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           {/* 输出结果 */}
           {toolResultContent && (
             <div className="min-w-fit max-w-full">
-              <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-orange-700' : 'text-cyan-300'}`}>输出:</h4>
+              <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-cyan-300' : 'text-cyan-300'}`}>输出:</h4>
               
               {/* 工具展开后只显示原始JSON数据 */}
-              <pre className={`p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre max-w-full border ${isPending ? 'bg-orange-50 text-orange-800 border-orange-300' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
+              <pre className={`p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre max-w-full border ${isPending ? 'bg-gray-900 text-cyan-300 border-cyan-500' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}

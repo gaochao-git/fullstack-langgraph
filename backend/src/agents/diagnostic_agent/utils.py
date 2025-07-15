@@ -5,6 +5,7 @@
 
 import json
 import logging
+import os
 from datetime import datetime
 from langchain_core.messages import ToolMessage
 from .state import SOPStep
@@ -289,17 +290,56 @@ def check_info_sufficient(state):
 
 
 def check_tool_calls(state):
-    """检查是否有工具调用"""
-    print(f"✅ 执行路由函数: check_tool_calls")
+    """检查是否有工具调用需要执行"""
     messages = state.get("messages", [])
     if not messages:
-        print(f"✅ 路由结果: reflection (无消息)")
         return "reflection"
     
     last_message = messages[-1]
-    if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-        print(f"✅ 路由结果: approval (有工具调用)")
+    has_tool_calls = hasattr(last_message, 'tool_calls') and last_message.tool_calls
+    
+    if has_tool_calls:
         return "approval"
     else:
-        print(f"✅ 路由结果: reflection (无工具调用)")
         return "reflection"
+
+
+def save_graph_image(graph, mode_name):
+    """保存图结构图像到文件"""
+    try:
+        graph_image = graph.get_graph().draw_mermaid_png()
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        graph_image_path = os.path.join(current_dir, "graph.png")
+        with open(graph_image_path, "wb") as f:
+            f.write(graph_image)
+        print(f"📝 {mode_name}：图已保存到 {graph_image_path}")
+    except Exception as e:
+        logger.warning(f"保存图结构图像失败: {e}")
+
+
+def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
+    """
+    根据checkpointer类型编译图
+    
+    Args:
+        builder: StateGraph构建器
+        checkpointer_type: checkpointer类型 ("memory" 或 "postgres")
+        
+    Returns:
+        tuple: (graph, mode_name)
+    """
+    if checkpointer_type == "postgres":
+        # PostgreSQL模式：不在这里编译，在API请求时用async with编译
+        graph = builder.compile(name="diagnostic-agent")
+        save_graph_image(graph, "PostgreSQL模式")
+        graph = None
+        print("📝 PostgreSQL模式：图将在API请求时用async with编译")
+        return graph, "PostgreSQL模式"
+    else:
+        # 内存模式：直接使用MemorySaver
+        from langgraph.checkpoint.memory import MemorySaver
+        checkpointer = MemorySaver()
+        graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+        save_graph_image(graph, "内存模式")
+        print(f"📝 内存模式：图已编译完成")
+        return graph, "内存模式"
