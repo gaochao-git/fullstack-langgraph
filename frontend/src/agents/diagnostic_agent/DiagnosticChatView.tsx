@@ -61,7 +61,7 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border-2 rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-100 to-yellow-100' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
+    <div className={`border rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-100 to-yellow-100' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
       {/* 工具调用头部（合并描述和折叠按钮） */}
       <div 
         className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-200 hover:to-yellow-200' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
@@ -360,7 +360,7 @@ export function DiagnosticChatView({
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6">
                 <div className="flex items-center gap-2 justify-end max-w-[90%]">
-                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2 border-2 border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
+                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2 border border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>
@@ -377,7 +377,7 @@ export function DiagnosticChatView({
                     <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
                       <Bot className="h-5 w-5 text-blue-200" />
                     </div>
-                    <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border-2 border-cyan-400" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
+                    <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border border-cyan-400" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
                       {(() => {
                         // 按时间顺序渲染所有消息和图表
                         const renderItems: React.ReactNode[] = [];
