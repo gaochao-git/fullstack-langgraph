@@ -313,7 +313,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-4 min-h-screen" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
       {/* 标题和搜索区域 */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-slate-800/60 via-slate-700/70 to-slate-800/60 rounded-lg border border-cyan-500/30 backdrop-blur-sm py-1.5 px-3 shadow-2xl shadow-cyan-500/20">
+      <div className="flex items-center justify-between bg-gradient-to-r from-slate-800/75 via-cyan-900/30 to-slate-800/75 rounded-lg border border-cyan-500/40 backdrop-blur-sm py-1.5 px-3 shadow-xl shadow-cyan-500/25">
         <div className="text-center flex-1">
           <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">故障诊断助手</h1>
         </div>
@@ -386,7 +386,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       {/* 双栏统计仪表板 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 第一栏：优先级统计 */}
-        <div className="bg-gradient-to-br from-slate-800/70 via-blue-900/30 to-slate-700/70 rounded-xl p-2 border border-blue-400/30 backdrop-blur-sm shadow-xl shadow-blue-500/15">
+        <div className="bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 rounded-xl p-2 border border-blue-500/40 backdrop-blur-sm shadow-xl shadow-blue-500/20">
           <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-1">
             <AlertTriangle className="w-4 h-4 text-red-400" />
             报警等级
@@ -459,7 +459,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
           </div>
         </div>
         {/* 第二栏：状态统计 */}
-        <div className="bg-gradient-to-br from-slate-800/70 via-blue-900/30 to-slate-700/70 rounded-xl p-2 border border-blue-400/30 backdrop-blur-sm shadow-xl shadow-blue-500/15">
+        <div className="bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 rounded-xl p-2 border border-blue-500/40 backdrop-blur-sm shadow-xl shadow-blue-500/20">
           <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-1">
             <Activity className="w-4 h-4 text-blue-400" />
             处理状态
@@ -548,7 +548,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       </div>
 
       {/* 故障列表 */}
-      <div className="bg-gradient-to-br from-slate-800/70 via-purple-900/20 to-slate-700/70 rounded-2xl p-3 border border-purple-400/30 backdrop-blur-sm shadow-2xl shadow-purple-500/15">
+      <div className="bg-gradient-to-br from-slate-800/75 via-purple-900/30 to-slate-700/75 rounded-2xl p-3 border border-purple-500/40 backdrop-blur-sm shadow-xl shadow-purple-500/20">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xl font-semibold text-white flex items-center gap-2">
             <BarChart3 className="w-6 h-6 text-blue-400" />
