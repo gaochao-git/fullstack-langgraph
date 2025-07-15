@@ -8,7 +8,7 @@ import json
 import logging
 
 # 导入工具模块
-from src.tools import ssh_tool, sop_tool, mysql_tool, elasticsearch_tool, zabbix_tool
+from src.tools import ssh_tool, sop_tool, mysql_tool, elasticsearch_tool, zabbix_tool, general_tool
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +38,13 @@ elasticsearch_tools = elasticsearch_tool.elasticsearch_tools
 # Zabbix监控工具列表
 zabbix_tools = zabbix_tool.zabbix_tools
 
+# 通用工具
+general_tools = [
+    general_tool.get_current_time
+]
+
 # 所有可用工具的完整列表
-all_tools = ssh_tools + sop_tools + mysql_tools + elasticsearch_tools + zabbix_tools
+all_tools = ssh_tools + sop_tools + mysql_tools + elasticsearch_tools + zabbix_tools + general_tools
 
 # 工具名称到工具对象的映射
 tool_name_mapping = {}
