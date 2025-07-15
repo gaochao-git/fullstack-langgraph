@@ -12,15 +12,14 @@ def get_question_analysis_prompt(user_question: str, current_analysis=None):
 - 故障现象: {current_analysis.fault_info or '待提取'}
 - SOP编号: {current_analysis.sop_id or '待提取'}
 """
-    
-    return f"""当前时间：{get_current_datetime()}
-
+    return f"""
+当前时间：{get_current_datetime()}
 用户最新输入：{user_question}
 {current_info}
 请从用户输入中提取或更新故障诊断信息。如果用户提供了新信息，请更新对应字段；如果没有提供新信息，保持原有值。
 
 对于每个字段：
-- fault_ip: 提取IP地址，如192.168.1.100或82.156.146.51
+- fault_ip: 提取IP地址，如192.168.1.100
 - fault_time: 提取时间信息，支持各种格式
 - fault_info: 提取故障现象描述，如"磁盘空间满"、"内存不足"等
 - sop_id: 提取SOP编号，如SOP-SYS-101、SOP-DB-001等
