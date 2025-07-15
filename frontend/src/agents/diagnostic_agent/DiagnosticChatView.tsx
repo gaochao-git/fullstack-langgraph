@@ -506,7 +506,7 @@ export function DiagnosticChatView({
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={interrupt ? "请先确认或取消工具执行..." : "请描述您遇到的问题..."}
             className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
-            style={{ backgroundColor: '#F8FAFC', borderColor: '#60A5FA', borderWidth: '2px', color: '#1E293B' }}
+            style={{ backgroundColor: '#1E293B', borderColor: '#60A5FA', borderWidth: '2px', color: '#F1F5F9' }}
             disabled={isLoading || !!interrupt}
           />
           <Button
