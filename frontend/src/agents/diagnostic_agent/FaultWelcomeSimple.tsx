@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Loader2
 } from "lucide-react";
+import ReactEcharts from 'echarts-for-react';
 
 // 故障类型定义
 type FaultPriority = "P1" | "P2" | "P3";
@@ -199,6 +200,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [timeFilter, setTimeFilter] = useState<string>("all");
 
   // 将故障四要素组合成一句话提问
   const formatDiagnosisQuestion = (fault: Fault): string => {
@@ -268,191 +270,306 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       filtered = filtered.filter(fault => fault.status === statusFilter);
     }
 
-    // 按优先级和时间排序
+    // 时间过滤
+    if (timeFilter !== "all") {
+      const now = new Date();
+      
+      filtered = filtered.filter(fault => {
+        const faultDate = new Date(fault.time);
+        const timeDiff = now.getTime() - faultDate.getTime();
+        
+        switch (timeFilter) {
+          case '10min':
+            return timeDiff <= 10 * 60 * 1000; // 10分钟
+          case '30min':
+            return timeDiff <= 30 * 60 * 1000; // 30分钟
+          case '1hour':
+            return timeDiff <= 60 * 60 * 1000; // 1小时
+          case 'today':
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return faultDate >= today;
+          case 'week':
+            const weekAgo = new Date();
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return faultDate >= weekAgo;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // 按状态和时间排序
     filtered.sort((a, b) => {
-      const priorityOrder = { "P1": 3, "P2": 2, "P3": 1 };
-      const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
-      if (priorityDiff !== 0) return priorityDiff;
+      const statusOrder = { "active": 4, "analyzing": 3, "analyzed": 2, "resolved": 1 };
+      const statusDiff = statusOrder[b.status] - statusOrder[a.status];
+      if (statusDiff !== 0) return statusDiff;
       return new Date(b.time).getTime() - new Date(a.time).getTime();
     });
 
     return filtered.slice(0, 50); // 限制显示数量
-  }, [searchTerm, priorityFilter, statusFilter]);
+  }, [searchTerm, priorityFilter, statusFilter, timeFilter]);
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-3" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
-      {/* 欢迎标题 */}
-      <div className="text-center">
-        <h1 className="text-xl font-bold text-blue-200 mb-1">故障诊断助手</h1>
-        <p className="text-sm text-blue-300">选择故障开始诊断，或直接输入描述</p>
+    <div className="max-w-4xl mx-auto p-4 space-y-4 min-h-screen" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}>
+      {/* 标题和搜索区域 */}
+      <div className="flex items-center justify-between bg-gradient-to-r from-slate-800/50 to-slate-700/50 rounded-lg border border-slate-600/30 backdrop-blur-sm py-1.5 px-3">
+        <div className="text-center flex-1">
+          <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">故障诊断助手</h1>
+        </div>
+        <div className="ml-8">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              placeholder="搜索故障标题、描述或IP..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-slate-700/60 border-slate-600 text-slate-100 placeholder-slate-400 shadow-lg transition-all duration-200 focus:bg-slate-700"
+            />
+          </div>
+          {/* 时间筛选按钮 */}
+          <div className="flex flex-wrap gap-2 mt-2">
+            <button 
+              onClick={() => setTimeFilter(timeFilter === '10min' ? 'all' : '10min')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                timeFilter === '10min' 
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
+                  : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              最近10分钟
+            </button>
+            <button 
+              onClick={() => setTimeFilter(timeFilter === '30min' ? 'all' : '30min')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                timeFilter === '30min' 
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
+                  : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              最近30分钟
+            </button>
+            <button 
+              onClick={() => setTimeFilter(timeFilter === '1hour' ? 'all' : '1hour')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                timeFilter === '1hour' 
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
+                  : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              最近1小时
+            </button>
+            <button 
+              onClick={() => setTimeFilter(timeFilter === 'today' ? 'all' : 'today')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                timeFilter === 'today' 
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
+                  : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              今天
+            </button>
+            <button 
+              onClick={() => setTimeFilter(timeFilter === 'week' ? 'all' : 'week')}
+              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                timeFilter === 'week' 
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
+                  : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
+              }`}
+            >
+              本周
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* 统计概览、搜索和过滤合并 */}
-      <div className="flex gap-1 items-center text-xs flex-wrap">
-        {/* 统计标签 - 可点击过滤 */}
-        <div 
-          onClick={() => {
-            setStatusFilter("all");
-            setPriorityFilter("all");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            statusFilter === "all" && priorityFilter === "all" 
-              ? "bg-blue-800 border-blue-400 text-blue-200" 
-              : "bg-blue-900/50 border-blue-600 text-blue-300 hover:bg-blue-800"
-          }`}
-        >
-          <BarChart3 className="w-3 h-3 text-blue-300" />
-          <span className="text-blue-300">总数</span>
-          <span className="font-bold text-blue-200">{stats.total}</span>
+      {/* 双栏统计仪表板 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 第一栏：优先级统计 */}
+        <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/60 rounded-xl p-2 border border-slate-600/30 backdrop-blur-sm">
+          <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-1">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
+            报警等级
+          </h3>
+          <div className="flex items-center gap-2">
+            {/* 总数环形图+数字 */}
+            <div className="relative flex-shrink-0">
+              <ReactEcharts
+                option={{
+                  series: [{
+                    type: 'pie',
+                    radius: ['75%', '99%'],
+                    center: ['50%', '50%'],
+                    label: { show: false },
+                    labelLine: { show: false },
+                    silent: true,
+                    data: [
+                      { value: stats.p1, name: 'P1', itemStyle: { color: '#ef4444', borderWidth: 0 } },
+                      { value: stats.p2, name: 'P2', itemStyle: { color: '#f97316', borderWidth: 0 } },
+                      { value: stats.p3, name: 'P3', itemStyle: { color: '#eab308', borderWidth: 0 } },
+                    ]
+                  }]
+                }}
+                style={{ width: 90, height: 90 }}
+                opts={{ renderer: 'canvas', devicePixelRatio: window.devicePixelRatio }}
+                notMerge={true}
+                lazyUpdate={true}
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-sm font-bold text-yellow-400 leading-none">{stats.total}</span>
+                <span className="text-xs text-slate-300 leading-tight">总数</span>
+              </div>
+            </div>
+            {/* P1/P2/P3按钮 */}
+            <div className="flex flex-col gap-2 flex-1">
+              <button onClick={() => { 
+                  if (priorityFilter === 'P1') {
+                    setPriorityFilter('all');
+                  } else {
+                    setPriorityFilter('P1');
+                  }
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${priorityFilter==='P1' ? 'bg-red-500 border-red-400 text-white shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-red-300 hover:bg-red-900/40 hover:border-red-500'}`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />P1 紧急 ({stats.p1})
+              </button>
+              <button onClick={() => { 
+                  if (priorityFilter === 'P2') {
+                    setPriorityFilter('all');
+                  } else {
+                    setPriorityFilter('P2');
+                  }
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${priorityFilter==='P2' ? 'bg-orange-500 border-orange-400 text-white shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-orange-300 hover:bg-orange-900/40 hover:border-orange-500'}`}
+              >
+                <Clock className="w-3.5 h-3.5" />P2 重要 ({stats.p2})
+              </button>
+              <button onClick={() => { 
+                  if (priorityFilter === 'P3') {
+                    setPriorityFilter('all');
+                  } else {
+                    setPriorityFilter('P3');
+                  }
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${priorityFilter==='P3' ? 'bg-yellow-500 border-yellow-400 text-gray-900 shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-yellow-300 hover:bg-yellow-900/40 hover:border-yellow-500'}`}
+              >
+                <Server className="w-3.5 h-3.5" />P3 一般 ({stats.p3})
+              </button>
+            </div>
+          </div>
         </div>
-        
-        <div 
-          onClick={() => {
-            setStatusFilter("active");
-            setPriorityFilter("all");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            statusFilter === "active" 
-              ? "bg-red-800 border-red-400 text-red-200" 
-              : "bg-red-900/50 border-red-600 text-red-300 hover:bg-red-800"
-          }`}
-        >
-          <AlertTriangle className="w-3 h-3 text-red-300" />
-          <span className="text-red-300">待处理</span>
-          <span className="font-bold text-red-200">{stats.active}</span>
-        </div>
-
-        <div 
-          onClick={() => {
-            setStatusFilter("analyzing");
-            setPriorityFilter("all");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            statusFilter === "analyzing" 
-              ? "bg-blue-800 border-blue-400 text-blue-200" 
-              : "bg-blue-900/50 border-blue-600 text-blue-300 hover:bg-blue-800"
-          }`}
-        >
-          <Activity className="w-3 h-3 text-blue-300" />
-          <span className="text-blue-300">分析中</span>
-          <span className="font-bold text-blue-200">{stats.analyzing}</span>
-        </div>
-
-        <div 
-          onClick={() => {
-            setStatusFilter("analyzed");
-            setPriorityFilter("all");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            statusFilter === "analyzed" 
-              ? "bg-green-800 border-green-400 text-green-200" 
-              : "bg-green-900/50 border-green-600 text-green-300 hover:bg-green-800"
-          }`}
-        >
-          <CheckCircle className="w-3 h-3 text-green-300" />
-          <span className="text-green-300">已分析</span>
-          <span className="font-bold text-green-200">{stats.analyzed}</span>
-        </div>
-
-        <div 
-          onClick={() => {
-            setStatusFilter("resolved");
-            setPriorityFilter("all");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            statusFilter === "resolved" 
-              ? "bg-purple-800 border-purple-400 text-purple-200" 
-              : "bg-purple-900/50 border-purple-600 text-purple-300 hover:bg-purple-800"
-          }`}
-        >
-          <CheckCircle className="w-3 h-3 text-purple-300" />
-          <span className="text-purple-300">已解决</span>
-          <span className="font-bold text-purple-200">{stats.resolved}</span>
-        </div>
-
-        <div 
-          onClick={() => {
-            setStatusFilter("all");
-            setPriorityFilter("P1");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            priorityFilter === "P1" 
-              ? "bg-red-800 border-red-400 text-red-200" 
-              : "bg-red-900/50 border-red-600 text-red-300 hover:bg-red-800"
-          }`}
-        >
-          <div className="w-2 h-2 rounded-full bg-red-400"></div>
-          <span className="text-red-300">P1</span>
-          <span className="font-bold text-red-200">{stats.p1}</span>
-        </div>
-
-        <div 
-          onClick={() => {
-            setStatusFilter("all");
-            setPriorityFilter("P2");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            priorityFilter === "P2" 
-              ? "bg-orange-800 border-orange-400 text-orange-200" 
-              : "bg-orange-900/50 border-orange-600 text-orange-300 hover:bg-orange-800"
-          }`}
-        >
-          <div className="w-2 h-2 rounded-full bg-orange-400"></div>
-          <span className="text-orange-300">P2</span>
-          <span className="font-bold text-orange-200">{stats.p2}</span>
-        </div>
-
-        <div 
-          onClick={() => {
-            setStatusFilter("all");
-            setPriorityFilter("P3");
-          }}
-          className={`flex items-center gap-1 px-1.5 py-1 rounded border cursor-pointer transition-colors ${
-            priorityFilter === "P3" 
-              ? "bg-yellow-800 border-yellow-400 text-yellow-200" 
-              : "bg-yellow-900/50 border-yellow-600 text-yellow-300 hover:bg-yellow-800"
-          }`}
-        >
-          <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-          <span className="text-yellow-300">P3</span>
-          <span className="font-bold text-yellow-200">{stats.p3}</span>
-        </div>
-
-        {/* 搜索框 */}
-        <div className="relative ml-2 w-32">
-          <Search className="absolute left-2 top-1.5 w-3 h-3 text-blue-300" />
-          <input
-            placeholder="搜索故障..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-7 pr-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-cyan-400"
-            style={{ backgroundColor: '#1E293B', borderColor: '#475569', color: '#E2E8F0' }}
-          />
+        {/* 第二栏：状态统计 */}
+        <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/60 rounded-xl p-2 border border-slate-600/30 backdrop-blur-sm">
+          <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-1">
+            <Activity className="w-4 h-4 text-blue-400" />
+            处理状态
+          </h3>
+          <div className="flex items-center gap-2">
+            {/* 已解决占比环形图+数字 */}
+            <div className="relative flex-shrink-0">
+              <ReactEcharts
+                option={{
+                  series: [{
+                    type: 'pie',
+                    radius: ['75%', '99%'],
+                    center: ['50%', '50%'],
+                    label: { show: false },
+                    labelLine: { show: false },
+                    silent: true,
+                    data: [
+                      { value: stats.active, name: '待处理', itemStyle: { color: '#ef4444', borderWidth: 0 } },
+                      { value: stats.analyzing, name: '分析中', itemStyle: { color: '#3b82f6', borderWidth: 0 } },
+                      { value: stats.analyzed, name: '已分析', itemStyle: { color: '#10b981', borderWidth: 0 } },
+                      { value: stats.resolved, name: '已解决', itemStyle: { color: '#a855f7', borderWidth: 0 } },
+                    ]
+                  }]
+                }}
+                style={{ width: 90, height: 90 }}
+                opts={{ renderer: 'canvas', devicePixelRatio: window.devicePixelRatio }}
+                notMerge={true}
+                lazyUpdate={true}
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-sm font-bold text-red-400 leading-none">{stats.total > 0 ? Math.round(stats.active / stats.total * 100) : 0}%</span>
+                <span className="text-xs text-slate-300 leading-tight">待处理</span>
+              </div>
+            </div>
+            {/* 状态按钮组 */}
+            <div className="flex flex-col gap-2 flex-1">
+              <button onClick={() => { 
+                  if (statusFilter === 'active') {
+                    setStatusFilter('all');
+                  } else {
+                    setStatusFilter('active');
+                  }
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${statusFilter==='active' ? 'bg-red-500 border-red-400 text-white shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-red-300 hover:bg-red-900/40 hover:border-red-500'}`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />待处理 ({stats.active})
+              </button>
+              <button onClick={() => { 
+                  if (statusFilter === 'analyzing') {
+                    setStatusFilter('all');
+                  } else {
+                    setStatusFilter('analyzing');
+                  }
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200 ${statusFilter==='analyzing' ? 'bg-blue-500 border-blue-400 text-white shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-blue-300 hover:bg-blue-900/40 hover:border-blue-500'}`}
+              >
+                <Activity className="w-3.5 h-3.5" />分析中 ({stats.analyzing})
+              </button>
+              <div className="flex gap-2">
+                <button onClick={() => { 
+                    if (statusFilter === 'analyzed') {
+                      setStatusFilter('all');
+                    } else {
+                      setStatusFilter('analyzed');
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200 flex-1 ${statusFilter==='analyzed' ? 'bg-green-500 border-green-400 text-white shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-green-300 hover:bg-green-900/40 hover:border-green-500'}`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />已分析 ({stats.analyzed})
+                </button>
+                <button onClick={() => { 
+                    if (statusFilter === 'resolved') {
+                      setStatusFilter('all');
+                    } else {
+                      setStatusFilter('resolved');
+                    }
+                  }}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200 flex-1 ${statusFilter==='resolved' ? 'bg-purple-500 border-purple-400 text-white shadow-lg transform scale-105' : 'bg-slate-700/50 border-slate-600 text-purple-300 hover:bg-purple-900/40 hover:border-purple-500'}`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5" />已解决 ({stats.resolved})
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* 故障列表 */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-blue-200">
+      <div className="bg-gradient-to-r from-slate-800/60 to-slate-700/60 rounded-2xl p-3 border border-slate-600/30 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+            <BarChart3 className="w-6 h-6 text-blue-400" />
             当前故障 ({filteredFaults.length})
           </h3>
           {filteredFaults.length >= 50 && (
-            <span className="text-xs text-blue-300">显示前50条</span>
+            <span className="text-sm text-slate-400 bg-slate-700/50 px-3 py-1 rounded-full">显示前50条</span>
           )}
         </div>
         
         {filteredFaults.length === 0 ? (
-          <div className="p-6 text-center border border-blue-600 rounded" style={{ backgroundColor: '#1E293B' }}>
-            <AlertTriangle className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-            <h3 className="text-lg font-medium text-blue-200 mb-2">暂无故障</h3>
-            <p className="text-blue-300">没有找到符合条件的故障</p>
+          <div className="p-8 text-center bg-slate-700/30 border border-slate-600/50 rounded-2xl">
+            <AlertTriangle className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+            <h3 className="text-xl font-medium text-slate-200 mb-2">暂无故障</h3>
+            <p className="text-slate-400">没有找到符合条件的故障</p>
           </div>
         ) : (
-          <div className="grid gap-0.5">
+          <div className="space-y-2">
             {filteredFaults.map((fault) => {
-              const priorityConfig = PRIORITY_CONFIG[fault.priority];
-              const statusConfig = STATUS_CONFIG[fault.status];
+              const priorityConfig = PRIORITY_CONFIG[fault.priority] || PRIORITY_CONFIG.P3;
+              const statusConfig = STATUS_CONFIG[fault.status] || STATUS_CONFIG.active;
               const canContinueChat = fault.status === "analyzed" || fault.status === "analyzing";
               const canStartDiagnosis = fault.status === "active";
               const hasFourElements = fault.time && fault.ip && fault.description && fault.sopId;
@@ -460,21 +577,20 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
               return (
                 <div 
                   key={fault.id} 
-                  className={`flex items-center justify-between gap-1 px-2 py-1 hover:bg-blue-800/50 border-l-2 ${priorityConfig.borderColor} border border-blue-600 rounded text-xs`}
-                  style={{ backgroundColor: '#1E293B' }}
+                  className={`flex items-center justify-between gap-3 px-3 py-2 hover:bg-slate-600/30 border-l-4 border-blue-500 bg-slate-700/40 rounded-xl text-sm transition-all duration-200 hover:shadow-lg`}
                 >
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <span className={`${statusConfig.tagBg} ${statusConfig.tagText} ${statusConfig.tagBorder} px-1.5 py-0.5 rounded border text-xs flex-shrink-0`}>
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className={`${statusConfig.tagBg} ${statusConfig.tagText} ${statusConfig.tagBorder} px-2 py-0.5 rounded-lg border text-xs font-medium flex-shrink-0`}>
                       {statusConfig.label}
                     </span>
-                    <div className={`w-2 h-2 rounded-full ${priorityConfig.color} flex-shrink-0`}></div>
-                    <span className="font-medium text-blue-200 truncate">{fault.title}</span>
-                    <span className="text-cyan-400 font-mono text-xs">{fault.sopId}</span>
-                    <span className="text-blue-300 font-mono">{fault.ip}</span>
-                    <span className="text-blue-400 text-xs">{fault.time}</span>
+                    <div className={`w-2.5 h-2.5 rounded-full ${priorityConfig.color} flex-shrink-0 shadow-sm`}></div>
+                    <span className="font-medium text-white truncate">{fault.title}</span>
+                    <span className="text-cyan-300 font-mono text-xs bg-slate-800/50 px-1.5 py-0.5 rounded">{fault.sopId}</span>
+                    <span className="text-slate-300 font-mono text-xs">{fault.ip}</span>
+                    <span className="text-slate-400 text-xs">{fault.time}</span>
                   </div>
                   
-                  <div className="flex gap-1 flex-shrink-0">
+                  <div className="flex gap-1.5 flex-shrink-0">
                     {/* 开始排查按钮 - 仅对待处理状态显示 */}
                     {fault.status === "active" && (
                       <button 
@@ -506,9 +622,9 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                             }
                           }
                         }}
-                        className={`px-2 py-0 rounded text-xs h-4 text-white ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all duration-200 ${
                           hasFourElements 
-                            ? 'bg-red-600 hover:bg-red-700 cursor-pointer' 
+                            ? 'bg-red-600 hover:bg-red-700 cursor-pointer shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
                             : 'bg-gray-600 cursor-not-allowed opacity-60'
                         }`}
                         disabled={!hasFourElements}
@@ -522,9 +638,9 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                     {fault.status === "analyzing" && (
                       <button 
                         onClick={() => onContinueChat(fault)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-0 rounded text-xs h-4 flex items-center gap-1"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                       >
-                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        <Loader2 className="w-3 h-3 animate-spin" />
                         查看进度
                       </button>
                     )}
@@ -533,7 +649,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                     {fault.status === "analyzed" && (
                       <button 
                         onClick={() => onContinueChat(fault)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-2 py-0 rounded text-xs h-4"
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                       >
                         查看结果
                       </button>
@@ -543,7 +659,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                     {fault.status === "analyzed" && onEndDiagnosis && (
                       <button 
                         onClick={() => onEndDiagnosis(fault)}
-                        className="bg-green-700 hover:bg-green-800 text-white px-2 py-0 rounded text-xs h-4"
+                        className="bg-green-700 hover:bg-green-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                       >
                         结束排查
                       </button>
@@ -553,7 +669,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                     {fault.status === "resolved" && (
                       <button 
                         onClick={() => onContinueChat(fault)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-2 py-0 rounded text-xs h-4"
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                       >
                         解决详情
                       </button>
@@ -566,9 +682,9 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
         )}
       </div>
 
-      <div className="text-center pt-2 border-t border-blue-600">
-        <p className="text-xs text-blue-300">
-          💡 也可直接在下方输入框描述新故障
+      <div className="text-center pt-6 mt-6 border-t border-slate-600/50">
+        <p className="text-slate-400 bg-slate-700/30 inline-block px-6 py-3 rounded-2xl border border-slate-600/30">
+          💡 也可直接在下方输入框描述新故障进行智能诊断
         </p>
       </div>
     </div>
