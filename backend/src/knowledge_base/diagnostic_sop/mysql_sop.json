@@ -48,7 +48,7 @@
       },
       {
         "step": 6,
-        "description": "查看CPU和IO占用前5名进程，找到资源占用的具体进程",
+        "description": "如果CPU或者磁盘IO有瓶颈且当前仍然存在瓶颈，则排查CPU和IO占用前5名进程，如果瓶颈当前已经没有了则跳过",
         "ai_generated": false,
         "tool": "execute_system_command",
         "args": "top -b -n1 | head -12; iotop -b -n1 | head -10",
