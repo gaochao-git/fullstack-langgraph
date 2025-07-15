@@ -47,6 +47,10 @@ const markdownStyles = `
     @apply text-base font-bold mt-2 mb-1;
     color: #FDE68A;
   }
+  .markdown-body h4 { 
+    @apply text-base font-bold mt-2 mb-1;
+    color: #FDE68A;
+  }
   .markdown-body p { 
     @apply mb-2 leading-relaxed;
     color: #E5E7EB;
