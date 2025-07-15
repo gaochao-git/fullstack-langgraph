@@ -36,10 +36,8 @@ def get_missing_info_prompt(question_analysis):
     info_status.append(f"✅ 故障时间: {question_analysis.fault_time}" if question_analysis.fault_time and question_analysis.fault_time != '待提取' else "❌ 故障时间: 待提取")
     info_status.append(f"✅ 故障现象: {question_analysis.fault_info}" if question_analysis.fault_info and question_analysis.fault_info != '待提取' else "❌ 故障现象: 待提取")
     info_status.append(f"✅ SOP编号: {question_analysis.sop_id}" if question_analysis.sop_id and question_analysis.sop_id != '待提取' else "❌ SOP编号: 待提取")
-    
     # 构建基础状态信息
     status_info = "\n".join(info_status)
-    
     # 构建缺失字段信息
     missing_fields_info = ""
     if question_analysis.missing_fields:
@@ -49,23 +47,13 @@ def get_missing_info_prompt(question_analysis):
             "故障现象": "具体的故障表现和症状描述",
             "排查SOP编号": "对应的标准作业程序编号（如：SOP-SYS-101、SOP-DB-001）"
         }
-        
         missing_items = []
         for i, field in enumerate(question_analysis.missing_fields, 1):
             description = field_descriptions.get(field, "")
             missing_items.append(f"{i}. **{field}**：{description}")
-        
-        missing_fields_info = f"""📋 还需要补充以下信息：
-
-{'\n'.join(missing_items)}"""
-    
+        missing_fields_info = f"""📋 还需要补充以下信息：{'\n'.join(missing_items)}"""
     # 使用f-string构建完整提示词
-    return f"""❗ 故障诊断信息不完整，当前状态：
-
-{status_info}
-
-{missing_fields_info}
-💡 您可以分多次补充，信息完整后将自动开始诊断。"""
+    return f"""❗ 故障诊断信息不完整，当前状态：\n{status_info}\n{missing_fields_info}您可以分多次补充，信息完整后将自动开始诊断。"""
 
 # 问题分析提示词 - 类似调研agent的query_writer_instructions（保留兼容性）
 question_analysis_instructions = """您是专业的故障诊断助手，负责分析用户输入并提取关键诊断信息。
