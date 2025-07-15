@@ -15,7 +15,7 @@ def get_question_analysis_prompt(user_question: str, current_analysis=None):
     return f"""
 当前时间：{get_current_datetime()}
 用户最新输入：{user_question}
-{current_info}
+故障信息：{current_info}
 请从用户输入中提取或更新故障诊断信息。如果用户提供了新信息，请更新对应字段；如果没有提供新信息，保持原有值。
 
 对于每个字段：
