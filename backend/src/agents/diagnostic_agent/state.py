@@ -56,9 +56,8 @@ class DiagnosticState(TypedDict):
     # 基础信息 - 移除user_question，可以从messages动态获取
     question_analysis: QuestionAnalysis = Field(default_factory=QuestionAnalysis)
     
-    # SOP管理
+    # SOP管理 - 移除sop_loaded，可以通过sop_detail判断
     sop_detail: SOPDetail = Field(default_factory=SOPDetail)
-    sop_loaded: bool = False
     
     # 诊断进度
     diagnosis_progress: DiagnosisProgress = Field(default_factory=DiagnosisProgress)

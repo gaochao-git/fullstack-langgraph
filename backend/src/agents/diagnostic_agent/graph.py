@@ -17,7 +17,7 @@ from .state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail
 from .prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions,reflection_instructions)
 from .schemas import QuestionInfoExtraction, DiagnosisReflectionOutput
 from .tools import all_tools
-from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls, save_graph_image, compile_graph_with_checkpointer, extract_diagnosis_results_from_messages, format_diagnosis_results_for_prompt)
+from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls, save_graph_image, compile_graph_with_checkpointer, extract_diagnosis_results_from_messages, format_diagnosis_results_for_prompt, is_sop_loaded)
 logger = logging.getLogger(__name__)
 
 
@@ -84,7 +84,7 @@ def plan_diagnosis_tools_node(state: DiagnosticState, config: RunnableConfig) ->
     # 构建工具规划提示
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     sop_detail = state.get("sop_detail", SOPDetail())
-    sop_state = "loaded" if state.get("sop_loaded", False) else "none"
+    sop_state = "loaded" if is_sop_loaded(sop_detail) else "none"
     
     formatted_prompt = tool_planning_instructions.format(
         fault_ip=question_analysis.fault_ip or "",
@@ -188,9 +188,7 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
     report_generated = state.get("report_generated", False)
     
     # 1. 处理SOP加载结果
-    updated_sop_detail, sop_loaded = process_sop_loading(messages, sop_detail)
-    if not sop_loaded:
-        sop_loaded = state.get("sop_loaded", False)
+    updated_sop_detail = process_sop_loading(messages, sop_detail)
     
     # 2. 更新诊断步骤
     current_step, has_new_execution, tool_name = update_diagnosis_step(
@@ -216,7 +214,7 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         fault_info=question_analysis.fault_info or '未提供',
         current_step=current_step,
         total_steps=updated_sop_detail.total_steps,
-        sop_state="loaded" if sop_loaded else "none",
+        sop_state="loaded" if is_sop_loaded(updated_sop_detail) else "none",
         report_generated=report_generated,
         diagnosis_results=format_diagnosis_results_for_prompt(diagnosis_results),
         user_input=user_input
@@ -238,8 +236,7 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         return {
             "messages": [AIMessage(content=reflection_result.response_content)],
             "diagnosis_progress": completed_progress,
-            "sop_detail": updated_sop_detail,
-            "sop_loaded": sop_loaded
+            "sop_detail": updated_sop_detail
         }
     
     elif reflection_result.action == "generate_report":
@@ -288,7 +285,6 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
             "messages": [AIMessage(content=final_message)],
             "diagnosis_progress": updated_progress,
             "sop_detail": updated_sop_detail,
-            "sop_loaded": sop_loaded,
             "final_diagnosis": response.content,
             "report_generated": True
         }
@@ -306,8 +302,7 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         
         return {
             "diagnosis_progress": updated_progress,
-            "sop_detail": updated_sop_detail,
-            "sop_loaded": sop_loaded
+            "sop_detail": updated_sop_detail
         }
 
 
@@ -335,13 +330,12 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     sop_detail = state.get("sop_detail", SOPDetail())
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
-    sop_loaded = state.get("sop_loaded", False)
     report_generated = state.get("report_generated", False)
     
     # 判断对话类型和回答策略
     response_type = determine_response_type(
         user_question, messages, question_analysis, 
-        diagnosis_progress, sop_loaded, report_generated
+        diagnosis_progress, sop_detail, report_generated
     )
     
     logger.info(f"响应类型判断: {response_type}")
@@ -412,7 +406,7 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
         }
 
 
-def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_loaded, report_generated=False):
+def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_detail, report_generated=False):
     """判断回答类型：是否需要生成诊断报告"""
     
     # 1. 用户明确要求生成报告
@@ -422,7 +416,7 @@ def determine_response_type(user_question, messages, question_analysis, diagnosi
     
     # 2. 完成了完整的SOP诊断流程且未生成过报告
     if (diagnosis_progress and diagnosis_progress.is_complete and 
-        sop_loaded and len(extract_diagnosis_results_from_messages(messages)) >= 2 and not report_generated):
+        is_sop_loaded(sop_detail) and len(extract_diagnosis_results_from_messages(messages)) >= 2 and not report_generated):
         return "diagnosis_report"
     
     # 3. 其他情况都是普通回答

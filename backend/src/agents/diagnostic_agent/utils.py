@@ -186,22 +186,35 @@ def is_already_approved(state, approval_info):
     return approval_info["step_id"] in approved_steps
 
 
+def is_sop_loaded(sop_detail):
+    """
+    判断SOP是否已加载
+    
+    Args:
+        sop_detail: SOPDetail对象
+        
+    Returns:
+        bool: 是否已加载
+    """
+    return bool(sop_detail.sop_id and sop_detail.steps)
+
+
 def process_sop_loading(messages, current_sop_detail):
     """
     处理SOP加载结果
     
     Returns:
-        tuple: (updated_sop_detail, sop_loaded)
+        SOPDetail: 更新后的SOP详情
     """
     if not (messages and isinstance(messages[-1], ToolMessage) and 
             messages[-1].name == "get_sop_content"):
-        return current_sop_detail, False
+        return current_sop_detail
     
     try:
         from .state import SOPDetail, SOPStep
         result = json.loads(messages[-1].content)
         if not (result.get("success") and result.get("sop_content")):
-            return current_sop_detail, False
+            return current_sop_detail
             
         sop_content = result["sop_content"]
         
@@ -227,11 +240,11 @@ def process_sop_loading(messages, current_sop_detail):
         )
         
         logger.info(f"SOP加载成功: {updated_sop_detail.sop_id}, 步骤数: {len(steps)}")
-        return updated_sop_detail, True
+        return updated_sop_detail
         
     except (json.JSONDecodeError, TypeError) as e:
         logger.error(f"解析SOP内容失败: {e}")
-        return current_sop_detail, False
+        return current_sop_detail
 
 
 def update_diagnosis_step(messages, current_step):
