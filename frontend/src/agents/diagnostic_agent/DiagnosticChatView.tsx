@@ -266,6 +266,7 @@ export function DiagnosticChatView({
     setInputValue(message);
   };
   
+  
   const handleCopy = async (text: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(text);
