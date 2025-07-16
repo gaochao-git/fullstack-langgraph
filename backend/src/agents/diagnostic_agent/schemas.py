@@ -28,3 +28,10 @@ class DiagnosisReflectionOutput(BaseModel):
     root_cause_found: bool = Field(description="是否找到根因")
     response_content: str = Field(description="具体回复内容（如果是answer_question）", default="")
     termination_reason: str = Field(description="continue/sop_completed/root_cause_found")
+
+
+class IntentAnalysisOutput(BaseModel):
+    """意图分析输出的结构化模式"""
+    intent: str = Field(description="用户意图：sop_diagnosis/general_qa")
+    reason: str = Field(description="判断理由")
+    confidence: float = Field(description="置信度：0-1", default=0.8)

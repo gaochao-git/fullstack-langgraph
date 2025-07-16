@@ -54,16 +54,22 @@ class DiagnosisProgress(BaseModel):
 
 class DiagnosticState(TypedDict):
     """
-    诊断代理的主状态
+    诊断代理的主状态 - 支持子图架构
     """
     messages: Annotated[list[AnyMessage], add_messages]
-    # 基础信息 - 移除user_question，可以从messages动态获取
-    question_analysis: QuestionAnalysis = Field(default_factory=QuestionAnalysis)
-    # SOP管理 - 移除sop_loaded，可以通过sop_detail判断
-    sop_detail: SOPDetail = Field(default_factory=SOPDetail)
-    # 诊断进度
-    diagnosis_progress: DiagnosisProgress = Field(default_factory=DiagnosisProgress)
     
-    # 最终报告
-    final_diagnosis: str = ""
-    report_generated: bool = False
+    # 意图分析 - 用于路由决策
+    intent: str
+    intent_reason: str
+    
+    # SOP诊断相关状态
+    question_analysis: QuestionAnalysis
+    sop_detail: SOPDetail
+    diagnosis_progress: DiagnosisProgress
+    final_diagnosis: str
+    report_generated: bool
+    
+    # 普通问答相关状态
+    qa_context: str
+    user_question: str
+    qa_type: str

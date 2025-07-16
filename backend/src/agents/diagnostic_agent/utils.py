@@ -335,17 +335,42 @@ def check_tool_calls(state):
         return "reflection"
 
 
-def save_graph_image(graph, mode_name):
+def save_graph_image(graph, mode_name, filename="graph.png"):
     """保存图结构图像到文件"""
     try:
         graph_image = graph.get_graph().draw_mermaid_png()
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        graph_image_path = os.path.join(current_dir, "graph.png")
+        graph_image_path = os.path.join(current_dir, filename)
         with open(graph_image_path, "wb") as f:
             f.write(graph_image)
         print(f"📝 {mode_name}：图已保存到 {graph_image_path}")
     except Exception as e:
         logger.warning(f"保存图结构图像失败: {e}")
+
+
+def auto_generate_subgraph_images():
+    """程序启动时自动生成所有子图的图片"""
+    try:
+        # 导入子图创建函数
+        from .sop_diagnosis_subgraph import create_sop_diagnosis_subgraph
+        from .general_qa_subgraph import create_general_qa_subgraph
+        
+        # 生成SOP诊断子图
+        try:
+            sop_subgraph = create_sop_diagnosis_subgraph()
+            save_graph_image(sop_subgraph, "SOP诊断子图", "sop_diagnosis_subgraph.png")
+        except Exception as e:
+            logger.warning(f"生成SOP诊断子图失败: {e}")
+        
+        # 生成普通问答子图
+        try:
+            qa_subgraph = create_general_qa_subgraph()
+            save_graph_image(qa_subgraph, "普通问答子图", "general_qa_subgraph.png")
+        except Exception as e:
+            logger.warning(f"生成普通问答子图失败: {e}")
+            
+    except ImportError as e:
+        logger.warning(f"导入子图模块失败，跳过子图图片生成: {e}")
 
 
 def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
@@ -359,6 +384,9 @@ def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
     Returns:
         tuple: (graph, mode_name)
     """
+    # 首先自动生成所有子图的图片
+    auto_generate_subgraph_images()
+    
     if checkpointer_type == "postgres":
         # PostgreSQL模式：不在这里编译，在API请求时用async with编译
         graph = builder.compile(name="diagnostic-agent")

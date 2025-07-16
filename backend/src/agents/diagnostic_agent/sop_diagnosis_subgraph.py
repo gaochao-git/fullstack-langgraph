@@ -1,11 +1,9 @@
 """
-故障诊断代理 - 使用LangGraph子图架构
-按照官方文档的方法实现：主图负责路由，子图处理具体逻辑
+SOP诊断子图 - 专门处理故障诊断SOP流程
 """
 
-import os
 import logging
-from typing import Dict, Any, Literal
+from typing import Dict, Any
 from langgraph.graph import StateGraph, END, START
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import SystemMessage, AIMessage
@@ -13,125 +11,32 @@ from langchain_core.runnables import RunnableConfig
 
 from .configuration import Configuration
 from .state import DiagnosticState, QuestionAnalysis, DiagnosisProgress, SOPDetail
-from .schemas import IntentAnalysisOutput, QuestionInfoExtraction, DiagnosisReflectionOutput
 from .prompts import (
     get_current_datetime, get_question_analysis_prompt, get_missing_info_prompt,
     tool_planning_instructions, diagnosis_report_instructions, reflection_instructions
 )
+from .schemas import QuestionInfoExtraction, DiagnosisReflectionOutput
 from .tools import all_tools
 from .utils import (
     merge_field, check_approval_needed, is_already_approved, process_sop_loading,
-    update_diagnosis_step, check_info_sufficient, check_tool_calls, save_graph_image,
-    compile_graph_with_checkpointer, extract_diagnosis_results_from_messages,
+    update_diagnosis_step, check_diagnosis_completion, check_info_sufficient,
+    check_tool_calls, extract_diagnosis_results_from_messages,
     format_diagnosis_results_for_prompt, is_sop_loaded
 )
 
 logger = logging.getLogger(__name__)
 
 
-# ================================
-# 主图节点：意图分析和路由
-# ================================
-
-def analyze_intent_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """
-    意图分析节点 - 判断用户是否需要SOP诊断还是普通问答
-    """
-    print(f"✅ 执行节点: analyze_intent_node")
-    
-    configurable = Configuration.from_runnable_config(config)
-    messages = state.get("messages", [])
-    
-    if not messages:
-        return {"intent": "general_qa", "intent_reason": "无用户输入"}
-    
-    user_question = messages[-1].content if messages else ""
-    
-    # 使用LLM分析用户意图
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=0.1  # 低温度确保分类准确
-    )
-    
-    intent_analysis_prompt = f"""
-你是一个专业的运维助手意图分析器。请分析用户的问题，判断用户是否需要故障诊断SOP还是普通问答。
-
-判断标准：
-
-1. 故障诊断SOP (sop_diagnosis)：
-   - 用户明确提到故障、报错、异常、问题等需要排查的情况
-   - 用户提到需要排查、诊断、解决具体问题
-   - 用户描述了具体的故障现象和影响
-   - 用户提到了IP、时间、错误信息等故障要素
-   - 用户明确要求执行故障诊断流程或SOP
-   - 关键词：故障、报错、异常、排查、诊断、SOP、问题解决、修复、恢复
-
-2. 普通问答 (general_qa)：
-   - 用户询问技术知识、操作方法、概念解释
-   - 用户进行日常聊天、问候、闲聊
-   - 用户询问系统信息、配置说明、状态查询
-   - 用户询问历史记录、统计信息
-   - 用户咨询如何使用某个功能或工具
-   - 不涉及具体故障排查的技术问题
-   - 关键词：如何、什么是、怎么、配置、安装、使用、查询、状态
-
-注意：
-- 如果用户只是询问故障相关概念或方法，不涉及具体故障排查，应归类为general_qa
-- 如果用户描述了具体的故障现象并需要排查，应归类为sop_diagnosis
-- 优先考虑用户的具体意图，而不是简单的关键词匹配
-
-用户问题：{user_question}
-
-请分析用户意图，返回分类结果和简要理由。
-"""
-    
-    structured_llm = llm.with_structured_output(IntentAnalysisOutput)
-    result = structured_llm.invoke(intent_analysis_prompt)
-    
-    logger.info(f"意图分析结果: {result.intent} - {result.reason}")
-    
-    return {
-        "intent": result.intent,
-        "intent_reason": result.reason
-    }
-
-
-def route_to_subgraph(state: DiagnosticState, config: RunnableConfig) -> Literal["sop_diagnosis", "general_qa"]:
-    """
-    路由函数 - 根据意图分析结果决定进入哪个子图
-    """
-    print(f"✅ 执行路由函数: route_to_subgraph")
-    
-    intent = state.get("intent", "general_qa")
-    
-    # 确保intent值有效
-    if intent not in ["sop_diagnosis", "general_qa"]:
-        logger.warning(f"无效的意图值: {intent}，默认使用general_qa")
-        intent = "general_qa"
-    
-    logger.info(f"路由决策: {intent}")
-    print(f"✅ 路由结果: {intent}")
-    
-    return intent
-
-
-# ================================
-# SOP诊断子图节点
-# ================================
-
 def analyze_question_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """问题分析节点 - 支持多轮补充四要素"""
-    print(f"✅ 执行SOP子图节点: analyze_question_node")
+    print(f"✅ 执行节点: analyze_question_node")
     configurable = Configuration.from_runnable_config(config)
     
     messages = state.get("messages", [])
     user_question = messages[-1].content if messages else ""
     
     # 四要素分析流程
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=configurable.question_analysis_temperature
-    )
+    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=configurable.question_analysis_temperature)
     
     # 获取当前已有的四要素信息
     current_analysis = state.get("question_analysis", QuestionAnalysis())
@@ -175,27 +80,11 @@ def analyze_question_node(state: DiagnosticState, config: RunnableConfig) -> Dic
     }
 
 
-def handle_insufficient_info_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """处理信息不足的情况，提示用户补充缺失信息"""
-    print(f"✅ 执行SOP子图节点: handle_insufficient_info_node")
-    question_analysis = state.get("question_analysis", QuestionAnalysis())
-    
-    # 使用提示词模板函数生成缺失信息提示
-    missing_info_prompt = get_missing_info_prompt(question_analysis)
-    
-    return {
-        "messages": [AIMessage(content=missing_info_prompt)]
-    }
-
-
 def plan_diagnosis_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """工具规划节点 - 严格按照SOP执行"""
-    print(f"✅ 执行SOP子图节点: plan_diagnosis_tools_node")
+    print(f"✅ 执行节点: plan_diagnosis_tools_node")
     configurable = Configuration.from_runnable_config(config)
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=configurable.tool_planning_temperature
-    )
+    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=configurable.tool_planning_temperature)
     
     # 绑定工具到LLM
     llm_with_tools = llm.bind_tools(all_tools)
@@ -233,8 +122,8 @@ def plan_diagnosis_tools_node(state: DiagnosticState, config: RunnableConfig) ->
 
 
 def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """SOP执行确认节点"""
-    print(f"✅ 执行SOP子图节点: approval_node")
+    """SOP执行确认节点 - 简化版本"""
+    print(f"✅ 执行节点: approval_node")
     
     # 检查是否需要审批
     approval_info = check_approval_needed(state)
@@ -316,7 +205,7 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
 
 def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
     """诊断反思节点 - 使用LLM智能决策下一步行动"""
-    print(f"✅ 执行SOP子图节点: reflect_diagnosis_progress_node")
+    print(f"✅ 执行节点: reflect_diagnosis_progress_node")
     configurable = Configuration.from_runnable_config(config)
     
     # 获取当前状态
@@ -445,9 +334,22 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         }
 
 
+def handle_insufficient_info_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+    """处理信息不足的情况，提示用户补充缺失信息"""
+    print(f"✅ 执行节点: handle_insufficient_info_node")
+    question_analysis = state.get("question_analysis", QuestionAnalysis())
+    
+    # 使用提示词模板函数生成缺失信息提示
+    missing_info_prompt = get_missing_info_prompt(question_analysis)
+    
+    return {
+        "messages": [AIMessage(content=missing_info_prompt)]
+    }
+
+
 def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) -> str:
     """评估诊断进度，根据执行情况决定下一步"""
-    print(f"✅ 执行SOP子图路由: evaluate_diagnosis_progress")
+    print(f"✅ 执行路由函数: evaluate_diagnosis_progress")
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
     
     # 如果诊断已标记为完成，直接结束
@@ -468,100 +370,6 @@ def evaluate_diagnosis_progress(state: DiagnosticState, config: RunnableConfig) 
     return "plan_tools"
 
 
-# ================================
-# 普通问答子图节点
-# ================================
-
-def analyze_question_context_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """分析问题上下文节点 - 理解用户问题并准备回答"""
-    print(f"✅ 执行问答子图节点: analyze_question_context_node")
-    
-    messages = state.get("messages", [])
-    if not messages:
-        return {"qa_context": "无历史对话"}
-    
-    # 获取用户问题
-    user_question = messages[-1].content if messages else ""
-    
-    # 构建对话上下文
-    context_parts = []
-    
-    # 添加诊断历史（如果有）
-    diagnosis_results = extract_diagnosis_results_from_messages(messages, max_results=3)
-    if diagnosis_results:
-        context_parts.append("相关诊断历史：")
-        context_parts.extend(diagnosis_results[:3])  # 最近3个诊断结果
-    
-    # 添加最近对话
-    if len(messages) > 1:
-        context_parts.append("\n最近对话：")
-        recent_messages = messages[-6:] if len(messages) > 6 else messages[:-1]
-        for i, msg in enumerate(recent_messages):
-            role = "用户" if i % 2 == 0 else "助手"
-            content = getattr(msg, 'content', str(msg))[:150]  # 限制长度
-            context_parts.append(f"{role}: {content}")
-    
-    qa_context = "\n".join(context_parts) if context_parts else "无历史对话"
-    
-    logger.info(f"问答上下文分析完成，历史诊断: {len(diagnosis_results)}, 对话轮次: {len(messages)}")
-    
-    return {
-        "qa_context": qa_context,
-        "user_question": user_question
-    }
-
-
-def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """生成回答节点 - 基于用户问题和上下文生成专业回答"""
-    print(f"✅ 执行问答子图节点: generate_answer_node")
-    
-    configurable = Configuration.from_runnable_config(config)
-    
-    # 获取状态信息
-    user_question = state.get("user_question", "")
-    qa_context = state.get("qa_context", "")
-    messages = state.get("messages", [])
-    
-    # 如果没有用户问题，从消息中获取
-    if not user_question and messages:
-        user_question = messages[-1].content if messages else ""
-    
-    # 创建LLM实例
-    llm = configurable.create_llm(
-        model_name=configurable.answer_model,
-        temperature=configurable.final_report_temperature
-    )
-    
-    # 生成回答提示词
-    prompt = f"""您是专业的运维技术助手，支持故障诊断、运维问答和日常交流。
-
-用户问题：{user_question}
-
-对话历史上下文：
-{qa_context}
-
-请根据用户问题类型回答：
-- 如果是运维技术问题，提供专业的技术指导
-- 如果是普通聊天，自然友好地回应
-- 如果涉及之前的诊断内容，可以引用相关信息
-- 保持简洁明了，不需要生成报告格式
-
-请直接回答用户的问题。"""
-    
-    # 生成回答
-    response = llm.invoke(prompt)
-    
-    logger.info(f"问答回答生成完成")
-    
-    return {
-        "messages": [AIMessage(content=response.content)]
-    }
-
-
-# ================================
-# 子图创建函数
-# ================================
-
 def create_sop_diagnosis_subgraph():
     """创建SOP诊断子图"""
     
@@ -570,7 +378,7 @@ def create_sop_diagnosis_subgraph():
     
     # 包装工具节点以添加打印
     def execute_tools_node(state, config):
-        print(f"✅ 执行SOP子图节点: execute_tools_node")
+        print(f"✅ 执行节点: execute_tools_node")
         return tool_node.invoke(state, config)
     
     # 创建子图
@@ -606,90 +414,3 @@ def create_sop_diagnosis_subgraph():
     )
     
     return builder.compile()
-
-
-def create_general_qa_subgraph():
-    """创建普通问答子图"""
-    
-    # 创建子图
-    builder = StateGraph(DiagnosticState, config_schema=Configuration)
-    
-    # 添加节点
-    builder.add_node("analyze_context", analyze_question_context_node)
-    builder.add_node("generate_answer", generate_answer_node)
-    
-    # 设置流程 - 简单的线性流程
-    builder.add_edge(START, "analyze_context")
-    builder.add_edge("analyze_context", "generate_answer")
-    builder.add_edge("generate_answer", END)
-    
-    return builder.compile()
-
-
-# ================================
-# 主图创建和编译
-# ================================
-
-def create_main_graph():
-    """创建主图 - 包含路由逻辑和两个子图"""
-    
-    # 创建主图
-    builder = StateGraph(DiagnosticState, config_schema=Configuration)
-    
-    # 添加意图分析节点
-    builder.add_node("analyze_intent", analyze_intent_node)
-    
-    # 创建并添加子图 - 按照官方文档的方式
-    sop_diagnosis_subgraph = create_sop_diagnosis_subgraph()
-    general_qa_subgraph = create_general_qa_subgraph()
-    
-    # 将子图作为节点添加到主图
-    builder.add_node("sop_diagnosis", sop_diagnosis_subgraph)
-    builder.add_node("general_qa", general_qa_subgraph)
-    
-    # 设置路由
-    builder.add_edge(START, "analyze_intent")
-    builder.add_conditional_edges(
-        "analyze_intent",
-        route_to_subgraph,
-        {
-            "sop_diagnosis": "sop_diagnosis",
-            "general_qa": "general_qa"
-        }
-    )
-    
-    # 两个子图执行完成后都结束
-    builder.add_edge("sop_diagnosis", END)
-    builder.add_edge("general_qa", END)
-    
-    return builder
-
-
-def compile_main_graph():
-    """编译主图"""
-    builder = create_main_graph()
-    checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
-    compiled_graph_tuple = compile_graph_with_checkpointer(builder, checkpointer_type)
-    
-    # compile_graph_with_checkpointer 返回 (graph, mode_name) 元组
-    compiled_graph = compiled_graph_tuple[0] if isinstance(compiled_graph_tuple, tuple) else compiled_graph_tuple
-    
-    # 保存图片的逻辑已经在 compile_graph_with_checkpointer 中处理了
-    
-    return compiled_graph_tuple
-
-
-# 创建builder并导出（用于PostgreSQL模式）
-builder = create_main_graph()
-
-# 导出编译后的图
-graph = compile_main_graph()
-
-# 保持兼容性，提供原有的接口
-def get_diagnostic_agent():
-    """获取诊断代理图实例 - 保持向后兼容性"""
-    return graph
-
-
-# 导出主要组件
-__all__ = ["graph", "builder", "get_diagnostic_agent", "create_main_graph", "compile_main_graph"]

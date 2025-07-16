@@ -54,36 +54,50 @@ class RunCreate(BaseModel):
 async def process_stream_chunk(chunk, event_id, thread_id):
     """处理单个流式数据块"""    
     # Handle tuple format from LangGraph streaming
-    if isinstance(chunk, tuple) and len(chunk) == 2:
-        event_type, data = chunk
+    if isinstance(chunk, tuple) and len(chunk) >= 2:
+        if len(chunk) == 2:
+            # 标准格式: (event_type, data)
+            event_type, data = chunk
+        elif len(chunk) == 3:
+            # 子图格式: (namespace, event_type, data)
+            namespace, event_type, data = chunk
+            logger.info(f"🔄 处理子图流式数据: namespace={namespace}, event_type={event_type}")
+        else:
+            # 未知格式，尝试获取最后两个元素
+            event_type, data = chunk[-2:]
+            logger.warning(f"⚠️ 未知的chunk格式，长度={len(chunk)}, 尝试使用后两个元素")
+        
         serialized_data = serialize_value(data)
         
         # Save messages to thread history from LangGraph state
         if event_type == "values" and isinstance(data, dict) and "messages" in data:
-            if thread_id not in thread_messages:
-                thread_messages[thread_id] = []
-            thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
-            logger.info(f"💾 保存了 {len(data['messages'])} 条消息到线程 {thread_id}")
+            if thread_messages is not None:
+                if thread_id not in thread_messages:
+                    thread_messages[thread_id] = []
+                thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
+                logger.info(f"💾 保存了 {len(data['messages'])} 条消息到线程 {thread_id}")
         
         # Also save messages from updates events (when nodes return message updates)
         elif event_type == "updates" and isinstance(data, dict):
             for node_name, node_data in data.items():
                 if isinstance(node_data, dict) and "messages" in node_data:
-                    if thread_id not in thread_messages:
-                        thread_messages[thread_id] = []
-                    # Append new messages instead of replacing
-                    new_messages = [serialize_value(msg) for msg in node_data["messages"]]
-                    thread_messages[thread_id].extend(new_messages)
-                    logger.info(f"💾 从节点 {node_name} 追加了 {len(new_messages)} 条消息到线程 {thread_id}")
+                    if thread_messages is not None:
+                        if thread_id not in thread_messages:
+                            thread_messages[thread_id] = []
+                        # Append new messages instead of replacing
+                        new_messages = [serialize_value(msg) for msg in node_data["messages"]]
+                        thread_messages[thread_id].extend(new_messages)
+                        logger.info(f"💾 从节点 {node_name} 追加了 {len(new_messages)} 条消息到线程 {thread_id}")
                     break  # Only process the first node with messages
         
         # Check for interrupts
         has_interrupt = False
         if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
             logger.info(f"Interrupt detected: {data}")
-            if thread_id not in thread_interrupts:
-                thread_interrupts[thread_id] = []
-            thread_interrupts[thread_id].append(data["__interrupt__"][0])
+            if thread_interrupts is not None:
+                if thread_id not in thread_interrupts:
+                    thread_interrupts[thread_id] = []
+                thread_interrupts[thread_id].append(data["__interrupt__"][0])
             has_interrupt = True
         
         return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serialized_data, ensure_ascii=False)}\n\n", has_interrupt
@@ -104,7 +118,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
     event_id = 0
     has_interrupt = False
     
-    async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes):
+    async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
         try:
             event_id += 1
             sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
@@ -131,7 +145,7 @@ async def stream_with_graph(graph, request_body, thread_id):
     event_id = 0
     has_interrupt = False
     
-    async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes):
+    async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
         try:
             event_id += 1
             sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
