@@ -17,6 +17,10 @@ class SOPStep(BaseModel):
     action: str = ""
     requires_approval: bool = False
     status: Literal["pending", "in_progress", "completed"] = "pending"
+    # 审批相关字段
+    approved: bool = False
+    approved_at: Optional[str] = None  # 审批时间
+    approval_id: Optional[str] = None  # 审批标识符，格式：sop_id:action
 
 
 class SOPDetail(BaseModel):
@@ -59,8 +63,6 @@ class DiagnosticState(TypedDict):
     sop_detail: SOPDetail = Field(default_factory=SOPDetail)
     # 诊断进度
     diagnosis_progress: DiagnosisProgress = Field(default_factory=DiagnosisProgress)
-    # 审批状态
-    approved_steps: List[str] = Field(default_factory=list)  # 已审批的步骤列表
     
     # 最终报告
     final_diagnosis: str = ""

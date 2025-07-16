@@ -157,10 +157,28 @@ def approval_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, A
     logger.info(f"用户审批结果: {user_approved}")
     
     if user_approved:
-        # 审批通过，添加到已审批列表
-        approved_steps = state.get("approved_steps", []) + [step_id]
-        logger.info(f"步骤审批通过，添加到已审批列表: {step_id}")
-        return {"approved_steps": approved_steps}
+        # 审批通过，更新SOP步骤的审批状态
+        sop_detail = state.get("sop_detail", SOPDetail())
+        updated_steps = []
+        
+        for step in sop_detail.steps:
+            if step.action == step_info.action:
+                # 更新匹配步骤的审批状态
+                step.approved = True
+                step.approved_at = get_current_datetime()
+                step.approval_id = step_id
+                logger.info(f"步骤审批通过，更新审批状态: {step_id}")
+            updated_steps.append(step)
+        
+        updated_sop_detail = SOPDetail(
+            sop_id=sop_detail.sop_id,
+            title=sop_detail.title,
+            description=sop_detail.description,
+            steps=updated_steps,
+            total_steps=sop_detail.total_steps
+        )
+        
+        return {"sop_detail": updated_sop_detail}
     else:
         # 用户取消，中止执行
         diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())

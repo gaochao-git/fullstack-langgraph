@@ -100,7 +100,10 @@ def _create_sop_step_from_data(sop_step_data):
         description=sop_step_data.get("description", ""),
         action=sop_step_data.get("action", ""),
         requires_approval=sop_step_data.get("requires_approval", False),
-        status="pending"
+        status="pending",
+        approved=False,
+        approved_at=None,
+        approval_id=None
     )
 
 
@@ -182,8 +185,20 @@ def check_approval_needed(state):
 
 def is_already_approved(state, approval_info):
     """检查步骤是否已经审批过"""
-    approved_steps = state.get("approved_steps", [])
-    return approval_info["step_id"] in approved_steps
+    sop_detail = state.get("sop_detail")
+    if not sop_detail or not sop_detail.steps:
+        return False
+    
+    step_id = approval_info["step_id"]
+    sop_id = approval_info["sop_id"]
+    action = approval_info["step_info"].action
+    
+    # 在SOP步骤中查找匹配的步骤
+    for step in sop_detail.steps:
+        if step.action == action and step.approved:
+            return True
+    
+    return False
 
 
 def is_sop_loaded(sop_detail):
@@ -225,7 +240,10 @@ def process_sop_loading(messages, current_sop_detail):
                 description=step_data.get("description", ""),
                 action=step_data.get("action", ""),
                 requires_approval=step_data.get("requires_approval", False),
-                status="pending"
+                status="pending",
+                approved=False,
+                approved_at=None,
+                approval_id=None
             )
             for step_data in sop_content.get("steps", [])
         ]
