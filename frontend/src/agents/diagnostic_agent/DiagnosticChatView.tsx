@@ -10,6 +10,13 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 
+// 黑名单：不显示这些工具调用，便于用户发现和维护
+const HIDDEN_TOOLS = [
+  'QuestionInfoExtraction',      // 问题信息提取
+  'DiagnosisReflectionOutput',   // 诊断反思输出
+  'IntentAnalysisOutput'         // 意图分析输出
+];
+
 // 诊断消息中的事件类型
 export interface ProcessedEvent {
   title: string;
@@ -155,10 +162,10 @@ interface ToolCallsProps {
 const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, onInterruptResume }) => {
   const allToolCalls = (message as any).tool_calls || [];
   
-  // 过滤掉 QuestionInfoExtraction 和没有工具名的调用
+  // 使用全局定义的黑名单过滤工具调用
   const toolCalls = allToolCalls.filter((call: any) => {
     const toolName = call.name || call.function?.name;
-    return toolName && toolName !== 'QuestionInfoExtraction' && toolName !== 'DiagnosisReflectionOutput';
+    return toolName && !HIDDEN_TOOLS.includes(toolName);
   });
   
   if (!toolCalls.length) return null;
