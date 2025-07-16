@@ -67,13 +67,3 @@ class DiagnosticState(TypedDict):
     # 最终报告
     final_diagnosis: str = ""
     report_generated: bool = False
-
-
-class DiagnosticOutput(BaseModel):
-    """诊断输出结果"""
-    final_diagnosis: str = ""
-    sop_used: str = ""
-    tools_executed: List[str] = Field(default_factory=list)
-    recommendations: List[str] = Field(default_factory=list)
-    execution_time: str = ""
-    step_count: int = 0
