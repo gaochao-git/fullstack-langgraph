@@ -358,14 +358,14 @@ def auto_generate_subgraph_images():
         # 生成SOP诊断子图
         try:
             sop_subgraph = create_sop_diagnosis_subgraph()
-            save_graph_image(sop_subgraph, "SOP诊断子图", "sop_diagnosis_subgraph.png")
+            save_graph_image(sop_subgraph, "SOP诊断子图", "graph_sop_diagnosis_subgraph.png")
         except Exception as e:
             logger.warning(f"生成SOP诊断子图失败: {e}")
         
         # 生成普通问答子图
         try:
             qa_subgraph = create_general_qa_subgraph()
-            save_graph_image(qa_subgraph, "普通问答子图", "general_qa_subgraph.png")
+            save_graph_image(qa_subgraph, "普通问答子图", "graph_general_qa_subgraph.png")
         except Exception as e:
             logger.warning(f"生成普通问答子图失败: {e}")
             
