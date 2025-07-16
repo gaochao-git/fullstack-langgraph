@@ -61,7 +61,6 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         elif len(chunk) == 3:
             # 子图格式: (namespace, event_type, data)
             namespace, event_type, data = chunk
-            logger.info(f"🔄 处理子图流式数据: namespace={namespace}, event_type={event_type}")
         else:
             # 未知格式，尝试获取最后两个元素
             event_type, data = chunk[-2:]

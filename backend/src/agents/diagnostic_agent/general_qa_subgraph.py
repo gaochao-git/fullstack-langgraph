@@ -340,15 +340,7 @@ def create_general_qa_subgraph():
     # 设置流程
     builder.add_edge(START, "analyze_context")
     builder.add_edge("analyze_context", "plan_tools")
-    builder.add_conditional_edges(
-        "plan_tools",
-        check_qa_tool_calls,
-        {
-            "execute_tools": "execute_tools",
-            "generate_answer": "generate_answer"
-        }
-    )
+    builder.add_conditional_edges("plan_tools",check_qa_tool_calls,{"execute_tools": "execute_tools","generate_answer": "generate_answer"})
     builder.add_edge("execute_tools", "generate_answer")
     builder.add_edge("generate_answer", END)
-    
     return builder.compile()
