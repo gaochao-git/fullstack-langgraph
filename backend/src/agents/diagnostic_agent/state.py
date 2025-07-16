@@ -64,8 +64,7 @@ class DiagnosticState(TypedDict):
     # 诊断进度
     diagnosis_progress: DiagnosisProgress = Field(default_factory=DiagnosisProgress)
     
-    # 诊断结果
-    diagnosis_results: List[str] = Field(default_factory=list)
+    # 诊断结果 - 现在从messages中提取，不再需要单独存储
     tools_used: List[str] = Field(default_factory=list)
     
     # 审批状态

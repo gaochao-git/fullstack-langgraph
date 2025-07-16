@@ -17,7 +17,7 @@ from .state import (DiagnosticState,QuestionAnalysis,DiagnosisProgress,SOPDetail
 from .prompts import (get_current_datetime,get_question_analysis_prompt,get_missing_info_prompt,tool_planning_instructions,diagnosis_report_instructions,reflection_instructions)
 from .schemas import QuestionInfoExtraction, DiagnosisReflectionOutput
 from .tools import all_tools
-from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls, save_graph_image, compile_graph_with_checkpointer)
+from .utils import (merge_field, check_approval_needed, is_already_approved,process_sop_loading, update_diagnosis_step, check_diagnosis_completion,check_info_sufficient, check_tool_calls, save_graph_image, compile_graph_with_checkpointer, extract_diagnosis_results_from_messages, format_diagnosis_results_for_prompt)
 logger = logging.getLogger(__name__)
 
 
@@ -199,11 +199,7 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
     )
     
     # 3. 更新诊断结果
-    diagnosis_results = list(state.get("diagnosis_results", []))
-    if has_new_execution and messages:
-        last_message = messages[-1]
-        diagnosis_results.append(f"Tool: {last_message.name}, Result: {last_message.content}")
-    
+    diagnosis_results = extract_diagnosis_results_from_messages(messages)
     # 4. 获取用户最新输入
     user_input = ""
     if messages:
@@ -223,7 +219,7 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         total_steps=updated_sop_detail.total_steps,
         sop_state="loaded" if sop_loaded else "none",
         report_generated=report_generated,
-        diagnosis_results='\n'.join(diagnosis_results[-5:]) if diagnosis_results else '无诊断结果',
+        diagnosis_results=format_diagnosis_results_for_prompt(diagnosis_results),
         user_input=user_input
     )
     
@@ -243,7 +239,6 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         return {
             "messages": [AIMessage(content=reflection_result.response_content)],
             "diagnosis_progress": completed_progress,
-            "diagnosis_results": diagnosis_results,
             "sop_detail": updated_sop_detail,
             "sop_loaded": sop_loaded
         }
@@ -293,7 +288,6 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         return {
             "messages": [AIMessage(content=final_message)],
             "diagnosis_progress": updated_progress,
-            "diagnosis_results": diagnosis_results,
             "sop_detail": updated_sop_detail,
             "sop_loaded": sop_loaded,
             "final_diagnosis": response.content,
@@ -313,7 +307,6 @@ def reflect_diagnosis_progress_node(state: DiagnosticState, config: RunnableConf
         
         return {
             "diagnosis_progress": updated_progress,
-            "diagnosis_results": diagnosis_results,
             "sop_detail": updated_sop_detail,
             "sop_loaded": sop_loaded
         }
@@ -343,14 +336,13 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     sop_detail = state.get("sop_detail", SOPDetail())
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
-    diagnosis_results = state.get("diagnosis_results", [])
     sop_loaded = state.get("sop_loaded", False)
     report_generated = state.get("report_generated", False)
     
     # 判断对话类型和回答策略
     response_type = determine_response_type(
         user_question, messages, question_analysis, 
-        diagnosis_progress, sop_loaded, diagnosis_results, report_generated
+        diagnosis_progress, sop_loaded, report_generated
     )
     
     logger.info(f"响应类型判断: {response_type}")
@@ -372,7 +364,7 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
             current_step=diagnosis_progress.current_step,
             total_steps=sop_detail.total_steps,
             completion_status='已完成' if diagnosis_progress.is_complete else '进行中',
-            diagnosis_results='\n'.join(diagnosis_results) if diagnosis_results else '未进行诊断'
+            diagnosis_results=format_diagnosis_results_for_prompt(messages, max_results=50)
         )
         
         response = llm.invoke(formatted_prompt)
@@ -397,7 +389,7 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
     
     else:
         # 运维问答或普通聊天
-        conversation_context = build_conversation_context(messages, diagnosis_results)
+        conversation_context = build_conversation_context(messages)
         
         prompt = f"""您是专业的运维技术助手，支持故障诊断、运维问答和日常交流。
 
@@ -421,7 +413,7 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
         }
 
 
-def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_loaded, diagnosis_results, report_generated=False):
+def determine_response_type(user_question, messages, question_analysis, diagnosis_progress, sop_loaded, report_generated=False):
     """判断回答类型：是否需要生成诊断报告"""
     
     # 1. 用户明确要求生成报告
@@ -431,21 +423,22 @@ def determine_response_type(user_question, messages, question_analysis, diagnosi
     
     # 2. 完成了完整的SOP诊断流程且未生成过报告
     if (diagnosis_progress and diagnosis_progress.is_complete and 
-        sop_loaded and len(diagnosis_results) >= 2 and not report_generated):
+        sop_loaded and len(extract_diagnosis_results_from_messages(messages)) >= 2 and not report_generated):
         return "diagnosis_report"
     
     # 3. 其他情况都是普通回答
     return "general_answer"
 
 
-def build_conversation_context(messages, diagnosis_results):
+def build_conversation_context(messages):
     """构建对话上下文"""
     context_parts = []
     
     # 添加诊断历史（如果有）
+    diagnosis_results = extract_diagnosis_results_from_messages(messages, max_results=3)
     if diagnosis_results:
         context_parts.append("诊断历史：")
-        context_parts.extend(diagnosis_results[-3:])  # 最近3个诊断结果
+        context_parts.extend(diagnosis_results)  # 最近3个诊断结果
     
     # 添加最近对话
     if messages and len(messages) > 1:

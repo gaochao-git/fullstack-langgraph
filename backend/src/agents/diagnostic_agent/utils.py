@@ -343,3 +343,45 @@ def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
         save_graph_image(graph, "内存模式")
         print(f"📝 内存模式：图已编译完成")
         return graph, "内存模式"
+
+
+def extract_diagnosis_results_from_messages(messages, max_results: int = 10):
+    """
+    从 messages 中提取诊断结果
+    
+    Args:
+        messages: 消息列表
+        max_results: 最大提取结果数量
+    
+    Returns:
+        格式化的诊断结果列表
+    """
+    diagnosis_results = []
+    
+    for message in messages:
+        if isinstance(message, ToolMessage):
+            # 过滤掉一些不需要的工具
+            if message.name in ['QuestionInfoExtraction', 'DiagnosisReflectionOutput']:
+                continue
+                
+            # 格式化工具结果
+            result = f"Tool: {message.name}, Result: {message.content}"
+            diagnosis_results.append(result)
+    
+    # 返回最近的 max_results 个结果
+    return diagnosis_results[-max_results:] if diagnosis_results else []
+
+
+def format_diagnosis_results_for_prompt(messages, max_results: int = 5):
+    """
+    格式化诊断结果用于提示词
+    
+    Args:
+        messages: 消息列表
+        max_results: 最大结果数量
+    
+    Returns:
+        格式化的字符串
+    """
+    results = extract_diagnosis_results_from_messages(messages, max_results)
+    return '\n'.join(results) if results else '无诊断结果'
