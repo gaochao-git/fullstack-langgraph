@@ -53,8 +53,7 @@ class DiagnosticState(TypedDict):
     诊断代理的主状态
     """
     messages: Annotated[list[AnyMessage], add_messages]
-    # 基础信息
-    user_question: str = ""
+    # 基础信息 - 移除user_question，可以从messages动态获取
     question_analysis: QuestionAnalysis = Field(default_factory=QuestionAnalysis)
     
     # SOP管理

@@ -70,7 +70,6 @@ def analyze_question_node(state: DiagnosticState, config: RunnableConfig) -> Dic
     logger.info(f"四要素分析: 充足={info_sufficient}, 缺失={missing_fields}")
     
     return {
-        "user_question": user_question,
         "question_analysis": merged_analysis
     }
 
@@ -332,7 +331,7 @@ def finalize_diagnosis_report_node(state: DiagnosticState, config: RunnableConfi
     
     # 获取状态信息
     messages = state.get("messages", [])
-    user_question = state.get("user_question", "")
+    user_question = messages[-1].content if messages else ""  # 动态获取
     question_analysis = state.get("question_analysis", QuestionAnalysis())
     sop_detail = state.get("sop_detail", SOPDetail())
     diagnosis_progress = state.get("diagnosis_progress", DiagnosisProgress())
