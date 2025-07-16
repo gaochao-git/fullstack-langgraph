@@ -55,16 +55,10 @@ class DiagnosticState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     # 基础信息 - 移除user_question，可以从messages动态获取
     question_analysis: QuestionAnalysis = Field(default_factory=QuestionAnalysis)
-    
     # SOP管理 - 移除sop_loaded，可以通过sop_detail判断
     sop_detail: SOPDetail = Field(default_factory=SOPDetail)
-    
     # 诊断进度
     diagnosis_progress: DiagnosisProgress = Field(default_factory=DiagnosisProgress)
-    
-    # 诊断结果 - 现在从messages中提取，不再需要单独存储
-    tools_used: List[str] = Field(default_factory=list)
-    
     # 审批状态
     approved_steps: List[str] = Field(default_factory=list)  # 已审批的步骤列表
     
