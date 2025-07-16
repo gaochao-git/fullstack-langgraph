@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, List, Literal
 from datetime import datetime
-
-from langgraph.graph import MessagesState
+from typing import Annotated
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 
 
@@ -46,8 +48,11 @@ class DiagnosisProgress(BaseModel):
     termination_reason: Literal["continue", "root_cause_found", "sop_completed", "max_steps_reached", "no_sop_fallback", "user_cancelled"] = "continue"
 
 
-class DiagnosticState(MessagesState):
-    """诊断代理的主状态 - 简化版本，参考优化实现"""
+class DiagnosticState(TypedDict):
+    """
+    诊断代理的主状态
+    """
+    messages: Annotated[list[AnyMessage], add_messages]
     # 基础信息
     user_question: str = ""
     question_analysis: QuestionAnalysis = Field(default_factory=QuestionAnalysis)
