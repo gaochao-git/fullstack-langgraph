@@ -608,22 +608,9 @@ def create_sop_diagnosis_subgraph():
     return builder.compile()
 
 
-def create_general_qa_subgraph():
-    """创建普通问答子图"""
-    
-    # 创建子图
-    builder = StateGraph(DiagnosticState, config_schema=Configuration)
-    
-    # 添加节点
-    builder.add_node("analyze_context", analyze_question_context_node)
-    builder.add_node("generate_answer", generate_answer_node)
-    
-    # 设置流程 - 简单的线性流程
-    builder.add_edge(START, "analyze_context")
-    builder.add_edge("analyze_context", "generate_answer")
-    builder.add_edge("generate_answer", END)
-    
-    return builder.compile()
+# 旧版本的create_general_qa_subgraph已移动到general_qa_subgraph.py文件中
+# 这里保留导入以保持兼容性
+from .general_qa_subgraph import create_general_qa_subgraph
 
 
 # ================================

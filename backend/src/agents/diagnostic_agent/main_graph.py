@@ -24,14 +24,19 @@ def analyze_intent_node(state: DiagnosticState, config: RunnableConfig) -> Dict[
     意图分析节点 - 判断用户是否需要SOP诊断还是普通问答
     """
     print(f"✅ 执行节点: analyze_intent_node")
+    print(f"🔍 analyze_intent_node - 输入状态: {list(state.keys())}")
     
     configurable = Configuration.from_runnable_config(config)
     messages = state.get("messages", [])
     
+    print(f"🔍 analyze_intent_node - messages数量: {len(messages)}")
+    
     if not messages:
+        print(f"🔍 analyze_intent_node - 无消息，默认返回general_qa")
         return {"intent": "general_qa"}
     
     user_question = messages[-1].content if messages else ""
+    print(f"🔍 analyze_intent_node - 用户问题: {user_question}")
     
     # 使用LLM分析用户意图
     llm = configurable.create_llm(
@@ -62,15 +67,22 @@ def analyze_intent_node(state: DiagnosticState, config: RunnableConfig) -> Dict[
 请分析用户意图，返回分类结果和简要理由。
 """
     
+    print(f"🔍 analyze_intent_node - 开始调用LLM分析意图...")
     structured_llm = llm.with_structured_output(IntentAnalysisOutput)
     result = structured_llm.invoke(intent_analysis_prompt)
+    print(f"🔍 analyze_intent_node - LLM分析完成")
+    print(f"🔍 analyze_intent_node - 意图: {result.intent}")
+    print(f"🔍 analyze_intent_node - 理由: {result.reason}")
     
     logger.info(f"意图分析结果: {result.intent} - {result.reason}")
     
-    return {
+    return_result = {
         "intent": result.intent,
         "intent_reason": result.reason
     }
+    print(f"🔍 analyze_intent_node - 返回结果: {return_result}")
+    
+    return return_result
 
 
 def route_to_subgraph(state: DiagnosticState, config: RunnableConfig) -> Literal["sop_diagnosis", "general_qa"]:
@@ -78,8 +90,13 @@ def route_to_subgraph(state: DiagnosticState, config: RunnableConfig) -> Literal
     路由函数 - 根据意图分析结果决定进入哪个子图
     """
     print(f"✅ 执行路由函数: route_to_subgraph")
+    print(f"🔍 route_to_subgraph - 输入状态: {list(state.keys())}")
     
     intent = state.get("intent", "general_qa")
+    intent_reason = state.get("intent_reason", "")
+    
+    print(f"🔍 route_to_subgraph - intent: {intent}")
+    print(f"🔍 route_to_subgraph - intent_reason: {intent_reason}")
     
     logger.info(f"路由决策: {intent}")
     print(f"✅ 路由结果: {intent}")
@@ -138,3 +155,6 @@ def compile_main_graph():
 
 # 导出编译后的图
 graph = compile_main_graph()
+
+# 导出builder用于PostgreSQL模式
+builder = create_main_graph()
