@@ -104,13 +104,8 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     # 调用LLM生成工具调用
     response = llm_with_tools.invoke(messages_with_system)
     
-
-        
-    result = {
-        "messages": [response]
-    }
     
-    return result
+    return {"messages": [response]}
 
 
 def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
