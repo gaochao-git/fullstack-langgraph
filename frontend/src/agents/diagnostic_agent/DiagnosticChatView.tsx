@@ -378,8 +378,32 @@ export function DiagnosticChatView({
                   </div>
                 </div>
               </div>
-              {/* 助手合并输出区域 */}
-              {round.assistant.length > 0 && (
+              {/* 助手合并输出区域 - 只有当有实际可显示内容时才显示 */}
+              {(() => {
+                // 检查是否有任何实际要渲染的内容
+                let hasRenderableContent = false;
+                
+                round.assistant.forEach((msg) => {
+                  if (msg.type === 'ai') {
+                    // 检查AI内容
+                    if (msg.content && String(msg.content).trim()) {
+                      hasRenderableContent = true;
+                    }
+                    
+                    // 检查工具调用（排除黑名单中的工具）
+                    const toolCalls = (msg as any).tool_calls || [];
+                    const visibleToolCalls = toolCalls.filter((call: any) => {
+                      const toolName = call.name || call.function?.name;
+                      return toolName && !HIDDEN_TOOLS.includes(toolName);
+                    });
+                    if (visibleToolCalls.length > 0) {
+                      hasRenderableContent = true;
+                    }
+                  }
+                });
+                
+                return hasRenderableContent;
+              })() && (
                 <div className="flex flex-col items-start mb-6">
                   <div className="flex items-start gap-2 max-w-[90%] min-w-0 w-full">
                     <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
@@ -405,8 +429,8 @@ export function DiagnosticChatView({
                                     />
                                   </div>
                                 )}
-                                {/* AI 内容 */}
-                                {msg.content && (
+                                {/* AI 内容 - 过滤空内容 */}
+                                {msg.content && String(msg.content).trim() && (
                                   <div className="mb-2 overflow-x-auto min-w-0">
                                     <div className="min-w-fit max-w-none">
                                       <MarkdownRenderer content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)} />
@@ -483,8 +507,34 @@ export function DiagnosticChatView({
               )}
             </div>
           ))}
-          {/* 加载状态 */}
-          {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
+          {/* 加载状态 - 当正在加载且最后一轮没有助手气泡时显示 */}
+          {isLoading && (() => {
+            const lastRound = dialogRounds[dialogRounds.length - 1];
+            if (!lastRound || lastRound.assistant.length === 0) return true;
+            
+            // 检查最后一轮是否会显示助手气泡（使用与上面气泡相同的逻辑）
+            let hasRenderableContent = false;
+            lastRound.assistant.forEach((msg) => {
+              if (msg.type === 'ai') {
+                // 检查AI内容
+                if (msg.content && String(msg.content).trim()) {
+                  hasRenderableContent = true;
+                }
+                
+                // 检查工具调用（排除黑名单中的工具）
+                const toolCalls = (msg as any).tool_calls || [];
+                const visibleToolCalls = toolCalls.filter((call: any) => {
+                  const toolName = call.name || call.function?.name;
+                  return toolName && !HIDDEN_TOOLS.includes(toolName);
+                });
+                if (visibleToolCalls.length > 0) {
+                  hasRenderableContent = true;
+                }
+              }
+            });
+            
+            return !hasRenderableContent;
+          })() && (
             <div className="flex items-center gap-2 text-gray-300 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
               诊断中...
