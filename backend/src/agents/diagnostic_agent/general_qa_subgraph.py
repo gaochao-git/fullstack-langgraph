@@ -104,12 +104,7 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     # 调用LLM生成工具调用
     response = llm_with_tools.invoke(messages_with_system)
     
-    # 检查是否生成了工具调用
-    has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
-    if has_tool_calls:
-        logger.info(f"检测到工具调用，数量: {len(response.tool_calls)}")
-    else:
-        logger.info("无工具调用，将直接生成回答")
+
         
     result = {
         "messages": [response]
