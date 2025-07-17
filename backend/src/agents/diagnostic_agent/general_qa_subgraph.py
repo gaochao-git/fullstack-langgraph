@@ -21,26 +21,19 @@ def analyze_question_context_node(state: DiagnosticState, config: RunnableConfig
     """
     分析问题上下文节点 - 理解用户问题并准备回答
     """
-    print(f"✅ 执行节点: analyze_question_context_node")
-    print(f"🔍 analyze_question_context_node - 输入状态: {list(state.keys())}")
-    
     messages = state.get("messages", [])
-    print(f"🔍 analyze_question_context_node - 消息数量: {len(messages)}")
     
     if not messages:
-        print(f"🔍 analyze_question_context_node - 无消息，返回默认上下文")
         return {"qa_context": "无历史对话"}
     
     # 获取用户问题
     user_question = messages[-1].content if messages else ""
-    print(f"🔍 analyze_question_context_node - 用户问题: {user_question}")
     
     # 构建对话上下文
     context_parts = []
     
     # 添加诊断历史（如果有）
     diagnosis_results = extract_diagnosis_results_from_messages(messages, max_results=3)
-    print(f"🔍 analyze_question_context_node - 诊断历史数量: {len(diagnosis_results)}")
     if diagnosis_results:
         context_parts.append("相关诊断历史：")
         context_parts.extend(diagnosis_results[:3])  # 最近3个诊断结果
@@ -49,14 +42,12 @@ def analyze_question_context_node(state: DiagnosticState, config: RunnableConfig
     if len(messages) > 1:
         context_parts.append("\n最近对话：")
         recent_messages = messages[-6:] if len(messages) > 6 else messages[:-1]
-        print(f"🔍 analyze_question_context_node - 最近对话数量: {len(recent_messages)}")
         for i, msg in enumerate(recent_messages):
             role = "用户" if i % 2 == 0 else "助手"
             content = getattr(msg, 'content', str(msg))[:150]  # 限制长度
             context_parts.append(f"{role}: {content}")
     
     qa_context = "\n".join(context_parts) if context_parts else "无历史对话"
-    print(f"🔍 analyze_question_context_node - 构建的上下文长度: {len(qa_context)}")
     
     logger.info(f"问答上下文分析完成，历史诊断: {len(diagnosis_results)}, 对话轮次: {len(messages)}")
     
@@ -64,9 +55,6 @@ def analyze_question_context_node(state: DiagnosticState, config: RunnableConfig
         "qa_context": qa_context,
         "user_question": user_question
     }
-    print(f"🔍 analyze_question_context_node - 返回结果: {list(result.keys())}")
-    print(f"🔍 analyze_question_context_node - qa_context: {result['qa_context'][:100]}...")
-    print(f"🔍 analyze_question_context_node - user_question: {result['user_question']}")
     
     return result
 
@@ -75,19 +63,14 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     """
     问答工具规划节点 - 让LLM自己决定是否需要工具调用
     """
-    print(f"✅ 执行节点: plan_qa_tools_node")
-    
     configurable = Configuration.from_runnable_config(config)
     user_question = state.get("user_question", "")
     qa_context = state.get("qa_context", "")
     messages = state.get("messages", [])
     
-
-    
     # 如果没有用户问题，从消息中获取
     if not user_question and messages:
         user_question = messages[-1].content if messages else ""
-        print(f"🔍 plan_qa_tools_node - 从消息中获取用户问题: {user_question}")
     
     # 创建可用工具列表（只包含安全的查询工具）
     # 普通问答助手只需要：通用工具（如时间查询）
@@ -101,7 +84,6 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
         temperature=0.3
     )
     llm_with_tools = llm.bind_tools(available_tools)
-    print(f"🔍 plan_qa_tools_node - LLM模型: {configurable.query_generator_model}")
     
     # 构建工具规划提示 - 让LLM自己决定是否需要工具
     tool_planning_prompt = f"""
@@ -129,14 +111,10 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     
     # 检查是否生成了工具调用
     has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
-    if hasattr(response, 'tool_calls'):
-        print(f"🔍 plan_qa_tools_node - tool_calls值: {response.tool_calls}")
-    
     if has_tool_calls:
-        for i, tool_call in enumerate(response.tool_calls):
-            print(f"  工具调用 {i+1}: {tool_call.get('name', 'unknown')} - {tool_call.get('args', {})}")
+        logger.info(f"检测到工具调用，数量: {len(response.tool_calls)}")
     else:
-        print(f"  LLM回答: {response.content[:200]}...")
+        logger.info("无工具调用，将直接生成回答")
         
     result = {
         "messages": [response]
@@ -149,9 +127,6 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
     """
     生成回答节点 - 基于用户问题和上下文生成专业回答
     """
-    print(f"✅ 执行节点: generate_answer_node")
-    print(f"🔍 generate_answer_node - 输入状态: {list(state.keys())}")
-    
     configurable = Configuration.from_runnable_config(config)
     
     # 获取状态信息
@@ -159,38 +134,26 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
     qa_context = state.get("qa_context", "")
     messages = state.get("messages", [])
     
-    print(f"🔍 generate_answer_node - user_question: {user_question}")
-    print(f"🔍 generate_answer_node - qa_context: {qa_context[:100]}...")
-    print(f"🔍 generate_answer_node - messages数量: {len(messages)}")
-    
     # 如果没有用户问题，从消息中获取
     if not user_question and messages:
         user_question = messages[-1].content if messages else ""
-        print(f"🔍 generate_answer_node - 从消息中获取用户问题: {user_question}")
     
     # 创建LLM实例
     llm = configurable.create_llm(
         model_name=configurable.answer_model,
         temperature=configurable.final_report_temperature
     )
-    print(f"🔍 generate_answer_node - LLM模型: {configurable.answer_model}")
     
     # 检查是否有工具结果
     tool_results = []
-    print(f"🔍 检查消息中的工具结果，总消息数: {len(messages)}")
     for i, msg in enumerate(messages):
-        print(f"  消息 {i}: type={type(msg)}, name={getattr(msg, 'name', None)}, content={getattr(msg, 'content', '')[:100]}...")
         if hasattr(msg, 'name') and msg.name and hasattr(msg, 'content'):
             tool_results.append(f"工具 {msg.name} 返回: {msg.content}")
-            print(f"    ✅ 找到工具结果: {msg.name}")
-    
-    print(f"🔍 找到的工具结果数量: {len(tool_results)}")
     
     # 生成通用的回答提示词
     if tool_results:
         tool_info = "\n".join(tool_results)
-        print(f"🛠️ 使用工具结果生成回答:")
-        print(f"  工具信息: {tool_info}")
+        logger.info(f"使用工具结果生成回答，工具数量: {len(tool_results)}")
         
         prompt = f"""你是一个专业的运维技术助手，擅长回答各种运维相关问题。
 
@@ -212,7 +175,7 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
 
 请直接回答用户的问题。"""
     else:
-        print(f"❌ 没有找到工具结果，使用默认回答模式")
+        logger.info("没有找到工具结果，使用默认回答模式")
         prompt = f"""你是一个专业的运维技术助手，擅长回答各种运维相关问题。
 
 用户问题：{user_question}
@@ -230,21 +193,13 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
 
 请直接回答用户的问题。"""
     
-    print(f"🔍 generate_answer_node - 开始调用LLM生成回答...")
-    print(f"🔍 generate_answer_node - 提示词长度: {len(prompt)}")
-    
     # 生成回答
     response = llm.invoke(prompt)
-    print(f"🔍 generate_answer_node - LLM响应完成")
-    print(f"🔍 generate_answer_node - 响应内容: {response.content[:200]}...")
-    
     logger.info(f"问答回答生成完成")
     
     result = {
         "messages": [AIMessage(content=response.content)]
     }
-    print(f"🔍 generate_answer_node - 返回结果: {list(result.keys())}")
-    print(f"🔍 generate_answer_node - 返回消息数量: {len(result['messages'])}")
     
     return result
 
@@ -316,38 +271,20 @@ def determine_qa_type(user_question: str, qa_context: str, config: RunnableConfi
 
 def check_qa_tool_calls(state: DiagnosticState, config: RunnableConfig) -> Literal["execute_tools", "END"]:
     """检查是否有工具调用需要执行，如果没有工具调用且已有回复则直接结束"""
-    print(f"✅ 执行路由函数: check_qa_tool_calls")
     
     messages = state.get("messages", [])
-    print(f"🔍 路由检查 - 消息总数: {len(messages)}")
     
     if not messages:
-        print(f"❌ 没有消息，直接结束")
         return "END"
     
     last_message = messages[-1]
-    print(f"🔍 最后一条消息类型: {type(last_message)}")
-    print(f"🔍 消息内容: {getattr(last_message, 'content', 'N/A')[:100]}...")
-    
     has_tool_calls = hasattr(last_message, 'tool_calls') and last_message.tool_calls
     has_content = hasattr(last_message, 'content') and last_message.content.strip()
-    
-    print(f"🔍 hasattr(tool_calls): {hasattr(last_message, 'tool_calls')}")
-    print(f"🔍 has_content: {has_content}")
-    if hasattr(last_message, 'tool_calls'):
-        print(f"🔍 tool_calls值: {last_message.tool_calls}")
-    
     if has_tool_calls:
-        print(f"✅ 检测到工具调用，数量: {len(last_message.tool_calls)}")
-        logger.info(f"检测到工具调用，数量: {len(last_message.tool_calls)}")
         return "execute_tools"
     elif has_content:
-        print(f"✅ 无工具调用但有回复内容，直接结束")
-        logger.info("无工具调用但有回复内容，直接结束")
         return "END"
     else:
-        print(f"❌ 无工具调用也无回复内容，直接结束")
-        logger.info("无工具调用也无回复内容，直接结束")
         return "END"
 
 
@@ -449,11 +386,7 @@ def create_general_qa_subgraph():
     
     # 包装工具节点以添加权限检查和interrupt
     def execute_qa_tools_node(state, config):
-        print(f"✅ 执行节点: execute_qa_tools_node")
-        print(f"🔍 execute_qa_tools_node - 输入状态: {list(state.keys())}")
-        
         messages = state.get("messages", [])
-        print(f"🔍 execute_qa_tools_node - messages数量: {len(messages)}")
         
         # 检查最后一条消息是否有工具调用
         if not messages:
@@ -461,11 +394,10 @@ def create_general_qa_subgraph():
             
         last_message = messages[-1]
         if not (hasattr(last_message, 'tool_calls') and last_message.tool_calls):
-            print(f"🔍 execute_qa_tools_node - 未检测到工具调用")
             return {"messages": []}
         
         tool_calls = last_message.tool_calls
-        print(f"🔍 execute_qa_tools_node - 检测到工具调用数量: {len(tool_calls)}")
+        logger.info(f"开始执行工具调用，数量: {len(tool_calls)}")
         
         # 权限检查
         from .tool_permissions import check_tool_permission, get_approval_message
@@ -476,17 +408,14 @@ def create_general_qa_subgraph():
         for tool_call in tool_calls:
             tool_name = tool_call.get('name', 'unknown')
             tool_args = tool_call.get('args', {})
-            print(f"  工具调用: {tool_name} - {tool_args}")
             
             # 检查权限
             permission_result = check_tool_permission(tool_name, tool_args)
             
             if permission_result["approved"]:
                 approved_tools.append(tool_call)
-                print(f"  ✅ 工具 {tool_name} 自动批准")
             else:
                 needs_approval.append((tool_call, permission_result))
-                print(f"  ⏳ 工具 {tool_name} 需要审批")
         
         # 如果有需要审批的工具，interrupt
         if needs_approval:
@@ -502,8 +431,6 @@ def create_general_qa_subgraph():
             if approved_tools:
                 combined_message = f"工具权限检查结果：\n- ✅ {len(approved_tools)} 个已自动批准\n- ⏳ {len(needs_approval)} 个需要确认\n\n" + combined_message
             
-            print(f"⏸️ 需要用户审批，触发interrupt")
-            
             # 触发interrupt，等待用户确认
             from langgraph.types import interrupt
             interrupt_info = {
@@ -516,12 +443,10 @@ def create_general_qa_subgraph():
             
             # 调用interrupt并获取用户确认结果
             user_approved = interrupt(interrupt_info)
-            print(f"🔍 用户审批结果: {user_approved}")
             
             if user_approved:
                 # 用户确认，执行所有工具
                 all_tools = approved_tools + [tc for tc, _ in needs_approval]
-                print(f"✅ 用户确认，执行所有 {len(all_tools)} 个工具")
                 
                 # 更新消息中的tool_calls为所有工具
                 from langchain_core.messages import AIMessage as LangAIMessage
@@ -533,7 +458,6 @@ def create_general_qa_subgraph():
                 temp_state["messages"] = messages[:-1] + [approved_message]
             else:
                 # 用户拒绝，只执行已批准的工具
-                print(f"❌ 用户拒绝，只执行 {len(approved_tools)} 个已批准工具")
                 if approved_tools:
                     from langchain_core.messages import AIMessage as LangAIMessage
                     approved_message = LangAIMessage(
@@ -547,13 +471,10 @@ def create_general_qa_subgraph():
                     return {"messages": [AIMessage(content="已取消工具执行。")]}
             
             # 执行工具
-            print(f"🔍 execute_qa_tools_node - 开始执行工具...")
             result = tool_node.invoke(temp_state, config)
-            print(f"🔍 execute_qa_tools_node - 工具执行完成")
             return result
         
         # 所有工具都已批准，直接执行
-        print(f"✅ 所有 {len(approved_tools)} 个工具都已批准，开始执行")
         
         # 如果只有部分工具被批准，更新消息中的tool_calls
         if len(approved_tools) < len(tool_calls):
@@ -567,16 +488,8 @@ def create_general_qa_subgraph():
         else:
             temp_state = state
         
-        print(f"🔍 execute_qa_tools_node - 开始执行工具...")
         result = tool_node.invoke(temp_state, config)
-        print(f"🔍 execute_qa_tools_node - 工具执行完成")
-        print(f"🔍 execute_qa_tools_node - 返回结果: {list(result.keys())}")
-        
-        if "messages" in result:
-            print(f"🔍 execute_qa_tools_node - 返回消息数量: {len(result['messages'])}")
-            for i, msg in enumerate(result["messages"]):
-                print(f"  返回消息 {i}: type={type(msg)}, name={getattr(msg, 'name', None)}, content={getattr(msg, 'content', '')[:100]}...")
-        
+        logger.info("工具执行完成")
         return result
     
     # 创建子图
