@@ -447,7 +447,7 @@ def create_general_qa_subgraph():
     qa_safe_tools = all_tools
     tool_node = ToolNode(qa_safe_tools)
     
-    # 包装工具节点以添加打印
+    # 包装工具节点以添加权限检查和interrupt
     def execute_qa_tools_node(state, config):
         print(f"✅ 执行节点: execute_qa_tools_node")
         print(f"🔍 execute_qa_tools_node - 输入状态: {list(state.keys())}")
@@ -456,18 +456,119 @@ def create_general_qa_subgraph():
         print(f"🔍 execute_qa_tools_node - messages数量: {len(messages)}")
         
         # 检查最后一条消息是否有工具调用
-        if messages:
-            last_message = messages[-1]
-            print(f"🔍 execute_qa_tools_node - 最后一条消息类型: {type(last_message)}")
-            if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
-                print(f"🔍 execute_qa_tools_node - 检测到工具调用数量: {len(last_message.tool_calls)}")
-                for i, tool_call in enumerate(last_message.tool_calls):
-                    print(f"  工具调用 {i+1}: {tool_call.get('name', 'unknown')} - {tool_call.get('args', {})}")
+        if not messages:
+            return {"messages": []}
+            
+        last_message = messages[-1]
+        if not (hasattr(last_message, 'tool_calls') and last_message.tool_calls):
+            print(f"🔍 execute_qa_tools_node - 未检测到工具调用")
+            return {"messages": []}
+        
+        tool_calls = last_message.tool_calls
+        print(f"🔍 execute_qa_tools_node - 检测到工具调用数量: {len(tool_calls)}")
+        
+        # 权限检查
+        from .tool_permissions import check_tool_permission, get_approval_message
+        
+        needs_approval = []
+        approved_tools = []
+        
+        for tool_call in tool_calls:
+            tool_name = tool_call.get('name', 'unknown')
+            tool_args = tool_call.get('args', {})
+            print(f"  工具调用: {tool_name} - {tool_args}")
+            
+            # 检查权限
+            permission_result = check_tool_permission(tool_name, tool_args)
+            
+            if permission_result["approved"]:
+                approved_tools.append(tool_call)
+                print(f"  ✅ 工具 {tool_name} 自动批准")
             else:
-                print(f"🔍 execute_qa_tools_node - 未检测到工具调用")
+                needs_approval.append((tool_call, permission_result))
+                print(f"  ⏳ 工具 {tool_name} 需要审批")
+        
+        # 如果有需要审批的工具，interrupt
+        if needs_approval:
+            approval_messages = []
+            for tool_call, permission_result in needs_approval:
+                tool_name = tool_call.get('name', 'unknown')
+                tool_args = tool_call.get('args', {})
+                approval_msg = get_approval_message(tool_name, tool_args, permission_result["risk_level"])
+                approval_messages.append(approval_msg)
+            
+            combined_message = f"检测到 {len(needs_approval)} 个工具调用需要确认：\n\n" + "\n\n---\n\n".join(approval_messages)
+            
+            if approved_tools:
+                combined_message = f"工具权限检查结果：\n- ✅ {len(approved_tools)} 个已自动批准\n- ⏳ {len(needs_approval)} 个需要确认\n\n" + combined_message
+            
+            print(f"⏸️ 需要用户审批，触发interrupt")
+            
+            # 触发interrupt，等待用户确认
+            from langgraph.types import interrupt
+            interrupt_info = {
+                "message": combined_message,
+                "approved_tools": approved_tools,
+                "pending_tools": [tc for tc, _ in needs_approval],
+                "original_tool_calls": tool_calls,
+                "suggestion_type": "tool_approval"
+            }
+            
+            # 调用interrupt并获取用户确认结果
+            user_approved = interrupt(interrupt_info)
+            print(f"🔍 用户审批结果: {user_approved}")
+            
+            if user_approved:
+                # 用户确认，执行所有工具
+                all_tools = approved_tools + [tc for tc, _ in needs_approval]
+                print(f"✅ 用户确认，执行所有 {len(all_tools)} 个工具")
+                
+                # 更新消息中的tool_calls为所有工具
+                from langchain_core.messages import AIMessage as LangAIMessage
+                approved_message = LangAIMessage(
+                    content=last_message.content,
+                    tool_calls=all_tools
+                )
+                temp_state = state.copy()
+                temp_state["messages"] = messages[:-1] + [approved_message]
+            else:
+                # 用户拒绝，只执行已批准的工具
+                print(f"❌ 用户拒绝，只执行 {len(approved_tools)} 个已批准工具")
+                if approved_tools:
+                    from langchain_core.messages import AIMessage as LangAIMessage
+                    approved_message = LangAIMessage(
+                        content=last_message.content,
+                        tool_calls=approved_tools
+                    )
+                    temp_state = state.copy()
+                    temp_state["messages"] = messages[:-1] + [approved_message]
+                else:
+                    # 没有已批准工具，返回取消消息
+                    return {"messages": [AIMessage(content="已取消工具执行。")]}
+            
+            # 执行工具
+            print(f"🔍 execute_qa_tools_node - 开始执行工具...")
+            result = tool_node.invoke(temp_state, config)
+            print(f"🔍 execute_qa_tools_node - 工具执行完成")
+            return result
+        
+        # 所有工具都已批准，直接执行
+        print(f"✅ 所有 {len(approved_tools)} 个工具都已批准，开始执行")
+        
+        # 如果只有部分工具被批准，更新消息中的tool_calls
+        if len(approved_tools) < len(tool_calls):
+            from langchain_core.messages import AIMessage as LangAIMessage
+            approved_message = LangAIMessage(
+                content=last_message.content,
+                tool_calls=approved_tools
+            )
+            temp_state = state.copy()
+            temp_state["messages"] = messages[:-1] + [approved_message]
+        else:
+            temp_state = state
         
         print(f"🔍 execute_qa_tools_node - 开始执行工具...")
-        result = tool_node.invoke(state, config)
+        result = tool_node.invoke(temp_state, config)
         print(f"🔍 execute_qa_tools_node - 工具执行完成")
         print(f"🔍 execute_qa_tools_node - 返回结果: {list(result.keys())}")
         
