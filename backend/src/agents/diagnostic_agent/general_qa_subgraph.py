@@ -314,23 +314,26 @@ def determine_qa_type(user_question: str, qa_context: str, config: RunnableConfi
         return "technical_qa"  # 默认为技术问答
 
 
-def check_qa_tool_calls(state: DiagnosticState, config: RunnableConfig) -> Literal["execute_tools", "generate_answer"]:
-    """检查是否有工具调用需要执行"""
+def check_qa_tool_calls(state: DiagnosticState, config: RunnableConfig) -> Literal["execute_tools", "END"]:
+    """检查是否有工具调用需要执行，如果没有工具调用且已有回复则直接结束"""
     print(f"✅ 执行路由函数: check_qa_tool_calls")
     
     messages = state.get("messages", [])
     print(f"🔍 路由检查 - 消息总数: {len(messages)}")
     
     if not messages:
-        print(f"❌ 没有消息，直接生成回答")
-        return "generate_answer"
+        print(f"❌ 没有消息，直接结束")
+        return "END"
     
     last_message = messages[-1]
     print(f"🔍 最后一条消息类型: {type(last_message)}")
     print(f"🔍 消息内容: {getattr(last_message, 'content', 'N/A')[:100]}...")
     
     has_tool_calls = hasattr(last_message, 'tool_calls') and last_message.tool_calls
+    has_content = hasattr(last_message, 'content') and last_message.content.strip()
+    
     print(f"🔍 hasattr(tool_calls): {hasattr(last_message, 'tool_calls')}")
+    print(f"🔍 has_content: {has_content}")
     if hasattr(last_message, 'tool_calls'):
         print(f"🔍 tool_calls值: {last_message.tool_calls}")
     
@@ -338,10 +341,14 @@ def check_qa_tool_calls(state: DiagnosticState, config: RunnableConfig) -> Liter
         print(f"✅ 检测到工具调用，数量: {len(last_message.tool_calls)}")
         logger.info(f"检测到工具调用，数量: {len(last_message.tool_calls)}")
         return "execute_tools"
+    elif has_content:
+        print(f"✅ 无工具调用但有回复内容，直接结束")
+        logger.info("无工具调用但有回复内容，直接结束")
+        return "END"
     else:
-        print(f"❌ 无工具调用，直接生成回答")
-        logger.info("无工具调用，直接生成回答")
-        return "generate_answer"
+        print(f"❌ 无工具调用也无回复内容，直接结束")
+        logger.info("无工具调用也无回复内容，直接结束")
+        return "END"
 
 
 def generate_technical_qa_prompt(user_question: str, qa_context: str) -> str:
@@ -483,7 +490,7 @@ def create_general_qa_subgraph():
     # 设置流程
     builder.add_edge(START, "analyze_context")
     builder.add_edge("analyze_context", "plan_tools")
-    builder.add_conditional_edges("plan_tools", check_qa_tool_calls, {"execute_tools": "execute_tools", "generate_answer": "generate_answer"})
+    builder.add_conditional_edges("plan_tools", check_qa_tool_calls, {"execute_tools": "execute_tools", "END": END})
     builder.add_edge("execute_tools", "generate_answer")
     builder.add_edge("generate_answer", END)
     return builder.compile()
