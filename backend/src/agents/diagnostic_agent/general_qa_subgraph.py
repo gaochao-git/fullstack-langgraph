@@ -71,11 +71,6 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     # 如果没有用户问题，从消息中获取
     if not user_question and messages:
         user_question = messages[-1].content if messages else ""
-    
-    # 创建可用工具列表（只包含安全的查询工具）
-    # 普通问答助手只需要：通用工具（如时间查询）
-    # 不包含SSH、MySQL、Elasticsearch、Zabbix等系统诊断工具
-    # 也不包含SOP工具，因为SOP是诊断专用的
     available_tools = all_tools
     
     # 创建带工具的LLM
