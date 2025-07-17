@@ -256,3 +256,180 @@ diagnosis_report_instructions = """您是专业的故障诊断专家，负责基
 # 保留原有的兼容性接口
 default_info_insufficient_prompt = question_analysis_instructions
 default_diagnosis_plan_prompt = final_diagnosis_instructions
+
+# 普通问答相关提示词
+
+def get_qa_tool_planning_prompt(user_question: str, qa_context: str) -> str:
+    """生成普通问答工具规划提示词"""
+    return f"""你是一个专业的运维助手。请分析用户问题，自主决定是否需要使用工具来获取信息。
+
+用户问题：{user_question}
+
+对话上下文：
+{qa_context}
+
+请分析用户问题：
+1. 如果需要获取实时信息（如当前时间、SOP文档内容等），请调用相应工具
+2. 如果是概念性问题、技术解释或不需要实时数据，请直接回答，不要调用工具
+3. 如果不确定，优先尝试调用工具获取准确信息
+
+注意：只调用安全的查询工具，不要执行任何可能影响系统的操作。"""
+
+
+def get_qa_answer_with_tools_prompt(user_question: str, qa_context: str, tool_info: str) -> str:
+    """生成带工具结果的问答回答提示词"""
+    return f"""你是一个专业的运维技术助手，擅长回答各种运维相关问题。
+
+用户问题：{user_question}
+
+对话历史上下文：
+{qa_context}
+
+工具执行结果：
+{tool_info}
+
+请根据用户问题、上下文信息和工具执行结果，提供专业、准确的回答。
+
+重要：
+1. 必须使用工具返回的实际结果来回答用户问题
+2. 不要说"无法获取"或"建议通过其他方式"，直接使用工具结果
+3. 保持专业和友好的语调
+4. 如果工具返回的是JSON格式，请解析并使用其中的有效信息
+
+请直接回答用户的问题。"""
+
+
+def get_qa_answer_without_tools_prompt(user_question: str, qa_context: str) -> str:
+    """生成不带工具结果的问答回答提示词"""
+    return f"""你是一个专业的运维技术助手，擅长回答各种运维相关问题。
+
+用户问题：{user_question}
+
+对话历史上下文：
+{qa_context}
+
+请根据用户问题和上下文信息，提供专业、准确的回答。
+
+回答要求：
+1. 保持专业和友好的语调
+2. 提供具体、实用的建议
+3. 如果涉及操作步骤，请详细说明
+4. 如果需要注意事项，请提醒用户
+
+请直接回答用户的问题。"""
+
+
+def get_qa_type_classification_prompt(user_question: str, qa_context: str) -> str:
+    """生成问答类型分类提示词"""
+    return f"""你是一个专业的问答类型分类器。请分析用户问题，判断属于以下哪种类型：
+
+1. **technical_qa** - 技术问答：
+   - 询问技术知识、操作方法、概念解释
+   - 询问如何配置、安装、部署、监控等
+   - 询问命令用法、脚本编写、架构设计等
+   - 例如："如何配置nginx"、"什么是docker"、"怎么优化数据库性能"
+
+2. **system_query** - 系统查询：
+   - 需要查询实时信息、系统状态、配置信息
+   - 需要搜索文档、SOP、历史记录
+   - 需要获取当前时间、版本信息、统计数据
+   - 例如："现在几点了"、"查询SOP文档"、"显示系统状态"、"搜索相关文档"
+
+3. **follow_up** - 后续问题：
+   - 对之前回答的追问和补充
+   - 要求更详细解释或相关延伸
+   - 基于历史对话的继续讨论
+   - 例如："详细说明一下"、"还有其他方法吗"、"为什么会这样"
+
+4. **casual_chat** - 日常聊天：
+   - 问候、感谢、闲聊
+   - 不涉及技术内容的对话
+   - 例如："你好"、"谢谢"、"再见"
+
+用户问题：{user_question}
+
+对话历史：{qa_context}
+
+请分析用户问题，只返回类型名称：technical_qa、system_query、follow_up、casual_chat"""
+
+
+def get_technical_qa_prompt(user_question: str, qa_context: str) -> str:
+    """生成技术问答提示词"""
+    return f"""您是专业的运维技术专家，请回答用户的技术问题。
+
+用户问题：{user_question}
+
+对话上下文：
+{qa_context}
+
+请提供：
+1. 直接回答用户问题
+2. 如果涉及操作，提供具体步骤
+3. 如果有风险，提醒注意事项
+4. 如果需要更多信息，主动询问
+
+回答要求：
+- 专业准确，简洁明了
+- 提供实用的解决方案
+- 包含具体的命令或配置示例（如适用）
+- 避免过于复杂的术语解释"""
+
+
+def get_system_query_prompt(user_question: str, qa_context: str) -> str:
+    """生成系统查询提示词"""
+    return f"""您是运维系统助手，用户想要查询系统信息。
+
+用户问题：{user_question}
+
+对话上下文：
+{qa_context}
+
+请根据用户需求：
+1. 如果有相关历史信息，提供摘要
+2. 如果需要实时查询，说明查询方法
+3. 如果信息不足，询问更多细节
+
+回答要求：
+- 直接回答用户查询
+- 提供具体的查询命令或方法
+- 如果涉及历史诊断，引用相关结果"""
+
+
+def get_follow_up_prompt(user_question: str, qa_context: str) -> str:
+    """生成后续问题提示词"""
+    return f"""用户对之前的对话有后续问题，请基于上下文提供详细回答。
+
+用户问题：{user_question}
+
+对话上下文：
+{qa_context}
+
+请：
+1. 结合之前的对话内容回答
+2. 提供更详细的解释或补充信息
+3. 如果用户问题不够清楚，主动澄清
+
+回答要求：
+- 连贯性强，与之前对话呼应
+- 提供具体的补充信息
+- 保持专业和友好的语调"""
+
+
+def get_casual_chat_prompt(user_question: str, qa_context: str) -> str:
+    """生成日常聊天提示词"""
+    return f"""您是友好的运维助手，用户在进行日常对话。
+
+用户问题：{user_question}
+
+对话上下文：
+{qa_context}
+
+请：
+1. 自然友好地回应用户
+2. 如果涉及运维相关内容，提供简单说明
+3. 保持专业但轻松的语调
+
+回答要求：
+- 简洁自然
+- 友好亲切
+- 如果合适，可以询问是否需要技术帮助"""
