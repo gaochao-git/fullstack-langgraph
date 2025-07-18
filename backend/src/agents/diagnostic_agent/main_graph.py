@@ -15,6 +15,7 @@ from .schemas import IntentAnalysisOutput
 from .utils import compile_graph_with_checkpointer
 from .sop_diagnosis_subgraph import create_sop_diagnosis_subgraph
 from .general_qa_subgraph import create_general_qa_subgraph
+from .react_general_agent import create_react_general_subgraph
 
 logger = logging.getLogger(__name__)
 
@@ -104,10 +105,15 @@ def route_to_subgraph(state: DiagnosticState, config: RunnableConfig) -> Literal
     return intent
 
 
-def create_main_graph():
+def create_main_graph(use_react_general_agent: bool = True):
     """
     创建主图 - 包含路由逻辑和两个子图
     基于官方文档的子图集成模式
+    
+    Args:
+        use_react_general_agent: 是否使用新的 create_react_agent 通用智能体
+                                True: 使用新的 react_general_agent
+                                False: 使用原有的 general_qa_subgraph
     """
     
     # 创建主图
@@ -116,14 +122,22 @@ def create_main_graph():
     # 添加意图分析节点
     builder.add_node("analyze_intent", analyze_intent_node)
     
-    # 创建并添加子图 - 直接作为节点集成
+    # 创建 SOP 诊断子图
     sop_diagnosis_subgraph = create_sop_diagnosis_subgraph()
-    general_qa_subgraph = create_general_qa_subgraph()
-    
-    # 将子图作为节点添加到主图中
-    # 根据官方文档，子图可以直接作为节点使用
     builder.add_node("sop_diagnosis", sop_diagnosis_subgraph)
-    builder.add_node("general_qa", general_qa_subgraph)
+    
+    # 根据配置选择通用智能体实现
+    if use_react_general_agent:
+        # 使用新的 create_react_agent 实现
+        print("📍 使用新的 create_react_agent 通用智能体")
+        general_subgraph = create_react_general_subgraph()
+    else:
+        # 使用原有的 general_qa_subgraph 实现
+        print("📍 使用原有的 general_qa_subgraph")
+        general_subgraph = create_general_qa_subgraph()
+    
+    # 将通用智能体作为节点添加到主图中
+    builder.add_node("general_qa", general_subgraph)
     
     # 设置路由 - 从意图分析开始
     builder.add_edge(START, "analyze_intent")
@@ -146,15 +160,15 @@ def create_main_graph():
 
 
 # 编译主图
-def compile_main_graph():
+def compile_main_graph(use_react_general_agent: bool = True):
     """编译主图"""
-    builder = create_main_graph()
+    builder = create_main_graph(use_react_general_agent=use_react_general_agent)
     checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
     return compile_graph_with_checkpointer(builder, checkpointer_type)
 
 
-# 导出编译后的图
-graph = compile_main_graph()
+# 导出编译后的图 - 默认使用新的 react general agent
+graph = compile_main_graph(use_react_general_agent=True)
 
-# 导出builder用于PostgreSQL模式
-builder = create_main_graph()
+# 导出builder用于PostgreSQL模式 - 默认使用新的 react general agent
+builder = create_main_graph(use_react_general_agent=True)
