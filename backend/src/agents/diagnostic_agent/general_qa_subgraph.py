@@ -32,13 +32,9 @@ def analyze_question_context_node(state: DiagnosticState, config: RunnableConfig
     分析问题上下文节点 - 理解用户问题并准备回答
     """
     messages = state.get("messages", [])
-    
-    if not messages:
-        return {"qa_context": "无历史对话"}
-    
+    if not messages: return {"qa_context": "无历史对话"}
     # 获取用户问题
     user_question = messages[-1].content if messages else ""
-    
     # 构建对话上下文
     context_parts = []
     
