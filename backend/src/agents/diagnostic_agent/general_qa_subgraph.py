@@ -127,36 +127,6 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
     return {"messages": [AIMessage(content=response.content)]}
 
 
-def determine_qa_type(user_question: str, qa_context: str, config: RunnableConfig) -> str:
-    """
-    使用LLM智能判断问答类型
-    """
-    configurable = Configuration.from_runnable_config(config)
-    
-    # 创建LLM
-    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=0.1)
-    
-    # 构建判断提示词
-    classification_prompt = get_qa_type_classification_prompt(user_question, qa_context)
-    
-    # 调用LLM分类
-    try:
-        result = llm.invoke(classification_prompt)
-        qa_type = result.content.strip().lower()
-        
-        # 确保返回有效类型
-        valid_types = ["technical_qa", "system_query", "follow_up", "casual_chat"]
-        if qa_type in valid_types:
-            return qa_type
-        else:
-            # 如果LLM返回的不是有效类型，使用简单的fallback逻辑
-            logger.warning(f"LLM返回无效类型: {qa_type}，使用fallback逻辑")
-            return "technical_qa"  # 默认为技术问答
-    except Exception as e:
-        logger.error(f"LLM分类失败: {e}，使用fallback逻辑")
-        return "technical_qa"  # 默认为技术问答
-
-
 def check_qa_tool_calls(state: DiagnosticState, config: RunnableConfig) -> Literal["execute_tools", "END"]:
     """检查是否有工具调用需要执行，如果没有工具调用且已有回复则直接结束"""
     
