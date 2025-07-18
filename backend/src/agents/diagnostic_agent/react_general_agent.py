@@ -12,6 +12,7 @@ from langgraph.prebuilt import create_react_agent
 from .configuration import Configuration
 from .tools import all_tools
 from .state import DiagnosticState
+from .tool_permissions import TOOL_PERMISSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,103 @@ GENERAL_AGENT_PROMPT = """你是一个专业的运维技术助手，专门帮助
 请以友好、专业的态度协助用户解决技术问题。"""
 
 
+def add_human_in_the_loop(tool, *, interrupt_config=None):
+    """
+    为工具添加人工干预功能的包装器
+    基于官方的 add_human_in_the_loop 实现
+    """
+    from typing import Callable
+    from langchain_core.tools import BaseTool, tool as create_tool
+    from langchain_core.runnables import RunnableConfig
+    from langgraph.types import interrupt
+    
+    if not isinstance(tool, BaseTool):
+        tool = create_tool(tool)
+
+    if interrupt_config is None:
+        interrupt_config = {
+            "allow_accept": True,
+            "allow_edit": True,
+            "allow_respond": True,
+        }
+
+    @create_tool(
+        tool.name,
+        description=tool.description,
+        args_schema=tool.args_schema
+    )
+    def call_tool_with_interrupt(config: RunnableConfig, **tool_input):
+        request = {
+            "action_request": {
+                "action": tool.name,
+                "args": tool_input
+            },
+            "config": interrupt_config,
+            "description": f"请审批工具调用: {tool.name}"
+        }
+        
+        # 使用 interrupt() 触发中断，等待用户响应
+        # 按照原有通用agent的方式处理中断
+        interrupt_info = {
+            "message": f"检测到工具调用需要确认: {tool.name}",
+            "tool_name": tool.name,
+            "tool_args": tool_input,
+            "description": f"请审批工具调用: {tool.name}",
+            "suggestion_type": "tool_approval",
+            "risk_level": "medium"  # 可以根据工具类型调整
+        }
+        
+        # 调用interrupt并获取用户确认结果
+        # 按照原有通用agent的实现方式，interrupt()应该返回boolean值
+        user_approved = interrupt(interrupt_info)
+        print(f"🔍 中断响应: {user_approved}")
+        
+        if user_approved:
+            print(f"✅ 用户批准执行工具: {tool.name}")
+            tool_response = tool.invoke(tool_input, config)
+        else:
+            print(f"❌ 用户拒绝执行工具: {tool.name}")
+            tool_response = f"工具 {tool.name} 执行被用户拒绝"
+
+        return tool_response
+
+    return call_tool_with_interrupt
+
+
+def create_selective_approval_tools():
+    """
+    创建选择性审批的工具列表
+    根据 TOOL_PERMISSIONS 配置，对需要审批的工具添加人工干预
+    """
+    from copy import deepcopy
+    
+    # 创建工具副本，避免修改原始工具
+    selective_tools = []
+    
+    for tool in all_tools:
+        tool_name = tool.name
+        
+        # 检查工具是否需要审批
+        if tool_name in TOOL_PERMISSIONS["approval_required"]:
+            # 需要审批的工具：添加人工干预
+            print(f"🔒 工具 {tool_name} 需要审批，添加人工干预")
+            wrapped_tool = add_human_in_the_loop(
+                tool,
+                interrupt_config={
+                    "allow_accept": True,
+                    "allow_edit": True,
+                    "allow_respond": True,
+                }
+            )
+            selective_tools.append(wrapped_tool)
+        else:
+            # 安全工具：直接使用
+            print(f"✅ 工具 {tool_name} 安全，直接使用")
+            selective_tools.append(tool)
+    
+    return selective_tools
+
+
 def create_react_general_subgraph():
     """
     创建基于 create_react_agent 的通用智能体子图
@@ -72,12 +170,15 @@ def create_react_general_subgraph():
         # 动态获取LLM
         llm = get_llm_from_config(config)
         
-        # 创建 react agent，使用 interrupt_before=["tools"] 实现工具审批
+        # 创建选择性审批的工具列表
+        selective_tools = create_selective_approval_tools()
+        
+        # 创建 react agent，使用选择性审批的工具
+        # 不需要额外的 interrupt_before 或 hook，因为审批逻辑已经在工具层面处理
         react_agent = create_react_agent(
             model=llm,
-            tools=all_tools,
+            tools=selective_tools,  # 使用选择性审批的工具
             prompt=GENERAL_AGENT_PROMPT,
-            interrupt_before=["tools"],  # 在工具执行前暂停，等待审批
         )
         
         # 准备消息 - 转换为 react agent 需要的格式

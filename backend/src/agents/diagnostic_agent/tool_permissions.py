@@ -18,6 +18,9 @@ TOOL_PERMISSIONS = {
         "get_sop_detail",    # 查询SOP详情（只读）
         "list_sops",         # 列出SOP（只读）
         "search_sops",       # 搜索SOP（只读）
+        "get_es_data",       # ES数据查询（只读）
+        "get_es_indices",    # ES索引查询（只读）
+        "get_es_trends_data", # ES趋势数据查询（只读）
     },
     
     # 2. 需要审批工具 - 涉及系统操作的工具
@@ -39,6 +42,7 @@ TOOL_PERMISSIONS = {
         "get_zabbix_alerts",
         "get_zabbix_host_info",
         "get_zabbix_metrics",
+        "get_zabbix_metric_data",
     }
 }
 
