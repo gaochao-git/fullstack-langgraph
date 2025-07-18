@@ -75,28 +75,18 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     messages = state.get("messages", [])
     
     # 如果没有用户问题，从消息中获取
-    if not user_question and messages:
-        user_question = messages[-1].content if messages else ""
+    if not user_question and messages: user_question = messages[-1].content if messages else ""
     available_tools = all_tools
-    
     # 创建带工具的LLM
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=0.3
-    )
+    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=0.3)
     llm_with_tools = llm.bind_tools(available_tools)
-    
     # 构建工具规划提示 - 让LLM自己决定是否需要工具
     tool_planning_prompt = get_qa_tool_planning_prompt(user_question, qa_context)
-    
     # 构建消息
     system_message = SystemMessage(content=tool_planning_prompt)
     messages_with_system = [system_message] + messages
-    
     # 调用LLM生成工具调用
     response = llm_with_tools.invoke(messages_with_system)
-    
-    
     return {"messages": [response]}
 
 
