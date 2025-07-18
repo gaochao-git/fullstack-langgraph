@@ -50,62 +50,61 @@ GENERAL_AGENT_PROMPT = """你是一个专业的运维技术助手，专门帮助
 请以友好、专业的态度协助用户解决技术问题。"""
 
 
-def create_react_general_agent_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
-    """
-    动态创建和使用 react agent 的节点函数
-    """
-    print(f"✅ 执行新通用智能体: react_general_agent")
-    print(f"🔍 react_general_agent - 输入状态: {list(state.keys())}")
-    
-    # 从配置中获取LLM实例
-    configurable = Configuration.from_runnable_config(config)
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=configurable.model_temperature
-    )
-    
-    # 动态创建 react agent
-    react_agent = create_react_agent(
-        model=llm,
-        tools=all_tools,
-    )
-    
-    # 准备消息，添加系统提示
-    messages = state.get("messages", [])
-    has_system_message = any(isinstance(msg, SystemMessage) for msg in messages)
-    
-    if not has_system_message and messages:
-        messages = [SystemMessage(content=GENERAL_AGENT_PROMPT)] + messages
-    
-    # 准备 react agent 状态
-    react_state = {"messages": messages}
-    
-    print(f"🚀 react_general_agent - 开始调用 create_react_agent...")
-    
-    # 调用 react agent
-    result = react_agent.invoke(react_state, config)
-    
-    print(f"✅ react_general_agent - 调用完成")
-    print(f"📝 react_general_agent - 返回消息数量: {len(result.get('messages', []))}")
-    
-    # 返回更新的消息
-    return {"messages": result.get("messages", [])}
-
-
 def create_react_general_subgraph():
     """
     创建基于 create_react_agent 的通用智能体子图
+    包装在我们自己的状态图中，以保持兼容性
     """
-    from langgraph.graph import StateGraph, START, END
+    # 从配置中获取LLM实例
+    def get_llm_from_config(config: RunnableConfig):
+        configurable = Configuration.from_runnable_config(config)
+        return configurable.create_llm(
+            model_name=configurable.query_generator_model,
+            temperature=configurable.model_temperature
+        )
     
-    # 创建简单的状态图，只包含一个 react agent 节点
+    # 创建带工具审批的 react agent 节点
+    def create_react_agent_node(state: DiagnosticState, config: RunnableConfig):
+        """创建 react agent 节点"""
+        print(f"✅ 执行新通用智能体: react_general_agent")
+        print(f"🔍 react_general_agent - 输入状态: {list(state.keys())}")
+        
+        # 动态获取LLM
+        llm = get_llm_from_config(config)
+        
+        # 创建 react agent，使用 interrupt_before=["tools"] 实现工具审批
+        react_agent = create_react_agent(
+            model=llm,
+            tools=all_tools,
+            prompt=GENERAL_AGENT_PROMPT,
+            interrupt_before=["tools"],  # 在工具执行前暂停，等待审批
+        )
+        
+        # 准备消息 - 转换为 react agent 需要的格式
+        messages = state.get("messages", [])
+        react_state = {"messages": messages}
+        
+        print(f"🚀 react_general_agent - 开始调用 create_react_agent...")
+        
+        # 调用 react agent
+        result = react_agent.invoke(react_state, config)
+        
+        print(f"✅ react_general_agent - 调用完成")
+        print(f"📝 react_general_agent - 返回消息数量: {len(result.get('messages', []))}")
+        
+        # 返回更新的消息，保持与原有状态的兼容
+        return {"messages": result.get("messages", [])}
+    
+    # 创建包装的状态图
+    from langgraph.graph import StateGraph, START, END
     builder = StateGraph(DiagnosticState)
     
     # 添加 react agent 节点
-    builder.add_node("react_general_agent", create_react_general_agent_node)
+    builder.add_node("react_general_agent", create_react_agent_node)
     
     # 设置边
     builder.add_edge(START, "react_general_agent")
     builder.add_edge("react_general_agent", END)
     
+    print(f"✅ 创建新的 create_react_agent 通用智能体子图")
     return builder.compile()

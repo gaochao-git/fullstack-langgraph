@@ -93,10 +93,35 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         has_interrupt = False
         if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
             logger.info(f"Interrupt detected: {data}")
-            if thread_interrupts is not None:
-                if thread_id not in thread_interrupts:
-                    thread_interrupts[thread_id] = []
-                thread_interrupts[thread_id].append(data["__interrupt__"][0])
+            interrupt_data = data["__interrupt__"]
+            
+            # 检查 interrupt_data 是否为空
+            if interrupt_data and len(interrupt_data) > 0:
+                if thread_interrupts is not None:
+                    if thread_id not in thread_interrupts:
+                        thread_interrupts[thread_id] = []
+                    thread_interrupts[thread_id].append(interrupt_data[0])
+                    logger.info(f"💾 保存了中断信息到线程 {thread_id}: {interrupt_data[0]}")
+            else:
+                logger.warning(f"⚠️ 检测到空的中断数据: {interrupt_data}")
+                
+                # 处理空的中断数据：创建工具审批请求
+                # 这通常发生在 create_react_agent 使用 interrupt_before=["tools"] 时
+                if thread_interrupts is not None:
+                    if thread_id not in thread_interrupts:
+                        thread_interrupts[thread_id] = []
+                    
+                    # 创建一个标准的工具审批请求
+                    approval_request = {
+                        "message": "🔧 检测到工具调用请求，需要用户确认后继续执行",
+                        "suggestion_type": "tool_approval",
+                        "pending_tools": [],  # 具体工具信息需要从上下文获取
+                        "approved_tools": [],
+                        "interrupt_type": "create_react_agent_tools"
+                    }
+                    thread_interrupts[thread_id].append(approval_request)
+                    logger.info(f"💾 创建了工具审批请求到线程 {thread_id}")
+            
             has_interrupt = True
         
         return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serialized_data, ensure_ascii=False)}\n\n", has_interrupt
