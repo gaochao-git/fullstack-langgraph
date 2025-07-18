@@ -122,10 +122,8 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
     else:
         logger.info("没有找到工具结果，使用默认回答模式")
         prompt = get_qa_answer_without_tools_prompt(user_question, qa_context)
-    
     # 生成回答
     response = llm.invoke(prompt)    
-    
     return {"messages": [AIMessage(content=response.content)]}
 
 
