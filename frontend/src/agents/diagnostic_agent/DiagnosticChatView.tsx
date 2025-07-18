@@ -832,7 +832,7 @@ export function DiagnosticChatView({
           ))}
           
           {/* 调试信息 */}
-          {interrupt && (
+          {/* {interrupt && (
             <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded">
               <h3 className="text-red-800 font-bold">调试信息:</h3>
               <pre className="text-xs text-red-700 overflow-auto">
@@ -842,7 +842,7 @@ export function DiagnosticChatView({
                 <strong>batch_mode:</strong> {String(interrupt.value?.batch_mode)}
               </div>
             </div>
-          )}
+          )} */}
           
           {/* 单个工具审批组件 */}
           {interrupt && interrupt.value && !interrupt.value.batch_mode && (
