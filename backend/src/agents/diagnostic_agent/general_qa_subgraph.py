@@ -102,14 +102,10 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
     messages = state.get("messages", [])
     
     # 如果没有用户问题，从消息中获取
-    if not user_question and messages:
-        user_question = messages[-1].content if messages else ""
+    if not user_question and messages: user_question = messages[-1].content if messages else ""
     
     # 创建LLM实例
-    llm = configurable.create_llm(
-        model_name=configurable.answer_model,
-        temperature=configurable.final_report_temperature
-    )
+    llm = configurable.create_llm(model_name=configurable.answer_model,temperature=configurable.final_report_temperature)
     
     # 检查是否有工具结果
     tool_results = []
@@ -128,14 +124,9 @@ def generate_answer_node(state: DiagnosticState, config: RunnableConfig) -> Dict
         prompt = get_qa_answer_without_tools_prompt(user_question, qa_context)
     
     # 生成回答
-    response = llm.invoke(prompt)
-    logger.info(f"问答回答生成完成")
+    response = llm.invoke(prompt)    
     
-    result = {
-        "messages": [AIMessage(content=response.content)]
-    }
-    
-    return result
+    return {"messages": [AIMessage(content=response.content)]}
 
 
 def determine_qa_type(user_question: str, qa_context: str, config: RunnableConfig) -> str:
