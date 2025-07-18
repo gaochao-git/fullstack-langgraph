@@ -79,7 +79,7 @@ def plan_qa_tools_node(state: DiagnosticState, config: RunnableConfig) -> Dict[s
     available_tools = all_tools
     # 创建带工具的LLM
     llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=0.3)
-    # 绑定工具时设置串行执行：parallel_tool_calls=False
+    # 绑定工具时设置串行执行：parallel_tool_calls=False，需要模型支持，deepseek不行
     llm_with_tools = llm.bind_tools(available_tools, parallel_tool_calls=False)
     # 构建工具规划提示 - 让LLM自己决定是否需要工具
     tool_planning_prompt = get_qa_tool_planning_prompt(user_question, qa_context)
