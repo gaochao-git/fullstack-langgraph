@@ -155,7 +155,7 @@ interface ToolCallsProps {
   message: Message;
   allMessages: Message[];
   interrupt?: any; // 添加interrupt数据
-  onInterruptResume?: (approved: boolean) => void; // 添加interrupt处理函数
+  onInterruptResume?: (approved: boolean | string[]) => void; // 添加interrupt处理函数
 }
 
 // 工具调用列表组件
@@ -225,6 +225,329 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
   );
 };
 
+// 批量工具审批组件 props
+interface BatchToolApprovalProps {
+  interrupt: any;
+  onInterruptResume: (approvedTools: string[]) => void;
+}
+
+// 批量工具审批组件
+const BatchToolApproval: React.FC<BatchToolApprovalProps> = ({ interrupt, onInterruptResume }) => {
+  const [approvedTools, setApprovedTools] = useState<Set<string>>(new Set());
+  const [submittedTools, setSubmittedTools] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // 从interrupt中获取待审批的工具列表
+  const pendingTools = interrupt?.pending_tools || [];
+  const approvedToolsFromBackend = interrupt?.approved_tools || [];
+  const totalTools = interrupt?.total_tools || 0;
+  
+  // 处理单个工具的审批状态变化
+  const handleToolApprovalChange = (toolCallId: string, approved: boolean) => {
+    setApprovedTools(prev => {
+      const newSet = new Set(prev);
+      if (approved) {
+        newSet.add(toolCallId);
+      } else {
+        newSet.delete(toolCallId);
+      }
+      return newSet;
+    });
+  };
+  
+  // 计算剩余待审批的工具
+  const remainingTools = pendingTools.filter((tool: any) => !submittedTools.has(tool.tool_call_id));
+  
+  // 处理全选/取消全选
+  const handleSelectAll = (selectAll: boolean) => {
+    if (selectAll) {
+      const allToolIds = remainingTools.map((tool: any) => tool.tool_call_id);
+      setApprovedTools(new Set(allToolIds));
+    } else {
+      setApprovedTools(new Set());
+    }
+  };
+  
+  // 提交当前选中的工具
+  const handleSubmitSelected = async () => {
+    const approvedToolIds = Array.from(approvedTools);
+    if (approvedToolIds.length > 0) {
+      setIsSubmitting(true);
+      try {
+        // 将当前选中的工具标记为已提交
+        setSubmittedTools(prev => new Set([...prev, ...approvedToolIds]));
+        // 清空当前选择
+        setApprovedTools(new Set());
+        // 提交选中的工具
+        onInterruptResume(approvedToolIds);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+  
+  // 提交所有剩余工具
+  const handleSubmitAll = async () => {
+    const allToolIds = remainingTools.map((tool: any) => tool.tool_call_id);
+    if (allToolIds.length > 0) {
+      setIsSubmitting(true);
+      try {
+        // 将所有剩余工具标记为已提交
+        setSubmittedTools(prev => new Set([...prev, ...allToolIds]));
+        // 清空当前选择
+        setApprovedTools(new Set());
+        // 提交所有剩余工具
+        onInterruptResume(allToolIds);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+  
+  // 拒绝所有工具
+  const handleRejectAll = async () => {
+    setIsSubmitting(true);
+    try {
+      // 拒绝所有工具
+      onInterruptResume([]);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-orange-800">
+          批量工具审批 ({pendingTools.length} 个待审批)
+        </h3>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleSelectAll(true)}
+            className="text-xs"
+          >
+            全选
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleSelectAll(false)}
+            className="text-xs"
+          >
+            取消全选
+          </Button>
+        </div>
+      </div>
+      
+      {/* 已自动批准的工具 */}
+      {approvedToolsFromBackend.length > 0 && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-sm font-medium text-green-700">
+              已自动批准 ({approvedToolsFromBackend.length} 个)
+            </span>
+          </div>
+          <div className="text-xs text-green-600">
+            {approvedToolsFromBackend.map((tool: any, index: number) => (
+              <span key={index} className="inline-block bg-green-100 px-2 py-1 rounded mr-2 mb-1">
+                {tool.name || 'Unknown Tool'}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* 已提交的工具 */}
+      {submittedTools.size > 0 && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <span className="text-sm font-medium text-blue-700">
+              已提交执行 ({submittedTools.size} 个)
+            </span>
+          </div>
+          <div className="text-xs text-blue-600">
+            {pendingTools
+              .filter((tool: any) => submittedTools.has(tool.tool_call_id))
+              .map((tool: any, index: number) => (
+                <span key={tool.tool_call_id} className="inline-block bg-blue-100 px-2 py-1 rounded mr-2 mb-1">
+                  {tool.tool_name || 'Unknown Tool'}
+                </span>
+              ))}
+          </div>
+        </div>
+      )}
+      
+      {/* 待确认的工具列表 */}
+      <div className="space-y-3">
+        {remainingTools.map((tool: any) => (
+          <div key={tool.tool_call_id} className="border border-orange-200 rounded-lg p-3 bg-white">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-medium text-orange-800">{tool.tool_name}</span>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${
+                      tool.risk_level === 'high' ? 'border-red-500 text-red-700' :
+                      tool.risk_level === 'medium' ? 'border-orange-500 text-orange-700' :
+                      'border-yellow-500 text-yellow-700'
+                    }`}
+                  >
+                    {tool.risk_level?.toUpperCase() || 'MEDIUM'} 风险
+                  </Badge>
+                </div>
+                <div className="text-xs text-gray-600 mb-2">
+                  <strong>参数:</strong>
+                </div>
+                <pre className="text-xs bg-gray-100 p-2 rounded border overflow-x-auto">
+                  {JSON.stringify(tool.tool_args, null, 2)}
+                </pre>
+                {tool.reason && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    <strong>原因:</strong> {tool.reason}
+                  </div>
+                )}
+              </div>
+              <div className="ml-4">
+                <input
+                  type="checkbox"
+                  checked={approvedTools.has(tool.tool_call_id)}
+                  onChange={(e) => handleToolApprovalChange(tool.tool_call_id, e.target.checked)}
+                  className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* 操作按钮 */}
+      <div className="flex justify-between items-center mt-4 pt-4 border-t border-orange-200">
+        <div className="text-sm text-gray-600">
+          已选择 {approvedTools.size} / {remainingTools.length} 个工具
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRejectAll}
+            className="border-gray-400 text-gray-600 hover:bg-gray-100"
+            disabled={isSubmitting}
+          >
+            拒绝全部
+          </Button>
+          <Button
+            onClick={handleSubmitSelected}
+            disabled={approvedTools.size === 0 || isSubmitting}
+            className="bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+          >
+            {isSubmitting ? "提交中..." : `提交选中 (${approvedTools.size} 个)`}
+          </Button>
+          {remainingTools.length > 0 && (
+            <Button
+              onClick={handleSubmitAll}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "提交中..." : `提交剩余 (${remainingTools.length} 个)`}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 单个工具审批组件 props
+interface SingleToolApprovalProps {
+  interrupt: any;
+  onInterruptResume: (approved: boolean) => void;
+}
+
+// 单个工具审批组件
+const SingleToolApproval: React.FC<SingleToolApprovalProps> = ({ interrupt, onInterruptResume }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const toolInfo = interrupt.value;
+  
+  const handleApprove = async () => {
+    setIsSubmitting(true);
+    try {
+      onInterruptResume(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleReject = async () => {
+    setIsSubmitting(true);
+    try {
+      onInterruptResume(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-orange-800 mb-2">
+          工具审批
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          {toolInfo.message}
+        </p>
+      </div>
+      
+      {/* 工具信息 */}
+      <div className="mb-4 p-3 bg-white border border-orange-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="font-medium text-orange-800">{toolInfo.tool_name}</span>
+          <Badge 
+            variant="outline" 
+            className={`text-xs ${
+              toolInfo.risk_level === 'high' ? 'border-red-500 text-red-700' :
+              toolInfo.risk_level === 'medium' ? 'border-orange-500 text-orange-700' :
+              'border-yellow-500 text-yellow-700'
+            }`}
+          >
+            {toolInfo.risk_level?.toUpperCase() || 'MEDIUM'} 风险
+          </Badge>
+        </div>
+        <div className="text-xs text-gray-600 mb-2">
+          <strong>参数:</strong>
+        </div>
+        <pre className="text-xs bg-gray-100 p-2 rounded border overflow-x-auto">
+          {JSON.stringify(toolInfo.tool_args, null, 2)}
+        </pre>
+      </div>
+      
+      {/* 操作按钮 */}
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={handleReject}
+          className="border-gray-400 text-gray-600 hover:bg-gray-100"
+          disabled={isSubmitting}
+        >
+          拒绝
+        </Button>
+        <Button
+          onClick={handleApprove}
+          className="bg-green-500 hover:bg-green-600 text-white"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "处理中..." : "批准执行"}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // 诊断聊天视图 props
 interface DiagnosticChatViewProps {
   messages: Message[];
@@ -234,7 +557,7 @@ interface DiagnosticChatViewProps {
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
   interrupt?: any; // 添加interrupt属性
-  onInterruptResume?: (approved: boolean) => void; // 添加interrupt处理函数
+  onInterruptResume?: (approved: boolean | string[]) => void; // 添加interrupt处理函数
 }
 
 // 新增：对话轮分组（每轮：用户消息+本轮所有助手消息）
@@ -507,6 +830,45 @@ export function DiagnosticChatView({
               )}
             </div>
           ))}
+          
+          {/* 调试信息 */}
+          {interrupt && (
+            <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded">
+              <h3 className="text-red-800 font-bold">调试信息:</h3>
+              <pre className="text-xs text-red-700 overflow-auto">
+                {JSON.stringify(interrupt, null, 2)}
+              </pre>
+              <div className="mt-2">
+                <strong>batch_mode:</strong> {String(interrupt.value?.batch_mode)}
+              </div>
+            </div>
+          )}
+          
+          {/* 单个工具审批组件 */}
+          {interrupt && interrupt.value && !interrupt.value.batch_mode && (
+            <div className="mb-6">
+              <SingleToolApproval 
+                interrupt={interrupt}
+                onInterruptResume={(approved) => {
+                  onInterruptResume?.(approved);
+                }}
+              />
+            </div>
+          )}
+          
+          {/* 批量工具审批组件 */}
+          {interrupt && interrupt.value && interrupt.value.batch_mode && (
+            <div className="mb-6">
+              <BatchToolApproval 
+                interrupt={interrupt.value}
+                onInterruptResume={(approvedTools) => {
+                  // 直接传递批准的工具ID列表
+                  onInterruptResume?.(approvedTools);
+                }}
+              />
+            </div>
+          )}
+          
           {/* 加载状态 - 当正在加载且最后一轮没有助手气泡时显示 */}
           {isLoading && (() => {
             const lastRound = dialogRounds[dialogRounds.length - 1];

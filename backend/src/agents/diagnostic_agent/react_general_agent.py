@@ -4,10 +4,13 @@
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import BaseTool
 from langgraph.prebuilt import create_react_agent
+from langgraph.types import interrupt
+from langgraph.prebuilt.interrupt import HumanInterruptConfig, HumanInterrupt
 
 from .configuration import Configuration
 from .tools import all_tools
@@ -51,15 +54,17 @@ GENERAL_AGENT_PROMPT = """你是一个专业的运维技术助手，专门帮助
 请以友好、专业的态度协助用户解决技术问题。"""
 
 
-def add_human_in_the_loop(tool, *, interrupt_config=None):
-    """
-    为工具添加人工干预功能的包装器
-    基于官方的 add_human_in_the_loop 实现
-    """
+def add_human_in_the_loop(
+    tool: Callable | BaseTool,
+    *,
+    interrupt_config: HumanInterruptConfig = None,
+) -> BaseTool:
+    """Wrap a tool to support human-in-the-loop review."""
     from typing import Callable
     from langchain_core.tools import BaseTool, tool as create_tool
     from langchain_core.runnables import RunnableConfig
     from langgraph.types import interrupt
+    from langgraph.prebuilt.interrupt import HumanInterruptConfig, HumanInterrupt
     
     if not isinstance(tool, BaseTool):
         tool = create_tool(tool)
@@ -77,28 +82,40 @@ def add_human_in_the_loop(tool, *, interrupt_config=None):
         args_schema=tool.args_schema
     )
     def call_tool_with_interrupt(config: RunnableConfig, **tool_input):
-        request = {
+        # 生成唯一的工具调用ID
+        import uuid
+        tool_call_id = str(uuid.uuid4())
+        
+        # 构建标准的中断请求
+        request: HumanInterrupt = {
             "action_request": {
                 "action": tool.name,
                 "args": tool_input
             },
             "config": interrupt_config,
-            "description": f"请审批工具调用: {tool.name}"
+            "description": f"请审批工具调用: {tool.name}",
+            "tool_call_id": tool_call_id  # 添加唯一标识用于批量处理
         }
         
-        # 使用 interrupt() 触发中断，等待用户响应
-        # 按照原有通用agent的方式处理中断
+        # 构建兼容的中断信息（用于前端显示）
         interrupt_info = {
             "message": f"检测到工具调用需要确认: {tool.name}",
             "tool_name": tool.name,
             "tool_args": tool_input,
+            "tool_call_id": tool_call_id,
             "description": f"请审批工具调用: {tool.name}",
             "suggestion_type": "tool_approval",
-            "risk_level": "medium"  # 可以根据工具类型调整
+            "risk_level": "medium",
+            "batch_mode": False,  # 单个工具模式
+            "pending_tools": [{
+                "tool_name": tool.name,
+                "tool_args": tool_input,
+                "tool_call_id": tool_call_id,
+                "risk_level": "medium"
+            }]
         }
         
         # 调用interrupt并获取用户确认结果
-        # 按照原有通用agent的实现方式，interrupt()应该返回boolean值
         user_approved = interrupt(interrupt_info)
         print(f"🔍 中断响应: {user_approved}")
         
@@ -112,6 +129,141 @@ def add_human_in_the_loop(tool, *, interrupt_config=None):
         return tool_response
 
     return call_tool_with_interrupt
+
+
+def create_batch_approval_interrupt_handler():
+    """
+    创建批量审批的中断处理器
+    基于官方文档的 interrupt() 实现
+    当检测到多个工具需要审批时，统一处理
+    """
+    def batch_approval_handler(state: DiagnosticState, config: RunnableConfig):
+        """批量审批处理器"""
+        messages = state.get("messages", [])
+        if not messages:
+            return {}
+        
+        last_message = messages[-1]
+        
+        # 检查是否有工具调用
+        if not (hasattr(last_message, 'tool_calls') and last_message.tool_calls):
+            return {}
+        
+        tool_calls = last_message.tool_calls
+        pending_tools = []
+        approved_tools = []
+        
+        # 检查每个工具调用的权限
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("name", "unknown")
+            tool_args = tool_call.get("args", {})
+            
+            # 生成唯一ID（如果还没有的话）
+            if "id" not in tool_call:
+                import uuid
+                tool_call_id = str(uuid.uuid4())
+                tool_call["id"] = tool_call_id
+            
+            # 检查权限
+            from .tool_permissions import check_tool_permission
+            permission_result = check_tool_permission(tool_name, tool_args)
+            
+            if permission_result["approved"]:
+                approved_tools.append(tool_call)
+            else:
+                pending_tools.append({
+                    "tool_name": tool_name,
+                    "tool_args": tool_args,
+                    "tool_call_id": tool_call["id"],
+                    "risk_level": permission_result["risk_level"],
+                    "reason": permission_result["reason"]
+                })
+        
+        # 如果有需要审批的工具，触发中断
+        if pending_tools:
+            # 构建中断信息
+            interrupt_info = {
+                "message": f"检测到 {len(pending_tools)} 个工具调用需要确认",
+                "batch_mode": True,  # 批量模式
+                "pending_tools": pending_tools,
+                "approved_tools": approved_tools,
+                "total_tools": len(tool_calls),
+                "suggestion_type": "batch_tool_approval",
+                "interrupt_type": "batch_tool_approval"  # 添加明确的类型标识
+            }
+            
+            print(f"🔍 批量审批处理器 - 触发中断: {interrupt_info}")
+            print(f"🔍 批量审批处理器 - batch_mode: {interrupt_info['batch_mode']}")
+            
+            # 调用interrupt
+            user_approved_tools = interrupt(interrupt_info)
+            
+            print(f"🔍 批量审批处理器 - 用户响应: {user_approved_tools}")
+            
+            # 处理用户审批结果
+            if isinstance(user_approved_tools, list):
+                # 用户返回了具体的审批列表
+                approved_tool_ids = set(user_approved_tools)
+                final_approved = approved_tools + [
+                    tool_call for tool_call in tool_calls 
+                    if tool_call.get("id") in approved_tool_ids
+                ]
+                print(f"✅ 批量审批结果: 批准了 {len(approved_tool_ids)} 个工具")
+                
+                # 检查是否还有未审批的工具
+                remaining_tools = [
+                    tool_call for tool_call in tool_calls 
+                    if tool_call.get("id") not in approved_tool_ids and 
+                    not any(tc.get("id") == tool_call.get("id") for tc in approved_tools)
+                ]
+                
+                if remaining_tools:
+                    print(f"⏳ 还有 {len(remaining_tools)} 个工具未审批，继续等待")
+                    # 更新消息，只包含已批准的工具
+                    from langchain_core.messages import AIMessage
+                    updated_message = AIMessage(
+                        content=last_message.content,
+                        tool_calls=final_approved
+                    )
+                    return {"messages": messages[:-1] + [updated_message]}
+                else:
+                    print(f"✅ 所有工具都已审批完成")
+                    # 更新消息，包含所有工具
+                    from langchain_core.messages import AIMessage
+                    updated_message = AIMessage(
+                        content=last_message.content,
+                        tool_calls=final_approved
+                    )
+                    return {"messages": messages[:-1] + [updated_message]}
+                    
+            elif user_approved_tools:
+                # 用户批准所有工具
+                final_approved = tool_calls
+                print(f"✅ 批量审批结果: 批准了所有工具")
+                
+                # 更新消息，包含所有工具
+                from langchain_core.messages import AIMessage
+                updated_message = AIMessage(
+                    content=last_message.content,
+                    tool_calls=final_approved
+                )
+                return {"messages": messages[:-1] + [updated_message]}
+            else:
+                # 用户拒绝所有工具
+                final_approved = approved_tools
+                print(f"❌ 批量审批结果: 拒绝了所有工具")
+                
+                # 更新消息，只包含已自动批准的工具
+                from langchain_core.messages import AIMessage
+                updated_message = AIMessage(
+                    content=last_message.content,
+                    tool_calls=final_approved
+                )
+                return {"messages": messages[:-1] + [updated_message]}
+        
+        return {}
+    
+    return batch_approval_handler
 
 
 def create_selective_approval_tools():
@@ -152,6 +304,7 @@ def create_react_general_subgraph():
     """
     创建基于 create_react_agent 的通用智能体子图
     包装在我们自己的状态图中，以保持兼容性
+    支持批量工具审批
     """
     # 从配置中获取LLM实例
     def get_llm_from_config(config: RunnableConfig):
@@ -174,7 +327,7 @@ def create_react_general_subgraph():
         selective_tools = create_selective_approval_tools()
         
         # 创建 react agent，使用选择性审批的工具
-        # 不需要额外的 interrupt_before 或 hook，因为审批逻辑已经在工具层面处理
+        # 不使用 interrupt_before，让我们的批量审批处理器来处理
         react_agent = create_react_agent(
             model=llm,
             tools=selective_tools,  # 使用选择性审批的工具
@@ -196,16 +349,139 @@ def create_react_general_subgraph():
         # 返回更新的消息，保持与原有状态的兼容
         return {"messages": result.get("messages", [])}
     
+    # 创建工具调用预处理器
+    def create_tool_calls_preprocessor():
+        """创建工具调用预处理器，在工具执行前检查权限"""
+        def preprocess_tool_calls(state: DiagnosticState, config: RunnableConfig):
+            """预处理工具调用，检查权限并触发批量审批"""
+            messages = state.get("messages", [])
+            if not messages:
+                return {}
+            
+            last_message = messages[-1]
+            
+            # 检查是否有工具调用
+            if not (hasattr(last_message, 'tool_calls') and last_message.tool_calls):
+                return {}
+            
+            tool_calls = last_message.tool_calls
+            pending_tools = []
+            approved_tools = []
+            
+            # 检查每个工具调用的权限
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("name", "unknown")
+                tool_args = tool_call.get("args", {})
+                
+                # 生成唯一ID（如果还没有的话）
+                if "id" not in tool_call:
+                    import uuid
+                    tool_call_id = str(uuid.uuid4())
+                    tool_call["id"] = tool_call_id
+                
+                # 检查权限
+                from .tool_permissions import check_tool_permission
+                permission_result = check_tool_permission(tool_name, tool_args)
+                
+                if permission_result["approved"]:
+                    approved_tools.append(tool_call)
+                else:
+                    pending_tools.append({
+                        "tool_name": tool_name,
+                        "tool_args": tool_args,
+                        "tool_call_id": tool_call["id"],
+                        "risk_level": permission_result["risk_level"],
+                        "reason": permission_result["reason"]
+                    })
+            
+            # 如果有需要审批的工具，触发中断
+            if pending_tools:
+                # 构建中断信息
+                interrupt_info = {
+                    "message": f"检测到 {len(pending_tools)} 个工具调用需要确认",
+                    "batch_mode": True,  # 批量模式
+                    "pending_tools": pending_tools,
+                    "approved_tools": approved_tools,
+                    "total_tools": len(tool_calls),
+                    "suggestion_type": "batch_tool_approval",
+                    "interrupt_type": "batch_tool_approval"  # 添加明确的类型标识
+                }
+                
+                print(f"🔍 工具调用预处理器 - 触发中断: {interrupt_info}")
+                print(f"🔍 工具调用预处理器 - batch_mode: {interrupt_info['batch_mode']}")
+                
+                # 调用interrupt
+                user_approved_tools = interrupt(interrupt_info)
+                
+                print(f"🔍 工具调用预处理器 - 用户响应: {user_approved_tools}")
+                
+                # 处理用户审批结果
+                if isinstance(user_approved_tools, list):
+                    # 用户返回了具体的审批列表
+                    approved_tool_ids = set(user_approved_tools)
+                    final_approved = approved_tools + [
+                        tool_call for tool_call in tool_calls 
+                        if tool_call.get("id") in approved_tool_ids
+                    ]
+                    print(f"✅ 工具调用预处理器 - 批准了 {len(approved_tool_ids)} 个工具")
+                    
+                    # 更新消息，只包含已批准的工具
+                    from langchain_core.messages import AIMessage
+                    updated_message = AIMessage(
+                        content=last_message.content,
+                        tool_calls=final_approved
+                    )
+                    return {"messages": messages[:-1] + [updated_message]}
+                        
+                elif user_approved_tools:
+                    # 用户批准所有工具
+                    final_approved = tool_calls
+                    print(f"✅ 工具调用预处理器 - 批准了所有工具")
+                    
+                    # 更新消息，包含所有工具
+                    from langchain_core.messages import AIMessage
+                    updated_message = AIMessage(
+                        content=last_message.content,
+                        tool_calls=final_approved
+                    )
+                    return {"messages": messages[:-1] + [updated_message]}
+                else:
+                    # 用户拒绝所有工具
+                    final_approved = approved_tools
+                    print(f"❌ 工具调用预处理器 - 拒绝了所有工具")
+                    
+                    # 更新消息，只包含已自动批准的工具
+                    from langchain_core.messages import AIMessage
+                    updated_message = AIMessage(
+                        content=last_message.content,
+                        tool_calls=final_approved
+                    )
+                    return {"messages": messages[:-1] + [updated_message]}
+            
+            return {}
+        
+        return preprocess_tool_calls
+    
     # 创建包装的状态图
     from langgraph.graph import StateGraph, START, END
     builder = StateGraph(DiagnosticState)
     
+    # 添加工具调用预处理器
+    tool_calls_preprocessor = create_tool_calls_preprocessor()
+    builder.add_node("tool_calls_preprocessor", tool_calls_preprocessor)
+    
     # 添加 react agent 节点
     builder.add_node("react_general_agent", create_react_agent_node)
     
-    # 设置边
-    builder.add_edge(START, "react_general_agent")
-    builder.add_edge("react_general_agent", END)
+    # 添加批量审批节点
+    batch_approval_handler = create_batch_approval_interrupt_handler()
+    builder.add_node("batch_approval", batch_approval_handler)
     
-    print(f"✅ 创建新的 create_react_agent 通用智能体子图")
+    # 设置边 - 在react_agent之前添加工具调用预处理器
+    builder.add_edge(START, "tool_calls_preprocessor")
+    builder.add_edge("tool_calls_preprocessor", "react_general_agent")
+    builder.add_edge("react_general_agent", "batch_approval")
+    builder.add_edge("batch_approval", END)
+    
+    print(f"✅ 创建新的 create_react_agent 通用智能体子图（支持批量审批）")
     return builder.compile()
