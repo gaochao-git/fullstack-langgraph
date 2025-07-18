@@ -134,10 +134,7 @@ def determine_qa_type(user_question: str, qa_context: str, config: RunnableConfi
     configurable = Configuration.from_runnable_config(config)
     
     # 创建LLM
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=0.1
-    )
+    llm = configurable.create_llm(model_name=configurable.query_generator_model,temperature=0.1)
     
     # 构建判断提示词
     classification_prompt = get_qa_type_classification_prompt(user_question, qa_context)
@@ -155,7 +152,6 @@ def determine_qa_type(user_question: str, qa_context: str, config: RunnableConfi
             # 如果LLM返回的不是有效类型，使用简单的fallback逻辑
             logger.warning(f"LLM返回无效类型: {qa_type}，使用fallback逻辑")
             return "technical_qa"  # 默认为技术问答
-            
     except Exception as e:
         logger.error(f"LLM分类失败: {e}，使用fallback逻辑")
         return "technical_qa"  # 默认为技术问答
