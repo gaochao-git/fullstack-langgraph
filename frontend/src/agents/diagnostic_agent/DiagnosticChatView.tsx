@@ -316,8 +316,14 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
               toolCall={toolCall}
               toolResult={toolResult}
               isPending={isPending}
-              onApprove={() => onInterruptResume?.(true)}
-              onReject={() => onInterruptResume?.(false)}
+              onApprove={() => {
+                console.log(`🔧 确认工具: ${toolCall.name}`, toolCall.args);
+                onInterruptResume?.(true);
+              }}
+              onReject={() => {
+                console.log(`🔧 拒绝工具: ${toolCall.name}`, toolCall.args);
+                onInterruptResume?.(false);
+              }}
               toolCount={toolCalls.length}
             />
           );
