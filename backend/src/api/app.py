@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import graphs
-from src.agents.diagnostic_agent.main_graph import graph as diagnostic_graph
+from src.agents.diagnostic_agent.graph import graph as diagnostic_graph
 from src.agents.research_agent.graph import graph as research_graph
 from src.agents.diagnostic_agent.configuration import Configuration as DiagnosticConfiguration
 from src.agents.research_agent.configuration import Configuration as ResearchConfiguration

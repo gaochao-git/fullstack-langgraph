@@ -190,7 +190,7 @@ async def stream_with_graph(graph, request_body, thread_id):
 
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应"""
-    from src.agents.diagnostic_agent.main_graph import builder
+    from src.agents.diagnostic_agent.graph import builder
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     
     logger.info(f"🔍 PostgreSQL模式 - 按照官方模式使用async with")

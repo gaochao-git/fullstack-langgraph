@@ -1,4 +1,4 @@
-"""简化的主图 - 直接使用create_react_agent"""
+"""智能运维助手图定义 - 使用create_react_agent的简化实现"""
 
 import os
 import logging
