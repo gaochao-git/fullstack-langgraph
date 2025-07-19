@@ -125,7 +125,6 @@ def serial_approval_node(state: AgentState) -> Command[Literal["execute_tools"]]
     
     # 所有工具都已审批完成
     print(f"\n✅ 所有工具审批完成，已批准 {len(approved_tools)} 个工具")
-    print(f"🔍 调试信息 - 已批准工具: {approved_tools}")
     
     # 返回审批结果和已批准的工具
     return Command(goto="execute_tools", update={"approved_tools": approved_tools})
@@ -137,12 +136,9 @@ def execute_tools_node(state: AgentState) -> Dict[str, Any]:
     print("🔧 执行工具节点")
     print("="*50)
     
-    # 调试信息
-    print(f"🔍 调试信息 - 完整状态: {state}")
     approved_tools = state.get("approved_tools", [])
     
     print(f"📊 已批准工具数量: {len(approved_tools)}")
-    print(f"🔍 调试信息 - 已批准工具: {approved_tools}")
     
     if not approved_tools:
         print("❌ 没有已批准的工具需要执行")
@@ -314,15 +310,13 @@ def interactive_test():
             })
             
             print(f"\n✅ 处理完成")
-            print(f"📊 结果统计:")
-            print(f"  消息数量: {len(result.get('messages', []))}")
             
             # 显示最终消息
             final_messages = result.get('messages', [])
             if final_messages:
                 last_message = final_messages[-1]
                 if hasattr(last_message, 'content'):
-                    print(f"  最终回答: {last_message.content}")
+                    print(f"📊 最终结果: {last_message.content}")
             
             print("-" * 60)
             
@@ -374,15 +368,13 @@ def batch_test():
             })
             
             print(f"\n✅ 测试用例 {i} 完成")
-            print(f"📊 最终结果:")
-            print(f"  消息数量: {len(result.get('messages', []))}")
             
             # 显示最终消息
             final_messages = result.get('messages', [])
             if final_messages:
                 last_message = final_messages[-1]
                 if hasattr(last_message, 'content'):
-                    print(f"  最终内容: {last_message.content}")
+                    print(f"📊 最终结果: {last_message.content}")
             
         except Exception as e:
             print(f"❌ 测试用例 {i} 失败: {e}")
