@@ -82,37 +82,16 @@ def add_human_in_the_loop(
         args_schema=tool.args_schema
     )
     def call_tool_with_interrupt(config: RunnableConfig, **tool_input):
-        # 生成唯一的工具调用ID
-        import uuid
-        tool_call_id = str(uuid.uuid4())
-        
-        # 构建标准的中断请求
-        request: HumanInterrupt = {
-            "action_request": {
-                "action": tool.name,
-                "args": tool_input
-            },
-            "config": interrupt_config,
-            "description": f"请审批工具调用: {tool.name}",
-            "tool_call_id": tool_call_id  # 添加唯一标识用于批量处理
-        }
-        
         # 构建兼容的中断信息（用于前端显示）
+        # 使用工具名+参数进行匹配，这是最可靠的方案
         interrupt_info = {
             "message": f"检测到工具调用需要确认: {tool.name}",
             "tool_name": tool.name,
             "tool_args": tool_input,
-            "tool_call_id": tool_call_id,
             "description": f"请审批工具调用: {tool.name}",
             "suggestion_type": "tool_approval",
             "risk_level": "medium",
             "batch_mode": False,  # 单个工具模式
-            "pending_tools": [{
-                "tool_name": tool.name,
-                "tool_args": tool_input,
-                "tool_call_id": tool_call_id,
-                "risk_level": "medium"
-            }]
         }
         
         # 调用interrupt并获取用户确认结果
