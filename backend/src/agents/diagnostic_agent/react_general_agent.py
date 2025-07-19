@@ -96,13 +96,10 @@ def add_human_in_the_loop(
         
         # 调用interrupt并获取用户确认结果
         user_approved = interrupt(interrupt_info)
-        print(f"🔍 中断响应: {user_approved}")
         
         if user_approved:
-            print(f"✅ 用户批准执行工具: {tool.name}")
             tool_response = tool.invoke(tool_input, config)
         else:
-            print(f"❌ 用户拒绝执行工具: {tool.name}")
             tool_response = f"工具 {tool.name} 执行被用户拒绝"
 
         return tool_response
@@ -171,13 +168,8 @@ def create_batch_approval_interrupt_handler():
                 "interrupt_type": "batch_tool_approval"  # 添加明确的类型标识
             }
             
-            print(f"🔍 批量审批处理器 - 触发中断: {interrupt_info}")
-            print(f"🔍 批量审批处理器 - batch_mode: {interrupt_info['batch_mode']}")
-            
             # 调用interrupt
             user_approved_tools = interrupt(interrupt_info)
-            
-            print(f"🔍 批量审批处理器 - 用户响应: {user_approved_tools}")
             
             # 处理用户审批结果
             if isinstance(user_approved_tools, list):
@@ -187,7 +179,6 @@ def create_batch_approval_interrupt_handler():
                     tool_call for tool_call in tool_calls 
                     if tool_call.get("id") in approved_tool_ids
                 ]
-                print(f"✅ 批量审批结果: 批准了 {len(approved_tool_ids)} 个工具")
                 
                 # 检查是否还有未审批的工具
                 remaining_tools = [
@@ -197,7 +188,6 @@ def create_batch_approval_interrupt_handler():
                 ]
                 
                 if remaining_tools:
-                    print(f"⏳ 还有 {len(remaining_tools)} 个工具未审批，继续等待")
                     # 更新消息，只包含已批准的工具
                     from langchain_core.messages import AIMessage
                     updated_message = AIMessage(
@@ -206,7 +196,6 @@ def create_batch_approval_interrupt_handler():
                     )
                     return {"messages": messages[:-1] + [updated_message]}
                 else:
-                    print(f"✅ 所有工具都已审批完成")
                     # 更新消息，包含所有工具
                     from langchain_core.messages import AIMessage
                     updated_message = AIMessage(
@@ -218,7 +207,6 @@ def create_batch_approval_interrupt_handler():
             elif user_approved_tools:
                 # 用户批准所有工具
                 final_approved = tool_calls
-                print(f"✅ 批量审批结果: 批准了所有工具")
                 
                 # 更新消息，包含所有工具
                 from langchain_core.messages import AIMessage
@@ -230,7 +218,6 @@ def create_batch_approval_interrupt_handler():
             else:
                 # 用户拒绝所有工具
                 final_approved = approved_tools
-                print(f"❌ 批量审批结果: 拒绝了所有工具")
                 
                 # 更新消息，只包含已自动批准的工具
                 from langchain_core.messages import AIMessage
@@ -261,7 +248,6 @@ def create_selective_approval_tools():
         # 检查工具是否需要审批
         if tool_name in TOOL_PERMISSIONS["approval_required"]:
             # 需要审批的工具：添加人工干预
-            print(f"🔒 工具 {tool_name} 需要审批，添加人工干预")
             wrapped_tool = add_human_in_the_loop(
                 tool,
                 interrupt_config={
@@ -273,7 +259,6 @@ def create_selective_approval_tools():
             selective_tools.append(wrapped_tool)
         else:
             # 安全工具：直接使用
-            print(f"✅ 工具 {tool_name} 安全，直接使用")
             selective_tools.append(tool)
     
     return selective_tools
@@ -296,8 +281,6 @@ def create_react_general_subgraph():
     # 创建带工具审批的 react agent 节点
     def create_react_agent_node(state: DiagnosticState, config: RunnableConfig):
         """创建 react agent 节点"""
-        print(f"✅ 执行新通用智能体: react_general_agent")
-        print(f"🔍 react_general_agent - 输入状态: {list(state.keys())}")
         
         # 动态获取LLM
         llm = get_llm_from_config(config)
@@ -317,13 +300,8 @@ def create_react_general_subgraph():
         messages = state.get("messages", [])
         react_state = {"messages": messages}
         
-        print(f"🚀 react_general_agent - 开始调用 create_react_agent...")
-        
         # 调用 react agent
         result = react_agent.invoke(react_state, config)
-        
-        print(f"✅ react_general_agent - 调用完成")
-        print(f"📝 react_general_agent - 返回消息数量: {len(result.get('messages', []))}")
         
         # 返回更新的消息，保持与原有状态的兼容
         return {"messages": result.get("messages", [])}
@@ -386,13 +364,8 @@ def create_react_general_subgraph():
                     "interrupt_type": "batch_tool_approval"  # 添加明确的类型标识
                 }
                 
-                print(f"🔍 工具调用预处理器 - 触发中断: {interrupt_info}")
-                print(f"🔍 工具调用预处理器 - batch_mode: {interrupt_info['batch_mode']}")
-                
                 # 调用interrupt
                 user_approved_tools = interrupt(interrupt_info)
-                
-                print(f"🔍 工具调用预处理器 - 用户响应: {user_approved_tools}")
                 
                 # 处理用户审批结果
                 if isinstance(user_approved_tools, list):
@@ -402,7 +375,6 @@ def create_react_general_subgraph():
                         tool_call for tool_call in tool_calls 
                         if tool_call.get("id") in approved_tool_ids
                     ]
-                    print(f"✅ 工具调用预处理器 - 批准了 {len(approved_tool_ids)} 个工具")
                     
                     # 更新消息，只包含已批准的工具
                     from langchain_core.messages import AIMessage
@@ -415,7 +387,6 @@ def create_react_general_subgraph():
                 elif user_approved_tools:
                     # 用户批准所有工具
                     final_approved = tool_calls
-                    print(f"✅ 工具调用预处理器 - 批准了所有工具")
                     
                     # 更新消息，包含所有工具
                     from langchain_core.messages import AIMessage
@@ -427,7 +398,6 @@ def create_react_general_subgraph():
                 else:
                     # 用户拒绝所有工具
                     final_approved = approved_tools
-                    print(f"❌ 工具调用预处理器 - 拒绝了所有工具")
                     
                     # 更新消息，只包含已自动批准的工具
                     from langchain_core.messages import AIMessage
@@ -462,5 +432,4 @@ def create_react_general_subgraph():
     builder.add_edge("react_general_agent", "batch_approval")
     builder.add_edge("batch_approval", END)
     
-    print(f"✅ 创建新的 create_react_agent 通用智能体子图（支持批量审批）")
     return builder.compile()
