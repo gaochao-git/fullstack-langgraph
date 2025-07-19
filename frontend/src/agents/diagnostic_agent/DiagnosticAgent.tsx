@@ -69,7 +69,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
     messagesKey: "messages",
     ...getThreadIdConfig(), // 只有历史会话才传递threadId
     onUpdateEvent: (event: any) => {
-      console.log("event", event);
       let processedEvent: ProcessedEvent | null = null;
       if (event.diagnostic_step) {
         processedEvent = {
