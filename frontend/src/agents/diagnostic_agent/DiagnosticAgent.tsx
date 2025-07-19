@@ -16,7 +16,6 @@ export default function DiagnosticAgent() {
     window.history.replaceState({}, '', url.toString());
     
     setSessionKey(prev => prev + 1);
-    console.log('创建新会话 - 重新挂载组件');
   }, []);
 
   return (
@@ -102,7 +101,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   // 当新线程创建时，将线程ID同步到URL
   useEffect(() => {
     if (thread.threadId && !getThreadIdFromUrl()) {
-      console.log('新线程创建，同步线程ID到URL:', thread.threadId);
       const url = new URL(window.location.href);
       url.searchParams.set('thread_id', thread.threadId);
       window.history.replaceState({}, '', url.toString());
@@ -154,10 +152,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   }, [thread]);
 
   const handleInterruptResume = useCallback((approved: boolean) => {
-    console.log('🔧 处理中断恢复:', approved);
-    console.log('🔧 当前线程ID:', thread.threadId);
-    console.log('🔧 URL中的线程ID:', getThreadIdFromUrl());
-    
+
     thread.submit(undefined, { 
       command: { resume: approved },
       user_name: "zhangsan123" // 临时固定用户名，后续可从用户系统获取
@@ -174,7 +169,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const loadHistoryThreads = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      console.log('开始获取用户历史线程数据...');
       
       // 调用新的用户线程接口
       const response = await fetch(
@@ -186,14 +180,11 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       if (response.ok) {
         const data = await response.json();
         const threads = data.threads || [];
-        console.log('获取到的用户历史线程:', data);
         setHistoryThreads(threads);
       } else {
-        console.error('获取用户历史线程失败:', response.status, response.statusText);
         setError('获取历史线程失败');
       }
     } catch (error) {
-      console.error('获取用户历史线程出错:', error);
       setError('获取历史线程出错');
     } finally {
       setLoadingHistory(false);
@@ -233,7 +224,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
 
   // 切换到历史会话
   const handleSwitchToThread = useCallback((threadId: string) => {
-    console.log('切换到线程:', threadId);
     
     // 使用一个简单直接的方法：重新加载页面并传递线程ID
     // 这样可以确保完全重新初始化到指定线程
