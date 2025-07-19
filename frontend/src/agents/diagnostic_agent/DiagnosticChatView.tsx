@@ -150,6 +150,100 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   );
 };
 
+// SOP执行确认组件 props
+interface SOPExecutionApprovalProps {
+  interrupt: any;
+  onInterruptResume: (approved: boolean) => void;
+}
+
+// SOP执行确认组件
+const SOPExecutionApproval: React.FC<SOPExecutionApprovalProps> = ({ interrupt, onInterruptResume }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const sopInfo = interrupt.value;
+  
+  const handleApprove = async () => {
+    setIsSubmitting(true);
+    try {
+      onInterruptResume(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleReject = async () => {
+    setIsSubmitting(true);
+    try {
+      onInterruptResume(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-orange-800 mb-2">
+          SOP执行确认
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          {sopInfo.message}
+        </p>
+      </div>
+      
+      {/* SOP信息 */}
+      <div className="mb-4 p-3 bg-white border border-orange-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="font-medium text-orange-800">SOP ID: {sopInfo.sop_id || '未知'}</span>
+          <Badge 
+            variant="outline" 
+            className="text-xs border-orange-500 text-orange-700"
+          >
+            SOP执行
+          </Badge>
+        </div>
+        <div className="text-xs text-gray-600 mb-2">
+          <strong>当前步骤:</strong> {sopInfo.current_sop_step || '未知'}
+        </div>
+        {sopInfo.tool_calls && sopInfo.tool_calls.length > 0 && (
+          <div>
+            <div className="text-xs text-gray-600 mb-2">
+              <strong>计划执行的操作:</strong>
+            </div>
+            <pre className="text-xs bg-gray-100 p-2 rounded border overflow-x-auto">
+              {sopInfo.tool_calls.map((call: any, index: number) => 
+                `${index + 1}. ${call.name}: ${JSON.stringify(call.args, null, 2)}`
+              ).join('\n')}
+            </pre>
+          </div>
+        )}
+      </div>
+      
+      {/* 操作按钮 */}
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReject}
+          className="border-gray-400 text-gray-600 hover:bg-gray-100 rounded-md"
+          disabled={isSubmitting}
+        >
+          取消
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={handleApprove}
+          className="bg-green-500 hover:bg-green-600 text-white"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "处理中..." : "确认执行"}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // 工具调用列表组件 props
 interface ToolCallsProps {
   message: Message;
@@ -187,19 +281,27 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
   
   // 检查工具调用是否为待确认状态
   const isPendingToolCall = (toolCall: any) => {
-    if (!interrupt) {
+    if (!interrupt || !interrupt.value) {
       return false;
     }
     
-    // 检查是否为最新的消息且有interrupt
-    const isLatestMessage = allMessages.length > 0 && allMessages[allMessages.length - 1].id === message.id;
+    const interruptValue = interrupt.value;
     
-    if (!isLatestMessage) {
-      return false;
+    // 工具审批：使用工具名+参数精确匹配
+    if (interruptValue.suggestion_type === "tool_approval") {
+      return interruptValue.tool_name === toolCall.name && 
+             JSON.stringify(interruptValue.tool_args) === JSON.stringify(toolCall.args || {});
     }
     
-    // 如果是最新消息且有interrupt，则标记为待确认
-    return true;
+    // SOP执行：检查工具调用列表中是否包含当前工具
+    if (interruptValue.suggestion_type === "sop_execution" && interruptValue.tool_calls) {
+      return interruptValue.tool_calls.some((sopToolCall: any) => 
+        sopToolCall.name === toolCall.name && 
+        JSON.stringify(sopToolCall.args || {}) === JSON.stringify(toolCall.args || {})
+      );
+    }
+    
+    return false;
   };
   
   return (
@@ -844,30 +946,6 @@ export function DiagnosticChatView({
             </div>
           )} */}
           
-          {/* 单个工具审批组件 */}
-          {interrupt && interrupt.value && !interrupt.value.batch_mode && (
-            <div className="mb-6">
-              <SingleToolApproval 
-                interrupt={interrupt}
-                onInterruptResume={(approved) => {
-                  onInterruptResume?.(approved);
-                }}
-              />
-            </div>
-          )}
-          
-          {/* 批量工具审批组件 */}
-          {interrupt && interrupt.value && interrupt.value.batch_mode && (
-            <div className="mb-6">
-              <BatchToolApproval 
-                interrupt={interrupt.value}
-                onInterruptResume={(approvedTools) => {
-                  // 直接传递批准的工具ID列表
-                  onInterruptResume?.(approvedTools);
-                }}
-              />
-            </div>
-          )}
           
           {/* 加载状态 - 当正在加载且最后一轮没有助手气泡时显示 */}
           {isLoading && (() => {
@@ -903,6 +981,7 @@ export function DiagnosticChatView({
             </div>
           )}
           
+
           {/* 保证自动滚动到底部 */}
           <div id="chat-messages-end" />
         </div>
