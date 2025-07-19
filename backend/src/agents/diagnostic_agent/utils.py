@@ -349,28 +349,9 @@ def save_graph_image(graph, mode_name, filename="graph.png"):
 
 
 def auto_generate_subgraph_images():
-    """程序启动时自动生成所有子图的图片"""
-    try:
-        # 导入子图创建函数
-        from .sop_diagnosis_subgraph import create_sop_diagnosis_subgraph
-        from .general_qa_subgraph import create_general_qa_subgraph
-        
-        # 生成SOP诊断子图
-        try:
-            sop_subgraph = create_sop_diagnosis_subgraph()
-            save_graph_image(sop_subgraph, "SOP诊断子图", "graph_sop_diagnosis_subgraph.png")
-        except Exception as e:
-            logger.warning(f"生成SOP诊断子图失败: {e}")
-        
-        # 生成普通问答子图
-        try:
-            qa_subgraph = create_general_qa_subgraph()
-            save_graph_image(qa_subgraph, "普通问答子图", "graph_general_qa_subgraph.png")
-        except Exception as e:
-            logger.warning(f"生成普通问答子图失败: {e}")
-            
-    except ImportError as e:
-        logger.warning(f"导入子图模块失败，跳过子图图片生成: {e}")
+    """程序启动时自动生成所有子图的图片（简化版本跳过）"""
+    # 简化版本：跳过子图生成
+    pass
 
 
 def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
@@ -382,7 +363,7 @@ def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
         checkpointer_type: checkpointer类型 ("memory" 或 "postgres")
         
     Returns:
-        tuple: (graph, mode_name)
+        编译后的graph
     """
     # 首先自动生成所有子图的图片
     auto_generate_subgraph_images()
@@ -393,7 +374,7 @@ def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
         save_graph_image(graph, "PostgreSQL模式")
         graph = None
         print("📝 PostgreSQL模式：图将在API请求时用async with编译")
-        return graph, "PostgreSQL模式"
+        return graph
     else:
         # 内存模式：直接使用MemorySaver
         from langgraph.checkpoint.memory import MemorySaver
@@ -401,7 +382,7 @@ def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
         graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
         save_graph_image(graph, "内存模式")
         print(f"📝 内存模式：图已编译完成")
-        return graph, "内存模式"
+        return graph
 
 
 def extract_diagnosis_results_from_messages(messages, max_results: int = 10):

@@ -1,174 +1,69 @@
-"""
-主图 - 智能路由到SOP诊断子图或普通问答子图
-"""
+"""简化的主图 - 直接使用create_react_agent"""
 
 import os
 import logging
-from typing import Dict, Any, Literal
-from langgraph.graph import StateGraph, END, START
-from langchain_core.messages import SystemMessage, AIMessage
+from typing import Dict, Any
+from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
 
 from .configuration import Configuration
-from .state import DiagnosticState, QuestionAnalysis
-from .schemas import IntentAnalysisOutput
+from .state import DiagnosticState
+from .tools import all_tools
 from .utils import compile_graph_with_checkpointer
-from .sop_diagnosis_subgraph import create_sop_diagnosis_subgraph
-from .general_qa_subgraph import create_general_qa_subgraph
-from .react_general_agent import create_react_general_subgraph
+from .prompts import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# 提示词已迁移到 prompts.py 文件中统一管理
 
-def analyze_intent_node(state: DiagnosticState, config: RunnableConfig) -> Dict[str, Any]:
+def create_main_graph():
     """
-    意图分析节点 - 判断用户是否需要SOP诊断还是普通问答
+    创建简化的主图 - 直接使用create_react_agent
     """
-    print(f"✅ 执行节点: analyze_intent_node")
-    print(f"🔍 analyze_intent_node - 输入状态: {list(state.keys())}")
+    print("📍 创建简化的智能运维助手")
     
-    configurable = Configuration.from_runnable_config(config)
-    messages = state.get("messages", [])
+    def get_llm_from_config(config: RunnableConfig):
+        """从配置中获取LLM实例"""
+        configurable = Configuration.from_runnable_config(config)
+        return configurable.create_llm(
+            model_name=configurable.query_generator_model,
+            temperature=configurable.model_temperature
+        )
     
-    print(f"🔍 analyze_intent_node - messages数量: {len(messages)}")
+    # 创建react agent
+    def create_agent_with_config(state: DiagnosticState, config: RunnableConfig):
+        """创建带配置的agent节点"""
+        llm = get_llm_from_config(config)
+        
+        # 创建react agent
+        agent = create_react_agent(
+            model=llm,
+            tools=all_tools,
+            prompt=SYSTEM_PROMPT,
+        )
+        
+        # 运行agent
+        result = agent.invoke(state, config)
+        return result
     
-    if not messages:
-        print(f"🔍 analyze_intent_node - 无消息，默认返回general_qa")
-        return {"intent": "general_qa"}
-    
-    user_question = messages[-1].content if messages else ""
-    print(f"🔍 analyze_intent_node - 用户问题: {user_question}")
-    
-    # 使用LLM分析用户意图
-    llm = configurable.create_llm(
-        model_name=configurable.query_generator_model,
-        temperature=0.1  # 低温度确保分类准确
-    )
-    
-    intent_analysis_prompt = f"""
-你是一个专业的运维助手意图分析器。请分析用户的问题，判断用户是否需要故障诊断SOP还是普通问答。
-
-判断标准：
-1. 故障诊断SOP (sop_diagnosis)：
-   - 用户明确提到故障、报错、异常等问题
-   - 用户提到需要排查、诊断、解决问题
-   - 用户描述了具体的故障现象
-   - 用户提到了IP、时间、错误信息等故障要素
-   - 关键词：故障、报错、异常、排查、诊断、SOP、问题解决
-
-2. 普通问答 (general_qa)：
-   - 用户询问技术知识、操作方法
-   - 用户进行日常聊天、问候
-   - 用户询问系统信息、配置说明
-   - 用户询问历史记录、状态查询
-   - 不涉及具体故障排查的技术问题
-
-用户问题：{user_question}
-
-请分析用户意图，返回分类结果和简要理由。
-"""
-    
-    print(f"🔍 analyze_intent_node - 开始调用LLM分析意图...")
-    structured_llm = llm.with_structured_output(IntentAnalysisOutput)
-    result = structured_llm.invoke(intent_analysis_prompt)
-    print(f"🔍 analyze_intent_node - LLM分析完成")
-    print(f"🔍 analyze_intent_node - 意图: {result.intent}")
-    print(f"🔍 analyze_intent_node - 理由: {result.reason}")
-    
-    logger.info(f"意图分析结果: {result.intent} - {result.reason}")
-    
-    return_result = {
-        "intent": result.intent,
-        "intent_reason": result.reason
-    }
-    print(f"🔍 analyze_intent_node - 返回结果: {return_result}")
-    
-    return return_result
-
-
-def route_to_subgraph(state: DiagnosticState, config: RunnableConfig) -> Literal["sop_diagnosis", "general_qa"]:
-    """
-    路由函数 - 根据意图分析结果决定进入哪个子图
-    """
-    print(f"✅ 执行路由函数: route_to_subgraph")
-    print(f"🔍 route_to_subgraph - 输入状态: {list(state.keys())}")
-    
-    intent = state.get("intent", "general_qa")
-    intent_reason = state.get("intent_reason", "")
-    
-    print(f"🔍 route_to_subgraph - intent: {intent}")
-    print(f"🔍 route_to_subgraph - intent_reason: {intent_reason}")
-    
-    logger.info(f"路由决策: {intent}")
-    print(f"✅ 路由结果: {intent}")
-    
-    return intent
-
-
-def create_main_graph(use_react_general_agent: bool = True):
-    """
-    创建主图 - 包含路由逻辑和两个子图
-    基于官方文档的子图集成模式
-    
-    Args:
-        use_react_general_agent: 是否使用新的 create_react_agent 通用智能体
-                                True: 使用新的 react_general_agent
-                                False: 使用原有的 general_qa_subgraph
-    """
-    
-    # 创建主图
+    # 使用StateGraph包装，保持与原有接口的兼容性
+    from langgraph.graph import StateGraph
     builder = StateGraph(DiagnosticState, config_schema=Configuration)
-    
-    # 添加意图分析节点
-    builder.add_node("analyze_intent", analyze_intent_node)
-    
-    # 创建 SOP 诊断子图
-    sop_diagnosis_subgraph = create_sop_diagnosis_subgraph()
-    builder.add_node("sop_diagnosis", sop_diagnosis_subgraph)
-    
-    # 根据配置选择通用智能体实现
-    if use_react_general_agent:
-        # 使用新的 create_react_agent 实现
-        print("📍 使用新的 create_react_agent 通用智能体")
-        general_subgraph = create_react_general_subgraph()
-    else:
-        # 使用原有的 general_qa_subgraph 实现
-        print("📍 使用原有的 general_qa_subgraph")
-        general_subgraph = create_general_qa_subgraph()
-    
-    # 将通用智能体作为节点添加到主图中
-    builder.add_node("general_qa", general_subgraph)
-    
-    # 设置路由 - 从意图分析开始
-    builder.add_edge(START, "analyze_intent")
-    
-    # 条件路由到不同的子图
-    builder.add_conditional_edges(
-        "analyze_intent",
-        route_to_subgraph,
-        {
-            "sop_diagnosis": "sop_diagnosis",
-            "general_qa": "general_qa"
-        }
-    )
-    
-    # 两个子图执行完成后都结束
-    builder.add_edge("sop_diagnosis", END)
-    builder.add_edge("general_qa", END)
+    builder.add_node("agent", create_agent_with_config)
+    builder.set_entry_point("agent")
+    builder.set_finish_point("agent")
     
     return builder
 
-
 # 编译主图
-def compile_main_graph(use_react_general_agent: bool = True):
+def compile_main_graph():
     """编译主图"""
-    builder = create_main_graph(use_react_general_agent=use_react_general_agent)
+    builder = create_main_graph()
     checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
     return compile_graph_with_checkpointer(builder, checkpointer_type)
 
+# 导出编译后的图
+graph = compile_main_graph()
 
-# 导出编译后的图 - 默认使用新的 react general agent
-graph = compile_main_graph(use_react_general_agent=True)
-
-# 导出builder用于PostgreSQL模式 - 默认使用新的 react general agent
-builder = create_main_graph(use_react_general_agent=True)
+# 导出builder用于PostgreSQL模式
+builder = create_main_graph()
