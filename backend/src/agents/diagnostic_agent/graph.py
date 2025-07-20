@@ -52,7 +52,6 @@ def create_main_graph(enable_tool_approval: bool = True):
             model=llm,
             tools=tools,
             prompt=SYSTEM_PROMPT,
-            # 不需要 interrupt_before，因为中断逻辑在工具内部（仅审批模式）
         )
         
         # 运行agent
