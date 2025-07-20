@@ -62,6 +62,13 @@ interface ToolCallProps {
 const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject, toolCount }) => {
   const [isExpanded, setIsExpanded] = useState(isPending || false); // 待确认状态默认展开
   
+  // 当工具变为待审批状态时，自动展开
+  useEffect(() => {
+    if (isPending) {
+      setIsExpanded(true);
+    }
+  }, [isPending]);
+  
   const toolName = toolCall?.name || "Unknown Tool";
   const toolArgs = toolCall?.args || {};
   const toolResultContent = toolResult?.content || "";
@@ -78,12 +85,37 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           <Wrench className={`h-5 w-5 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
           <span className={`font-mono text-sm font-semibold truncate ${isPending ? 'text-orange-800' : 'text-yellow-400'}`}>{toolName}</span>
           <span className={`ml-2 text-xs font-bold flex-shrink-0 ${isPending ? 'text-orange-700' : 'text-yellow-400'}`}>工具调用（{toolCount || 1}）</span>
-          {isPending && (
-            <Badge className="text-xs ml-2 bg-orange-500 hover:bg-orange-600 text-white border-orange-500">
-              待确认
-            </Badge>
-          )}
         </div>
+        
+        {/* 待确认状态的操作按钮 - 放在头部 */}
+        {isPending && (
+          <div className="flex gap-2 mr-2" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                console.log(`🔧 确认工具: ${toolCall.name}`, toolCall.args);
+                // 传递详细的审批信息给后端
+                onApprove?.();
+              }}
+              className="bg-green-500 hover:bg-green-600 text-white font-medium text-xs px-2 py-1 h-6"
+            >
+              ✅ 确认
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                console.log(`❌ 拒绝工具: ${toolCall.name}`);
+                onReject?.();
+              }}
+              className="border-red-400 text-red-600 hover:bg-red-50 font-medium text-xs px-2 py-1 h-6"
+            >
+              ❌ 拒绝
+            </Button>
+          </div>
+        )}
+        
         {isExpanded ? (
           <ChevronDown className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
         ) : (
@@ -102,33 +134,6 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
             </pre>
           </div>
           
-          {/* 待确认状态的操作按钮 */}
-          {isPending && (
-            <div className="flex gap-2 pt-1.5 border-t border-orange-200 mt-2 pt-2">
-              <Button
-                variant="default"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onApprove?.();
-                }}
-                className="bg-green-500 hover:bg-green-600 text-white"
-              >
-                确认执行
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReject?.();
-                }}
-                className="border-gray-400 text-gray-600 hover:bg-gray-100 rounded-md"
-              >
-                取消
-              </Button>
-            </div>
-          )}
           
           
           {/* 输出结果 */}
