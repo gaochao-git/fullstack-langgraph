@@ -52,7 +52,7 @@
         "action": "生成排查报告",
         "command": "",
         "tool": "llm",
-        "description": "报告必须包含以下几部分信息：基本信息、故障描述、根因分析、修复建议、预防措施",
+        "description": "报告必须包含以下几部分信息：基本信息(时间、对象、问题描述、sop编号)、根因分析、修复建议、预防措施",
         "requires_approval": false
       }
     ],
