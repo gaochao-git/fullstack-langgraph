@@ -7,8 +7,8 @@ const md: MarkdownIt = new MarkdownIt({
   breaks: false,
   // 配置代码高亮
   highlight: function (str: string, lang: string): string {
-    return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #DBEAFE; border: 1px solid #93C5FD;">' +
-           '<code style="color: #1E3A8A;">' +
+    return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #1F2937; border: 1px solid #374151;">' +
+           '<code style="color: #D1D5DB;">' +
            md.utils.escapeHtml(str) +
            '</code></pre>';
   }
@@ -78,8 +78,8 @@ const markdownStyles = `
     overflow-wrap: break-word;
   }
   .markdown-body pre { 
-    background-color: #DBEAFE;
-    border: 1px solid #93C5FD;
+    background-color: #1F2937;
+    border: 1px solid #374151;
     border-radius: 6px;
     padding: 12px;
     overflow-x: auto;
@@ -88,7 +88,7 @@ const markdownStyles = `
     word-break: normal;
   }
   .markdown-body pre code {
-    color: #1E3A8A;
+    color: #D1D5DB;
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 0.75em;
     background: transparent;
