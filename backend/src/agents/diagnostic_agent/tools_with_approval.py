@@ -49,14 +49,43 @@ def add_human_in_the_loop(
         }
         
         # 触发中断，等待用户审批
-        user_approved = interrupt(interrupt_info)
+        approval_result = interrupt(interrupt_info)
         
-        if user_approved:
-            # 用户批准，执行原始工具
-            return tool.invoke(tool_input)
+        print(f"🔍 收到审批结果: {approval_result}")
+        print(f"🔍 审批结果类型: {type(approval_result)}")
+        
+        # 解析前端传递的审批数据
+        if isinstance(approval_result, dict):
+            # 前端传递了详细的审批信息: {"工具名": xx, "工具参数": xxx, "审批结果": xxxx}
+            approved_tool_name = approval_result.get("工具名") or approval_result.get("tool_name")
+            approved_tool_args = approval_result.get("工具参数") or approval_result.get("tool_args")
+            user_approved = approval_result.get("审批结果") or approval_result.get("approved")
+            
+            print(f"🔍 解析审批信息:")
+            print(f"  - 审批工具: {approved_tool_name}")
+            print(f"  - 审批参数: {approved_tool_args}")
+            print(f"  - 审批结果: {user_approved}")
+            
+            # 验证工具名称和参数是否匹配
+            if (approved_tool_name == tool.name and approved_tool_args == tool_input):
+                print(f"✅ 审批验证通过: {tool.name}")
+                if user_approved:
+                    return tool.invoke(tool_input)
+                else:
+                    return f"工具 {tool.name} 执行被用户拒绝"
+            else:
+                error_msg = f"❌ 审批验证失败: 请求工具 {tool.name}，审批工具 {approved_tool_name}"
+                print(error_msg)
+                return error_msg
         else:
-            # 用户拒绝，返回拒绝信息
-            return f"工具 {tool.name} 执行被用户拒绝"
+            # 简单的布尔值审批
+            user_approved = bool(approval_result)
+            print(f"🔍 简单审批模式: {user_approved}")
+            
+            if user_approved:
+                return tool.invoke(tool_input)
+            else:
+                return f"工具 {tool.name} 执行被用户拒绝"
 
     return call_tool_with_interrupt
 

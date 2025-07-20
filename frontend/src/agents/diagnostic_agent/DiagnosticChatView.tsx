@@ -318,11 +318,21 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
               isPending={isPending}
               onApprove={() => {
                 console.log(`🔧 确认工具: ${toolCall.name}`, toolCall.args);
-                onInterruptResume?.(true);
+                // 传递详细的审批信息给后端
+                onInterruptResume?.({
+                  "工具名": toolCall.name,
+                  "工具参数": toolCall.args,
+                  "审批结果": true
+                });
               }}
               onReject={() => {
                 console.log(`🔧 拒绝工具: ${toolCall.name}`, toolCall.args);
-                onInterruptResume?.(false);
+                // 传递详细的审批信息给后端
+                onInterruptResume?.({
+                  "工具名": toolCall.name,
+                  "工具参数": toolCall.args,
+                  "审批结果": false
+                });
               }}
               toolCount={toolCalls.length}
             />
