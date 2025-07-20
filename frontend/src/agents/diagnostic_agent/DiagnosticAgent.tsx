@@ -63,7 +63,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   }>({
     apiUrl: import.meta.env.DEV
       ? "http://localhost:8000"
-      : "http://localhost:8123",
+      : "http://82.156.146.51/api",
     assistantId: "diagnostic_agent",
     messagesKey: "messages",
     ...getThreadIdConfig(), // 只有历史会话才传递threadId
@@ -174,7 +174,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       const response = await fetch(
         import.meta.env.DEV 
           ? "http://localhost:8000/users/zhangsan123/threads?limit=20&offset=0" 
-          : "http://localhost:8123/users/zhangsan123/threads?limit=20&offset=0"
+          : "http://82.156.146.51/api/users/zhangsan123/threads?limit=20&offset=0"
       );
 
       if (response.ok) {

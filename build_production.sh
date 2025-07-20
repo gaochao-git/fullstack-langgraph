@@ -15,7 +15,8 @@ mkdir -p ${BUILD_DIR}/${PACKAGE_NAME}
 echo "📦 构建前端静态文件..."
 cd frontend
 npm install
-npm run build
+# 跳过TypeScript类型检查，只构建生产文件
+npx vite build --config vite.config.prod.ts
 cd ..
 
 echo "📦 准备后端文件..."

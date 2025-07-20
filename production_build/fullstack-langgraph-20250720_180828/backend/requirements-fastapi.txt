@@ -1,0 +1,35 @@
+# FastAPI独立部署依赖
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# LangGraph核心（开源）
+langgraph==0.2.69
+langchain-core==0.3.25
+langchain-community==0.3.8
+
+# LangGraph PostgreSQL持久化支持
+langgraph-checkpoint-postgres[psycopg]==2.0.2
+psycopg[pool]
+
+# 模型和工具
+langchain-openai==0.2.14
+elasticsearch==8.12.0
+mysql-connector-python==9.1.0
+paramiko==3.5.0
+requests==2.32.3
+
+# 工具和配置
+python-dotenv==1.0.1
+python-multipart==0.0.19
+
+# 日志和监控
+structlog==24.4.0
+
+# 生产环境
+gunicorn==23.0.0
+
+# 开发工具（可选）
+pytest==8.3.4
+httpx==0.28.1

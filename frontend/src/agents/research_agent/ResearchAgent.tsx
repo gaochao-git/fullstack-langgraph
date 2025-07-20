@@ -27,7 +27,7 @@ export default function ResearchAgent() {
   }>({
     apiUrl: import.meta.env.DEV
       ? "http://localhost:8000"
-      : "http://localhost:8123",
+      : "http://82.156.146.51/api",
     assistantId: "research_agent",
     messagesKey: "messages",
     onUpdateEvent: (event: any) => {

@@ -1,0 +1,15 @@
+[Unit]
+Description=Fullstack LangGraph Application
+After=network.target
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=/path/to/fullstack-langgraph  # 替换为实际路径
+ExecStart=/path/to/fullstack-langgraph/start.sh  # 替换为实际路径
+ExecStop=/path/to/fullstack-langgraph/stop.sh   # 替换为实际路径
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

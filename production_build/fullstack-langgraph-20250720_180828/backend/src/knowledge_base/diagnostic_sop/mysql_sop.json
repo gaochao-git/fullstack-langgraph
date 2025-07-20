@@ -1,0 +1,163 @@
+{
+  "SOP-DB-001": {
+    "id": "SOP-DB-001",
+    "title": "MySQL数据库响应耗时升高诊断",
+    "category": "database",
+    "description": "诊断MySQL数据库响应时间过长的标准操作程序",
+    "severity": "high",
+    "steps": [
+      {
+        "step": 1,
+        "description": "获取慢查询日志配置和阈值设置",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SHOW VARIABLES WHERE Variable_name IN ('long_query_time', 'slow_query_log');",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "description": "确定分析范围",
+        "ai_generated": true,
+        "tool": "llm",
+        "args": "根据用户描述的响应耗时和慢查询阈值，确定分析范围，如果用户告诉了范围用用户的，否则用报警时间前后5分钟",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "description": "大模型判断是否需要分析慢查询日志",
+        "ai_generated": true,
+        "tool": "llm",
+        "args": "如果响应耗时小于慢查询阈值则跳过慢日志分析直接执行第5步，如果大于阈值则继续第4步",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "description": "从ES中查询指定时间范围的慢查询日志，分析是写慢查询还是读慢查询，查看扫描行数和锁等待情况，如果要过滤先获取一条数据看看有哪些字段然后过滤",
+        "ai_generated": true,
+        "tool": "get_es_data",
+        "args": "index: mysql-slow-*, start_time: 动态生成, end_time: 动态生成, query: 动态生成,获取一条数据看看有哪些字段然后生成",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "description": "获取指定时间范围内的磁盘IO使用率和CPU使用率，检查是否存在瓶颈或异常波动",
+        "ai_generated": true,
+        "tool": "get_zabbix_metric_data",
+        "args": "metric: [system.cpu.util[,user], disk.io.util[vda]](一定要一个指标获取完数据分析完再分析下一个), start_time: 动态生成, end_time: 动态生成",
+        "requires_approval": false
+      },
+      {
+        "step": 6,
+        "description": "如果CPU或者磁盘IO有瓶颈且当前仍然存在瓶颈，则排查CPU和IO占用前5名进程，如果瓶颈当前已经没有了则跳过",
+        "ai_generated": false,
+        "tool": "execute_system_command",
+        "args": "top -b -n1 | head -12; iotop -b -n1 | head -10",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
+    "recommendations": "建议优化识别到的慢查询SQL，为高频查询字段添加索引，重构复杂查询，联系DBA进行查询优化"
+  },
+  "SOP-DB-002": {
+    "id": "SOP-DB-002",
+    "title": "MySQL连接数过多诊断",
+    "category": "database",
+    "description": "诊断MySQL连接数过多等问题",
+    "severity": "high",
+    "steps": [
+      {
+        "step": 1,
+        "description": "查看当前活跃连接数量",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SHOW STATUS LIKE 'Threads_connected';",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "description": "确认最大连接数限制",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SHOW VARIABLES LIKE 'max_connections';",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "description": "分析连接来源分布",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT USER, HOST, COUNT(*) FROM information_schema.PROCESSLIST GROUP BY USER, HOST;",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "description": "分析连接状态分布",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT COMMAND, COUNT(*) FROM information_schema.PROCESSLIST GROUP BY COMMAND;",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "description": "查找长时间等待的连接",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT ID, USER, HOST, TIME, STATE FROM information_schema.PROCESSLIST WHERE TIME > 300;",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
+    "recommendations": "建议优化应用连接池配置，增加最大连接数限制，优化长时间运行的查询，实施连接超时策略"
+  },
+  "SOP-DB-003": {
+    "id": "SOP-DB-003",
+    "title": "MySQL活跃会话数过多诊断",
+    "category": "database",
+    "description": "诊断MySQL活跃会话数过多导致的性能问题",
+    "severity": "high",
+    "steps": [
+      {
+        "step": 1,
+        "description": "统计当前活跃会话数量",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT COUNT(*) as active_sessions FROM information_schema.PROCESSLIST WHERE COMMAND != 'Sleep';",
+        "requires_approval": false
+      },
+      {
+        "step": 2,
+        "description": "查看所有活跃会话的详细状态",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT ID, USER, HOST, DB, COMMAND, TIME, STATE, INFO FROM information_schema.PROCESSLIST WHERE COMMAND != 'Sleep' ORDER BY TIME DESC;",
+        "requires_approval": false
+      },
+      {
+        "step": 3,
+        "description": "识别运行时间超过60秒的会话",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT ID, USER, HOST, TIME, STATE, INFO FROM information_schema.PROCESSLIST WHERE TIME > 60 AND COMMAND != 'Sleep';",
+        "requires_approval": false
+      },
+      {
+        "step": 4,
+        "description": "分析会话状态分布情况",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT STATE, COUNT(*) as session_count FROM information_schema.PROCESSLIST GROUP BY STATE ORDER BY session_count DESC;",
+        "requires_approval": false
+      },
+      {
+        "step": 5,
+        "description": "按用户统计会话数量",
+        "ai_generated": false,
+        "tool": "execute_mysql_query",
+        "args": "SELECT USER, COUNT(*) as session_count FROM information_schema.PROCESSLIST GROUP BY USER ORDER BY session_count DESC;",
+        "requires_approval": false
+      }
+    ],
+    "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
+    "recommendations": "建议优化长时间运行的查询，调整应用连接池配置，终止异常的长时间会话，优化数据库连接管理策略"
+  }
+}
