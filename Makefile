@@ -1,4 +1,4 @@
-.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev prod test clean
+.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev prod test clean build-prod
 
 help:
 	@echo "Available commands:"
@@ -11,6 +11,7 @@ help:
 	@echo ""
 	@echo "🏭 Production:"
 	@echo "  make prod            - Start production server"
+	@echo "  make build-prod      - Build production deployment package"
 	@echo ""
 	@echo "🧪 Testing:"
 	@echo "  make test            - Run tests"
@@ -53,9 +54,15 @@ test:
 	@echo "🧪 Running tests..."
 	@cd backend && python -m pytest || echo "No tests found"
 
+# Build production deployment package
+build-prod:
+	@echo "📦 Building production deployment package..."
+	@./build_production.sh
+
 # Clean build artifacts
 clean:
 	@echo "🧹 Cleaning build artifacts..."
 	@cd frontend && rm -rf dist node_modules/.cache
 	@cd backend && find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	@cd backend && find . -name "*.pyc" -delete 2>/dev/null || true 
+	@cd backend && find . -name "*.pyc" -delete 2>/dev/null || true
+	@rm -rf production_build 
