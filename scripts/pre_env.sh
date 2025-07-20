@@ -21,21 +21,31 @@ fi
 PYTHON_VERSION=$($PYTHON_PATH --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
 echo "✅ Python版本: $PYTHON_VERSION"
 
-# 停止现有服务
-echo "🛑 停止现有服务..."
+# 检查是否有服务正在运行
 if [ -f backend.pid ]; then
     PID=$(cat backend.pid)
-    echo "停止进程 $PID..."
-    kill $PID 2>/dev/null || true
-    sleep 2
-    kill -9 $PID 2>/dev/null || true
-    rm -f backend.pid
+    if kill -0 $PID 2>/dev/null; then
+        echo "⚠️  检测到服务正在运行 (PID: $PID)"
+        echo "请先停止服务再执行环境初始化："
+        echo "  ./stop.sh"
+        echo ""
+        echo "❌ 退出以避免影响正在运行的服务"
+        exit 1
+    else
+        echo "🧹 清理无效的PID文件..."
+        rm -f backend.pid
+    fi
 fi
 
-# 备份现有虚拟环境
+# 检查是否已存在虚拟环境
 if [ -d "venv" ]; then
-    echo "🗂️  备份现有虚拟环境..."
-    mv venv venv_backup_$(date +%Y%m%d_%H%M%S) 2>/dev/null || rm -rf venv
+    echo "⚠️  检测到已存在的虚拟环境"
+    echo "如需重新初始化，请先手动删除或备份现有的 venv 目录："
+    echo "  mv venv venv_backup_$(date +%Y%m%d_%H%M%S)"
+    echo "  rm -rf venv"
+    echo ""
+    echo "❌ 退出以避免覆盖现有环境"
+    exit 1
 fi
 
 # 创建虚拟环境
