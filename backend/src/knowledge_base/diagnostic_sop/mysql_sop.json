@@ -56,14 +56,7 @@
       }
     ],
     "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
-    "escalation_criteria": "如果响应耗时升高且影响核心业务功能",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议优化识别到的慢查询SQL",
-      "建议为高频查询字段添加索引",
-      "建议重构复杂查询",
-      "建议联系DBA进行查询优化"
-    ]
+    "recommendations": "建议优化识别到的慢查询SQL，为高频查询字段添加索引，重构复杂查询，联系DBA进行查询优化"
   },
   "SOP-DB-002": {
     "id": "SOP-DB-002",
@@ -114,14 +107,7 @@
       }
     ],
     "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
-    "escalation_criteria": "如果无法建立新连接且业务受影响",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议优化应用连接池配置",
-      "建议增加最大连接数限制",
-      "建议优化长时间运行的查询",
-      "建议实施连接超时策略"
-    ]
+    "recommendations": "建议优化应用连接池配置，增加最大连接数限制，优化长时间运行的查询，实施连接超时策略"
   },
   "SOP-DB-003": {
     "id": "SOP-DB-003",
@@ -172,13 +158,6 @@
       }
     ],
     "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],
-    "escalation_criteria": "如果活跃会话数持续过高且影响数据库性能",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议优化长时间运行的查询",
-      "建议调整应用连接池配置",
-      "建议终止异常的长时间会话",
-      "建议优化数据库连接管理策略"
-    ]
+    "recommendations": "建议优化长时间运行的查询，调整应用连接池配置，终止异常的长时间会话，优化数据库连接管理策略"
   }
 }

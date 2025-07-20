@@ -5,7 +5,7 @@
     "category": "system",
     "description": "诊断服务器磁盘空间不足的标准操作程序",
     "severity": "critical",
-    "symptoms": ["磁盘使用率超过90%", "No space left on device", "应用无法写入文件"],
+    "symptoms": ["磁盘使用率超过某个阈值报警", "日志报错No space left on device", "应用无法写入文件"],
     "steps": [
       {
         "step": 1,
@@ -52,25 +52,13 @@
         "action": "生成排查报告",
         "command": "",
         "tool": "llm",
-        "description": "基本信息、故障描述、根因分析、修复建议、预防措施",
+        "description": "报告必须包含以下几部分信息：基本信息、故障描述、根因分析、修复建议、预防措施",
         "requires_approval": false
       }
     ],
     "tools_required": ["get_current_time"],
-    "escalation_criteria": "如果磁盘使用率超过95%",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议清理/tmp和/var/tmp中的临时文件",
-      "建议归档或删除旧的日志文件",
-      "建议联系系统管理员扩展磁盘空间",
-      "建议实施日志轮转策略"
-    ],
-    "prevention": [
-      "设置磁盘使用率监控告警",
-      "定期清理日志文件",
-      "实施日志轮转策略",
-      "监控大文件增长"
-    ]
+    "recommendations": "建议清理/tmp和/var/tmp中的临时文件，归档或删除旧的日志文件，联系系统管理员扩展磁盘空间，实施日志轮转策略",
+    "prevention": "设置磁盘使用率监控告警，定期清理日志文件，实施日志轮转策略，监控大文件增长"
   },
   "SOP-SYS-102": {
     "id": "SOP-SYS-102",
@@ -122,20 +110,8 @@
       }
     ],
     "tools_required": ["system_monitor", "process_tools"],
-    "escalation_criteria": "如果负载平均值持续超过CPU核心数的2倍",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议优化高CPU使用率的进程",
-      "建议优化高内存使用的进程",
-      "建议检查IO瓶颈并优化磁盘性能",
-      "建议联系系统管理员进行资源调优"
-    ],
-    "prevention": [
-      "监控系统负载趋势",
-      "合理配置服务资源",
-      "定期性能调优",
-      "容量规划"
-    ]
+    "recommendations": "建议优化高CPU使用率的进程，优化高内存使用的进程，检查IO瓶颈并优化磁盘性能，联系系统管理员进行资源调优",
+    "prevention": "监控系统负载趋势，合理配置服务资源，定期性能调优，容量规划"
   },
   "SOP-SYS-103": {
     "id": "SOP-SYS-103",
@@ -187,19 +163,7 @@
       }
     ],
     "tools_required": ["get_current_time"],
-    "escalation_criteria": "如果内存使用率超过90%且持续增长",
-    "diagnostic_only": true,
-    "recommendations": [
-      "建议优化高内存使用的进程",
-      "建议增加系统内存",
-      "建议配置或增大swap空间",
-      "建议联系系统管理员分析内存泄漏"
-    ],
-    "prevention": [
-      "监控内存使用趋势",
-      "合理配置应用内存",
-      "定期重启长期运行的服务",
-      "内存泄漏检测"
-    ]
+    "recommendations": "建议优化高内存使用的进程，增加系统内存，配置或增大swap空间，联系系统管理员分析内存泄漏",
+    "prevention": "监控内存使用趋势，合理配置应用内存，定期重启长期运行的服务，内存泄漏检测"
   }
 } 
