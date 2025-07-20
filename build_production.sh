@@ -53,7 +53,7 @@ source venv/bin/activate
 # 安装依赖
 echo "📦 安装Python依赖..."
 cd backend
-pip install .
+pip install -r requirements.txt
 cd ..
 
 # 启动服务
