@@ -35,6 +35,9 @@ cp scripts/stop.sh ${BUILD_DIR}/${PACKAGE_NAME}/stop.sh
 # 复制环境预配置脚本
 cp scripts/pre_env.sh ${BUILD_DIR}/${PACKAGE_NAME}/pre_env.sh
 
+# 复制升级脚本
+cp scripts/upgrade.sh ${BUILD_DIR}/${PACKAGE_NAME}/upgrade.sh
+
 # 创建nginx配置
 cat > ${BUILD_DIR}/${PACKAGE_NAME}/nginx.conf << 'EOF'
 server {
@@ -172,6 +175,7 @@ EOF
 chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/start.sh
 chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/stop.sh
 chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/pre_env.sh
+chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/upgrade.sh
 
 echo "📦 创建部署包..."
 cd ${BUILD_DIR}
@@ -186,7 +190,7 @@ echo "🚀 部署步骤:"
 echo "1. 本地开发: make dev"
 echo "2. 本地打包: make build"
 echo "3. 拷贝到远程: make deploy"
-echo "4. 远程服务器解压: tar -xzf ${PACKAGE_NAME}.tar.gz"
-echo "5. 远程服务器执行环境预配置: ./pre_env.sh 构建venv环境和安装依赖"
-echo "6. 远程服务器执行启动服务: ./start.sh --prod"
-echo "7. 远程服务器执行停止服务: ./stop.sh"
+echo "4. 远程服务器初次部署: ./pre_env.sh"
+echo "5. 远程服务器启动服务: ./start.sh"
+echo "6. 远程服务器升级版本: ./upgrade.sh ${PACKAGE_NAME}"
+echo "7. 远程服务器停止服务: ./stop.sh"
