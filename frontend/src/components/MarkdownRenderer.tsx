@@ -1,16 +1,37 @@
 import { Typography } from 'antd';
 import React from 'react';
 import MarkdownIt from 'markdown-it';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css';
 
 const md: MarkdownIt = new MarkdownIt({ 
   html: true, 
   breaks: false,
   // 配置代码高亮
   highlight: function (str: string, lang: string): string {
-    return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #1F2937; border: 1px solid #374151;">' +
-           '<code style="color: #D1D5DB;">' +
-           md.utils.escapeHtml(str) +
-           '</code></pre>';
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        const highlighted = hljs.highlight(str, { language: lang }).value;
+        return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
+               `<code class="hljs language-${lang}">` +
+               highlighted +
+               '</code></pre>';
+      } catch (__) {}
+    }
+    // 自动检测语言
+    try {
+      const highlighted = hljs.highlightAuto(str).value;
+      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
+             '<code class="hljs">' +
+             highlighted +
+             '</code></pre>';
+    } catch (__) {
+      // 如果高亮失败，返回原始代码
+      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
+             '<code style="color: #e6edf3;">' +
+             md.utils.escapeHtml(str) +
+             '</code></pre>';
+    }
   }
 });
 
@@ -78,17 +99,16 @@ const markdownStyles = `
     overflow-wrap: break-word;
   }
   .markdown-body pre { 
-    background-color: #1F2937;
-    border: 1px solid #374151;
-    border-radius: 6px;
-    padding: 12px;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
     overflow-x: auto;
     margin: 8px 0;
     white-space: pre;
     word-break: normal;
   }
   .markdown-body pre code {
-    color: #D1D5DB;
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
     font-size: 0.75em;
     background: transparent;
@@ -96,6 +116,10 @@ const markdownStyles = `
     border: none;
     white-space: pre;
     word-break: normal;
+  }
+  .markdown-body .hljs {
+    background: transparent !important;
+    padding: 8px !important;
   }
   .markdown-body ul {
     @apply list-disc list-inside mb-2;
