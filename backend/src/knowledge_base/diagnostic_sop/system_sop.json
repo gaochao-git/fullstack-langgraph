@@ -46,6 +46,14 @@
         "tool": "execute_system_command",
         "description": "列出7天前的日志文件（不删除）",
         "requires_approval": false
+      },
+      {
+        "step": 6,
+        "action": "生成排查报告",
+        "command": "",
+        "tool": "llm",
+        "description": "基本信息、故障描述、根因分析、修复建议、预防措施",
+        "requires_approval": false
       }
     ],
     "tools_required": ["get_current_time"],
