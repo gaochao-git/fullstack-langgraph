@@ -25,68 +25,15 @@ cp -r backend ${BUILD_DIR}/${PACKAGE_NAME}/
 # 复制前端构建结果
 cp -r frontend/dist ${BUILD_DIR}/${PACKAGE_NAME}/frontend_dist
 
-echo "📝 创建部署脚本..."
-# 创建启动脚本
-cat > ${BUILD_DIR}/${PACKAGE_NAME}/start.sh << 'EOF'
-#!/bin/bash
+echo "📝 复制部署脚本..."
+# 复制启动脚本
+cp scripts/start.sh ${BUILD_DIR}/${PACKAGE_NAME}/start.sh
 
-echo "🚀 启动 fullstack-langgraph 生产环境..."
+# 复制停止脚本
+cp scripts/stop.sh ${BUILD_DIR}/${PACKAGE_NAME}/stop.sh
 
-# 检查Python版本
-python_version=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
-required_version="3.11"
-
-if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" != "$required_version" ]; then
-    echo "❌ 错误: 需要 Python 3.11 或更高版本，当前版本: $python_version"
-    exit 1
-fi
-
-# 创建虚拟环境（如果不存在）
-if [ ! -d "venv" ]; then
-    echo "📦 创建Python虚拟环境..."
-    python3 -m venv venv
-fi
-
-# 激活虚拟环境
-source venv/bin/activate
-
-# 安装依赖
-echo "📦 安装Python依赖..."
-cd backend
-pip install -r requirements.txt
-cd ..
-
-# 启动服务
-echo "🏭 启动后端服务..."
-cd backend
-uvicorn src.api.app:app --host 0.0.0.0 --port 8000 &
-BACKEND_PID=$!
-
-echo "✅ 后端服务已启动 (PID: $BACKEND_PID)"
-echo "🌐 后端API地址: http://localhost:8000"
-echo "📁 前端静态文件位置: $(pwd)/../frontend_dist"
-echo ""
-echo "请配置nginx代理前端静态文件和后端API"
-echo "参考配置文件: nginx.conf"
-echo ""
-echo "按 Ctrl+C 停止服务"
-
-# 等待信号
-trap "echo '正在停止服务...'; kill $BACKEND_PID; exit" INT TERM
-wait $BACKEND_PID
-EOF
-
-# 创建停止脚本
-cat > ${BUILD_DIR}/${PACKAGE_NAME}/stop.sh << 'EOF'
-#!/bin/bash
-
-echo "🛑 停止 fullstack-langgraph 服务..."
-
-# 查找并停止uvicorn进程
-pkill -f "uvicorn src.api.app:app" || echo "未找到运行中的后端服务"
-
-echo "✅ 服务已停止"
-EOF
+# 复制环境预配置脚本
+cp scripts/pre_env.sh ${BUILD_DIR}/${PACKAGE_NAME}/pre_env.sh
 
 # 创建nginx配置
 cat > ${BUILD_DIR}/${PACKAGE_NAME}/nginx.conf << 'EOF'
@@ -224,6 +171,7 @@ EOF
 # 设置执行权限
 chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/start.sh
 chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/stop.sh
+chmod +x ${BUILD_DIR}/${PACKAGE_NAME}/pre_env.sh
 
 echo "📦 创建部署包..."
 cd ${BUILD_DIR}
@@ -235,8 +183,10 @@ echo "📦 部署包位置: ${BUILD_DIR}/${PACKAGE_NAME}.tar.gz"
 echo "📁 解压后目录: ${BUILD_DIR}/${PACKAGE_NAME}/"
 echo ""
 echo "🚀 部署步骤:"
-echo "1. 将 ${BUILD_DIR}/${PACKAGE_NAME}.tar.gz 上传到CentOS服务器"
-echo "2. 解压: tar -xzf ${PACKAGE_NAME}.tar.gz"
-echo "3. 进入目录: cd ${PACKAGE_NAME}"
-echo "4. 查看部署说明: cat README_DEPLOY.md"
-echo "5. 运行: ./start.sh"
+echo "1. 本地开发: make dev"
+echo "2. 本地打包: make build"
+echo "3. 拷贝到远程: make deploy"
+echo "4. 远程服务器解压: tar -xzf ${PACKAGE_NAME}.tar.gz"
+echo "5. 远程服务器执行环境预配置: ./pre_env.sh 构建venv环境和安装依赖"
+echo "6. 远程服务器执行启动服务: ./start.sh --prod"
+echo "7. 远程服务器执行停止服务: ./stop.sh"

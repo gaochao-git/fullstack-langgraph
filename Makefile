@@ -1,17 +1,19 @@
-.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev prod test clean build-prod
+.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev prod test clean build deploy pre-env
 
 help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "🚀 Development:"
 	@echo "  make install         - Install all dependencies (frontend + backend)"
-	@echo "  make dev             - Start both frontend and backend development servers"
+	@echo "  make dev             - Start local development servers (frontend + backend)"
 	@echo "  make dev-frontend    - Start frontend development server only"
 	@echo "  make dev-backend     - Start backend development server only"
 	@echo ""
 	@echo "🏭 Production:"
 	@echo "  make prod            - Start production server"
-	@echo "  make build-prod      - Build production deployment package"
+	@echo "  make build           - Build production deployment package"
+	@echo "  make deploy          - Deploy package to remote server"
+	@echo "  make pre-env         - Setup remote environment and install dependencies"
 	@echo ""
 	@echo "🧪 Testing:"
 	@echo "  make test            - Run tests"
@@ -39,10 +41,10 @@ dev-backend:
 	@echo "🔧 Starting backend development server with hot reload..."
 	@cd backend && uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
 
-# Run frontend and backend concurrently
+# Run frontend and backend concurrently  
 dev:
-	@echo "🚀 Starting both frontend and backend development servers..."
-	@make dev-frontend & make dev-backend
+	@echo "🚀 Starting local development servers..."
+	@./scripts/start.sh --dev
 
 # Production server
 prod:
@@ -55,9 +57,32 @@ test:
 	@cd backend && python -m pytest || echo "No tests found"
 
 # Build production deployment package
-build-prod:
+build:
 	@echo "📦 Building production deployment package..."
 	@./build_production.sh
+
+# Keep old alias for compatibility
+build-prod: build
+
+# Deploy to remote server
+deploy:
+	@echo "🚀 Deploying to remote server..."
+	@if [ ! -d "production_build" ]; then \
+		echo "❌ No build found. Run 'make build' first."; \
+		exit 1; \
+	fi
+	@LATEST_PACKAGE=$$(ls -t production_build/*.tar.gz 2>/dev/null | head -n1); \
+	if [ -z "$$LATEST_PACKAGE" ]; then \
+		echo "❌ No deployment package found. Run 'make build' first."; \
+		exit 1; \
+	fi; \
+	echo "📦 Deploying $$LATEST_PACKAGE..."; \
+	scp "$$LATEST_PACKAGE" root@82.156.146.51:/tmp/
+
+# Setup remote environment
+pre-env:
+	@echo "🔧 Setting up remote environment..."
+	@./scripts/pre_env.sh
 
 # Clean build artifacts
 clean:
