@@ -8,7 +8,7 @@ from langchain_core.runnables import RunnableConfig
 
 from .configuration import Configuration
 from .state import DiagnosticState
-from .tools import all_tools
+from .tools_with_approval import get_tools_with_selective_approval
 from .utils import compile_graph_with_checkpointer
 from .prompts import SYSTEM_PROMPT
 
@@ -35,11 +35,13 @@ def create_main_graph():
         """创建带配置的agent节点"""
         llm = get_llm_from_config(config)
         
-        # 创建react agent
+        # 创建react agent，使用选择性审批的工具
+        tools_with_approval = get_tools_with_selective_approval()
         agent = create_react_agent(
             model=llm,
-            tools=all_tools,
+            tools=tools_with_approval,  # 使用带选择性审批的工具
             prompt=SYSTEM_PROMPT,
+            # 不需要 interrupt_before，因为中断逻辑在工具内部
         )
         
         # 运行agent
