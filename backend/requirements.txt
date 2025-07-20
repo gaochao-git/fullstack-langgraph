@@ -3,6 +3,7 @@
 # Web框架
 fastapi==0.116.1
 uvicorn==0.35.0
+gunicorn==23.0.0
 pydantic==2.11.7
 
 # LangGraph核心
