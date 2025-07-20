@@ -40,10 +40,10 @@ dev-backend:
 	@echo "🔧 Starting backend development server with hot reload..."
 	@cd backend && uvicorn src.api.app:app --reload --host 127.0.0.1 --port 8000
 
-# Run frontend and backend concurrently  
+# Run frontend and backend concurrently
 dev:
-	@echo "🚀 Starting local development servers..."
-	@./scripts/start.sh --dev
+	@echo "🚀 Starting both frontend and backend development servers..."
+	@make dev-frontend & make dev-backend
 
 # Production server
 prod:

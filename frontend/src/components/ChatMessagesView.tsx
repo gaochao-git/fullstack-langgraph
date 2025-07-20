@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Message } from "@langchain/langgraph-sdk";
 import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, CopyCheck, ChevronDown, ChevronRight, Settings, Loader2 } from "lucide-react";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { InputForm } from "./InputForm";
+import { MobileDrawer } from "./ui/mobile-drawer";
+import { MobileCard } from "./ui/mobile-layout";
 
 // 处理过的事件类型
 export interface ProcessedEvent {
