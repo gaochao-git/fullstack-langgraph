@@ -207,7 +207,7 @@ def get_zabbix_metric_data(
     
     Args:
         ip: 主机IP地址
-        metric_key: 指标名称，例如：system.cpu.util
+        metric_key: 指标名称，例如：system.cpu.util，如果用户未明确输入key，请先获取指标名在调用
         start_time: 开始时间，格式：YYYY-MM-DD HH:MM:SS
         end_time: 结束时间，格式：YYYY-MM-DD HH:MM:SS
     
