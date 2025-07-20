@@ -2,8 +2,8 @@
 
 import os
 import logging
-from typing import Dict, Any
 from langgraph.prebuilt import create_react_agent
+from langgraph.graph import StateGraph
 from langchain_core.runnables import RunnableConfig
 
 from .configuration import Configuration
@@ -59,7 +59,6 @@ def create_main_graph(enable_tool_approval: bool = True):
         return result
     
     # 使用StateGraph包装，保持与原有接口的兼容性
-    from langgraph.graph import StateGraph
     builder = StateGraph(DiagnosticState, config_schema=Configuration)
     builder.add_node("agent", create_agent_with_config)
     builder.set_entry_point("agent")
@@ -79,17 +78,9 @@ def compile_main_graph(enable_tool_approval: bool = True):
     checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
     return compile_graph_with_checkpointer(builder, checkpointer_type)
 
-# 从环境变量读取审批配置，默认启用
+# 默认不启用工具审批
 ENABLE_TOOL_APPROVAL = False
 
-# 导出编译后的图 - 根据环境变量配置
+# 导出主要使用的图和构建器
 graph = compile_main_graph(ENABLE_TOOL_APPROVAL)
-
-# 导出builder用于PostgreSQL模式 - 根据环境变量配置
 builder = create_main_graph(ENABLE_TOOL_APPROVAL)
-
-# 导出两种模式的图，供用户选择
-graph_with_approval = compile_main_graph(True)
-graph_without_approval = compile_main_graph(False)
-builder_with_approval = create_main_graph(True)
-builder_without_approval = create_main_graph(False)
