@@ -1,4 +1,4 @@
-.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev prod test clean build deploy pre-env
+.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev prod test clean build deploy
 
 help:
 	@echo "Available commands:"
@@ -13,7 +13,6 @@ help:
 	@echo "  make prod            - Start production server"
 	@echo "  make build           - Build production deployment package"
 	@echo "  make deploy          - Deploy package to remote server"
-	@echo "  make pre-env         - Setup remote environment and install dependencies"
 	@echo ""
 	@echo "🧪 Testing:"
 	@echo "  make test            - Run tests"
@@ -77,12 +76,10 @@ deploy:
 		exit 1; \
 	fi; \
 	echo "📦 Deploying $$LATEST_PACKAGE..."; \
-	scp "$$LATEST_PACKAGE" root@82.156.146.51:/tmp/
+	echo "📡 Copying to root@82.156.146.51:/tmp/"; \
+	scp "$$LATEST_PACKAGE" root@82.156.146.51:/tmp/ && \
+	echo "✅ Successfully deployed to root@82.156.146.51:/tmp/$$(basename $$LATEST_PACKAGE)"
 
-# Setup remote environment
-pre-env:
-	@echo "🔧 Setting up remote environment..."
-	@./scripts/pre_env.sh
 
 # Clean build artifacts
 clean:
