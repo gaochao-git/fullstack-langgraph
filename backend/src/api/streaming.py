@@ -31,6 +31,30 @@ def init_refs(ASSISTANTS_param):
     global ASSISTANTS
     ASSISTANTS = ASSISTANTS_param
 
+async def ensure_user_thread_mapping(user_name, thread_id, request_body):
+    """
+    确保用户和线程的归属已写入user_threads表，如不存在则自动写入。
+    自动提取thread_title（取消息内容前20字）。
+    """
+    import asyncio
+    import logging
+    from .user_threads_db import check_user_thread_exists, create_user_thread_mapping
+    logger = logging.getLogger(__name__)
+    logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
+    exists = await check_user_thread_exists(user_name, thread_id)
+    logger.info(f"[ensure_user_thread_mapping] exists={exists}")
+    if not exists:
+        thread_title = None
+        if hasattr(request_body, 'input') and request_body.input and "messages" in request_body.input:
+            messages = request_body.input["messages"]
+            if messages and len(messages) > 0:
+                last_msg = messages[-1]
+                if isinstance(last_msg, dict) and "content" in last_msg:
+                    content = str(last_msg["content"])
+                    thread_title = content[:20] + "..." if len(content) > 20 else content
+        logger.info(f"[ensure_user_thread_mapping] creating mapping: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}")
+        await create_user_thread_mapping(user_name, thread_id, thread_title)
+
 class RunCreate(BaseModel):
     assistant_id: str
     input: Optional[Dict[str, Any]] = None
@@ -165,11 +189,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
         try:
-            # 不再操作check_user_thread_exists
-            # 不再操作create_user_thread_mapping
-            # 不再操作thread_messages
-            # 不再操作thread_interrupts
-            pass
+            await ensure_user_thread_mapping(user_name, thread_id, request_body)
         except Exception as e:
             logger.error(f"处理用户线程关联时出错: {e}")
             # 不影响主流程，继续执行
