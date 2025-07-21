@@ -27,52 +27,28 @@ async def test_postgres_connection():
         logger.error(f"❌ PostgreSQL连接测试失败: {e}")
         raise e
 
-async def recover_thread_from_postgres(thread_id: str) -> bool:
-    """从PostgreSQL checkpointer中恢复线程信息"""
+async def recover_thread_from_postgres(thread_id: str):
+    """从PostgreSQL checkpointer中恢复线程信息，查到返回dict，查不到返回None"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     try:
-        # 每次创建新的checkpointer连接来恢复线程
         async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
             await checkpointer.setup()
             config = {"configurable": {"thread_id": thread_id}}
-            # 获取最新的checkpoint来验证thread存在
             history = [c async for c in checkpointer.alist(config, limit=1)]
             if history:
-                logger.info(f"✅ 从PostgreSQL恢复线程: {thread_id}")
                 checkpoint_tuple = history[0]
-                # 不再写入内存变量
-                # threads_store[thread_id] = {
-                #     "thread_id": thread_id,
-                #     "created_at": checkpoint_tuple.metadata.get("created_at", datetime.now().isoformat()) if checkpoint_tuple.metadata else datetime.now().isoformat(),
-                #     "metadata": {},
-                #     "state": {},
-                #     "recovered_from_postgres": True
-                # }
-                # if thread_id not in thread_messages:
-                #     thread_messages[thread_id] = []
-                # if thread_id not in thread_interrupts:
-                #     thread_interrupts[thread_id] = []
-                try:
-                    if checkpoint_tuple.checkpoint and "channel_values" in checkpoint_tuple.checkpoint:
-                        channel_values = checkpoint_tuple.checkpoint["channel_values"]
-                        # 不再写入内存变量
-                        # if "messages" in channel_values:
-                        #     thread_messages[thread_id] = channel_values["messages"]
-                        #     logger.info(f"恢复了 {len(thread_messages[thread_id])} 条消息")
-                        # if "diagnosis_progress" in channel_values:
-                        #     threads_store[thread_id]["state"]["diagnosis_progress"] = channel_values["diagnosis_progress"]
-                        logger.info(f"从checkpoint恢复的通道: {list(channel_values.keys())}")
-                    else:
-                        logger.info(f"Checkpoint结构: {list(checkpoint_tuple.checkpoint.keys()) if checkpoint_tuple.checkpoint else 'None'}")
-                except Exception as e:
-                    logger.warning(f"恢复状态时出错，但线程恢复成功: {e}")
-                return True
+                thread_data = {
+                    "thread_id": thread_id,
+                    "created_at": checkpoint_tuple.metadata.get("created_at") if checkpoint_tuple.metadata else None,
+                    "metadata": checkpoint_tuple.metadata or {},
+                    "state": checkpoint_tuple.checkpoint.get("channel_values", {}) if checkpoint_tuple.checkpoint else {},
+                }
+                return thread_data
             else:
-                logger.info(f"❌ PostgreSQL中未找到线程: {thread_id}")
-                return False
+                return None
     except Exception as e:
         logger.error(f"恢复线程失败: {e}")
-        return False
+        return None
 
 def prepare_graph_config(request_body, thread_id):
     """准备图执行配置"""

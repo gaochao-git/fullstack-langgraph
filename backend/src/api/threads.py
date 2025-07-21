@@ -74,6 +74,8 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
         raise HTTPException(status_code=404, detail="Thread not found")
     
     # Return history with actual messages and interrupt information
+    messages = thread_data.get("state", {}).get("messages", [])
+    interrupts = thread_data.get("state", {}).get("interrupts", [])
     history = [
         {
             "checkpoint": {
@@ -88,7 +90,7 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
                 "parents": {}
             },
             "values": {
-                "messages": [], # 历史消息需要从PostgreSQL获取
+                "messages": messages,
                 **thread_data.get("state", {})
             },
             "next": [],
@@ -96,7 +98,7 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
                 {
                     "id": str(uuid.uuid4()),
                     "name": "current_task",
-                    "interrupts": [], # 历史中断需要从PostgreSQL获取
+                    "interrupts": interrupts,
                     "error": None
                 }
             ],
@@ -129,6 +131,8 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
         before = request_body.get("before", None)
     
     # Return history with actual messages and interrupt information
+    messages = thread_data.get("state", {}).get("messages", [])
+    interrupts = thread_data.get("state", {}).get("interrupts", [])
     history = [
         {
             "checkpoint": {
@@ -143,7 +147,7 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 "parents": {}
             },
             "values": {
-                "messages": [], # 历史消息需要从PostgreSQL获取
+                "messages": messages,
                 **thread_data.get("state", {})
             },
             "next": [],
@@ -151,7 +155,7 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 {
                     "id": str(uuid.uuid4()),
                     "name": "current_task",
-                    "interrupts": [], # 历史中断需要从PostgreSQL获取
+                    "interrupts": interrupts,
                     "error": None
                 }
             ],
