@@ -61,9 +61,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const thread = useStream<{
     messages: Message[];
   }>({
-    apiUrl: import.meta.env.DEV
-      ? "http://localhost:8000"
-      : "http://82.156.146.51/api",
+    apiUrl: import.meta.env.VITE_API_BASE_URL,
     assistantId: "diagnostic_agent",
     messagesKey: "messages",
     ...getThreadIdConfig(), // 只有历史会话才传递threadId
@@ -172,9 +170,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
       
       // 调用新的用户线程接口
       const response = await fetch(
-        import.meta.env.DEV 
-          ? "http://localhost:8000/users/zhangsan123/threads?limit=20&offset=0" 
-          : "http://82.156.146.51/api/users/zhangsan123/threads?limit=20&offset=0"
+        `${import.meta.env.VITE_API_BASE_URL}/users/zhangsan123/threads?limit=20&offset=0`
       );
 
       if (response.ok) {

@@ -13,14 +13,16 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',  // 允许外部设备访问
     port: 3000,    // vite默认端口为5173，这里修改为3000
     proxy: {
       // Proxy API requests to the backend server
       "/api": {
-        target: "http://127.0.0.1:8000", // Default backend address
+        target: process.env.VITE_BACKEND_URL || "http://127.0.0.1:8000", // 支持环境变量配置后端地址
         changeOrigin: true,
-        // Optionally rewrite path if needed (e.g., remove /api prefix if backend doesn't expect it)
-        // rewrite: (path) => path.replace(/^\/api/, ''),
+        // Remove /api prefix since backend doesn't expect it
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        secure: false, // 开发环境可以禁用SSL验证
       },
     },
   },

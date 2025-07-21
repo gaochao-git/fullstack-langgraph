@@ -25,9 +25,7 @@ export default function ResearchAgent() {
     message?: string;
     [key: string]: any;
   }>({
-    apiUrl: import.meta.env.DEV
-      ? "http://localhost:8000"
-      : "http://82.156.146.51/api",
+    apiUrl: import.meta.env.VITE_API_BASE_URL,
     assistantId: "research_agent",
     messagesKey: "messages",
     onUpdateEvent: (event: any) => {
