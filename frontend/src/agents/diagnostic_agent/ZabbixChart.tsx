@@ -196,7 +196,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
     }, [data, showHeader]);
 
     return (
-        <div style={{ width: '100%', padding: '5px 0', position: 'relative' }}>
+        <div style={{ width: '100%', padding: '0', position: 'relative' }}>
             {/* 自定义头部 - 支持悬浮显示 */}
             {headerInfo && (
                 <div style={{
