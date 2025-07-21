@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from typing import Optional
 
 from .utils import (
-    should_use_postgres_mode, 
     prepare_graph_config, 
     serialize_value,
     POSTGRES_CONNECTION_STRING,
@@ -161,33 +160,6 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
     else:
         logger.info("Skipping end event due to interrupt - waiting for user approval")
 
-async def stream_with_graph(graph, request_body, thread_id):
-    """通用的图流媒体处理函数"""
-    config, graph_input, stream_modes, checkpoint = prepare_graph_config(request_body, thread_id)
-    logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
-    
-    event_id = 0
-    has_interrupt = False
-    
-    async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
-        try:
-            event_id += 1
-            sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
-            yield sse_data
-            if chunk_has_interrupt:
-                has_interrupt = True
-        except Exception as e:
-            logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}")
-            event_id += 1
-            yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
-    
-    # End event - only send if no interrupt occurred
-    if not has_interrupt:
-        event_id += 1
-        yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-    else:
-        logger.info("Skipping end event due to interrupt - waiting for user approval")
-
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应"""
     from src.agents.diagnostic_agent.graph import builder
@@ -205,15 +177,6 @@ async def handle_postgres_streaming(request_body, thread_id):
         # 在同一个async with内执行完整的流式处理
         async for item in stream_with_graph_postgres(graph, request_body, thread_id):
             yield item
-
-async def handle_memory_streaming(request_body, thread_id):
-    """处理内存模式的流式响应"""
-    assistant = ASSISTANTS[request_body.assistant_id]
-    graph = assistant["graph"]
-    
-    # 使用现有图进行流式处理
-    async for item in stream_with_graph(graph, request_body, thread_id):
-        yield item
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint"""
@@ -270,14 +233,9 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
 
     async def generate():
         try:
-            # 根据助手类型和checkpointer类型选择处理策略
-            if should_use_postgres_mode(request_body.assistant_id):
-                async for item in handle_postgres_streaming(request_body, thread_id):
-                    yield item
-            else:
-                async for item in handle_memory_streaming(request_body, thread_id):
-                    yield item
-                
+            # 只保留PostgreSQL处理逻辑
+            async for item in handle_postgres_streaming(request_body, thread_id):
+                yield item
         except Exception as e:
             logger.error(f"Error in streaming: {e}")
             yield f"event: error\n"
