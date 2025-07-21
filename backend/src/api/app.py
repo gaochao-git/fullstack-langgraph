@@ -111,21 +111,17 @@ class AssistantResponse(BaseModel):
 async def create_thread_endpoint(thread_create: ThreadCreate):
     return await create_thread(thread_create)
 
-@app.get("/threads/{thread_id}", response_model=ThreadResponse)
-async def get_thread_endpoint(thread_id: str):
-    return await get_thread(thread_id)
+# @app.get("/threads/{thread_id}", response_model=ThreadResponse)
+# async def get_thread_endpoint(thread_id: str):
+#     return await get_thread(thread_id)
 
-@app.get("/threads/{thread_id}/state")
-async def get_thread_state_endpoint(thread_id: str):
-    return await get_thread_state(thread_id)
+# @app.get("/threads/{thread_id}/state")
+# async def get_thread_state_endpoint(thread_id: str):
+#     return await get_thread_state(thread_id)
 
-@app.post("/threads/{thread_id}/state")
-async def update_thread_state_endpoint(thread_id: str, state: Dict[str, Any]):
-    return await update_thread_state(thread_id, state)
-
-@app.get("/threads/{thread_id}/history")
-async def get_thread_history_endpoint(thread_id: str, limit: int = 10, before: Optional[str] = None):
-    return await get_thread_history(thread_id, limit, before)
+# @app.post("/threads/{thread_id}/state")
+# async def update_thread_state_endpoint(thread_id: str, state: Dict[str, Any]):
+#     return await update_thread_state(thread_id, state)
 
 @app.post("/threads/{thread_id}/history")
 async def get_thread_history_post_endpoint(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
@@ -144,43 +140,43 @@ async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int
     threads = await get_user_threads(user_name, limit, offset)
     return {"user_name": user_name, "threads": threads, "total": len(threads)}
 
-@app.put("/users/{user_name}/threads/{thread_id}/title")
-async def update_thread_title_endpoint(user_name: str, thread_id: str, request_body: Dict[str, Any]):
-    """更新线程标题"""
-    from .user_threads_db import update_thread_title
-    new_title = request_body.get("title", "")
-    if not new_title:
-        raise HTTPException(status_code=400, detail="Title is required")
+# @app.put("/users/{user_name}/threads/{thread_id}/title")
+# async def update_thread_title_endpoint(user_name: str, thread_id: str, request_body: Dict[str, Any]):
+#     """更新线程标题"""
+#     from .user_threads_db import update_thread_title
+#     new_title = request_body.get("title", "")
+#     if not new_title:
+#         raise HTTPException(status_code=400, detail="Title is required")
     
-    success = await update_thread_title(user_name, thread_id, new_title)
-    if success:
-        return {"success": True, "message": "Thread title updated successfully"}
-    else:
-        raise HTTPException(status_code=404, detail="Thread not found or update failed")
+#     success = await update_thread_title(user_name, thread_id, new_title)
+#     if success:
+#         return {"success": True, "message": "Thread title updated successfully"}
+#     else:
+#         raise HTTPException(status_code=404, detail="Thread not found or update failed")
 
 # Assistant Management Endpoints
-@app.get("/assistants", response_model=List[AssistantResponse])
-async def list_assistants():
-    """List available assistants"""
-    return [
-        AssistantResponse(
-            assistant_id=assistant_id,
-            description=assistant["description"]
-        )
-        for assistant_id, assistant in ASSISTANTS.items()
-    ]
+# @app.get("/assistants", response_model=List[AssistantResponse])
+# async def list_assistants():
+#     """List available assistants"""
+#     return [
+#         AssistantResponse(
+#             assistant_id=assistant_id,
+#             description=assistant["description"]
+#         )
+#         for assistant_id, assistant in ASSISTANTS.items()
+#     ]
 
-@app.get("/assistants/{assistant_id}", response_model=AssistantResponse)
-async def get_assistant(assistant_id: str):
-    """Get assistant details"""
-    if assistant_id not in ASSISTANTS:
-        raise HTTPException(status_code=404, detail="Assistant not found")
+# @app.get("/assistants/{assistant_id}", response_model=AssistantResponse)
+# async def get_assistant(assistant_id: str):
+#     """Get assistant details"""
+#     if assistant_id not in ASSISTANTS:
+#         raise HTTPException(status_code=404, detail="Assistant not found")
     
-    assistant = ASSISTANTS[assistant_id]
-    return AssistantResponse(
-        assistant_id=assistant_id,
-        description=assistant["description"]
-    )
+#     assistant = ASSISTANTS[assistant_id]
+#     return AssistantResponse(
+#         assistant_id=assistant_id,
+#         description=assistant["description"]
+#     )
 
 
 def create_frontend_router(build_dir="../frontend/dist"):
