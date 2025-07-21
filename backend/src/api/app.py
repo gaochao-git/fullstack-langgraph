@@ -102,14 +102,6 @@ ASSISTANTS = {
     }
 }
 
-class RunResponse(BaseModel):
-    run_id: str
-    thread_id: str
-    assistant_id: str
-    created_at: str
-    status: str
-    metadata: Dict[str, Any]
-
 class AssistantResponse(BaseModel):
     assistant_id: str
     description: str
@@ -166,71 +158,6 @@ async def update_thread_title_endpoint(user_name: str, thread_id: str, request_b
     else:
         raise HTTPException(status_code=404, detail="Thread not found or update failed")
 
-# Run Management Endpoints
-@app.post("/threads/{thread_id}/runs", response_model=RunResponse)
-async def create_run(thread_id: str, run_create: RunCreate):
-    """Create and start a new run"""
-    from .utils import recover_thread_from_postgres
-    
-    if thread_id not in threads_store:
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            raise HTTPException(status_code=404, detail="Thread not found")
-    
-    if run_create.assistant_id not in ASSISTANTS:
-        raise HTTPException(status_code=400, detail="Invalid assistant_id")
-    
-    run_id = str(uuid.uuid4())
-    run_data = {
-        "run_id": run_id,
-        "thread_id": thread_id,
-        "assistant_id": run_create.assistant_id,
-        "created_at": datetime.now().isoformat(),
-        "status": "running",
-        "metadata": run_create.metadata or {},
-        "config": run_create.config or {},
-        "input": run_create.input
-    }
-    runs_store[run_id] = run_data
-    logger.info(f"Created run: {run_id} for thread: {thread_id}")
-    
-    # Start async run
-    asyncio.create_task(_execute_run(run_id))
-    
-    return RunResponse(**run_data)
-
-@app.get("/threads/{thread_id}/runs/{run_id}")
-async def get_run(thread_id: str, run_id: str):
-    """Get run details"""
-    if run_id not in runs_store:
-        raise HTTPException(status_code=404, detail="Run not found")
-    
-    run_data = runs_store[run_id]
-    if run_data["thread_id"] != thread_id:
-        raise HTTPException(status_code=404, detail="Run not found in thread")
-    
-    return run_data
-
-@app.post("/threads/{thread_id}/runs/{run_id}/interrupt")
-async def interrupt_run(thread_id: str, run_id: str):
-    """Interrupt a running run"""
-    if run_id not in runs_store:
-        raise HTTPException(status_code=404, detail="Run not found")
-    
-    runs_store[run_id]["status"] = "interrupted"
-    return {"success": True, "run_id": run_id}
-
-@app.post("/threads/{thread_id}/runs/{run_id}/resume")
-async def resume_run(thread_id: str, run_id: str, command: Optional[Dict[str, Any]] = None):
-    """Resume an interrupted run"""
-    if run_id not in runs_store:
-        raise HTTPException(status_code=404, detail="Run not found")
-    
-    runs_store[run_id]["status"] = "running"
-    # TODO: Implement actual resume logic with command
-    return {"success": True, "run_id": run_id}
-
 # Assistant Management Endpoints
 @app.get("/assistants", response_model=List[AssistantResponse])
 async def list_assistants():
@@ -254,33 +181,6 @@ async def get_assistant(assistant_id: str):
         assistant_id=assistant_id,
         description=assistant["description"]
     )
-
-# Helper function to execute runs
-async def _execute_run(run_id: str):
-    """Execute a run asynchronously"""
-    try:
-        run_data = runs_store[run_id]
-        assistant = ASSISTANTS[run_data["assistant_id"]]
-        graph = assistant["graph"]
-        
-        # Build config
-        config = {
-            "configurable": run_data.get("config", {}),
-            "thread_id": run_data["thread_id"]
-        }
-        
-        # Execute the graph
-        result = await graph.ainvoke(run_data["input"], config=config)
-        
-        # Update thread state with result
-        threads_store[run_data["thread_id"]]["state"].update(result)
-        runs_store[run_id]["status"] = "completed"
-        runs_store[run_id]["result"] = result
-        
-    except Exception as e:
-        logger.error(f"Error executing run {run_id}: {e}")
-        runs_store[run_id]["status"] = "failed"
-        runs_store[run_id]["error"] = str(e)
 
 
 def create_frontend_router(build_dir="../frontend/dist"):
