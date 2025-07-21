@@ -14,17 +14,7 @@ logger = logging.getLogger(__name__)
 # 全局连接字符串配置 - 从环境变量读取
 POSTGRES_CONNECTION_STRING = os.getenv("POSTGRES_CHECKPOINT_URI")
 
-# 存储引用 - 从app.py导入时设置
-threads_store = None
-thread_messages = None
-thread_interrupts = None
-
-def init_storage_refs(ts, tm, ti):
-    """初始化存储引用"""
-    global threads_store, thread_messages, thread_interrupts
-    threads_store = ts
-    thread_messages = tm
-    thread_interrupts = ti
+# 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
 async def test_postgres_connection():
     """启动时测试PostgreSQL连接"""
@@ -50,25 +40,27 @@ async def recover_thread_from_postgres(thread_id: str) -> bool:
             if history:
                 logger.info(f"✅ 从PostgreSQL恢复线程: {thread_id}")
                 checkpoint_tuple = history[0]
-                threads_store[thread_id] = {
-                    "thread_id": thread_id,
-                    "created_at": checkpoint_tuple.metadata.get("created_at", datetime.now().isoformat()) if checkpoint_tuple.metadata else datetime.now().isoformat(),
-                    "metadata": {},
-                    "state": {},
-                    "recovered_from_postgres": True
-                }
-                if thread_id not in thread_messages:
-                    thread_messages[thread_id] = []
-                if thread_id not in thread_interrupts:
-                    thread_interrupts[thread_id] = []
+                # 不再写入内存变量
+                # threads_store[thread_id] = {
+                #     "thread_id": thread_id,
+                #     "created_at": checkpoint_tuple.metadata.get("created_at", datetime.now().isoformat()) if checkpoint_tuple.metadata else datetime.now().isoformat(),
+                #     "metadata": {},
+                #     "state": {},
+                #     "recovered_from_postgres": True
+                # }
+                # if thread_id not in thread_messages:
+                #     thread_messages[thread_id] = []
+                # if thread_id not in thread_interrupts:
+                #     thread_interrupts[thread_id] = []
                 try:
                     if checkpoint_tuple.checkpoint and "channel_values" in checkpoint_tuple.checkpoint:
                         channel_values = checkpoint_tuple.checkpoint["channel_values"]
-                        if "messages" in channel_values:
-                            thread_messages[thread_id] = channel_values["messages"]
-                            logger.info(f"恢复了 {len(thread_messages[thread_id])} 条消息")
-                        if "diagnosis_progress" in channel_values:
-                            threads_store[thread_id]["state"]["diagnosis_progress"] = channel_values["diagnosis_progress"]
+                        # 不再写入内存变量
+                        # if "messages" in channel_values:
+                        #     thread_messages[thread_id] = channel_values["messages"]
+                        #     logger.info(f"恢复了 {len(thread_messages[thread_id])} 条消息")
+                        # if "diagnosis_progress" in channel_values:
+                        #     threads_store[thread_id]["state"]["diagnosis_progress"] = channel_values["diagnosis_progress"]
                         logger.info(f"从checkpoint恢复的通道: {list(channel_values.keys())}")
                     else:
                         logger.info(f"Checkpoint结构: {list(checkpoint_tuple.checkpoint.keys()) if checkpoint_tuple.checkpoint else 'None'}")
@@ -98,8 +90,8 @@ def prepare_graph_config(request_body, thread_id):
         graph_input = Command(resume=request_body.command["resume"])
         logger.info(f"Resuming execution with command: {request_body.command}")
         # Clear interrupt information when resuming
-        if thread_id in thread_interrupts:
-            thread_interrupts[thread_id] = []
+        # if thread_id in thread_interrupts: # 不再写入内存变量
+        #     thread_interrupts[thread_id] = []
     elif request_body.input is not None:
         graph_input = request_body.input
     else:

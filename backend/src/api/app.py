@@ -23,16 +23,15 @@ from src.agents.diagnostic_agent.configuration import Configuration as Diagnosti
 from src.agents.research_agent.configuration import Configuration as ResearchConfiguration
 
 # Import API modules
-from .utils import test_postgres_connection, init_storage_refs as init_utils_refs
+from .utils import test_postgres_connection
 from .threads import (
     ThreadCreate, ThreadResponse, 
     create_thread, get_thread, get_thread_state, update_thread_state,
-    get_thread_history, get_thread_history_post,
-    init_storage_refs as init_threads_refs
+    get_thread_history, get_thread_history_post
 )
 from .streaming import (
     RunCreate, stream_run_standard,
-    init_refs as init_streaming_refs
+    init_refs
 )
 
 # Define the FastAPI app
@@ -42,10 +41,8 @@ app = FastAPI(title="LangGraph Server", version="1.0.0")
 @app.on_event("startup")
 async def startup_event():
     await test_postgres_connection()
-    # 初始化各模块的存储引用
-    init_utils_refs(threads_store, thread_messages, thread_interrupts)
-    init_threads_refs(threads_store, thread_messages, thread_interrupts)
-    init_streaming_refs(threads_store, thread_messages, thread_interrupts, ASSISTANTS)
+    # 初始化各模块的存储引用（只初始化ASSISTANTS）
+    init_refs(ASSISTANTS)
     
     # 初始化用户线程数据库连接
     from .user_threads_db import init_user_threads_db
@@ -87,15 +84,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 logger.info(f"📝 日志配置完成，级别: {log_level}, 文件: {log_filename}")
-
-
-# In-memory storage for threads and runs (TODO: replace with persistent storage)
-threads_store: Dict[str, Dict[str, Any]] = {}
-runs_store: Dict[str, Dict[str, Any]] = {}
-# Store message history for each thread
-thread_messages: Dict[str, List[Dict[str, Any]]] = {}
-# Store interrupt information for each thread
-thread_interrupts: Dict[str, List[Dict[str, Any]]] = {}
 
 
 # Available assistants based on langgraph.json

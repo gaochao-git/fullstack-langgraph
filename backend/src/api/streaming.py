@@ -23,19 +23,13 @@ from .user_threads_db import (
 
 logger = logging.getLogger(__name__)
 
-# 存储引用 - 从app.py导入时设置
-threads_store = None
-thread_messages = None
-thread_interrupts = None
+# 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和相关操作
+
 ASSISTANTS = None
 
-def init_refs(ts, tm, ti, assistants):
-    """初始化引用"""
-    global threads_store, thread_messages, thread_interrupts, ASSISTANTS
-    threads_store = ts
-    thread_messages = tm
-    thread_interrupts = ti
-    ASSISTANTS = assistants
+def init_refs(ASSISTANTS_param):
+    global ASSISTANTS
+    ASSISTANTS = ASSISTANTS_param
 
 class RunCreate(BaseModel):
     assistant_id: str
@@ -69,24 +63,16 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         
         # Save messages to thread history from LangGraph state
         if event_type == "values" and isinstance(data, dict) and "messages" in data:
-            if thread_messages is not None:
-                if thread_id not in thread_messages:
-                    thread_messages[thread_id] = []
-                thread_messages[thread_id] = [serialize_value(msg) for msg in data["messages"]]
-                logger.info(f"💾 保存了 {len(data['messages'])} 条消息到线程 {thread_id}")
+            # 不再操作thread_messages
+            pass
         
         # Also save messages from updates events (when nodes return message updates)
         elif event_type == "updates" and isinstance(data, dict):
             for node_name, node_data in data.items():
                 if isinstance(node_data, dict) and "messages" in node_data:
-                    if thread_messages is not None:
-                        if thread_id not in thread_messages:
-                            thread_messages[thread_id] = []
-                        # Append new messages instead of replacing
-                        new_messages = [serialize_value(msg) for msg in node_data["messages"]]
-                        thread_messages[thread_id].extend(new_messages)
-                        logger.info(f"💾 从节点 {node_name} 追加了 {len(new_messages)} 条消息到线程 {thread_id}")
-                    break  # Only process the first node with messages
+                    # 不再操作thread_messages
+                    pass
+                break  # Only process the first node with messages
         
         # Check for interrupts
         has_interrupt = False
@@ -96,30 +82,15 @@ async def process_stream_chunk(chunk, event_id, thread_id):
             
             # 检查 interrupt_data 是否为空
             if interrupt_data and len(interrupt_data) > 0:
-                if thread_interrupts is not None:
-                    if thread_id not in thread_interrupts:
-                        thread_interrupts[thread_id] = []
-                    thread_interrupts[thread_id].append(interrupt_data[0])
-                    logger.info(f"💾 保存了中断信息到线程 {thread_id}: {interrupt_data[0]}")
+                # 不再操作thread_interrupts
+                pass
             else:
                 logger.warning(f"⚠️ 检测到空的中断数据: {interrupt_data}")
                 
                 # 处理空的中断数据：创建工具审批请求
                 # 这通常发生在 create_react_agent 使用 interrupt_before=["tools"] 时
-                if thread_interrupts is not None:
-                    if thread_id not in thread_interrupts:
-                        thread_interrupts[thread_id] = []
-                    
-                    # 创建一个标准的工具审批请求
-                    approval_request = {
-                        "message": "🔧 检测到工具调用请求，需要用户确认后继续执行",
-                        "suggestion_type": "tool_approval",
-                        "pending_tools": [],  # 具体工具信息需要从上下文获取
-                        "approved_tools": [],
-                        "interrupt_type": "create_react_agent_tools"
-                    }
-                    thread_interrupts[thread_id].append(approval_request)
-                    logger.info(f"💾 创建了工具审批请求到线程 {thread_id}")
+                # 不再操作thread_interrupts
+                pass
             
             has_interrupt = True
         
@@ -166,8 +137,7 @@ async def handle_postgres_streaming(request_body, thread_id):
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     
     logger.info(f"🔍 PostgreSQL模式 - 按照官方模式使用async with")
-    if thread_id in threads_store:
-        threads_store[thread_id]["streaming_status"] = "starting"
+    # 不再操作threads_store
     
     # 按照官方模式：在async with内完成整个请求周期
     async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
@@ -180,11 +150,7 @@ async def handle_postgres_streaming(request_body, thread_id):
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint"""
-    if thread_id not in threads_store:
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            raise HTTPException(status_code=404, detail="Thread not found")
+    # 不再操作ASSISTANTS
     if request_body.assistant_id not in ASSISTANTS: 
         raise HTTPException(status_code=400, detail="Invalid assistant_id")
     
@@ -199,32 +165,11 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
         try:
-            exists = await check_user_thread_exists(user_name, thread_id)
-            logger.info(f"🔍 检查用户线程是否存在: {exists}")
-            if not exists:
-                # 尝试从输入内容中提取标题
-                thread_title = None
-                if request_body.input and "messages" in request_body.input:
-                    messages = request_body.input["messages"]
-                    if messages and len(messages) > 0:
-                        last_msg = messages[-1]
-                        if isinstance(last_msg, dict) and "content" in last_msg:
-                            content = str(last_msg["content"])
-                            # 取前20个字符作为标题
-                            thread_title = content[:20] + "..." if len(content) > 20 else content
-                
-                logger.info(f"🔍 准备创建用户线程关联，标题: {thread_title}")
-                success = await create_user_thread_mapping(
-                    user_name, 
-                    thread_id, 
-                    thread_title
-                )
-                if success:
-                    logger.info(f"✅ 已创建用户线程关联: {user_name} -> {thread_id}")
-                else:
-                    logger.warning(f"❌ 创建用户线程关联失败: {user_name} -> {thread_id}")
-            else:
-                logger.info(f"ℹ️ 用户线程关联已存在，跳过创建: {user_name} -> {thread_id}")
+            # 不再操作check_user_thread_exists
+            # 不再操作create_user_thread_mapping
+            # 不再操作thread_messages
+            # 不再操作thread_interrupts
+            pass
         except Exception as e:
             logger.error(f"处理用户线程关联时出错: {e}")
             # 不影响主流程，继续执行

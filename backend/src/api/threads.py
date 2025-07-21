@@ -12,17 +12,7 @@ from .utils import recover_thread_from_postgres
 
 logger = logging.getLogger(__name__)
 
-# 存储引用 - 从app.py导入时设置
-threads_store = None
-thread_messages = None
-thread_interrupts = None
-
-def init_storage_refs(ts, tm, ti):
-    """初始化存储引用"""
-    global threads_store, thread_messages, thread_interrupts
-    threads_store = ts
-    thread_messages = tm
-    thread_interrupts = ti
+# 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
 class ThreadCreate(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
@@ -41,57 +31,47 @@ async def create_thread(thread_create: ThreadCreate):
         "metadata": thread_create.metadata or {},
         "state": {}
     }
-    threads_store[thread_id] = thread_data
-    thread_messages[thread_id] = []  # Initialize empty message history
-    thread_interrupts[thread_id] = []  # Initialize empty interrupt history
+    # 持久化到PostgreSQL
+    # 这里需要一个PostgreSQL客户端来执行插入操作
+    # 例如：await postgres_client.insert_thread(thread_id, thread_data)
     logger.info(f"Created thread: {thread_id}")
     return ThreadResponse(**thread_data)
 
 async def get_thread(thread_id: str):
     """Get thread details"""
-    if thread_id not in threads_store:
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            raise HTTPException(status_code=404, detail="Thread not found")
-    return ThreadResponse(**threads_store[thread_id])
+    # 尝试从PostgreSQL获取线程
+    thread_data = await recover_thread_from_postgres(thread_id)
+    if not thread_data:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    return ThreadResponse(**thread_data)
 
 async def get_thread_state(thread_id: str):
     """Get thread state"""
-    if thread_id not in threads_store:
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            raise HTTPException(status_code=404, detail="Thread not found")
-    return threads_store[thread_id].get("state", {})
+    # 尝试从PostgreSQL获取线程
+    thread_data = await recover_thread_from_postgres(thread_id)
+    if not thread_data:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    return thread_data.get("state", {})
 
 async def update_thread_state(thread_id: str, state: Dict[str, Any]):
     """Update thread state"""
-    if thread_id not in threads_store:
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            raise HTTPException(status_code=404, detail="Thread not found")
-    threads_store[thread_id]["state"] = state
+    # 尝试从PostgreSQL获取线程
+    thread_data = await recover_thread_from_postgres(thread_id)
+    if not thread_data:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    thread_data["state"] = state
+    # 持久化到PostgreSQL
+    # 这里需要一个PostgreSQL客户端来执行更新操作
+    # 例如：await postgres_client.update_thread_state(thread_id, state)
     return {"success": True}
 
 async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[str] = None):
     """Get all past states for a thread"""
     logger.info(f"请求history - thread_id: {thread_id}")
-    logger.info(f"当前threads_store中的thread_ids: {list(threads_store.keys())}")
-    
-    if thread_id not in threads_store:
-        logger.warning(f"Thread {thread_id} 未找到在threads_store中，尝试从PostgreSQL恢复")
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            logger.error(f"Thread {thread_id} 无法从PostgreSQL恢复")
-            raise HTTPException(status_code=404, detail="Thread not found")
-        logger.info(f"✅ 成功从PostgreSQL恢复线程: {thread_id}")
-    
-    thread_data = threads_store[thread_id]
-    messages = thread_messages.get(thread_id, [])
-    interrupts = thread_interrupts.get(thread_id, [])
+    # 尝试从PostgreSQL获取线程
+    thread_data = await recover_thread_from_postgres(thread_id)
+    if not thread_data:
+        raise HTTPException(status_code=404, detail="Thread not found")
     
     # Return history with actual messages and interrupt information
     history = [
@@ -108,7 +88,7 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
                 "parents": {}
             },
             "values": {
-                "messages": messages,
+                "messages": [], # 历史消息需要从PostgreSQL获取
                 **thread_data.get("state", {})
             },
             "next": [],
@@ -116,10 +96,10 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
                 {
                     "id": str(uuid.uuid4()),
                     "name": "current_task",
-                    "interrupts": interrupts,
+                    "interrupts": [], # 历史中断需要从PostgreSQL获取
                     "error": None
                 }
-            ] if interrupts else [],
+            ],
             "config": {
                 "configurable": {
                     "thread_id": thread_id,
@@ -136,16 +116,10 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
 async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
     """Get all past states for a thread (POST version)"""
     logger.info(f"请求history(POST) - thread_id: {thread_id}")
-    logger.info(f"当前threads_store中的thread_ids: {list(threads_store.keys())}")
-    
-    if thread_id not in threads_store:
-        logger.warning(f"Thread {thread_id} 未找到在threads_store中，尝试从PostgreSQL恢复")
-        # 尝试从PostgreSQL恢复线程
-        recovered = await recover_thread_from_postgres(thread_id)
-        if not recovered:
-            logger.error(f"Thread {thread_id} 无法从PostgreSQL恢复")
-            raise HTTPException(status_code=404, detail="Thread not found")
-        logger.info(f"✅ 成功从PostgreSQL恢复线程: {thread_id}")
+    # 尝试从PostgreSQL获取线程
+    thread_data = await recover_thread_from_postgres(thread_id)
+    if not thread_data:
+        raise HTTPException(status_code=404, detail="Thread not found")
     
     # Extract parameters from request body if provided
     limit = 10
@@ -153,10 +127,6 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
     if request_body:
         limit = request_body.get("limit", 10)
         before = request_body.get("before", None)
-    
-    thread_data = threads_store[thread_id]
-    messages = thread_messages.get(thread_id, [])
-    interrupts = thread_interrupts.get(thread_id, [])
     
     # Return history with actual messages and interrupt information
     history = [
@@ -173,7 +143,7 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 "parents": {}
             },
             "values": {
-                "messages": messages,
+                "messages": [], # 历史消息需要从PostgreSQL获取
                 **thread_data.get("state", {})
             },
             "next": [],
@@ -181,10 +151,10 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 {
                     "id": str(uuid.uuid4()),
                     "name": "current_task",
-                    "interrupts": interrupts,
+                    "interrupts": [], # 历史中断需要从PostgreSQL获取
                     "error": None
                 }
-            ] if interrupts else [],
+            ],
             "config": {
                 "configurable": {
                     "thread_id": thread_id,
