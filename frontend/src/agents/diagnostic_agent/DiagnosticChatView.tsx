@@ -689,6 +689,20 @@ interface DialogRound {
   assistant: Message[];
 }
 
+// 诊断聊天视图组件 Props 扩展
+interface DiagnosticChatViewProps {
+  messages: Message[];
+  isLoading: boolean;
+  onSubmit: (input: string) => void;
+  onCancel: () => void;
+  liveActivityEvents: ProcessedEvent[];
+  historicalActivities: Record<string, ProcessedEvent[]>;
+  interrupt?: any;
+  onInterruptResume?: (approved: boolean) => void;
+  onNewSession?: () => void; // 新增：新建会话回调
+  onHistoryToggle?: () => void; // 新增：历史会话抽屉切换回调
+}
+
 // 诊断聊天视图组件
 export function DiagnosticChatView({
   messages,
@@ -699,6 +713,8 @@ export function DiagnosticChatView({
   historicalActivities,
   interrupt,
   onInterruptResume,
+  onNewSession,
+  onHistoryToggle,
 }: DiagnosticChatViewProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -805,11 +821,40 @@ export function DiagnosticChatView({
         `}
       </style>
       
+      {/* 头部工具栏 */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-blue-600/30" style={{ background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 50%)' }}>
+        <div className="flex items-center gap-2">
+          <Bot className="h-5 w-5 text-cyan-400" />
+          <span className="font-semibold text-white">故障诊断助手</span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={onNewSession}
+            variant="outline"
+            size="sm"
+            className="bg-blue-600/20 hover:bg-blue-600/40 border-blue-500 text-blue-200 hover:text-white text-xs px-3 py-1.5 h-7"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            新建会话
+          </Button>
+          <Button
+            onClick={onHistoryToggle}
+            variant="outline"
+            size="sm"
+            className="bg-purple-600/20 hover:bg-purple-600/40 border-purple-500 text-purple-200 hover:text-white text-xs px-3 py-1.5 h-7"
+          >
+            <History className="h-3 w-3 mr-1" />
+            历史会话
+          </Button>
+        </div>
+      </div>
+      
       {/* 消息区 */}
       <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 relative"
-        style={{ background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', minHeight: 0, maxHeight: 'calc(100vh - 140px)' }}
+        style={{ background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', minHeight: 0, maxHeight: 'calc(100vh - 190px)' }}
         onScroll={handleScroll}
       >
         <div className="flex flex-col overflow-x-hidden">
