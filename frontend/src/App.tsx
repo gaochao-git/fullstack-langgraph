@@ -140,7 +140,7 @@ export default function App() {
               <MenuUnfoldOutlined />
             </button>
             <span style={{ color: '#1677ff', fontWeight: 600, fontSize: 16 }}>
-              运维平台
+              智能运维平台
             </span>
           </div>
           <Menu
