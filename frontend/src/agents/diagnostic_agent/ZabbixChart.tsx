@@ -29,43 +29,14 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
         const formatValue = (val) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
         const statsText = `当前值: ${formatValue(values[values.length - 1])} ${firstItem.units} | 最大值: ${formatValue(maxValue)} ${firstItem.units} | 数据点: ${values.length}`;
         
-        // 提取年月日部分
-        const extractDate = (timeRange) => {
-          if (!timeRange) return '';
-          // 假设时间格式包含日期，提取YYYY-MM-DD部分
-          const dateMatch = timeRange.match(/(\d{4}-\d{2}-\d{2})/);
-          return dateMatch ? dateMatch[1] : timeRange.split(' ')[0] || '';
-        };
-        const dateText = extractDate(firstItem.timeRange);
-        const leftText = `${dateText} | ${firstItem.hostname || ''} | ${firstItem.key_}`;
+        // 简化头部信息：只显示IP和指标名称
+        const headerText = `${firstItem.hostname || ''} | ${firstItem.key_}`;
 
         // 确定是否从0开始
         const shouldStartFromZero = minValue <= maxValue * 0.1;  // 如果最小值小于最大值的10%，则从0开始
         const yAxisMin = shouldStartFromZero ? 0 : minValue * 0.95;
 
         return {
-            title: showHeader ? [
-                {
-                    text: `${leftText}`,
-                    left: 'left',
-                    top: 0,
-                    textStyle: {
-                        color: '#FCD34D',
-                        fontSize: 13,
-                        fontWeight: 'bold'
-                    }
-                },
-                {
-                    text: `${statsText}`,
-                    right: 'right',
-                    top: 0,
-                    textStyle: {
-                        color: '#FCD34D',
-                        fontSize: 11,
-                        fontWeight: 'bold'
-                    }
-                }
-            ] : undefined,
             tooltip: {
                 trigger: 'axis',
                 formatter: function(params) {
@@ -83,10 +54,10 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 }
             },
             grid: {
-                top: showHeader ? 30 : 2,
+                top: showHeader ? 40 : 2,
                 left: '1%',
                 right: '1%',
-                bottom: '3%',
+                bottom: showHeader ? '3%' : '3%',
                 containLabel: true
             },
             xAxis: {
@@ -194,8 +165,59 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
         };
     }, [data, showHeader]); // 只有当data或showHeader变化时才重新计算
 
+    // 计算统计信息用于底部显示
+    const statsInfo = useMemo(() => {
+        if (!showHeader || !Array.isArray(data) || data.length === 0) return null;
+        
+        const values = data.map(item => parseFloat(item.value));
+        const firstItem = data[0];
+        
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        const currentValue = values[values.length - 1];
+        
+        const formatValue = (val) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        
+        return {
+            max: formatValue(maxValue),
+            min: formatValue(minValue),
+            units: firstItem.units
+        };
+    }, [data, showHeader]);
+
+    // 获取头部信息用于显示
+    const headerInfo = useMemo(() => {
+        if (!showHeader || !Array.isArray(data) || data.length === 0) return null;
+        const firstItem = data[0];
+        return {
+            hostname: firstItem.hostname || '',
+            key: firstItem.key_ || ''
+        };
+    }, [data, showHeader]);
+
     return (
-        <div style={{ width: '100%', padding: '5px 0' }}>
+        <div style={{ width: '100%', padding: '5px 0', position: 'relative' }}>
+            {/* 自定义头部 - 支持悬浮显示 */}
+            {headerInfo && (
+                <div style={{
+                    position: 'absolute',
+                    top: '5px',
+                    left: '10px',
+                    zIndex: 10,
+                    color: '#FCD34D',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    maxWidth: 'calc(100% - 20px)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                }}
+                title={`${headerInfo.hostname} | ${headerInfo.key}`} // 悬浮显示完整内容
+                >
+                    {headerInfo.hostname} | {headerInfo.key}
+                </div>
+            )}
+            
             <ReactEcharts 
                 option={chartOption} 
                 style={{ height: '200px', ...style }}
@@ -206,6 +228,23 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 lazyUpdate={true}  // 启用懒更新，减少不必要的图表更新
                 notMerge={true}    // 完全替换配置，避免合并开销
             />
+            
+            {/* 统计信息显示在图表下方 */}
+            {statsInfo && (
+                <div style={{ 
+                    color: '#FCD34D', 
+                    fontSize: '11px', 
+                    fontWeight: 'bold',
+                    textAlign: 'center',
+                    marginTop: '2px',
+                    padding: '2px 8px',
+                    background: 'rgba(59, 130, 246, 0.1)',
+                    borderRadius: '4px'
+                }}>
+                    最大值: {statsInfo.max} {statsInfo.units} | 
+                    最小值: {statsInfo.min} {statsInfo.units}
+                </div>
+            )}
         </div>
     );
 });
