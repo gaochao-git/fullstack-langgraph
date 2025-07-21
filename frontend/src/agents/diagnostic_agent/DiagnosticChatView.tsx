@@ -1009,9 +1009,16 @@ export function DiagnosticChatView({
             
             return !hasRenderableContent;
           })() && (
-            <div className="flex items-center gap-2 text-gray-300 mb-6 pl-10">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              诊断中...
+            <div className="flex flex-col items-start mb-6 mr-2">
+              <div className="flex items-start gap-2 w-full">
+                <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
+                  <Bot className="h-5 w-5 text-blue-200" />
+                </div>
+                <div className="flex items-center gap-2 text-gray-300">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  诊断中...
+                </div>
+              </div>
             </div>
           )}
           
