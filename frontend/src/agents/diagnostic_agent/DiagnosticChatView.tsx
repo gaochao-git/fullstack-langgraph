@@ -1046,7 +1046,11 @@ export function DiagnosticChatView({
             <Button
               type="button"
               variant="outline"
-              onClick={onCancel}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCancel();
+              }}
               className="px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30 whitespace-nowrap"
               style={{
                 animation: 'buttonPulse 1.5s ease-in-out infinite'

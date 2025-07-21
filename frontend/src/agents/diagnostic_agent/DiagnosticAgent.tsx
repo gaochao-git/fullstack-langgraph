@@ -146,7 +146,6 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
 
   const handleCancel = useCallback(() => {
     thread.stop();
-    window.location.reload();
   }, [thread]);
 
   const handleInterruptResume = useCallback((approved: boolean) => {
