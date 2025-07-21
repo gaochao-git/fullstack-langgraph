@@ -118,19 +118,9 @@ async def get_thread_history(thread_id: str, limit: int = 10, before: Optional[s
 async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
     """Get all past states for a thread (POST version)"""
     logger.info(f"请求history(POST) - thread_id: {thread_id}")
-    # 尝试从PostgreSQL获取线程
     thread_data = await recover_thread_from_postgres(thread_id)
     if not thread_data:
         raise HTTPException(status_code=404, detail="Thread not found")
-    
-    # Extract parameters from request body if provided
-    limit = 10
-    before = None
-    if request_body:
-        limit = request_body.get("limit", 10)
-        before = request_body.get("before", None)
-    
-    # Return history with actual messages and interrupt information
     messages = thread_data.get("state", {}).get("messages", [])
     interrupts = thread_data.get("state", {}).get("interrupts", [])
     history = [
@@ -147,8 +137,7 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
                 "parents": {}
             },
             "values": {
-                "messages": messages,
-                **thread_data.get("state", {})
+                "messages": messages
             },
             "next": [],
             "tasks": [
@@ -169,5 +158,4 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
             "parent_config": None
         }
     ]
-    
-    return history[:limit]
+    return history
