@@ -21,29 +21,17 @@ def save_graph_image(graph, mode_name, filename="graph.png"):
         logger.warning(f"保存图结构图像失败: {e}")
 
 
-def compile_graph_with_checkpointer(builder, checkpointer_type="memory"):
+def compile_graph_with_checkpointer(builder, checkpointer_type=None):
     """
-    根据checkpointer类型编译图
-    
+    只支持PostgreSQL模式编译图
     Args:
         builder: StateGraph构建器
-        checkpointer_type: checkpointer类型 ("memory" 或 "postgres")
-        
+        checkpointer_type: 保留参数但不再使用
     Returns:
         编译后的graph
     """
-    if checkpointer_type == "postgres":
-        # PostgreSQL模式：不在这里编译，在API请求时用async with编译
-        graph = builder.compile(name="diagnostic-agent")
-        save_graph_image(graph, "PostgreSQL模式")
-        graph = None
-        print("📝 PostgreSQL模式：图将在API请求时用async with编译")
-        return graph
-    else:
-        # 内存模式：直接使用MemorySaver
-        from langgraph.checkpoint.memory import MemorySaver
-        checkpointer = MemorySaver()
-        graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
-        save_graph_image(graph, "内存模式")
-        print(f"📝 内存模式：图已编译完成")
-        return graph
+    # 只保留PostgreSQL分支
+    graph = builder.compile(name="diagnostic-agent")
+    save_graph_image(graph, "PostgreSQL模式")
+    print("📝 PostgreSQL模式：图已编译完成")
+    return graph

@@ -66,17 +66,15 @@ def create_main_graph(enable_tool_approval: bool = True):
     
     return builder
 
-# 编译主图
+# 编译主图（只支持PostgreSQL持久化）
 def compile_main_graph(enable_tool_approval: bool = True):
     """
-    编译主图
-    
+    编译主图（只支持PostgreSQL持久化）
     Args:
         enable_tool_approval: 是否启用工具审批功能，默认True
     """
     builder = create_main_graph(enable_tool_approval)
-    checkpointer_type = os.getenv("CHECKPOINTER_TYPE", "memory")
-    return compile_graph_with_checkpointer(builder, checkpointer_type)
+    return compile_graph_with_checkpointer(builder)
 
 # 默认不启用工具审批
 ENABLE_TOOL_APPROVAL = False
