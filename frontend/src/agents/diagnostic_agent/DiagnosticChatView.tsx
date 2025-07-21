@@ -1029,21 +1029,22 @@ export function DiagnosticChatView({
             style={{ backgroundColor: '#1E293B', borderColor: '#60A5FA', borderWidth: '2px', color: '#F1F5F9' }}
             disabled={isLoading || !!interrupt}
           />
-          <Button
-            type="submit"
-            disabled={isLoading || !inputValue.trim() || !!interrupt}
-            className="bg-cyan-500 text-white px-6 py-2 rounded-lg hover:bg-cyan-600 disabled:opacity-50 shadow-lg border border-cyan-400"
-          >
-            {interrupt ? <DiagnosisButtonText text="工具确认" /> : isLoading ? <DiagnosisButtonText /> : "发送"}
-          </Button>
-          {(isLoading || interrupt) && (
+          {(isLoading || interrupt) ? (
             <Button
               type="button"
               variant="outline"
               onClick={onCancel}
-              className="px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30"
+              className="px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30 whitespace-nowrap"
             >
               取消
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              disabled={!inputValue.trim()}
+              className="bg-cyan-500 text-white px-6 py-2 rounded-lg hover:bg-cyan-600 disabled:opacity-50 shadow-lg border border-cyan-400 whitespace-nowrap"
+            >
+              发送
             </Button>
           )}
         </form>
