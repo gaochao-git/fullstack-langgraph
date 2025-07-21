@@ -792,6 +792,19 @@ export function DiagnosticChatView({
 
   return (
     <div className="flex flex-col h-full relative w-full overflow-x-hidden" style={{ minHeight: 0, background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
+      <style>
+        {`
+          @keyframes buttonSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          @keyframes buttonPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); }
+          }
+        `}
+      </style>
+      
       {/* 消息区 */}
       <div
         ref={messagesContainerRef}
@@ -1035,8 +1048,24 @@ export function DiagnosticChatView({
               variant="outline"
               onClick={onCancel}
               className="px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30 whitespace-nowrap"
+              style={{
+                animation: 'buttonPulse 1.5s ease-in-out infinite'
+              }}
             >
-              取消
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span 
+                  style={{
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    border: '2px solid currentColor',
+                    borderTop: '2px solid transparent',
+                    borderRadius: '50%',
+                    animation: 'buttonSpin 1s linear infinite'
+                  }}
+                />
+                取消
+              </span>
             </Button>
           ) : (
             <Button
