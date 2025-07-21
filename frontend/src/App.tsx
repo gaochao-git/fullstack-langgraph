@@ -65,7 +65,36 @@ export default function App() {
       {/* 桌面端侧边栏 */}
       {!isMobile && (
         <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
-          <div style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.2)' }} />
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: 48,
+            padding: '0 12px',
+            background: 'rgba(255,255,255,0.08)',
+            margin: 0
+          }}>
+            <button
+              type="button"
+              onClick={() => setCollapsed(!collapsed)}
+              style={{
+                fontSize: '16px',
+                width: 36,
+                height: 36,
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                marginRight: '8px',
+                color: '#fff'
+              }}
+            >
+              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            </button>
+            {!collapsed && (
+              <span style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>
+                智能运维平台
+              </span>
+            )}
+          </div>
           <Menu
             theme="dark"
             mode="inline"
@@ -78,14 +107,42 @@ export default function App() {
       {/* 移动端抽屉菜单 */}
       {isMobile && (
         <Drawer
-          title="导航菜单"
+          title={null}
           placement="left"
-          closable={true}
+          closable={false}
           onClose={() => setMobileMenuVisible(false)}
           open={mobileMenuVisible}
           bodyStyle={{ padding: 0 }}
           width={250}
         >
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: 48,
+            padding: '0 12px',
+            background: 'rgba(22,119,255,0.08)',
+            margin: 0
+          }}>
+            <button
+              type="button"
+              onClick={() => setMobileMenuVisible(false)}
+              style={{
+                fontSize: '16px',
+                width: 36,
+                height: 36,
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                marginRight: '8px',
+                color: '#1677ff'
+              }}
+            >
+              <MenuUnfoldOutlined />
+            </button>
+            <span style={{ color: '#1677ff', fontWeight: 600, fontSize: 16 }}>
+              运维平台
+            </span>
+          </div>
           <Menu
             mode="inline"
             defaultSelectedKeys={['1']}
@@ -95,46 +152,8 @@ export default function App() {
         </Drawer>
       )}
       <Layout>
-        <Header
-          style={{
-            padding: '0 16px',
-            background: colorBgContainer,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            borderBottom: '1px solid #f0f0f0',
-            height: 48,
-            lineHeight: '48px',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={() => {
-                if (isMobile) {
-                  setMobileMenuVisible(!mobileMenuVisible);
-                } else {
-                  setCollapsed(!collapsed);
-                }
-              }}
-              style={{
-                fontSize: '16px',
-                width: 48,
-                height: 48,
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                marginRight: '8px',
-              }}
-            >
-              {collapsed || isMobile ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            </button>
-            <Title level={isMobile ? 5 : 4} style={{ margin: 0, fontSize: isMobile ? '16px' : '20px' }}>
-              {isMobile ? '运维平台' : '基础设施智能运维平台'}
-            </Title>
-          </div>
-        </Header>
-        <Layout style={{ height: 'calc(100vh - 48px)' }}>
+        {/* 删除Header，主内容区直接顶到顶部 */}
+        <Layout style={{ height: '100vh' }}>
           <Content 
             style={{ 
               padding: isMobile ? '12px' : '16px',
