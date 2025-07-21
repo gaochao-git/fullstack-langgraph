@@ -111,9 +111,9 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
           
           if (chartData.length === 0) {
             return (
-              <div key={metricKey} className="border border-cyan-500 rounded-lg p-3" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
-                <h5 className="font-medium text-cyan-100 mb-2">{metricData.name}</h5>
-                <div className="text-center text-cyan-200 py-4">
+              <div key={metricKey} className="border border-cyan-500 rounded-lg p-0" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+                <h5 className="font-medium text-cyan-100 mb-2 px-3 pt-3">{metricData.name}</h5>
+                <div className="text-center text-cyan-200 py-4 px-3">
                   <p>当前值: {metricData.current_value} {metricData.units}</p>
                   <p className="text-sm">暂无历史数据</p>
                 </div>
@@ -122,7 +122,7 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
           }
           
           return (
-            <div key={metricKey} className="border border-cyan-500 rounded-lg p-3" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+            <div key={metricKey} className="border border-cyan-500 rounded-lg p-0" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
               <ZabbixChart 
                 data={chartData}
                 showHeader={true}
