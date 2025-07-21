@@ -201,6 +201,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [expandedFault, setExpandedFault] = useState<string | null>(null);
 
   // 将故障四要素组合成一句话提问
   const formatDiagnosisQuestion = (fault: Fault): string => {
@@ -573,108 +574,286 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
               const canContinueChat = fault.status === "analyzed" || fault.status === "analyzing";
               const canStartDiagnosis = fault.status === "active";
               const hasFourElements = fault.time && fault.ip && fault.description && fault.sopId;
-
+              const isExpanded = expandedFault === fault.id;
+              
               return (
                 <div 
                   key={fault.id} 
-                  className={`flex items-center justify-between gap-3 px-3 py-2 hover:bg-slate-600/30 border-l-4 border-blue-500 bg-slate-700/40 rounded-xl text-sm transition-all duration-200 hover:shadow-lg`}
+                  className={`relative px-3 py-2 hover:bg-slate-600/30 border-l-4 border-blue-500 bg-slate-700/40 rounded-xl text-sm transition-all duration-200 hover:shadow-lg ${isExpanded ? 'bg-slate-600/50' : ''}`}
                 >
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className={`${statusConfig.tagBg} ${statusConfig.tagText} ${statusConfig.tagBorder} px-2 py-0.5 rounded-lg border text-xs font-medium flex-shrink-0`}>
-                      {statusConfig.label}
-                    </span>
-                    <div className={`w-2.5 h-2.5 rounded-full ${priorityConfig.color} flex-shrink-0 shadow-sm`}></div>
-                    <span className="font-medium text-white truncate">{fault.title}</span>
-                    <span className="text-cyan-300 font-mono text-xs bg-slate-800/50 px-1.5 py-0.5 rounded">{fault.sopId}</span>
-                    <span className="text-slate-300 font-mono text-xs">{fault.ip}</span>
-                    <span className="text-slate-400 text-xs">{fault.time}</span>
+                  {/* 主要信息行 - 可点击展开 */}
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => setExpandedFault(isExpanded ? null : fault.id)}
+                  >
+                    <div>
+                      {/* 桌面端：完整信息显示 */}
+                      <div className="hidden md:flex items-center justify-between gap-2 w-full overflow-x-auto">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-2.5 h-2.5 rounded-full ${priorityConfig.color} flex-shrink-0 shadow-sm`}></div>
+                          <span className="font-medium text-white whitespace-nowrap">{fault.title}</span>
+                          <span className="text-slate-300 font-mono text-xs whitespace-nowrap">{fault.ip}</span>
+                          <span className="text-slate-400 text-xs whitespace-nowrap">{fault.time}</span>
+                          {/* 展开/折叠图标 */}
+                          <svg 
+                            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        
+                        {/* 桌面端按钮区域 */}
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          {fault.status === "active" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('点击开始排查按钮', fault.id, fault.title);
+                                
+                                if (!hasFourElements) {
+                                  alert('故障信息不完整，无法进行诊断排查。请确保包含：故障时间、故障IP、故障现象、SOP编号。');
+                                  return;
+                                }
+                                
+                                if (onStartDiagnosis) {
+                                  const question = formatDiagnosisQuestion(fault);
+                                  console.log('调用onStartDiagnosis:', question);
+                                  onStartDiagnosis(question);
+                                } else {
+                                  console.log('onStartDiagnosis未定义，使用回退逻辑');
+                                  const scenario = DIAGNOSIS_SCENARIOS[fault.id as keyof typeof DIAGNOSIS_SCENARIOS];
+                                  if (scenario) {
+                                    const faultWithDescription = {
+                                      ...fault,
+                                      diagnosisDescription: scenario.description
+                                    };
+                                    onDiagnose(faultWithDescription);
+                                  } else {
+                                    onDiagnose(fault);
+                                  }
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all duration-200 whitespace-nowrap ${
+                                hasFourElements 
+                                  ? 'bg-red-600 hover:bg-red-700 cursor-pointer' 
+                                  : 'bg-gray-600 cursor-not-allowed opacity-60'
+                              }`}
+                              disabled={!hasFourElements}
+                              title={hasFourElements ? '开始排查' : '故障信息不完整，无法开始排查'}
+                            >
+                              开始排查
+                            </button>
+                          )}
+                          
+                          {fault.status === "analyzing" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onContinueChat(fault);
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 whitespace-nowrap"
+                            >
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              查看进度
+                            </button>
+                          )}
+                          
+                          {fault.status === "analyzed" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onContinueChat(fault);
+                              }}
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
+                            >
+                              查看结果
+                            </button>
+                          )}
+                          
+                          {fault.status === "analyzed" && onEndDiagnosis && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEndDiagnosis(fault);
+                              }}
+                              className="bg-green-700 hover:bg-green-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
+                            >
+                              结束排查
+                            </button>
+                          )}
+                          
+                          {fault.status === "resolved" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onContinueChat(fault);
+                              }}
+                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
+                            >
+                              解决详情
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* 手机端：简化显示 */}
+                      <div className="flex md:hidden items-center justify-between gap-2 w-full">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-2.5 h-2.5 rounded-full ${priorityConfig.color} flex-shrink-0 shadow-sm`}></div>
+                          <span className="font-medium text-white truncate">
+                            {fault.title.length > 10 ? fault.title.substring(0, 10) + '...' : fault.title}
+                          </span>
+                          {/* 展开/折叠图标 */}
+                          <svg 
+                            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''} flex-shrink-0`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        
+                        {/* 手机端按钮区域 */}
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          {fault.status === "active" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log('点击开始排查按钮', fault.id, fault.title);
+                                
+                                if (!hasFourElements) {
+                                  alert('故障信息不完整，无法进行诊断排查。请确保包含：故障时间、故障IP、故障现象、SOP编号。');
+                                  return;
+                                }
+                                
+                                if (onStartDiagnosis) {
+                                  const question = formatDiagnosisQuestion(fault);
+                                  console.log('调用onStartDiagnosis:', question);
+                                  onStartDiagnosis(question);
+                                } else {
+                                  console.log('onStartDiagnosis未定义，使用回退逻辑');
+                                  const scenario = DIAGNOSIS_SCENARIOS[fault.id as keyof typeof DIAGNOSIS_SCENARIOS];
+                                  if (scenario) {
+                                    const faultWithDescription = {
+                                      ...fault,
+                                      diagnosisDescription: scenario.description
+                                    };
+                                    onDiagnose(faultWithDescription);
+                                  } else {
+                                    onDiagnose(fault);
+                                  }
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all duration-200 whitespace-nowrap ${
+                                hasFourElements 
+                                  ? 'bg-red-600 hover:bg-red-700 cursor-pointer' 
+                                  : 'bg-gray-600 cursor-not-allowed opacity-60'
+                              }`}
+                              disabled={!hasFourElements}
+                              title={hasFourElements ? '开始排查' : '故障信息不完整，无法开始排查'}
+                            >
+                              开始排查
+                            </button>
+                          )}
+                          
+                          {fault.status === "analyzing" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onContinueChat(fault);
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 whitespace-nowrap"
+                            >
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              查看进度
+                            </button>
+                          )}
+                          
+                          {fault.status === "analyzed" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onContinueChat(fault);
+                              }}
+                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
+                            >
+                              查看结果
+                            </button>
+                          )}
+                          
+                          {fault.status === "analyzed" && onEndDiagnosis && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEndDiagnosis(fault);
+                              }}
+                              className="bg-green-700 hover:bg-green-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
+                            >
+                              结束排查
+                            </button>
+                          )}
+                          
+                          {fault.status === "resolved" && (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onContinueChat(fault);
+                              }}
+                              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 whitespace-nowrap"
+                            >
+                              解决详情
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    {/* 开始排查按钮 - 仅对待处理状态显示 */}
-                    {fault.status === "active" && (
-                      <button 
-                        onClick={() => {
-                          console.log('点击开始排查按钮', fault.id, fault.title);
-                          
-                          if (!hasFourElements) {
-                            alert('故障信息不完整，无法进行诊断排查。请确保包含：故障时间、故障IP、故障现象、SOP编号。');
-                            return;
-                          }
-                          
-                          if (onStartDiagnosis) {
-                            // 使用四要素组合的一句话提问
-                            const question = formatDiagnosisQuestion(fault);
-                            console.log('调用onStartDiagnosis:', question);
-                            onStartDiagnosis(question);
-                          } else {
-                            console.log('onStartDiagnosis未定义，使用回退逻辑');
-                            // 回退到原有逻辑
-                            const scenario = DIAGNOSIS_SCENARIOS[fault.id as keyof typeof DIAGNOSIS_SCENARIOS];
-                            if (scenario) {
-                              const faultWithDescription = {
-                                ...fault,
-                                diagnosisDescription: scenario.description
-                              };
-                              onDiagnose(faultWithDescription);
-                            } else {
-                              onDiagnose(fault);
-                            }
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white transition-all duration-200 ${
-                          hasFourElements 
-                            ? 'bg-red-600 hover:bg-red-700 cursor-pointer shadow-lg hover:shadow-xl transform hover:-translate-y-0.5' 
-                            : 'bg-gray-600 cursor-not-allowed opacity-60'
-                        }`}
-                        disabled={!hasFourElements}
-                        title={hasFourElements ? '开始排查' : '故障信息不完整，无法开始排查'}
-                      >
-                        开始排查
-                      </button>
-                    )}
-                    
-                    {/* 查看进度按钮 - 对分析中状态显示 */}
-                    {fault.status === "analyzing" && (
-                      <button 
-                        onClick={() => onContinueChat(fault)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                      >
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        查看进度
-                      </button>
-                    )}
-                    
-                    {/* 查看结果按钮 - 对已分析状态显示 */}
-                    {fault.status === "analyzed" && (
-                      <button 
-                        onClick={() => onContinueChat(fault)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                      >
-                        查看结果
-                      </button>
-                    )}
-                    
-                    {/* 结束排查按钮 - 对已分析状态显示 */}
-                    {fault.status === "analyzed" && onEndDiagnosis && (
-                      <button 
-                        onClick={() => onEndDiagnosis(fault)}
-                        className="bg-green-700 hover:bg-green-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                      >
-                        结束排查
-                      </button>
-                    )}
-                    
-                    {/* 查看详情按钮 - 对已解决状态显示 */}
-                    {fault.status === "resolved" && (
-                      <button 
-                        onClick={() => onContinueChat(fault)}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                      >
-                        解决详情
-                      </button>
-                    )}
-                  </div>
+                  {/* 展开的详细信息 */}
+                  {isExpanded && (
+                    <div className="mt-3 pt-3 border-t border-slate-600/50 space-y-3">
+                      <div className="space-y-2 text-xs">
+                        {/* 故障描述行 */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 flex-shrink-0">故障描述：</span>
+                          <div className="text-slate-200 bg-slate-800/30 px-2 py-1 rounded overflow-x-auto whitespace-nowrap" style={{width: 'calc(100% - 80px)'}}>{fault.description}</div>
+                        </div>
+                        {/* 其他信息行 */}
+                        <div className="pr-28">
+                          <div className="flex flex-wrap gap-4">
+                            <div className="whitespace-nowrap">
+                              <span className="text-slate-400">SOP编号：</span>
+                              <span className="text-cyan-300 font-mono">{fault.sopId}</span>
+                            </div>
+                            <div className="whitespace-nowrap">
+                              <span className="text-slate-400">优先级：</span>
+                              <span className={`${priorityConfig.textColor} font-medium`}>{fault.priority}</span>
+                            </div>
+                            <div className="whitespace-nowrap">
+                              <span className="text-slate-400">状态：</span>
+                              <span className={`${statusConfig.textColor} font-medium`}>{statusConfig.label}</span>
+                            </div>
+                            <div className="whitespace-nowrap">
+                              <span className="text-slate-400">最后更新：</span>
+                              <span className="text-slate-200">{fault.lastUpdated}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {fault.analysisResult && (
+                          <div className="pr-28">
+                            <span className="text-slate-400 text-xs">分析结果：</span>
+                            <div className="text-slate-200 text-xs mt-1 bg-slate-800/30 p-2 rounded">
+                              {fault.analysisResult}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

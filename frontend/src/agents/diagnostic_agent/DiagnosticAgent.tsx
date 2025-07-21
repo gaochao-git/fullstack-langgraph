@@ -41,7 +41,7 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
   const hasFinalizeEventOccurredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(true); // 默认展开
+  const [showHistory, setShowHistory] = useState(window.innerWidth >= 768); // 桌面端默认展开，手机端默认折叠
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(260); // 侧边栏宽度状态
