@@ -41,7 +41,15 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 trigger: 'axis',
                 formatter: function(params) {
                     const value = parseFloat(params[0].value);
-                    const formattedValue = Number.isInteger(value) ? value.toString() : value.toFixed(2);
+                    // 使用与Y轴标签相同的格式化逻辑
+                    let formattedValue;
+                    if (value >= 1000000) {
+                        formattedValue = (value / 1000000).toFixed(1) + 'M';
+                    } else if (value >= 1000) {
+                        formattedValue = (value / 1000).toFixed(1) + 'K';
+                    } else {
+                        formattedValue = Number.isInteger(value) ? value.toString() : value.toFixed(1);
+                    }
                     const time = params[0].axisValue;
                     return `${time}<br/>${formattedValue}${firstItem.units}`;
                 },
@@ -55,7 +63,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
             },
             grid: {
                 top: showHeader ? 40 : 2,
-                left: '1%',
+                left: '8%',
                 right: '1%',
                 bottom: showHeader ? '3%' : '3%',
                 containLabel: true
@@ -94,7 +102,15 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                     fontSize: 11,
                     formatter: (value) => {
                         const numValue = parseFloat(value);
-                        const formattedValue = Number.isInteger(numValue) ? numValue.toString() : numValue.toFixed(2);
+                        // 对于大数字，使用K/M/G等单位简化显示
+                        let formattedValue;
+                        if (numValue >= 1000000) {
+                            formattedValue = (numValue / 1000000).toFixed(1) + 'M';
+                        } else if (numValue >= 1000) {
+                            formattedValue = (numValue / 1000).toFixed(1) + 'K';
+                        } else {
+                            formattedValue = Number.isInteger(numValue) ? numValue.toString() : numValue.toFixed(1);
+                        }
                         return formattedValue + firstItem.units;
                     }
                 },
