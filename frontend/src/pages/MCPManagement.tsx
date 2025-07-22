@@ -17,7 +17,9 @@ import {
   Descriptions,
   Badge,
   Divider,
-  Alert
+  Alert,
+  Form,
+  message as antdMessage
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -40,7 +42,7 @@ const { Option } = Select;
 interface MCPTool {
   name: string;
   description: string;
-  enabled: boolean;
+  globalEnabled: boolean;  // 全局开关
   category: string;
   parameters?: any;
 }
@@ -73,19 +75,19 @@ const mockMCPServers: MCPServer[] = [
       {
         name: 'mysql_query',
         description: 'Execute MySQL queries and return results',
-        enabled: true,
+        globalEnabled: true,
         category: 'database'
       },
       {
         name: 'postgres_query', 
         description: 'Execute PostgreSQL queries and return results',
-        enabled: true,
+        globalEnabled: true,
         category: 'database'
       },
       {
         name: 'db_health_check',
         description: 'Check database connection and performance metrics',
-        enabled: false,
+        globalEnabled: false,
         category: 'monitoring'
       }
     ]
@@ -103,19 +105,19 @@ const mockMCPServers: MCPServer[] = [
       {
         name: 'system_metrics',
         description: 'Get system CPU, memory, disk usage metrics',
-        enabled: true,
+        globalEnabled: true,
         category: 'monitoring'
       },
       {
         name: 'log_analyzer',
         description: 'Analyze system logs for errors and patterns',
-        enabled: true,
+        globalEnabled: true,
         category: 'analysis'
       },
       {
         name: 'process_monitor',
         description: 'Monitor running processes and resource usage',
-        enabled: false,
+        globalEnabled: false,
         category: 'monitoring'
       }
     ]
@@ -133,19 +135,19 @@ const mockMCPServers: MCPServer[] = [
       {
         name: 'ping_test',
         description: 'Test network connectivity to hosts',
-        enabled: false,
+        globalEnabled: false,
         category: 'network'
       },
       {
         name: 'port_scan',
         description: 'Scan open ports on target hosts',
-        enabled: false,
+        globalEnabled: false,
         category: 'network'
       },
       {
         name: 'traceroute',
         description: 'Trace network path to destination',
-        enabled: false,
+        globalEnabled: false,
         category: 'network'
       }
     ]
@@ -163,13 +165,13 @@ const mockMCPServers: MCPServer[] = [
       {
         name: 'aws_ec2_list',
         description: 'List AWS EC2 instances and their status',
-        enabled: false,
+        globalEnabled: false,
         category: 'cloud'
       },
       {
         name: 'azure_resource_monitor',
         description: 'Monitor Azure resources and costs',
-        enabled: false,
+        globalEnabled: false,
         category: 'cloud'
       }
     ]
@@ -185,7 +187,11 @@ const MCPManagement: React.FC = () => {
   
   // 模态框状态
   const [serverDetailModal, setServerDetailModal] = useState(false);
+  const [serverFormModal, setServerFormModal] = useState(false);
   const [selectedServer, setSelectedServer] = useState<MCPServer | null>(null);
+  const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
+  const [formConnectionStatus, setFormConnectionStatus] = useState<'idle' | 'testing' | 'connected' | 'error'>('idle');
+  const [formDiscoveredTools, setFormDiscoveredTools] = useState<MCPTool[]>([]);
   
   const { message } = App.useApp();
 
@@ -249,8 +255,8 @@ const MCPManagement: React.FC = () => {
   };
 
 
-  // 切换工具状态
-  const toggleToolEnabled = (serverId: string, toolName: string) => {
+  // 切换工具全局状态
+  const toggleToolGlobalEnabled = (serverId: string, toolName: string) => {
     setServers(prevServers =>
       prevServers.map(server => {
         if (server.id === serverId) {
@@ -258,13 +264,167 @@ const MCPManagement: React.FC = () => {
             ...server,
             tools: server.tools.map(tool =>
               tool.name === toolName 
-                ? { ...tool, enabled: !tool.enabled }
+                ? { ...tool, globalEnabled: !tool.globalEnabled }
                 : tool
             )
           };
         }
         return server;
       })
+    );
+    
+    const newState = servers.find(s => s.id === serverId)?.tools.find(t => t.name === toolName)?.globalEnabled;
+    message.success(`工具 ${toolName} 已${!newState ? '全局启用' : '全局禁用'}`);
+  };
+
+  // 批量启用/禁用服务器的所有工具
+  const toggleAllServerTools = (serverId: string, enableAll: boolean) => {
+    setServers(prevServers =>
+      prevServers.map(server => {
+        if (server.id === serverId) {
+          return {
+            ...server,
+            tools: server.tools.map(tool => ({
+              ...tool,
+              globalEnabled: enableAll
+            }))
+          };
+        }
+        return server;
+      })
+    );
+    
+    const serverName = servers.find(s => s.id === serverId)?.name;
+    message.success(`${serverName} 的所有工具已${enableAll ? '全局启用' : '全局禁用'}`);
+  };
+
+  // 新增服务器
+  const handleAddServer = () => {
+    setEditingServer(null);
+    setFormConnectionStatus('idle');
+    setFormDiscoveredTools([]);
+    setServerFormModal(true);
+  };
+
+  // 编辑服务器
+  const handleEditServer = (server: MCPServer) => {
+    setEditingServer(server);
+    setFormConnectionStatus(server.status === 'connected' ? 'connected' : 'idle');
+    setFormDiscoveredTools(server.tools || []);
+    setServerFormModal(true);
+  };
+
+  // 删除服务器
+  const handleDeleteServer = (serverId: string) => {
+    setServers(prevServers => prevServers.filter(server => server.id !== serverId));
+    message.success('服务器已删除');
+  };
+
+  // 测试连接
+  const handleTestConnection = (serverId: string) => {
+    const server = servers.find(s => s.id === serverId);
+    if (server) {
+      // 模拟连接测试
+      setTimeout(() => {
+        setServers(prevServers =>
+          prevServers.map(s =>
+            s.id === serverId
+              ? { ...s, status: 'connected', lastConnected: new Date().toISOString().slice(0, 16) }
+              : s
+          )
+        );
+        message.success(`${server.name} 连接测试成功`);
+      }, 1000);
+      message.info('正在测试连接...');
+    }
+  };
+
+  // 保存服务器
+  const handleSaveServer = (values: any) => {
+    const serverData = {
+      ...values,
+      tools: formDiscoveredTools,
+      status: formConnectionStatus === 'connected' ? 'connected' as const : 'disconnected' as const,
+      lastConnected: formConnectionStatus === 'connected' ? new Date().toISOString().slice(0, 16) : undefined
+    };
+
+    if (editingServer) {
+      // 编辑模式
+      setServers(prevServers =>
+        prevServers.map(server =>
+          server.id === editingServer.id
+            ? { ...server, ...serverData }
+            : server
+        )
+      );
+      message.success('服务器信息已更新');
+    } else {
+      // 新增模式
+      const newServer: MCPServer = {
+        id: `server-${Date.now()}`,
+        ...serverData,
+        enabled: true
+      };
+      setServers(prevServers => [...prevServers, newServer]);
+      message.success('服务器已添加');
+    }
+    setServerFormModal(false);
+  };
+
+  // 表单中测试连接并发现工具
+  const handleFormTestConnection = async (formValues: any) => {
+    if (!formValues.uri) {
+      message.warning('请先填写连接地址');
+      return;
+    }
+
+    setFormConnectionStatus('testing');
+    
+    // 模拟连接测试和工具发现
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // 模拟发现的工具（根据URI模拟不同的工具）
+      const mockDiscoveredTools: MCPTool[] = [];
+      
+      if (formValues.uri.includes('database') || formValues.uri.includes('3001')) {
+        mockDiscoveredTools.push(
+          { name: 'mysql_query', description: 'Execute MySQL queries', globalEnabled: true, category: 'database' },
+          { name: 'postgres_query', description: 'Execute PostgreSQL queries', globalEnabled: true, category: 'database' },
+          { name: 'db_health_check', description: 'Check database health', globalEnabled: false, category: 'monitoring' }
+        );
+      } else if (formValues.uri.includes('monitor') || formValues.uri.includes('3002')) {
+        mockDiscoveredTools.push(
+          { name: 'system_metrics', description: 'Get system metrics', globalEnabled: true, category: 'monitoring' },
+          { name: 'log_analyzer', description: 'Analyze system logs', globalEnabled: true, category: 'analysis' },
+          { name: 'process_monitor', description: 'Monitor processes', globalEnabled: false, category: 'monitoring' }
+        );
+      } else {
+        // 默认工具
+        mockDiscoveredTools.push(
+          { name: 'generic_tool_1', description: 'Generic tool 1', globalEnabled: true, category: 'general' },
+          { name: 'generic_tool_2', description: 'Generic tool 2', globalEnabled: false, category: 'general' }
+        );
+      }
+
+      setFormConnectionStatus('connected');
+      setFormDiscoveredTools(mockDiscoveredTools);
+      message.success('连接测试成功，已发现工具');
+    } catch (error) {
+      setFormConnectionStatus('error');
+      setFormDiscoveredTools([]);
+      message.error('连接测试失败');
+    }
+  };
+
+  // 切换表单中工具的状态
+  const toggleFormToolEnabled = (toolName: string) => {
+    setFormDiscoveredTools(prevTools =>
+      prevTools.map(tool =>
+        tool.name === toolName
+          ? { ...tool, globalEnabled: !tool.globalEnabled }
+          : tool
+      )
     );
   };
 
@@ -318,12 +478,14 @@ const MCPManagement: React.FC = () => {
       key: 'toolsCount',
       width: 100,
       render: (_, record: MCPServer) => {
-        const enabledCount = record.tools.filter(tool => tool.enabled).length;
+        const enabledCount = record.tools.filter(tool => tool.globalEnabled).length;
         const totalCount = record.tools.length;
         return (
           <Space>
             <ToolOutlined />
-            <span>{enabledCount}/{totalCount}</span>
+            <span style={{ color: enabledCount > 0 ? '#52c41a' : '#8c8c8c' }}>
+              {enabledCount}/{totalCount}
+            </span>
           </Space>
         );
       }
@@ -361,7 +523,7 @@ const MCPManagement: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 150,
+      width: 180,
       fixed: 'right',
       render: (_, record: MCPServer) => (
         <Space size="small">
@@ -376,16 +538,32 @@ const MCPManagement: React.FC = () => {
             type="text" 
             size="small" 
             icon={<LinkOutlined />}
-            onClick={() => message.info('连接测试功能开发中...')}
+            onClick={() => handleTestConnection(record.id)}
             title="测试连接"
           />
           <Button 
             type="text" 
             size="small" 
-            icon={<SettingOutlined />}
-            onClick={() => message.info('服务器配置功能开发中...')}
-            title="配置"
+            icon={<EditOutlined />}
+            onClick={() => handleEditServer(record)}
+            title="编辑"
           />
+          <Popconfirm
+            title="删除服务器"
+            description="确定要删除这个MCP服务器吗？删除后无法恢复。"
+            onConfirm={() => handleDeleteServer(record.id)}
+            okText="确定"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+          >
+            <Button 
+              type="text" 
+              size="small" 
+              icon={<DeleteOutlined />}
+              danger
+              title="删除"
+            />
+          </Popconfirm>
         </Space>
       )
     }
@@ -439,7 +617,7 @@ const MCPManagement: React.FC = () => {
                 <Button 
                   type="primary" 
                   icon={<PlusOutlined />}
-                  onClick={() => message.info('添加服务器功能开发中...')}
+                  onClick={handleAddServer}
                 >
                   添加服务器
                 </Button>
@@ -495,25 +673,41 @@ const MCPManagement: React.FC = () => {
               </Descriptions.Item>
             </Descriptions>
             
-            <Divider>可用工具 ({selectedServer.tools.length})</Divider>
+            <Divider>
+              可用工具 ({selectedServer.tools.length})
+            </Divider>
             
             <div className="space-y-3">
               {selectedServer.tools.map(tool => (
-                <Card key={tool.name} size="small">
+                <Card key={tool.name} size="small" 
+                      style={{ 
+                        borderColor: tool.globalEnabled ? '#52c41a' : '#d9d9d9',
+                        backgroundColor: tool.globalEnabled ? '#f6ffed' : '#fafafa'
+                      }}>
                   <Row align="middle" justify="space-between">
                     <Col span={18}>
                       <Space direction="vertical" size="small">
                         <Space>
-                          <span className="font-medium">{tool.name}</span>
+                          <span className={`font-medium ${tool.globalEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                            {tool.name}
+                          </span>
                           <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
+                          {tool.globalEnabled && (
+                            <Tag color="green" size="small">全局启用</Tag>
+                          )}
+                          {!tool.globalEnabled && (
+                            <Tag color="default" size="small">全局禁用</Tag>
+                          )}
                         </Space>
-                        <span className="text-gray-600 text-sm">{tool.description}</span>
+                        <span className={`text-sm ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                          {tool.description}
+                        </span>
                       </Space>
                     </Col>
                     <Col span={6} className="text-right">
                       <Switch
-                        checked={tool.enabled}
-                        onChange={() => toggleToolEnabled(selectedServer.id, tool.name)}
+                        checked={tool.globalEnabled}
+                        disabled={true}
                         checkedChildren="启用"
                         unCheckedChildren="禁用"
                       />
@@ -524,6 +718,161 @@ const MCPManagement: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 服务器表单模态框 */}
+      <Modal
+        title={editingServer ? "编辑MCP服务器" : "添加MCP服务器"}
+        open={serverFormModal}
+        onCancel={() => setServerFormModal(false)}
+        footer={null}
+        width={600}
+      >
+        <Form
+          layout="vertical"
+          onFinish={handleSaveServer}
+          key={editingServer?.id || 'new'}
+          initialValues={editingServer ? {
+            name: editingServer.name,
+            uri: editingServer.uri,
+            description: editingServer.description,
+            version: editingServer.version
+          } : {}}
+        >
+          {(form) => (
+            <>
+              <Form.Item
+                label="服务器名称"
+                name="name"
+                rules={[
+                  { required: true, message: '请输入服务器名称' },
+                  { max: 50, message: '服务器名称不能超过50个字符' }
+                ]}
+              >
+                <Input placeholder="例如：Database Tools Server" />
+              </Form.Item>
+
+              <Form.Item
+                label="连接地址"
+                name="uri"
+                rules={[
+                  { required: true, message: '请输入连接地址' },
+                  { pattern: /^mcp:\/\//, message: '连接地址必须以 mcp:// 开头' }
+                ]}
+              >
+                <Input.Group compact>
+                  <Input 
+                    placeholder="mcp://localhost:3001" 
+                    style={{ width: 'calc(100% - 100px)' }}
+                  />
+                  <Button 
+                    type="primary"
+                    loading={formConnectionStatus === 'testing'}
+                    onClick={() => handleFormTestConnection(form.getFieldsValue())}
+                    style={{ width: '100px' }}
+                  >
+                    {formConnectionStatus === 'testing' ? '测试中' : '测试连接'}
+                  </Button>
+                </Input.Group>
+              </Form.Item>
+
+              {/* 连接状态提示 */}
+              {formConnectionStatus !== 'idle' && (
+                <Form.Item>
+                  <Alert
+                    message={
+                      formConnectionStatus === 'testing' ? '正在测试连接...' :
+                      formConnectionStatus === 'connected' ? '连接成功' :
+                      '连接失败'
+                    }
+                    type={
+                      formConnectionStatus === 'testing' ? 'info' :
+                      formConnectionStatus === 'connected' ? 'success' :
+                      'error'
+                    }
+                    showIcon
+                  />
+                </Form.Item>
+              )}
+
+              <Form.Item
+                label="描述"
+                name="description"
+                rules={[
+                  { max: 200, message: '描述不能超过200个字符' }
+                ]}
+              >
+                <Input.TextArea 
+                  rows={3}
+                  placeholder="描述该MCP服务器提供的功能和用途"
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="版本"
+                name="version"
+              >
+                <Input placeholder="例如：1.0.0" />
+              </Form.Item>
+
+              {/* 工具配置 */}
+              {formDiscoveredTools.length > 0 && (
+                <Form.Item label="发现的工具">
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {formDiscoveredTools.map(tool => (
+                      <Card key={tool.name} size="small" 
+                            style={{ 
+                              borderColor: tool.globalEnabled ? '#52c41a' : '#d9d9d9',
+                              backgroundColor: tool.globalEnabled ? '#f6ffed' : '#fafafa'
+                            }}>
+                        <Row align="middle" justify="space-between">
+                          <Col span={18}>
+                            <Space direction="vertical" size="small">
+                              <Space>
+                                <span className={`font-medium ${tool.globalEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                                  {tool.name}
+                                </span>
+                                <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
+                                {tool.globalEnabled && (
+                                  <Tag color="green" size="small">全局启用</Tag>
+                                )}
+                                {!tool.globalEnabled && (
+                                  <Tag color="default" size="small">全局禁用</Tag>
+                                )}
+                              </Space>
+                              <span className={`text-sm ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                                {tool.description}
+                              </span>
+                            </Space>
+                          </Col>
+                          <Col span={6} className="text-right">
+                            <Switch
+                              checked={tool.globalEnabled}
+                              onChange={() => toggleFormToolEnabled(tool.name)}
+                              checkedChildren="启用"
+                              unCheckedChildren="禁用"
+                            />
+                          </Col>
+                        </Row>
+                      </Card>
+                    ))}
+                  </div>
+                </Form.Item>
+              )}
+
+              <Form.Item>
+                <div className="flex justify-end gap-2">
+                  <Button onClick={() => setServerFormModal(false)}>
+                    取消
+                  </Button>
+                  <Button type="primary" htmlType="submit">
+                    {editingServer ? '更新' : '添加'}
+                  </Button>
+                </div>
+              </Form.Item>
+            </>
+          )}
+        </Form>
       </Modal>
 
     </div>
