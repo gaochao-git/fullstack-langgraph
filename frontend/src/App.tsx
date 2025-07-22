@@ -2,10 +2,8 @@ import { Routes, Route, Link } from "react-router-dom";
 import { Layout, Menu, Typography, theme, Drawer, ConfigProvider, App as AntdApp } from "antd";
 import {
   RobotOutlined,
-  ToolOutlined,
-  ApiOutlined,
-  BookOutlined,
-  SettingOutlined,
+  UserOutlined,
+  FileTextOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LinkOutlined,
@@ -54,33 +52,18 @@ function AppContent() {
     },
     {
       key: '2',
-      icon: <SettingOutlined />,
+      icon: <UserOutlined />,
       label: <Link to="/agents">智能体管理</Link>,
     },
     {
       key: '3',
-      icon: <SettingOutlined />,
+      icon: <FileTextOutlined />,
       label: <Link to="/sop">SOP管理</Link>,
     },
     {
       key: '4',
       icon: <LinkOutlined />,
       label: <Link to="/mcp">MCP管理</Link>,
-    },
-    {
-      key: '5',
-      icon: <ToolOutlined />,
-      label: <Link to="/tools">工具</Link>,
-    },
-    {
-      key: '6',
-      icon: <ApiOutlined />,
-      label: <Link to="/models">模型</Link>,
-    },
-    {
-      key: '7',
-      icon: <BookOutlined />,
-      label: <Link to="/knowledge">知识库</Link>,
     },
   ];
 

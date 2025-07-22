@@ -256,7 +256,7 @@ const SOPManagementSimple: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 md:p-6">
+    <div>
       <Card>
         <div className="mb-4">
           <Row gutter={[16, 16]} align="middle">

@@ -349,50 +349,6 @@ const AgentManagement: React.FC = () => {
 
   return (
     <div>
-      {/* 概览统计 */}
-      <Row gutter={[16, 16]} className="mb-6">
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="总智能体"
-              value={agents.length}
-              prefix={<RobotOutlined />}
-              valueStyle={{ color: '#1677ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="运行中"
-              value={agents.filter(a => a.status === 'running').length}
-              prefix={<PlayCircleOutlined />}
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="已停止"
-              value={agents.filter(a => a.status === 'stopped').length}
-              prefix={<PauseCircleOutlined />}
-              valueStyle={{ color: '#faad14' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card>
-            <Statistic
-              title="平均成功率"
-              value={agents.reduce((acc, agent) => acc + agent.successRate, 0) / agents.length}
-              precision={1}
-              suffix="%"
-              valueStyle={{ color: '#52c41a' }}
-            />
-          </Card>
-        </Col>
-      </Row>
 
       {/* 智能体管理 */}
       <Card title="智能体管理">
@@ -467,81 +423,35 @@ const AgentManagement: React.FC = () => {
                 ]}
               >
                 <Card.Meta
-                  avatar={
-                    <Avatar 
-                      size={48}
-                      icon={<RobotOutlined />} 
-                      style={{ 
-                        backgroundColor: agent.status === 'running' ? '#52c41a' : 
-                                       agent.status === 'error' ? '#ff4d4f' : '#faad14'
-                      }} 
-                    />
-                  }
+                  avatar={null}
                   title={
-                    <Space direction="vertical" size="small">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{agent.displayName}</span>
-                        <Switch
-                          size="small"
-                          checked={agent.enabled}
-                          onChange={() => toggleAgentEnabled(agent.id)}
-                        />
-                      </div>
-                      <div className="text-xs text-gray-500">{agent.name}</div>
-                    </Space>
+                    <div className="flex items-center justify-between">
+                      <div className="text-base font-medium text-gray-900">{agent.displayName}</div>
+                      <Switch
+                        size="small"
+                        checked={agent.enabled}
+                        onChange={() => toggleAgentEnabled(agent.id)}
+                      />
+                    </div>
                   }
                   description={
-                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                      {/* 状态和版本 */}
-                      <div className="flex justify-between items-center">
-                        <Badge 
-                          status={agent.status === 'running' ? 'success' : agent.status === 'error' ? 'error' : 'warning'} 
-                          text={getStatusText(agent.status)}
-                        />
-                        <Tag color="blue" size="small">{agent.version}</Tag>
-                      </div>
-                      
-                      {/* 运行统计 */}
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          <span className="text-gray-600">运行次数: </span>
-                          <span className="font-medium">{agent.totalRuns}</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-600">成功率: </span>
-                          <span className="font-medium text-green-600">{agent.successRate}%</span>
-                        </div>
-                      </div>
-
-                      {/* MCP工具统计 */}
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          <span className="text-gray-600">服务器: </span>
-                          <span className="font-medium">{agent.mcpConfig.enabledServers.length}</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-gray-600">工具: </span>
-                          <span className="font-medium">{agent.mcpConfig.selectedTools.length}/{agent.mcpConfig.totalTools}</span>
+                    <div className="space-y-2 mt-1">
+                      {/* 运行统计和MCP工具统计合并 */}
+                      <div className="text-sm space-y-1">
+                        <div><span className="text-gray-500">运行次数: </span><span className="font-semibold text-gray-800">{agent.totalRuns}</span></div>
+                        <div className="flex flex-wrap gap-x-4">
+                          <span><span className="text-gray-500">服务器: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.enabledServers.length}</span></span>
+                          <span><span className="text-gray-500">工具: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.selectedTools.length}/{agent.mcpConfig.totalTools}</span></span>
                         </div>
                       </div>
 
                       {/* 核心能力 */}
-                      <div className="mt-2">
-                        <Space wrap size="small">
-                          {agent.capabilities.slice(0, 3).map(capability => (
-                            <Tag key={capability} size="small" color="blue">{capability}</Tag>
-                          ))}
-                          {agent.capabilities.length > 3 && (
-                            <Tag size="small" color="default">+{agent.capabilities.length - 3}</Tag>
-                          )}
-                        </Space>
+                      <div className="flex flex-wrap gap-1">
+                        {agent.capabilities.slice(0, 3).map(capability => (
+                          <Tag key={capability} size="small" color="blue" className="text-xs">{capability}</Tag>
+                        ))}
                       </div>
-
-                      {/* 最后使用时间 */}
-                      <div className="text-xs text-gray-500 mt-2">
-                        最后使用: {agent.lastUsed?.replace('T', ' ').slice(0, 16) || '-'}
-                      </div>
-                    </Space>
+                    </div>
                   }
                 />
               </Card>
