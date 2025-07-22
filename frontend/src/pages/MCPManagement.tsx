@@ -19,6 +19,7 @@ import {
   Divider,
   Alert,
   Form,
+  Collapse,
   message as antdMessage
 } from 'antd';
 import { 
@@ -194,6 +195,9 @@ const MCPManagement: React.FC = () => {
   const [formDiscoveredTools, setFormDiscoveredTools] = useState<MCPTool[]>([]);
   
   const { message } = App.useApp();
+  const [form] = Form.useForm();
+
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
   // 获取状态颜色
   const getStatusColor = (status: MCPServer['status']): string => {
@@ -373,47 +377,43 @@ const MCPManagement: React.FC = () => {
 
   // 表单中测试连接并发现工具
   const handleFormTestConnection = async (formValues: any) => {
+    console.log('测试连接参数 formValues:', formValues);
+    console.log('测试连接参数 formValues.uri:', formValues.uri);
     if (!formValues.uri) {
       message.warning('请先填写连接地址');
       return;
     }
 
     setFormConnectionStatus('testing');
-    
-    // 模拟连接测试和工具发现
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // 模拟发现的工具（根据URI模拟不同的工具）
-      const mockDiscoveredTools: MCPTool[] = [];
-      
-      if (formValues.uri.includes('database') || formValues.uri.includes('3001')) {
-        mockDiscoveredTools.push(
-          { name: 'mysql_query', description: 'Execute MySQL queries', globalEnabled: true, category: 'database' },
-          { name: 'postgres_query', description: 'Execute PostgreSQL queries', globalEnabled: true, category: 'database' },
-          { name: 'db_health_check', description: 'Check database health', globalEnabled: false, category: 'monitoring' }
-        );
-      } else if (formValues.uri.includes('monitor') || formValues.uri.includes('3002')) {
-        mockDiscoveredTools.push(
-          { name: 'system_metrics', description: 'Get system metrics', globalEnabled: true, category: 'monitoring' },
-          { name: 'log_analyzer', description: 'Analyze system logs', globalEnabled: true, category: 'analysis' },
-          { name: 'process_monitor', description: 'Monitor processes', globalEnabled: false, category: 'monitoring' }
-        );
+      // 带baseurl调用后端接口
+      const resp = await fetch(`${API_BASE_URL}/api/mcp/test_server`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: formValues.uri })
+      });
+      const data = await resp.json();
+      if (data.healthy) {
+        // 转换后端返回的工具为前端MCPTool结构
+        const discoveredTools = (data.tools || []).map((tool: any) => ({
+          name: tool.name,
+          description: tool.description,
+          globalEnabled: true, // 默认全局启用，可根据需要调整
+          category: 'unknown', // 后端未返回类别，前端可自定义
+          parameters: tool.inputSchema
+        }));
+        setFormConnectionStatus('connected');
+        setFormDiscoveredTools(discoveredTools);
+        message.success('连接测试成功，已发现工具');
       } else {
-        // 默认工具
-        mockDiscoveredTools.push(
-          { name: 'generic_tool_1', description: 'Generic tool 1', globalEnabled: true, category: 'general' },
-          { name: 'generic_tool_2', description: 'Generic tool 2', globalEnabled: false, category: 'general' }
-        );
+        setFormConnectionStatus('error');
+        setFormDiscoveredTools([]);
+        message.error('连接测试失败: ' + (data.error || '未知错误'));
       }
-
-      setFormConnectionStatus('connected');
-      setFormDiscoveredTools(mockDiscoveredTools);
-      message.success('连接测试成功，已发现工具');
-    } catch (error) {
+    } catch (error: any) {
       setFormConnectionStatus('error');
       setFormDiscoveredTools([]);
-      message.error('连接测试失败');
+      message.error('连接测试失败: ' + (error?.message || '未知错误'));
     }
   };
 
@@ -426,6 +426,39 @@ const MCPManagement: React.FC = () => {
           : tool
       )
     );
+  };
+
+  // 格式化工具描述
+  const formatToolDescription = (description: string) => {
+    if (!description) return { summary: '', args: '', returns: '' };
+    
+    // 分离主要描述和参数信息
+    const lines = description.split('\n');
+    let summary = '';
+    let args = '';
+    let returns = '';
+    let currentSection = 'summary';
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('Args:')) {
+        currentSection = 'args';
+        continue;
+      } else if (trimmedLine.startsWith('Returns:')) {
+        currentSection = 'returns';
+        continue;
+      }
+      
+      if (currentSection === 'summary' && trimmedLine) {
+        summary += (summary ? ' ' : '') + trimmedLine;
+      } else if (currentSection === 'args' && trimmedLine) {
+        args += (args ? '\n' : '') + trimmedLine;
+      } else if (currentSection === 'returns' && trimmedLine) {
+        returns += (returns ? ' ' : '') + trimmedLine;
+      }
+    }
+    
+    return { summary, args, returns };
   };
 
   // 表格列定义
@@ -693,10 +726,10 @@ const MCPManagement: React.FC = () => {
                           </span>
                           <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
                           {tool.globalEnabled && (
-                            <Tag color="green" size="small">全局启用</Tag>
+                            <Tag color="green">全局启用</Tag>
                           )}
                           {!tool.globalEnabled && (
-                            <Tag color="default" size="small">全局禁用</Tag>
+                            <Tag color="default">全局禁用</Tag>
                           )}
                         </Space>
                         <span className={`text-sm ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
@@ -729,6 +762,7 @@ const MCPManagement: React.FC = () => {
         width={600}
       >
         <Form
+          form={form}
           layout="vertical"
           onFinish={handleSaveServer}
           key={editingServer?.id || 'new'}
@@ -739,139 +773,174 @@ const MCPManagement: React.FC = () => {
             version: editingServer.version
           } : {}}
         >
-          {(form) => (
-            <>
-              <Form.Item
-                label="服务器名称"
-                name="name"
-                rules={[
-                  { required: true, message: '请输入服务器名称' },
-                  { max: 50, message: '服务器名称不能超过50个字符' }
-                ]}
-              >
-                <Input placeholder="例如：Database Tools Server" />
-              </Form.Item>
+          <Form.Item
+            label="服务器名称"
+            name="name"
+            rules={[
+              { required: true, message: '请输入服务器名称' },
+              { max: 50, message: '服务器名称不能超过50个字符' }
+            ]}
+          >
+            <Input placeholder="例如：Database Tools Server" />
+          </Form.Item>
 
-              <Form.Item
-                label="连接地址"
-                name="uri"
-                rules={[
-                  { required: true, message: '请输入连接地址' },
-                  { pattern: /^mcp:\/\//, message: '连接地址必须以 mcp:// 开头' }
-                ]}
-              >
-                <Input.Group compact>
-                  <Input 
-                    placeholder="mcp://localhost:3001" 
-                    style={{ width: 'calc(100% - 100px)' }}
-                  />
-                  <Button 
-                    type="primary"
-                    loading={formConnectionStatus === 'testing'}
-                    onClick={() => handleFormTestConnection(form.getFieldsValue())}
-                    style={{ width: '100px' }}
-                  >
-                    {formConnectionStatus === 'testing' ? '测试中' : '测试连接'}
-                  </Button>
-                </Input.Group>
-              </Form.Item>
+          <Form.Item
+            label="连接地址"
+            name="uri"
+            rules={[
+              { required: true, message: '请输入连接地址' }
+            ]}
+          >
+            <Input 
+              placeholder="例如：mcp://localhost:3001 或 http://localhost:8080" 
+              addonAfter={
+                <Button 
+                  type="primary"
+                  size="small"
+                  loading={formConnectionStatus === 'testing'}
+                  onClick={async () => {
+                    const values = await form.validateFields();
+                    handleFormTestConnection(values);
+                  }}
+                >
+                  {formConnectionStatus === 'testing' ? '测试中' : '测试连接'}
+                </Button>
+              }
+            />
+          </Form.Item>
 
-              {/* 连接状态提示 */}
-              {formConnectionStatus !== 'idle' && (
-                <Form.Item>
-                  <Alert
-                    message={
-                      formConnectionStatus === 'testing' ? '正在测试连接...' :
-                      formConnectionStatus === 'connected' ? '连接成功' :
-                      '连接失败'
-                    }
-                    type={
-                      formConnectionStatus === 'testing' ? 'info' :
-                      formConnectionStatus === 'connected' ? 'success' :
-                      'error'
-                    }
-                    showIcon
-                  />
-                </Form.Item>
-              )}
-
-              <Form.Item
-                label="描述"
-                name="description"
-                rules={[
-                  { max: 200, message: '描述不能超过200个字符' }
-                ]}
-              >
-                <Input.TextArea 
-                  rows={3}
-                  placeholder="描述该MCP服务器提供的功能和用途"
-                />
-              </Form.Item>
-
-              <Form.Item
-                label="版本"
-                name="version"
-              >
-                <Input placeholder="例如：1.0.0" />
-              </Form.Item>
-
-              {/* 工具配置 */}
-              {formDiscoveredTools.length > 0 && (
-                <Form.Item label="发现的工具">
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {formDiscoveredTools.map(tool => (
-                      <Card key={tool.name} size="small" 
-                            style={{ 
-                              borderColor: tool.globalEnabled ? '#52c41a' : '#d9d9d9',
-                              backgroundColor: tool.globalEnabled ? '#f6ffed' : '#fafafa'
-                            }}>
-                        <Row align="middle" justify="space-between">
-                          <Col span={18}>
-                            <Space direction="vertical" size="small">
-                              <Space>
-                                <span className={`font-medium ${tool.globalEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
-                                  {tool.name}
-                                </span>
-                                <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
-                                {tool.globalEnabled && (
-                                  <Tag color="green" size="small">全局启用</Tag>
-                                )}
-                                {!tool.globalEnabled && (
-                                  <Tag color="default" size="small">全局禁用</Tag>
-                                )}
-                              </Space>
-                              <span className={`text-sm ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
-                                {tool.description}
-                              </span>
-                            </Space>
-                          </Col>
-                          <Col span={6} className="text-right">
-                            <Switch
-                              checked={tool.globalEnabled}
-                              onChange={() => toggleFormToolEnabled(tool.name)}
-                              checkedChildren="启用"
-                              unCheckedChildren="禁用"
-                            />
-                          </Col>
-                        </Row>
-                      </Card>
-                    ))}
-                  </div>
-                </Form.Item>
-              )}
-
-              <Form.Item>
-                <div className="flex justify-end gap-2">
-                  <Button onClick={() => setServerFormModal(false)}>
-                    取消
-                  </Button>
-                  <Button type="primary" htmlType="submit">
-                    {editingServer ? '更新' : '添加'}
-                  </Button>
-                </div>
-              </Form.Item>
-            </>
+          {/* 连接状态提示 */}
+          {formConnectionStatus !== 'idle' && (
+            <Form.Item>
+              <Alert
+                message={
+                  formConnectionStatus === 'testing' ? '正在测试连接...' :
+                  formConnectionStatus === 'connected' ? '连接成功' :
+                  '连接失败'
+                }
+                type={
+                  formConnectionStatus === 'testing' ? 'info' :
+                  formConnectionStatus === 'connected' ? 'success' :
+                  'error'
+                }
+                showIcon
+              />
+            </Form.Item>
           )}
+
+          <Form.Item
+            label="描述"
+            name="description"
+            rules={[
+              { max: 200, message: '描述不能超过200个字符' }
+            ]}
+          >
+            <Input.TextArea 
+              rows={3}
+              placeholder="描述该MCP服务器提供的功能和用途"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="版本"
+            name="version"
+          >
+            <Input placeholder="例如：1.0.0" />
+          </Form.Item>
+
+          {/* 工具配置 */}
+          {formDiscoveredTools.length > 0 && (
+            <Form.Item label={`发现的工具 (${formDiscoveredTools.length})`}>
+              <Collapse
+                size="small"
+                items={formDiscoveredTools.map(tool => {
+                  const { summary, args, returns } = formatToolDescription(tool.description);
+                  const parameters = tool.parameters?.properties || {};
+                  
+                  return {
+                    key: tool.name,
+                    label: (
+                      <Row align="middle" style={{ width: '100%' }}>
+                        <Col span={20}>
+                          <Space>
+                            <span className={`font-medium ${tool.globalEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                              {tool.name}
+                            </span>
+                            {Object.keys(parameters).length > 0 && (
+                              <Tag color="blue" size="small">{Object.keys(parameters).length} 参数</Tag>
+                            )}
+                          </Space>
+                        </Col>
+                        <Col span={4} className="text-right">
+                          <Switch
+                            checked={tool.globalEnabled}
+                            onChange={(checked) => {
+                              toggleFormToolEnabled(tool.name);
+                            }}
+                            onClick={(checked, e) => e.stopPropagation()}
+                            size="small"
+                          />
+                        </Col>
+                      </Row>
+                    ),
+                    children: (
+                      <div className="space-y-2 pt-1">
+                        {/* 工具描述 */}
+                        {summary && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-500 mb-1">描述:</div>
+                            <div className={`text-xs ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                              {summary}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 参数信息 */}
+                        {Object.keys(parameters).length > 0 && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-500 mb-1">参数:</div>
+                            <div className="space-y-1">
+                              {Object.entries(parameters).map(([paramName, paramInfo]: [string, any]) => (
+                                <div key={paramName} className="flex items-center gap-1 text-xs bg-gray-50 px-2 py-1 rounded">
+                                  <span className="font-mono text-blue-600 font-medium text-xs">{paramName}</span>
+                                  <Tag size="small" color="blue" className="text-xs">{paramInfo.type || 'unknown'}</Tag>
+                                  {paramInfo.default !== undefined && (
+                                    <Tag size="small" color="orange" className="text-xs">默认: {String(paramInfo.default)}</Tag>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* 返回值信息 */}
+                        {returns && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-500 mb-1">返回:</div>
+                            <div className={`text-xs bg-green-50 px-2 py-1 rounded ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                              {returns}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  };
+                })}
+                style={{ maxHeight: '400px', overflowY: 'auto' }}
+              />
+            </Form.Item>
+          )}
+
+          <Form.Item>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setServerFormModal(false)}>
+                取消
+              </Button>
+              <Button type="primary" htmlType="submit">
+                {editingServer ? '更新' : '添加'}
+              </Button>
+            </div>
+          </Form.Item>
         </Form>
       </Modal>
 
