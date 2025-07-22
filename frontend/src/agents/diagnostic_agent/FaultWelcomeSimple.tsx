@@ -316,7 +316,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       {/* 标题和搜索区域 */}
       <div className="flex items-center justify-between bg-gradient-to-r from-slate-800/75 via-cyan-900/30 to-slate-800/75 rounded-lg border border-cyan-500/40 backdrop-blur-sm py-1.5 px-3 shadow-xl shadow-cyan-500/25">
         <div className="text-center flex-1">
-          <h1 className="text-xl font-bold text-white bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">故障诊断助手</h1>
+          <h1 className="text-lg md:text-xl font-bold text-white bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">故障诊断助手</h1>
         </div>
         <div className="ml-8">
           <div className="relative">
@@ -325,14 +325,14 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
               placeholder="搜索故障标题、描述或IP..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-slate-700/60 border-slate-600 text-slate-100 placeholder-slate-400 shadow-lg transition-all duration-200 focus:bg-slate-700"
+              className="w-full pl-9 pr-4 py-1 text-xs md:text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 bg-slate-700/60 border-slate-600 text-slate-100 placeholder-slate-400 shadow-lg transition-all duration-200 focus:bg-slate-700"
             />
           </div>
           {/* 时间筛选按钮 */}
           <div className="flex flex-wrap gap-2 mt-2">
             <button 
               onClick={() => setTimeFilter(timeFilter === '10min' ? 'all' : '10min')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 ${
                 timeFilter === '10min' 
                   ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
                   : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
@@ -342,7 +342,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
             </button>
             <button 
               onClick={() => setTimeFilter(timeFilter === '30min' ? 'all' : '30min')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 ${
                 timeFilter === '30min' 
                   ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
                   : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
@@ -352,7 +352,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
             </button>
             <button 
               onClick={() => setTimeFilter(timeFilter === '1hour' ? 'all' : '1hour')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 ${
                 timeFilter === '1hour' 
                   ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
                   : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
@@ -362,7 +362,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
             </button>
             <button 
               onClick={() => setTimeFilter(timeFilter === 'today' ? 'all' : 'today')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 ${
                 timeFilter === 'today' 
                   ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
                   : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
@@ -372,7 +372,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
             </button>
             <button 
               onClick={() => setTimeFilter(timeFilter === 'week' ? 'all' : 'week')}
-              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200 ${
+              className={`px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 ${
                 timeFilter === 'week' 
                   ? 'bg-blue-500 border-blue-400 text-white shadow-md' 
                   : 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
@@ -388,7 +388,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 第一栏：优先级统计 */}
         <div className="bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 rounded-xl p-2 border border-blue-500/40 backdrop-blur-sm shadow-xl shadow-blue-500/20">
-          <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-1">
+          <h3 className="text-xs md:text-sm font-semibold text-white mb-1 flex items-center gap-1">
             <AlertTriangle className="w-4 h-4 text-red-400" />
             报警等级
           </h3>
@@ -417,8 +417,8 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
                 lazyUpdate={true}
               />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-sm font-bold text-yellow-400 leading-none">{stats.total}</span>
-                <span className="text-xs text-slate-300 leading-tight">总数</span>
+                <span className="text-xs md:text-sm font-bold text-yellow-400 leading-none">{stats.total}</span>
+                <span className="text-xs md:text-sm text-slate-300 leading-tight">总数</span>
               </div>
             </div>
             {/* P1/P2/P3按钮 */}
@@ -461,7 +461,7 @@ export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis,
         </div>
         {/* 第二栏：状态统计 */}
         <div className="bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 rounded-xl p-2 border border-blue-500/40 backdrop-blur-sm shadow-xl shadow-blue-500/20">
-          <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-1">
+          <h3 className="text-xs md:text-sm font-semibold text-white mb-1 flex items-center gap-1">
             <Activity className="w-4 h-4 text-blue-400" />
             处理状态
           </h3>

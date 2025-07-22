@@ -71,8 +71,8 @@ const ToolCall: React.FC<{
       >
         <div className="flex items-center gap-2 flex-1">
           <Settings className="h-4 w-4 text-blue-500" />
-          <span className="text-xs text-gray-600">工具调用</span>
-          <span className="font-mono text-sm text-blue-600">{toolName}</span>
+          <span className="text-xs md:text-sm text-gray-600">工具调用</span>
+          <span className="font-mono text-xs md:text-sm text-blue-600">{toolName}</span>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-gray-500 ml-auto" />
           ) : (
@@ -83,15 +83,15 @@ const ToolCall: React.FC<{
       {isExpanded && (
         <div className="border-t border-gray-300 p-3 space-y-3">
           <div>
-            <h4 className="text-sm font-semibold text-gray-700 mb-2">参数:</h4>
-            <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto text-gray-800">
+            <h4 className="text-xs md:text-sm font-semibold text-gray-700 mb-2">参数:</h4>
+            <pre className="bg-gray-100 p-2 rounded text-xs md:text-sm overflow-x-auto text-gray-800">
               {typeof toolArgs === 'string' ? toolArgs : JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
           {toolResultContent && (
             <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-2">输出:</h4>
-              <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto max-h-60 overflow-y-auto text-gray-800">
+              <h4 className="text-xs md:text-sm font-semibold text-gray-700 mb-2">输出:</h4>
+              <pre className="bg-gray-100 p-2 rounded text-xs md:text-sm overflow-x-auto max-h-60 overflow-y-auto text-gray-800">
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}
@@ -180,7 +180,7 @@ const AssistantMessageGroup: React.FC<{
       <div className="relative break-words flex flex-col max-w-[100%] sm:max-w-[90%]">
         {/* 活动事件时间线 */}
         {activityForThisGroup && activityForThisGroup.length > 0 && (
-          <div className="mb-3 border-b border-gray-200 pb-3 text-xs">
+          <div className="mb-3 border-b border-gray-200 pb-3 text-xs md:text-sm">
             <ActivityTimeline
               processedEvents={activityForThisGroup}
               isLoading={isLiveActivityForThisGroup}
@@ -224,7 +224,7 @@ const AssistantMessageGroup: React.FC<{
               handleCopy(contentToCopy, group.id);
             }}
           >
-            {copiedMessageId === group.id ? "已复制" : "复制"}
+            <span className="text-xs md:text-sm">{copiedMessageId === group.id ? "已复制" : "复制"}</span>
             {copiedMessageId === group.id ? <CopyCheck /> : <Copy />}
           </Button>
         )}
@@ -300,7 +300,7 @@ export function ChatMessagesView({
                     className="cursor-pointer bg-gray-200 border-gray-300 text-gray-700 hover:bg-gray-300 self-end mt-2"
                     onClick={() => handleCopy(msg.content, msg.id || String(idx))}
                   >
-                    {copiedMessageId === (msg.id || String(idx)) ? "已复制" : "复制"}
+                    <span className="text-xs md:text-sm">{copiedMessageId === (msg.id || String(idx)) ? "已复制" : "复制"}</span>
                     {copiedMessageId === (msg.id || String(idx)) ? <CopyCheck /> : <Copy />}
                   </Button>
                 </div>
@@ -327,7 +327,7 @@ export function ChatMessagesView({
           {isLoading && messages.length > 0 && messages[messages.length - 1]?.type === "human" && (
             <div className="flex items-center gap-2 text-gray-600 mb-6">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {isDiagnosticMode ? "诊断中..." : "研究中..."}
+              <span className="text-sm md:text-base">{isDiagnosticMode ? "诊断中..." : "研究中..."}</span>
             </div>
           )}
           <div id="chat-messages-end" />

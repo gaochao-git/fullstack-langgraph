@@ -12,7 +12,7 @@ const md: MarkdownIt = new MarkdownIt({
     if (lang && hljs.getLanguage(lang)) {
       try {
         const highlighted = hljs.highlight(str, { language: lang }).value;
-        return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
+        return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs md:text-sm my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
                `<code class="hljs language-${lang}">` +
                highlighted +
                '</code></pre>';
@@ -21,13 +21,13 @@ const md: MarkdownIt = new MarkdownIt({
     // 自动检测语言
     try {
       const highlighted = hljs.highlightAuto(str).value;
-      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
+      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs md:text-sm my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
              '<code class="hljs">' +
              highlighted +
              '</code></pre>';
     } catch (__) {
       // 如果高亮失败，返回原始代码
-      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
+      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs md:text-sm my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
              '<code style="color: #e6edf3;">' +
              md.utils.escapeHtml(str) +
              '</code></pre>';
@@ -53,27 +53,27 @@ const markdownStyles = `
     word-wrap: break-word;
   }
   .markdown-body h1 { 
-    @apply text-xl font-bold mt-3 mb-2;
+    @apply text-base md:text-xl font-bold mt-3 mb-2;
     color: #FBBF24;
     border-bottom: 2px solid #3B82F6;
     padding-bottom: 4px;
   }
   .markdown-body h2 { 
-    @apply text-lg font-bold mt-3 mb-2;
+    @apply text-sm md:text-lg font-bold mt-3 mb-2;
     color: #FCD34D;
     border-bottom: 1px solid #D1D5DB;
     padding-bottom: 2px;
   }
   .markdown-body h3 { 
-    @apply text-base font-bold mt-2 mb-1;
+    @apply text-xs md:text-base font-bold mt-2 mb-1;
     color: #FDE68A;
   }
   .markdown-body h4 { 
-    @apply text-base font-bold mt-2 mb-1;
+    @apply text-xs md:text-sm font-bold mt-2 mb-1;
     color: #FDE68A;
   }
   .markdown-body p { 
-    @apply mb-2 leading-relaxed;
+    @apply mb-2 leading-relaxed text-sm md:text-base;
     color: #E5E7EB;
     white-space: normal;
     word-break: normal;
@@ -93,7 +93,7 @@ const markdownStyles = `
     padding: 0;
     border-radius: 0;
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 0.75em;
+    font-size: 0.7rem;
     border: none;
     white-space: nowrap;
     overflow-wrap: break-word;
@@ -110,7 +110,7 @@ const markdownStyles = `
   }
   .markdown-body pre code {
     font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 0.75em;
+    font-size: 0.7rem;
     background: transparent;
     padding: 0;
     border: none;
@@ -122,17 +122,17 @@ const markdownStyles = `
     padding: 8px !important;
   }
   .markdown-body ul {
-    @apply list-disc list-inside mb-2;
+    @apply list-disc list-inside mb-2 text-sm md:text-base;
     color: #E5E7EB;
     padding-left: 12px;
   }
   .markdown-body ol {
-    @apply list-decimal list-inside mb-2;
+    @apply list-decimal list-inside mb-2 text-sm md:text-base;
     color: #E5E7EB;
     padding-left: 12px;
   }
   .markdown-body li {
-    @apply mb-1;
+    @apply mb-1 text-sm md:text-base;
     color: #E5E7EB;
   }
   .markdown-body blockquote {

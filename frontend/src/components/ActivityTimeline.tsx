@@ -63,7 +63,7 @@ export function ActivityTimeline({
       <CardHeader>
         <CardDescription className="flex items-center justify-between">
           <div
-            className="flex items-center justify-start text-sm w-full cursor-pointer gap-2 text-neutral-100"
+            className="flex items-center justify-start text-xs md:text-sm w-full cursor-pointer gap-2 text-neutral-100"
             onClick={() => setIsTimelineCollapsed(!isTimelineCollapsed)}
           >
             Research
@@ -85,7 +85,7 @@ export function ActivityTimeline({
                   <Loader2 className="h-3 w-3 text-neutral-400 animate-spin" />
                 </div>
                 <div>
-                  <p className="text-sm text-neutral-300 font-medium">
+                  <p className="text-xs md:text-sm text-neutral-300 font-medium">
                     Searching...
                   </p>
                 </div>
@@ -103,10 +103,10 @@ export function ActivityTimeline({
                       {getEventIcon(eventItem.title, index)}
                     </div>
                     <div>
-                      <p className="text-sm text-neutral-200 font-medium mb-0.5">
+                      <p className="text-xs md:text-sm text-neutral-200 font-medium mb-0.5">
                         {eventItem.title}
                       </p>
-                      <p className="text-xs text-neutral-300 leading-relaxed">
+                      <p className="text-xs md:text-sm text-neutral-300 leading-relaxed">
                         {typeof eventItem.data === "string"
                           ? eventItem.data
                           : Array.isArray(eventItem.data)
@@ -122,7 +122,7 @@ export function ActivityTimeline({
                       <Loader2 className="h-3 w-3 text-neutral-400 animate-spin" />
                     </div>
                     <div>
-                      <p className="text-sm text-neutral-300 font-medium">
+                      <p className="text-xs md:text-sm text-neutral-300 font-medium">
                         Searching...
                       </p>
                     </div>
@@ -132,8 +132,8 @@ export function ActivityTimeline({
             ) : !isLoading ? ( // Only show "No activity" if not loading and no events
               <div className="flex flex-col items-center justify-center h-full text-neutral-500 pt-10">
                 <Info className="h-6 w-6 mb-3" />
-                <p className="text-sm">No activity to display.</p>
-                <p className="text-xs text-neutral-600 mt-1">
+                <p className="text-xs md:text-sm">No activity to display.</p>
+                <p className="text-xs md:text-sm text-neutral-600 mt-1">
                   Timeline will update during processing.
                 </p>
               </div>
