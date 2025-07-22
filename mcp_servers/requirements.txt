@@ -1,0 +1,12 @@
+# MCP服务器依赖
+fastmcp==0.4.0
+uvicorn==0.35.0
+
+# 数据库工具依赖
+PyMySQL==1.1.1
+
+# SSH工具依赖
+paramiko==3.5.1
+
+# Elasticsearch工具依赖
+requests==2.32.4

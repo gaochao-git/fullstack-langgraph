@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""
+Elasticsearch Tools MCP Server
+基于现有Elasticsearch工具实现的MCP服务器
+"""
+
+import json
+import requests
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timedelta
+import logging
+
+from fastmcp import FastMCP
+
+# 配置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# 创建MCP服务器实例
+mcp = FastMCP("Elasticsearch Tools Server")
+
+# ES服务器配置
+ES_BASE_URL = "http://82.156.146.51:9200"
+ES_TIMEOUT = 30
+
+def _es_request(method: str, endpoint: str, data: Dict = None, params: Dict = None) -> Dict:
+    """执行ES REST API请求"""
+    url = f"{ES_BASE_URL}/{endpoint.lstrip('/')}"
+    headers = {"Content-Type": "application/json"}
+    
+    try:
+        if method.upper() == "GET":
+            response = requests.get(url, params=params, headers=headers, timeout=ES_TIMEOUT)
+        elif method.upper() == "POST":
+            response = requests.post(url, json=data, params=params, headers=headers, timeout=ES_TIMEOUT)
+        else:
+            raise ValueError(f"不支持的HTTP方法: {method}")
+        
+        response.raise_for_status()
+        return response.json()
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"ES请求失败: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"响应内容: {e.response.text}")
+            print(f"ES错误响应: {e.response.text}")
+        raise Exception(f"ES请求失败: {str(e)}")
+
+def _test_es_connection() -> bool:
+    """测试ES连接"""
+    try:
+        info = _es_request("GET", "/")
+        logger.info(f"Elasticsearch连接成功，版本: {info['version']['number']}")
+        return True
+    except Exception as e:
+        logger.error(f"ES连接测试失败: {e}")
+        return False
+
+@mcp.tool()
+async def get_es_data(
+    index_name: str,
+    start_time: str,
+    end_time: str,
+    query_body: Optional[Dict[str, Any]] = None
+) -> str:
+    """执行自定义Elasticsearch查询。支持指定索引名、时间范围和查询体。
+    
+    Args:
+        index_name: 索引名称
+        start_time: 开始时间，格式：年-月-日 时:分:秒
+        end_time: 结束时间，格式：年-月-日 时:分:秒
+        query_body: 自定义查询体，如果为空则生成默认查询
+    
+    Returns:
+        包含查询结果的JSON字符串
+    """
+    try:
+        # 简化时区处理：使用ES的time_zone参数，不需要手动添加时区
+        def normalize_time_format(time_str):
+            """统一时间格式转换，支持空格和T分隔符"""
+            # 将空格格式转换为ISO格式：2025-07-14 10:45:00 -> 2025-07-14T10:45:00
+            if " " in time_str and "T" not in time_str:
+                time_str = time_str.replace(" ", "T")
+            
+            # 移除时区信息，让ES通过time_zone参数处理
+            if time_str.endswith("+08:00"):
+                time_str = time_str[:-6]
+            elif time_str.endswith("Z"):
+                time_str = time_str[:-1]
+                
+            return time_str
+        
+        start_time_normalized = normalize_time_format(start_time)
+        end_time_normalized = normalize_time_format(end_time)
+        
+        # 如果没有提供查询体，使用默认查询（使用time_zone参数）
+        if not query_body:
+            query_body = {
+                "query": {
+                    "bool": {
+                        "must": [
+                            {
+                                "range": {
+                                    "@timestamp": {
+                                        "gte": start_time_normalized,
+                                        "lte": end_time_normalized,
+                                        "time_zone": "Asia/Shanghai"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                },
+                "sort": [{"@timestamp": {"order": "desc"}}],
+                "size": 100
+            }
+        else:
+            # 确保查询体包含时间范围
+            if "query" not in query_body:
+                query_body["query"] = {"bool": {"must": []}}
+            
+            if "bool" not in query_body["query"]:
+                query_body["query"]["bool"] = {"must": []}
+            
+            if "must" not in query_body["query"]["bool"]:
+                query_body["query"]["bool"]["must"] = []
+            
+            # 检查是否已存在@timestamp的range查询，如果存在则更新，否则添加
+            timestamp_filter_found = False
+            for i, condition in enumerate(query_body["query"]["bool"]["must"]):
+                if isinstance(condition, dict) and "range" in condition and "@timestamp" in condition["range"]:
+                    # 更新现有的时间过滤器，使用time_zone参数
+                    query_body["query"]["bool"]["must"][i] = {
+                        "range": {
+                            "@timestamp": {
+                                "gte": start_time_normalized,
+                                "lte": end_time_normalized,
+                                "time_zone": "Asia/Shanghai"
+                            }
+                        }
+                    }
+                    timestamp_filter_found = True
+                    break
+            
+            # 如果没有找到时间过滤器，则添加新的
+            if not timestamp_filter_found:
+                time_filter = {
+                    "range": {
+                        "@timestamp": {
+                            "gte": start_time_normalized,
+                            "lte": end_time_normalized,
+                            "time_zone": "Asia/Shanghai"
+                        }
+                    }
+                }
+                query_body["query"]["bool"]["must"].append(time_filter)
+        
+        # 打印查询体用于调试
+        logger.info(f"ES查询体: {json.dumps(query_body, indent=2)}")
+        print(f"ES查询体: {json.dumps(query_body, indent=2)}")
+        
+        # 执行查询
+        response = _es_request("POST", f"/{index_name}/_search", data=query_body)
+        
+        # 处理结果
+        hits = response.get("hits", {}).get("hits", [])
+        results = []
+        
+        for hit in hits:
+            results.append({
+                "timestamp": hit["_source"].get("@timestamp"),
+                "source": hit["_source"]
+            })
+        
+        return json.dumps({
+            "total": response.get("hits", {}).get("total", {}).get("value", 0),
+            "time_range": f"{start_time_normalized} to {end_time_normalized} (Asia/Shanghai)",
+            "results": results
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error executing custom query: {e}")
+        return json.dumps({"error": f"Failed to execute custom query: {str(e)}"})
+
+@mcp.tool()
+async def get_es_trends_data(
+    index_name: str,
+    start_time: str,
+    end_time: str,
+    field: str,
+    interval: str = "1h"
+) -> str:
+    """获取ES趋势数据。用于分析指定时间范围内数据的趋势变化。
+    
+    Args:
+        index_name: 索引名称
+        start_time: 开始时间，格式：年-月-日 时:分:秒
+        end_time: 结束时间，格式：年-月-日 时:分:秒
+        field: 用于统计趋势的字段
+        interval: 时间间隔，如: 1m, 5m, 1h, 1d
+    
+    Returns:
+        包含趋势数据的JSON字符串
+    """
+    try:
+        # 测试连接
+        _test_es_connection()
+        
+        # 构建趋势聚合查询
+        query_body = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "range": {
+                                "@timestamp": {
+                                    "gte": start_time,
+                                    "lte": end_time
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            "aggs": {
+                "trends": {
+                    "date_histogram": {
+                        "field": "@timestamp",
+                        "interval": interval,
+                        "format": "yyyy-MM-dd HH:mm:ss"
+                    },
+                    "aggs": {
+                        "value_stats": {
+                            "stats": {
+                                "field": field
+                            }
+                        },
+                        "doc_count": {
+                            "value_count": {
+                                "field": field
+                            }
+                        }
+                    }
+                }
+            },
+            "size": 0
+        }
+        
+        # 执行查询
+        response = _es_request("POST", f"/{index_name}/_search", data=query_body)
+        
+        # 处理聚合结果
+        buckets = response.get("aggregations", {}).get("trends", {}).get("buckets", [])
+        trends_data = []
+        
+        for bucket in buckets:
+            stats = bucket.get("value_stats", {})
+            trends_data.append({
+                "timestamp": bucket["key_as_string"],
+                "doc_count": bucket["doc_count"],
+                "value_count": bucket.get("doc_count", {}).get("value", 0),
+                "avg": stats.get("avg"),
+                "min": stats.get("min"),
+                "max": stats.get("max"),
+                "sum": stats.get("sum")
+            })
+        
+        return json.dumps({
+            "index": index_name,
+            "time_range": f"{start_time} to {end_time}",
+            "field": field,
+            "interval": interval,
+            "total_buckets": len(trends_data),
+            "trends": trends_data
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error getting ES trends data: {e}")
+        return json.dumps({"error": f"Failed to get ES trends data: {str(e)}"})
+
+@mcp.tool()
+async def get_es_indices() -> str:
+    """获取Elasticsearch所有索引列表。用于查看可用的索引。
+    
+    Returns:
+        包含索引列表的JSON字符串
+    """
+    try:
+        # 获取所有索引
+        indices = _es_request("GET", "/_cat/indices", params={"format": "json"})
+        
+        # 格式化索引信息
+        index_data = []
+        for index in indices:
+            index_data.append({
+                "index": index["index"],
+                "status": index["status"], 
+                "health": index["health"],
+                "docs_count": index.get("docs.count", "0"),
+                "store_size": index.get("store.size", "0b")
+            })
+        
+        # 按索引名称排序
+        index_data.sort(key=lambda x: x["index"])
+        
+        return json.dumps({
+            "total_indices": len(index_data),
+            "indices": index_data
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"Error getting ES indices: {e}")
+        return json.dumps({"error": f"Failed to get ES indices: {str(e)}"})
+
+if __name__ == "__main__":
+    # 使用SSE传输方式启动服务器
+    mcp.run(transport="sse", host="localhost", port=3003)
