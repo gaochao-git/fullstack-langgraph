@@ -8,11 +8,14 @@ import {
   SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  LinkOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import ResearchAgent from "./agents/research_agent/ResearchAgent";
 import DiagnosticAgent from "./agents/diagnostic_agent/DiagnosticAgent";
 import SOPManagementSimple from "./pages/SOPManagementSimple";
+import MCPManagement from "./pages/MCPManagement";
+import AgentManagement from "./pages/AgentManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
@@ -52,20 +55,30 @@ function AppContent() {
     {
       key: '2',
       icon: <SettingOutlined />,
-      label: <Link to="/sop">SOP管理</Link>,
+      label: <Link to="/agents">智能体管理</Link>,
     },
     {
       key: '3',
+      icon: <SettingOutlined />,
+      label: <Link to="/sop">SOP管理</Link>,
+    },
+    {
+      key: '4',
+      icon: <LinkOutlined />,
+      label: <Link to="/mcp">MCP管理</Link>,
+    },
+    {
+      key: '5',
       icon: <ToolOutlined />,
       label: <Link to="/tools">工具</Link>,
     },
     {
-      key: '4',
+      key: '6',
       icon: <ApiOutlined />,
       label: <Link to="/models">模型</Link>,
     },
     {
-      key: '5',
+      key: '7',
       icon: <BookOutlined />,
       label: <Link to="/knowledge">知识库</Link>,
     },
@@ -211,7 +224,9 @@ function AppContent() {
               />
               <Route path="/agents/research_agent" element={<ResearchAgent />} />
               <Route path="/agents/diagnostic_agent" element={<DiagnosticAgent />} />
+              <Route path="/agents" element={<AgentManagement />} />
               <Route path="/sop" element={<SOPManagementSimple />} />
+              <Route path="/mcp" element={<MCPManagement />} />
               <Route
                 path="*"
                 element={
