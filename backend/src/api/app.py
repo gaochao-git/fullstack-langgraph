@@ -33,6 +33,7 @@ from .streaming import (
     RunCreate, stream_run_standard,
     init_refs
 )
+from .sop_routes import router as sop_router
 
 # Define the FastAPI app
 app = FastAPI(title="LangGraph Server", version="1.0.0")
@@ -47,6 +48,18 @@ async def startup_event():
     # 初始化用户线程数据库连接
     from .user_threads_db import init_user_threads_db
     await init_user_threads_db()
+    
+    # 初始化SOP数据库（如果连接失败则跳过）
+    try:
+        from ..database.config import init_database, test_database_connection
+        db_connected = await test_database_connection()
+        if db_connected:
+            await init_database()
+            logger.info("✅ SOP数据库初始化成功")
+        else:
+            logger.warning("⚠️  SOP数据库连接失败，跳过数据库初始化")
+    except Exception as e:
+        logger.warning(f"⚠️  SOP数据库初始化失败: {e}，API将继续启动但SOP功能可能不可用")
 
 # Add CORS middleware
 app.add_middleware(
@@ -105,6 +118,9 @@ ASSISTANTS = {
 class AssistantResponse(BaseModel):
     assistant_id: str
     description: str
+
+# Include SOP router
+app.include_router(sop_router)
 
 # Thread Management Endpoints - 使用导入的函数
 @app.post("/threads", response_model=ThreadResponse)

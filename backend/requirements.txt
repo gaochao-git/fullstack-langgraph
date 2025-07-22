@@ -29,6 +29,10 @@ asyncpg==0.30.0
 aiomysql==0.2.0
 PyMySQL==1.1.1
 
+# ORM and Database
+sqlalchemy==2.0.36
+alembic==1.14.0
+
 # AI模型
 openai==1.97.0
 

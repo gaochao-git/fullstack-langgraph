@@ -1,16 +1,18 @@
 import { Routes, Route, Link } from "react-router-dom";
-import { Layout, Menu, Typography, theme, Drawer, ConfigProvider } from "antd";
+import { Layout, Menu, Typography, theme, Drawer, ConfigProvider, App as AntdApp } from "antd";
 import {
   RobotOutlined,
   ToolOutlined,
   ApiOutlined,
   BookOutlined,
+  SettingOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import ResearchAgent from "./agents/research_agent/ResearchAgent";
 import DiagnosticAgent from "./agents/diagnostic_agent/DiagnosticAgent";
+import SOPManagementSimple from "./pages/SOPManagementSimple";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
@@ -49,16 +51,21 @@ function AppContent() {
     },
     {
       key: '2',
+      icon: <SettingOutlined />,
+      label: <Link to="/sop">SOP管理</Link>,
+    },
+    {
+      key: '3',
       icon: <ToolOutlined />,
       label: <Link to="/tools">工具</Link>,
     },
     {
-      key: '3',
+      key: '4',
       icon: <ApiOutlined />,
       label: <Link to="/models">模型</Link>,
     },
     {
-      key: '4',
+      key: '5',
       icon: <BookOutlined />,
       label: <Link to="/knowledge">知识库</Link>,
     },
@@ -66,7 +73,8 @@ function AppContent() {
 
   return (
     <ConfigProvider theme={antdTheme}>
-      <Layout style={{ minHeight: "100vh" }}>
+      <AntdApp>
+        <Layout style={{ minHeight: "100vh" }}>
       {/* 桌面端侧边栏 */}
       {!isMobile && (
         <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
@@ -203,6 +211,7 @@ function AppContent() {
               />
               <Route path="/agents/research_agent" element={<ResearchAgent />} />
               <Route path="/agents/diagnostic_agent" element={<DiagnosticAgent />} />
+              <Route path="/sop" element={<SOPManagementSimple />} />
               <Route
                 path="*"
                 element={
@@ -226,6 +235,7 @@ function AppContent() {
         </Layout>
       </Layout>
     </Layout>
+      </AntdApp>
     </ConfigProvider>
   );
 }
