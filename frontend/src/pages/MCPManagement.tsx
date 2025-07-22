@@ -917,24 +917,6 @@ const MCPManagement: React.FC = () => {
             }}
           </Form.Item>
 
-          {/* 连接状态提示 */}
-          {formConnectionStatus !== 'idle' && (
-            <Form.Item>
-              <Alert
-                message={
-                  formConnectionStatus === 'testing' ? '正在测试连接...' :
-                  formConnectionStatus === 'connected' ? '连接成功' :
-                  '连接失败'
-                }
-                type={
-                  formConnectionStatus === 'testing' ? 'info' :
-                  formConnectionStatus === 'connected' ? 'success' :
-                  'error'
-                }
-                showIcon
-              />
-            </Form.Item>
-          )}
 
           <Form.Item
             label="描述"
