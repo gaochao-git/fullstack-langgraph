@@ -12,6 +12,9 @@ router = APIRouter(prefix="/api/mcp", tags=["MCP"])
 
 class MCPTestRequest(BaseModel):
     url: str
+    authType: str = "none"
+    authToken: Optional[str] = None
+    apiKeyHeader: Optional[str] = None
 
 class MCPToolInfo(BaseModel):
     name: str
@@ -25,7 +28,7 @@ class MCPTestResponse(BaseModel):
 
 @router.post("/test_server", response_model=MCPTestResponse)
 async def test_mcp_server(req: MCPTestRequest):
-    print(f"测试连接到 {req.url}")
+    print(f"测试连接到 {req.url}，认证方式: {req.authType}")
     if Client is None:
         return MCPTestResponse(healthy=False, tools=[], error="fastmcp 未安装，请先 pip install fastmcp")
     
@@ -39,9 +42,22 @@ async def test_mcp_server(req: MCPTestRequest):
             else:
                 test_url += "/sse/"
     
+    # 构建认证头
+    headers = {}
+    if req.authType == "bearer" and req.authToken:
+        headers["Authorization"] = f"Bearer {req.authToken}"
+    elif req.authType == "basic" and req.authToken:
+        headers["Authorization"] = f"Basic {req.authToken}"
+    elif req.authType == "api_key" and req.authToken and req.apiKeyHeader:
+        headers[req.apiKeyHeader] = req.authToken
+    
     try:
         print(f"实际连接到: {test_url}")
-        async with Client(test_url) as client:
+        print(f"使用认证头: {list(headers.keys()) if headers else 'None'}")
+        
+        # 创建客户端时传入认证头
+        client_kwargs = {"headers": headers} if headers else {}
+        async with Client(test_url, **client_kwargs) as client:
             tools = await client.list_tools()
             tool_list = [
                 MCPToolInfo(
@@ -53,4 +69,6 @@ async def test_mcp_server(req: MCPTestRequest):
             ]
             return MCPTestResponse(healthy=True, tools=tool_list)
     except Exception as e:
-        return MCPTestResponse(healthy=False, tools=[], error=str(e))
+        error_msg = str(e)
+        print(f"连接错误: {error_msg}")
+        return MCPTestResponse(healthy=False, tools=[], error=error_msg)

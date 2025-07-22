@@ -58,6 +58,9 @@ interface MCPServer {
   enabled: boolean;
   lastConnected?: string;
   version?: string;
+  authType?: 'none' | 'bearer' | 'basic' | 'api_key';
+  authToken?: string;
+  apiKeyHeader?: string;
 }
 
 
@@ -384,13 +387,34 @@ const MCPManagement: React.FC = () => {
       return;
     }
 
+    // 检查认证配置
+    if (formValues.authType !== 'none' && !formValues.authToken) {
+      message.warning('请填写认证信息');
+      return;
+    }
+
+    if (formValues.authType === 'api_key' && !formValues.apiKeyHeader) {
+      message.warning('请填写 API Key Header');
+      return;
+    }
+
     setFormConnectionStatus('testing');
     try {
+      // 构建请求体，包含认证信息
+      const requestBody = {
+        url: formValues.uri,
+        authType: formValues.authType || 'none',
+        authToken: formValues.authToken || null,
+        apiKeyHeader: formValues.apiKeyHeader || null
+      };
+      
+      console.log('发送测试连接请求:', requestBody);
+      
       // 带baseurl调用后端接口
       const resp = await fetch(`${API_BASE_URL}/api/mcp/test_server`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: formValues.uri })
+        body: JSON.stringify(requestBody)
       });
       const data = await resp.json();
       if (data.healthy) {
@@ -770,8 +794,13 @@ const MCPManagement: React.FC = () => {
             name: editingServer.name,
             uri: editingServer.uri,
             description: editingServer.description,
-            version: editingServer.version
-          } : {}}
+            version: editingServer.version,
+            authType: editingServer.authType || 'none',
+            authToken: editingServer.authToken || '',
+            apiKeyHeader: editingServer.apiKeyHeader || 'X-API-Key'
+          } : {
+            authType: 'none'
+          }}
         >
           <Form.Item
             label="服务器名称"
@@ -784,19 +813,22 @@ const MCPManagement: React.FC = () => {
             <Input placeholder="例如：Database Tools Server" />
           </Form.Item>
 
-          <Form.Item
-            label="连接地址"
-            name="uri"
-            rules={[
-              { required: true, message: '请输入连接地址' }
-            ]}
-          >
-            <Input 
-              placeholder="例如：mcp://localhost:3001 或 http://localhost:8080" 
-              addonAfter={
+          <Form.Item label="连接地址" required style={{ marginBottom: 0 }}>
+            <Row gutter={8} align="middle" wrap={false}>
+              <Col flex="auto">
+                <Form.Item
+                  name="uri"
+                  noStyle
+                  rules={[{ required: true, message: '请输入连接地址' }]}
+                >
+                  <Input 
+                    placeholder="例如：mcp://localhost:3001 或 http://localhost:8080" 
+                  />
+                </Form.Item>
+              </Col>
+              <Col>
                 <Button 
                   type="primary"
-                  size="small"
                   loading={formConnectionStatus === 'testing'}
                   onClick={async () => {
                     const values = await form.validateFields();
@@ -805,8 +837,84 @@ const MCPManagement: React.FC = () => {
                 >
                   {formConnectionStatus === 'testing' ? '测试中' : '测试连接'}
                 </Button>
+              </Col>
+            </Row>
+          </Form.Item>
+
+          {/* 认证类型选择 */}
+          <Form.Item
+            label="认证类型"
+            name="authType"
+            initialValue="none"
+            style={{ marginBottom: 0 }}
+          >
+            <Select size="middle">
+              <Option value="none">无认证</Option>
+              <Option value="bearer">Bearer</Option>
+              <Option value="basic">Basic</Option>
+              <Option value="api_key">API Key</Option>
+            </Select>
+          </Form.Item>
+
+          {/* 认证信息输入，根据类型动态渲染 */}
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => 
+              prevValues.authType !== currentValues.authType
+            }
+          >
+            {({ getFieldValue }) => {
+              const authType = getFieldValue('authType');
+              
+              if (authType === 'bearer') {
+                return (
+                  <Form.Item
+                    label="Bearer Token"
+                    name="authToken"
+                    rules={[{ required: true, message: '请输入 Bearer Token' }]}
+                  >
+                    <Input.Password placeholder="输入 Bearer Token" />
+                  </Form.Item>
+                );
               }
-            />
+              
+              if (authType === 'basic') {
+                return (
+                  <Form.Item
+                    label="Basic Auth Token"
+                    name="authToken"
+                    rules={[{ required: true, message: '请输入 Basic Auth Token (base64编码)' }]}
+                    extra="格式: base64(username:password)"
+                  >
+                    <Input.Password placeholder="输入 Basic Auth Token" />
+                  </Form.Item>
+                );
+              }
+              
+              if (authType === 'api_key') {
+                return (
+                  <>
+                    <Form.Item
+                      label="API Key Header"
+                      name="apiKeyHeader"
+                      rules={[{ required: true, message: '请输入 API Key Header 名称' }]}
+                      initialValue="X-API-Key"
+                    >
+                      <Input placeholder="例如: X-API-Key, Authorization, etc." />
+                    </Form.Item>
+                    <Form.Item
+                      label="API Key"
+                      name="authToken"
+                      rules={[{ required: true, message: '请输入 API Key' }]}
+                    >
+                      <Input.Password placeholder="输入 API Key" />
+                    </Form.Item>
+                  </>
+                );
+              }
+              
+              return null;
+            }}
           </Form.Item>
 
           {/* 连接状态提示 */}
