@@ -201,3 +201,5 @@ cython_debug/
 
 backend/.langgraph_api
 production_build
+*.log
+*.pid
