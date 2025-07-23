@@ -197,33 +197,33 @@ const AgentManagement: React.FC = () => {
           const { summary, args, returns } = formatToolDescription(tool.description);
           
           return {
-            title: `${tool.name} [${tool.category}]`,
+            title: tool.name,
             key: `system-${tool.name}`,
             children: [
               {
                 title: (
-                  <div className="space-y-3 p-2">
+                  <div className="space-y-2 p-1">
                     <div>
-                      <div className="text-sm font-medium text-gray-800 mb-2">工具描述</div>
-                      <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                      <div className="text-xs font-medium text-gray-700 mb-1">工具描述</div>
+                      <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded leading-tight">
                         {summary}
                       </div>
                     </div>
                     
                     {args && (
                       <div>
-                        <div className="text-sm font-medium text-gray-800 mb-2">参数说明</div>
-                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-                          <pre className="whitespace-pre-wrap font-mono text-xs">{args}</pre>
+                        <div className="text-xs font-medium text-gray-700 mb-1">参数说明</div>
+                        <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs leading-tight">{args}</pre>
                         </div>
                       </div>
                     )}
                     
                     {returns && (
                       <div>
-                        <div className="text-sm font-medium text-gray-800 mb-2">返回值说明</div>
-                        <div className="text-sm text-gray-600 bg-green-50 p-3 rounded">
-                          <pre className="whitespace-pre-wrap font-mono text-xs">{returns}</pre>
+                        <div className="text-xs font-medium text-gray-700 mb-1">返回值说明</div>
+                        <div className="text-xs text-gray-600 bg-green-50 p-2 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs leading-tight">{returns}</pre>
                         </div>
                       </div>
                     )}
@@ -282,42 +282,41 @@ const AgentManagement: React.FC = () => {
       console.log('处理服务器:', server.name, '工具数量:', server.tools?.length);
       
       return {
-        title: `${server.name} (${server.status}) - ${server.tools?.length || 0}工具`,
+        title: `${server.name} - ${server.tools?.length || 0}工具`,
         key: `server-${server.id}`,
         disabled: server.status !== 'connected',
         children: (server.tools || []).map(tool => {
           const { summary, args, returns } = formatToolDescription(tool.description);
           
           return {
-            title: `${tool.name} [${tool.category}]`,
+            title: tool.name,
             key: `tool-${tool.name}`,
             disabled: server.status !== 'connected',
-            isLeaf: true,
             children: [
               {
                 title: (
-                  <div className="space-y-3 p-2">
+                  <div className="space-y-2 p-1">
                     <div>
-                      <div className="text-sm font-medium text-gray-800 mb-2">工具描述</div>
-                      <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                      <div className="text-xs font-medium text-gray-700 mb-1">工具描述</div>
+                      <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded leading-tight">
                         {tool.description}
                       </div>
                     </div>
                     
                     {args && (
                       <div>
-                        <div className="text-sm font-medium text-gray-800 mb-2">参数说明</div>
-                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
-                          <pre className="whitespace-pre-wrap font-mono text-xs">{args}</pre>
+                        <div className="text-xs font-medium text-gray-700 mb-1">参数说明</div>
+                        <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs leading-tight">{args}</pre>
                         </div>
                       </div>
                     )}
                     
                     {returns && (
                       <div>
-                        <div className="text-sm font-medium text-gray-800 mb-2">返回值说明</div>
-                        <div className="text-sm text-gray-600 bg-green-50 p-3 rounded">
-                          <pre className="whitespace-pre-wrap font-mono text-xs">{returns}</pre>
+                        <div className="text-xs font-medium text-gray-700 mb-1">返回值说明</div>
+                        <div className="text-xs text-gray-600 bg-green-50 p-2 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs leading-tight">{returns}</pre>
                         </div>
                       </div>
                     )}
