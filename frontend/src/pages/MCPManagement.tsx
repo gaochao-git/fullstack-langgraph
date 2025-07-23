@@ -724,20 +724,11 @@ const MCPManagement: React.FC = () => {
           <div>
             <Descriptions column={2} bordered>
               <Descriptions.Item label="服务器名称" span={2}>
-                <Space>
-                  {selectedServer.name}
-                  <Badge 
-                    status={selectedServer.status === 'connected' ? 'success' : 
-                             selectedServer.status === 'error' ? 'error' : 'warning'} 
-                    text={getStatusText(selectedServer.status)}
-                  />
-                </Space>
+                {selectedServer.name}
               </Descriptions.Item>
               <Descriptions.Item label="连接地址" span={2}>
                 <code>{selectedServer.uri}</code>
               </Descriptions.Item>
-              <Descriptions.Item label="版本">{selectedServer.version}</Descriptions.Item>
-              <Descriptions.Item label="最后连接时间">{selectedServer.lastConnected}</Descriptions.Item>
               <Descriptions.Item label="描述" span={2}>
                 {selectedServer.description}
               </Descriptions.Item>
@@ -747,50 +738,114 @@ const MCPManagement: React.FC = () => {
               可用工具 ({selectedServer.tools.length})
             </Divider>
             
-            <div className="space-y-3">
-              {selectedServer.tools.map(tool => (
-                <Card key={tool.name} size="small" 
-                      style={{ 
-                        borderColor: '#52c41a',
-                        backgroundColor: '#f6ffed'
-                      }}>
-                  <Row align="middle">
-                    <Col span={24}>
-                      <Space direction="vertical" size="small">
+            <Collapse
+              size="small"
+              items={selectedServer.tools.map(tool => {
+                const { summary, args, returns } = formatToolDescription(tool.description);
+                // 处理参数显示：tool.parameters 可能是 inputSchema 格式
+                let parameters = {};
+                if (tool.parameters?.properties) {
+                  // 标准的 inputSchema 格式
+                  parameters = tool.parameters.properties;
+                } else if (tool.parameters && typeof tool.parameters === 'object') {
+                  // 直接的参数对象
+                  parameters = tool.parameters;
+                }
+                
+                return {
+                  key: tool.name,
+                  label: (
+                    <Row align="middle" style={{ width: '100%' }}>
+                      <Col span={24}>
                         <Space>
                           <span className="font-medium text-gray-900">
                             {tool.name}
                           </span>
-                          <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
+                          {Object.keys(parameters).length > 0 && (
+                            <Tag color="blue" size="small">{Object.keys(parameters).length} 参数</Tag>
+                          )}
                         </Space>
-                        <div>
-                          <span className="text-sm text-gray-600">
-                            {tool.description}
-                          </span>
-                          {(() => {
-                            // 统一参数提取逻辑，与表单中的逻辑保持一致
-                            let params = {};
-                            if (tool.parameters?.properties) {
-                              params = tool.parameters.properties;
-                            } else if (tool.parameters && typeof tool.parameters === 'object') {
-                              params = tool.parameters;
-                            }
-                            const paramCount = Object.keys(params).length;
-                            return paramCount > 0 && (
-                              <div style={{ marginTop: 8 }}>
-                                <Tag size="small" color="blue">
-                                  {paramCount} 个参数
-                                </Tag>
-                              </div>
-                            );
-                          })()}
+                      </Col>
+                    </Row>
+                  ),
+                  children: (
+                    <div className="space-y-2 pt-1">
+                      {/* 工具描述 */}
+                      {summary && (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>描述:</div>
+                          <div style={{ 
+                            fontSize: 12, 
+                            color: '#595959',
+                            backgroundColor: '#fff',
+                            padding: '8px 12px',
+                            border: '1px solid #f0f0f0',
+                            borderRadius: 4,
+                            lineHeight: '1.5'
+                          }}>
+                            {summary}
+                          </div>
                         </div>
-                      </Space>
-                    </Col>
-                  </Row>
-                </Card>
-              ))}
-            </div>
+                      )}
+                      
+                      {/* 参数信息 */}
+                      {Object.keys(parameters).length > 0 && (
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>参数:</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {Object.entries(parameters).map(([paramName, paramInfo]: [string, any]) => (
+                              <div key={paramName} style={{ 
+                                display: 'flex', 
+                                alignItems: 'flex-start', 
+                                gap: 8, 
+                                fontSize: 12, 
+                                backgroundColor: '#fafafa', 
+                                padding: '8px 12px', 
+                                borderRadius: 4, 
+                                border: '1px solid #f0f0f0',
+                                flexWrap: 'wrap'
+                              }}>
+                                <span style={{ fontFamily: 'monospace', color: '#1890ff', fontWeight: 600, minWidth: 80 }}>
+                                  {paramName}
+                                </span>
+                                <Tag size="small" color="blue">{paramInfo.type || 'unknown'}</Tag>
+                                {paramInfo.description && (
+                                  <span style={{ color: '#666666', flex: 1, marginLeft: 8 }}>
+                                    {paramInfo.description}
+                                  </span>
+                                )}
+                                {paramInfo.default !== undefined && (
+                                  <Tag size="small" color="orange">默认: {String(paramInfo.default)}</Tag>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* 返回值信息 */}
+                      {returns && (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>返回:</div>
+                          <div style={{ 
+                            fontSize: 12, 
+                            backgroundColor: '#f6ffed', 
+                            padding: '8px 12px', 
+                            borderRadius: 4, 
+                            border: '1px solid #b7eb8f',
+                            color: '#52c41a',
+                            lineHeight: '1.4'
+                          }}>
+                            {returns}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                };
+              })}
+              style={{ maxHeight: '400px', overflowY: 'auto' }}
+            />
           </div>
         )}
       </Modal>
