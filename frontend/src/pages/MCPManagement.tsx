@@ -64,127 +64,55 @@ interface MCPServer {
 }
 
 
-// Mock数据
-const mockMCPServers: MCPServer[] = [
-  {
-    id: 'server-1',
-    name: 'Database Tools Server',
-    uri: 'mcp://localhost:3001',
-    status: 'connected',
-    description: '数据库相关工具集合，支持MySQL、PostgreSQL查询和监控',
-    enabled: true,
-    lastConnected: '2025-07-22 10:30:00',
-    version: '1.0.0',
-    tools: [
-      {
-        name: 'mysql_query',
-        description: 'Execute MySQL queries and return results',
-        globalEnabled: true,
-        category: 'database'
-      },
-      {
-        name: 'postgres_query', 
-        description: 'Execute PostgreSQL queries and return results',
-        globalEnabled: true,
-        category: 'database'
-      },
-      {
-        name: 'db_health_check',
-        description: 'Check database connection and performance metrics',
-        globalEnabled: false,
-        category: 'monitoring'
-      }
-    ]
-  },
-  {
-    id: 'server-2',
-    name: 'System Monitor Server',
-    uri: 'mcp://localhost:3002',
-    status: 'connected',
-    description: '系统监控工具，包含性能分析、日志查看等功能',
-    enabled: true,
-    lastConnected: '2025-07-22 10:25:00',
-    version: '2.1.0',
-    tools: [
-      {
-        name: 'system_metrics',
-        description: 'Get system CPU, memory, disk usage metrics',
-        globalEnabled: true,
-        category: 'monitoring'
-      },
-      {
-        name: 'log_analyzer',
-        description: 'Analyze system logs for errors and patterns',
-        globalEnabled: true,
-        category: 'analysis'
-      },
-      {
-        name: 'process_monitor',
-        description: 'Monitor running processes and resource usage',
-        globalEnabled: false,
-        category: 'monitoring'
-      }
-    ]
-  },
-  {
-    id: 'server-3',
-    name: 'Network Tools Server',
-    uri: 'mcp://remote-host:3003',
-    status: 'error',
-    description: '网络诊断工具集，包含ping、traceroute、端口扫描等',
-    enabled: false,
-    lastConnected: '2025-07-22 09:15:00',
-    version: '1.5.2',
-    tools: [
-      {
-        name: 'ping_test',
-        description: 'Test network connectivity to hosts',
-        globalEnabled: false,
-        category: 'network'
-      },
-      {
-        name: 'port_scan',
-        description: 'Scan open ports on target hosts',
-        globalEnabled: false,
-        category: 'network'
-      },
-      {
-        name: 'traceroute',
-        description: 'Trace network path to destination',
-        globalEnabled: false,
-        category: 'network'
-      }
-    ]
-  },
-  {
-    id: 'server-4',
-    name: 'Cloud API Server',
-    uri: 'mcp://api.cloud.com:443',
-    status: 'disconnected',
-    description: '云服务API集成，支持AWS、Azure、阿里云等',
-    enabled: false,
-    lastConnected: '2025-07-21 16:45:00',
-    version: '3.0.1',
-    tools: [
-      {
-        name: 'aws_ec2_list',
-        description: 'List AWS EC2 instances and their status',
-        globalEnabled: false,
-        category: 'cloud'
-      },
-      {
-        name: 'azure_resource_monitor',
-        description: 'Monitor Azure resources and costs',
-        globalEnabled: false,
-        category: 'cloud'
-      }
-    ]
-  }
-];
+// API基础URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// 将后端数据转换为前端格式
+const transformServerFromAPI = (apiServer: any): MCPServer => {
+  const tools = apiServer.server_tools ? JSON.parse(apiServer.server_tools) : [];
+  return {
+    id: apiServer.server_id,
+    name: apiServer.server_name,
+    uri: apiServer.server_uri,
+    status: apiServer.connection_status as 'connected' | 'disconnected' | 'error',
+    description: apiServer.server_description || '',
+    enabled: apiServer.is_enabled === 'on',
+    lastConnected: apiServer.update_time,
+    authType: apiServer.auth_type || 'none',
+    authToken: apiServer.auth_token,
+    apiKeyHeader: apiServer.api_key_header,
+    tools: tools.map((tool: any) => ({
+      name: tool.name,
+      description: tool.description,
+      globalEnabled: tool.globalEnabled !== false,
+      category: tool.category || 'unknown',
+      parameters: tool.parameters
+    }))
+  };
+};
+
+// 将前端数据转换为后端格式
+const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'frontend_user') => {
+  return {
+    server_id: server.id,
+    server_name: server.name,
+    server_uri: server.uri,
+    server_description: server.description,
+    is_enabled: server.enabled ? 'on' : 'off',
+    connection_status: server.status || 'disconnected',
+    auth_type: server.authType || '',
+    auth_token: server.authToken,
+    api_key_header: server.apiKeyHeader,
+    server_tools: server.tools ? JSON.stringify(server.tools) : '[]',
+    server_config: '{}',
+    team_name: 'default_team',
+    create_by: createBy
+  };
+};
 
 
 const MCPManagement: React.FC = () => {
-  const [servers, setServers] = useState<MCPServer[]>(mockMCPServers);
+  const [servers, setServers] = useState<MCPServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -200,7 +128,128 @@ const MCPManagement: React.FC = () => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+  // API调用函数
+  const fetchServers = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mcp/servers`);
+      if (response.ok) {
+        const data = await response.json();
+        const transformedServers = data.map(transformServerFromAPI);
+        setServers(transformedServers);
+      } else {
+        message.error('获取服务器列表失败');
+      }
+    } catch (error) {
+      console.error('获取服务器列表错误:', error);
+      message.error('获取服务器列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createServer = async (serverData: Partial<MCPServer>) => {
+    try {
+      const apiData = transformServerToAPI(serverData);
+      const response = await fetch(`${API_BASE_URL}/api/mcp/servers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiData)
+      });
+      
+      if (response.ok) {
+        message.success('服务器创建成功');
+        await fetchServers();
+        return true;
+      } else {
+        const errorData = await response.json();
+        message.error(`创建服务器失败: ${errorData.detail || '未知错误'}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('创建服务器错误:', error);
+      message.error('创建服务器失败');
+      return false;
+    }
+  };
+
+  const updateServer = async (serverId: string, serverData: Partial<MCPServer>) => {
+    try {
+      const apiData = { ...transformServerToAPI(serverData), update_by: 'frontend_user' };
+      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(apiData)
+      });
+      
+      if (response.ok) {
+        message.success('服务器更新成功');
+        await fetchServers();
+        return true;
+      } else {
+        const errorData = await response.json();
+        message.error(`更新服务器失败: ${errorData.detail || '未知错误'}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('更新服务器错误:', error);
+      message.error('更新服务器失败');
+      return false;
+    }
+  };
+
+  const deleteServer = async (serverId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        message.success('服务器删除成功');
+        await fetchServers();
+        return true;
+      } else {
+        const errorData = await response.json();
+        message.error(`删除服务器失败: ${errorData.detail || '未知错误'}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('删除服务器错误:', error);
+      message.error('删除服务器失败');
+      return false;
+    }
+  };
+
+  const testServerConnection = async (serverId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}/test`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.healthy) {
+          message.success('服务器连接测试成功');
+          await fetchServers(); // 刷新状态
+        } else {
+          message.error(`连接测试失败: ${data.error || '未知错误'}`);
+        }
+        return data;
+      } else {
+        message.error('连接测试失败');
+        return { healthy: false, tools: [], error: '请求失败' };
+      }
+    } catch (error) {
+      console.error('测试连接错误:', error);
+      message.error('连接测试失败');
+      return { healthy: false, tools: [], error: String(error) };
+    }
+  };
+
+  // 初始化数据
+  useEffect(() => {
+    fetchServers();
+  }, []);
 
   // 获取状态颜色
   const getStatusColor = (status: MCPServer['status']): string => {
@@ -244,21 +293,91 @@ const MCPManagement: React.FC = () => {
   });
 
   // 切换服务器启用状态
-  const toggleServerEnabled = (serverId: string) => {
-    setServers(prevServers =>
-      prevServers.map(server =>
-        server.id === serverId 
-          ? { ...server, enabled: !server.enabled }
-          : server
-      )
-    );
-    message.success('服务器状态已更新');
+  const toggleServerEnabled = async (serverId: string) => {
+    const server = servers.find(s => s.id === serverId);
+    if (!server) return;
+    
+    const newEnabled = !server.enabled;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}/enable`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newEnabled ? 'on' : 'off' })
+      });
+      
+      if (response.ok) {
+        await fetchServers(); // 刷新数据
+        message.success(`服务器已${newEnabled ? '启用' : '禁用'}`);
+      } else {
+        message.error('更新服务器状态失败');
+      }
+    } catch (error) {
+      console.error('更新服务器状态错误:', error);
+      message.error('更新服务器状态失败');
+    }
   };
 
   // 查看服务器详情
   const handleViewServer = (server: MCPServer) => {
     setSelectedServer(server);
     setServerDetailModal(true);
+  };
+
+  // 删除服务器
+  const handleDeleteServer = async (serverId: string) => {
+    await deleteServer(serverId);
+  };
+
+  // 添加服务器
+  const handleAddServer = () => {
+    setEditingServer(null);
+    setFormConnectionStatus('idle');
+    setFormDiscoveredTools([]);
+    form.resetFields();
+    setServerFormModal(true);
+  };
+
+  // 编辑服务器
+  const handleEditServer = (server: MCPServer) => {
+    setEditingServer(server);
+    setFormConnectionStatus('idle');
+    setFormDiscoveredTools(server.tools);
+    setServerFormModal(true);
+  };
+
+  // 测试连接
+  const handleTestConnection = async (serverId: string) => {
+    await testServerConnection(serverId);
+  };
+
+  // 保存服务器（新增或编辑）
+  const handleSaveServer = async (values: any) => {
+    const serverData: Partial<MCPServer> = {
+      id: editingServer?.id || `server-${Date.now()}`,
+      name: values.name,
+      uri: values.uri,
+      description: values.description,
+      authType: values.authType,
+      authToken: values.authToken,
+      apiKeyHeader: values.apiKeyHeader,
+      enabled: true,
+      status: 'disconnected',
+      tools: formDiscoveredTools
+    };
+
+    let success = false;
+    if (editingServer) {
+      success = await updateServer(editingServer.id, serverData);
+    } else {
+      success = await createServer(serverData);
+    }
+
+    if (success) {
+      setServerFormModal(false);
+      form.resetFields();
+      setFormConnectionStatus('idle');
+      setFormDiscoveredTools([]);
+    }
   };
 
 
@@ -305,78 +424,6 @@ const MCPManagement: React.FC = () => {
     message.success(`${serverName} 的所有工具已${enableAll ? '全局启用' : '全局禁用'}`);
   };
 
-  // 新增服务器
-  const handleAddServer = () => {
-    setEditingServer(null);
-    setFormConnectionStatus('idle');
-    setFormDiscoveredTools([]);
-    setServerFormModal(true);
-  };
-
-  // 编辑服务器
-  const handleEditServer = (server: MCPServer) => {
-    setEditingServer(server);
-    setFormConnectionStatus(server.status === 'connected' ? 'connected' : 'idle');
-    setFormDiscoveredTools(server.tools || []);
-    setServerFormModal(true);
-  };
-
-  // 删除服务器
-  const handleDeleteServer = (serverId: string) => {
-    setServers(prevServers => prevServers.filter(server => server.id !== serverId));
-    message.success('服务器已删除');
-  };
-
-  // 测试连接
-  const handleTestConnection = (serverId: string) => {
-    const server = servers.find(s => s.id === serverId);
-    if (server) {
-      // 模拟连接测试
-      setTimeout(() => {
-        setServers(prevServers =>
-          prevServers.map(s =>
-            s.id === serverId
-              ? { ...s, status: 'connected', lastConnected: new Date().toISOString().slice(0, 16) }
-              : s
-          )
-        );
-        message.success(`${server.name} 连接测试成功`);
-      }, 1000);
-      message.info('正在测试连接...');
-    }
-  };
-
-  // 保存服务器
-  const handleSaveServer = (values: any) => {
-    const serverData = {
-      ...values,
-      tools: formDiscoveredTools,
-      status: formConnectionStatus === 'connected' ? 'connected' as const : 'disconnected' as const,
-      lastConnected: formConnectionStatus === 'connected' ? new Date().toISOString().slice(0, 16) : undefined
-    };
-
-    if (editingServer) {
-      // 编辑模式
-      setServers(prevServers =>
-        prevServers.map(server =>
-          server.id === editingServer.id
-            ? { ...server, ...serverData }
-            : server
-        )
-      );
-      message.success('服务器信息已更新');
-    } else {
-      // 新增模式
-      const newServer: MCPServer = {
-        id: `server-${Date.now()}`,
-        ...serverData,
-        enabled: true
-      };
-      setServers(prevServers => [...prevServers, newServer]);
-      message.success('服务器已添加');
-    }
-    setServerFormModal(false);
-  };
 
   // 表单中测试连接并发现工具
   const handleFormTestConnection = async (formValues: any) => {
@@ -403,14 +450,15 @@ const MCPManagement: React.FC = () => {
       // 构建请求体，包含认证信息
       const requestBody = {
         url: formValues.uri,
-        authType: formValues.authType || 'none',
-        authToken: formValues.authToken || null,
-        apiKeyHeader: formValues.apiKeyHeader || null
+        auth_type: formValues.authType || '',
+        auth_token: formValues.authToken || null,
+        api_key_header: formValues.apiKeyHeader || null
       };
       
       console.log('发送测试连接请求:', requestBody);
       
-      // 带baseurl调用后端接口
+      // 对于表单中的测试，我们创建一个临时服务器来测试
+      // 这里先简化处理，只检查URL格式
       const resp = await fetch(`${API_BASE_URL}/api/mcp/test_server`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -667,7 +715,8 @@ const MCPManagement: React.FC = () => {
               <Space>
                 <Button 
                   icon={<ReloadOutlined />}
-                  onClick={() => message.success('数据已刷新')}
+                  onClick={fetchServers}
+                  loading={loading}
                 >
                   刷新
                 </Button>

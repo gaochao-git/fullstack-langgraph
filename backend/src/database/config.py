@@ -56,6 +56,15 @@ def get_sync_session():
         session.close()
 
 
+def get_db():
+    """Get database session for FastAPI dependency injection."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 async def init_database():
     """Initialize database tables."""
     async with async_engine.begin() as conn:

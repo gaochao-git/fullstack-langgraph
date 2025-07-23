@@ -49,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_user_threads_user_id ON user_threads(user_name);
 CREATE INDEX IF NOT EXISTS idx_user_threads_create_at ON user_threads(user_name, create_at DESC);
 
 -- 标准操作程序提示词模板表 (PostgreSQL)
-CREATE TABLE sop_prompt_templates (
+CREATE TABLE IF NOT EXISTS sop_prompt_templates (
   id BIGSERIAL PRIMARY KEY,
   sop_id VARCHAR(50) NOT NULL UNIQUE,
   sop_title VARCHAR(255) NOT NULL,
@@ -65,4 +65,23 @@ CREATE TABLE sop_prompt_templates (
   create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX uk_sop_id ON sop_prompt_templates(sop_id);
+
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    id SERIAL PRIMARY KEY,
+    server_id VARCHAR(100) UNIQUE NOT NULL,
+    server_name VARCHAR(200) NOT NULL,
+    server_uri VARCHAR(500) NOT NULL,
+    server_description TEXT,
+    is_enabled VARCHAR(10) DEFAULT 'on',
+    connection_status VARCHAR(20) DEFAULT 'disconnected',
+    auth_type VARCHAR(20) DEFAULT '',
+    auth_token TEXT,
+    api_key_header VARCHAR(100),
+    server_tools TEXT,
+    server_config TEXT,
+    team_name VARCHAR(100) NOT NULL,
+    create_by VARCHAR(100) NOT NULL,
+    update_by VARCHAR(100),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
