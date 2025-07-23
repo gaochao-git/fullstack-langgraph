@@ -7,6 +7,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LinkOutlined,
+  ApiOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import ResearchAgent from "./agents/research_agent/ResearchAgent";
@@ -14,6 +15,7 @@ import DiagnosticAgent from "./agents/diagnostic_agent/DiagnosticAgent";
 import SOPManagementSimple from "./pages/SOPManagementSimple";
 import MCPManagement from "./pages/MCPManagement";
 import AgentManagement from "./pages/AgentManagement";
+import ModelsManagement from "./pages/ModelsManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
@@ -64,6 +66,11 @@ function AppContent() {
       key: '4',
       icon: <LinkOutlined />,
       label: <Link to="/mcp">MCP管理</Link>,
+    },
+    {
+      key: '5',
+      icon: <ApiOutlined />,
+      label: <Link to="/models">模型管理</Link>,
     },
   ];
 
@@ -210,6 +217,7 @@ function AppContent() {
               <Route path="/agents" element={<AgentManagement />} />
               <Route path="/sop" element={<SOPManagementSimple />} />
               <Route path="/mcp" element={<MCPManagement />} />
+              <Route path="/models" element={<ModelsManagement />} />
               <Route
                 path="*"
                 element={
