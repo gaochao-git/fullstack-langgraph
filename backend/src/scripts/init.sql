@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS mcp_servers_bak (
     agent_capabilities TEXT,           -- JSON存储能力列表
     agent_version VARCHAR(20) DEFAULT '1.0.0',
     agent_status VARCHAR(20) DEFAULT 'stopped',
-    agent_enabled BOOLEAN DEFAULT TRUE,
-    is_builtin BOOLEAN DEFAULT FALSE,
+    agent_enabled  VARCHAR(20),
+    is_builtin  VARCHAR(20),
     tools_info TEXT,
     llm_info TEXT,
     prompt_info TEXT,

@@ -79,13 +79,13 @@ const formatToolDescription = (description: string) => {
 };
 
 // 本地状态类型（兼容旧的驼峰命名）
-interface LocalAgent extends Omit<Agent, 'display_name' | 'last_used' | 'total_runs' | 'success_rate' | 'avg_response_time' | 'mcp_config'> {
+interface LocalAgent extends Omit<Agent, 'display_name' | 'last_used' | 'total_runs' | 'success_rate' | 'avg_response_time' | 'mcp_config' | 'is_builtin'> {
   displayName: string;
   lastUsed?: string;
   totalRuns: number;
   successRate: number;
   avgResponseTime: number;
-  is_builtin: boolean;
+  is_builtin: string; // 'yes' | 'no'
   mcpConfig: {
     enabledServers: string[];
     selectedTools: string[];
@@ -106,6 +106,8 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
   totalRuns: agent.total_runs,
   successRate: agent.success_rate,
   avgResponseTime: agent.avg_response_time,
+  // 保证 is_builtin 始终为 'yes' 或 'no'
+  is_builtin: agent.is_builtin === true || agent.is_builtin === 'yes' ? 'yes' : 'no',
   mcpConfig: {
     enabledServers: agent.mcp_config.enabled_servers,
     selectedTools: agent.mcp_config.selected_tools,
@@ -385,13 +387,20 @@ const AgentManagement: React.FC = () => {
   };
 
   // 过滤智能体
-  const filteredAgents = agents.filter(agent => {
-    const matchSearch = !searchText || 
-      agent.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
-      agent.description.toLowerCase().includes(searchText.toLowerCase());
-    const matchStatus = !statusFilter || agent.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const filteredAgents = agents
+    .filter(agent => {
+      const matchSearch = !searchText || 
+        agent.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
+        agent.description.toLowerCase().includes(searchText.toLowerCase());
+      const matchStatus = !statusFilter || agent.status === statusFilter;
+      return matchSearch && matchStatus;
+    })
+    // 内置智能体排前面
+    .sort((a, b) => {
+      if (a.is_builtin === 'yes' && b.is_builtin !== 'yes') return -1;
+      if (a.is_builtin !== 'yes' && b.is_builtin === 'yes') return 1;
+      return 0;
+    });
 
   // 切换智能体启用状态
   const toggleAgentEnabled = async (agentId: string) => {
@@ -531,7 +540,7 @@ const AgentManagement: React.FC = () => {
 
   // 删除智能体
   const handleDeleteAgent = (agent: LocalAgent) => {
-    if (agent.is_builtin) {
+    if (agent.is_builtin === 'yes') {
       message.warning('不能删除内置智能体');
       return;
     }
@@ -699,7 +708,7 @@ const AgentManagement: React.FC = () => {
                   >
                     编辑
                   </Button>,
-                  ...(!agent.is_builtin ? [
+                  ...(agent.is_builtin !== 'yes' ? [
                     <Button 
                       key="delete"
                       type="text" 
@@ -721,7 +730,9 @@ const AgentManagement: React.FC = () => {
                   avatar={null}
                   title={
                     <div className="flex items-center justify-between">
-                      <div className="text-base font-medium text-gray-900">{agent.displayName}</div>
+                      <div className="text-base font-medium flex items-center gap-2" style={{ color: agent.is_builtin === 'yes' ? '#faad14' : undefined }}>
+                        {agent.displayName}
+                      </div>
                       <Switch
                         size="small"
                         checked={agent.enabled}
@@ -783,7 +794,9 @@ const AgentManagement: React.FC = () => {
                                      selectedAgent.status === 'error' ? '#ff4d4f' : '#faad14'
                     }} 
                   />
-                  {selectedAgent.displayName}
+                  <span style={{ color: selectedAgent.is_builtin === 'yes' ? '#faad14' : undefined }}>
+                    {selectedAgent.displayName}
+                  </span>
                   <Badge 
                     status={selectedAgent.status === 'running' ? 'success' : 
                            selectedAgent.status === 'error' ? 'error' : 'warning'} 
