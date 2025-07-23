@@ -392,7 +392,10 @@ const AgentManagement: React.FC = () => {
       const matchSearch = !searchText || 
         agent.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
         agent.description.toLowerCase().includes(searchText.toLowerCase());
-      const matchStatus = !statusFilter || agent.status === statusFilter;
+      // 状态筛选用 agent.enabled
+      let matchStatus = true;
+      if (statusFilter === 'enabled') matchStatus = agent.enabled === true || agent.enabled === 'yes';
+      if (statusFilter === 'disabled') matchStatus = agent.enabled === false || agent.enabled === 'no';
       return matchSearch && matchStatus;
     })
     // 内置智能体排前面
@@ -659,9 +662,8 @@ const AgentManagement: React.FC = () => {
                 value={statusFilter}
                 onChange={setStatusFilter}
               >
-                <Option value="running">运行中</Option>
-                <Option value="stopped">已停止</Option>
-                <Option value="error">错误</Option>
+                <Option value="enabled">已启用</Option>
+                <Option value="disabled">已禁用</Option>
               </Select>
             </Col>
             <Col xs={24} sm={12} md={12}>
