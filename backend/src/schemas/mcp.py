@@ -14,6 +14,7 @@ class MCPServerBase(BaseModel):
     auth_type: Optional[str] = ""
     auth_token: Optional[str] = None
     api_key_header: Optional[str] = None
+    read_timeout_seconds: int = 5
     server_tools: Optional[List[Dict[str, Any]]] = None
     server_config: Optional[Dict[str, Any]] = None
     team_name: str
@@ -35,6 +36,7 @@ class MCPServerUpdate(BaseModel):
     auth_type: Optional[str] = None
     auth_token: Optional[str] = None
     api_key_header: Optional[str] = None
+    read_timeout_seconds: Optional[int] = None
     server_tools: Optional[List[Dict[str, Any]]] = None
     server_config: Optional[Dict[str, Any]] = None
     update_by: Optional[str] = None
@@ -44,6 +46,7 @@ class MCPServerResponse(MCPServerBase):
     """MCP服务器响应模型"""
     id: int
     server_id: str
+    read_timeout_seconds: int
     update_by: Optional[str] = None
     create_time: Optional[str] = None
     update_time: Optional[str] = None

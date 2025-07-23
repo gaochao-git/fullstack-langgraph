@@ -17,7 +17,6 @@ import {
   Descriptions,
   Badge,
   Divider,
-  Alert,
   Form,
   Collapse,
   message as antdMessage
@@ -43,7 +42,7 @@ const { Option } = Select;
 interface MCPTool {
   name: string;
   description: string;
-  globalEnabled: boolean;  // 全局开关
+  globalEnabled: boolean;  // 保留用于兼容性，但所有工具默认可用
   category: string;
   parameters?: any;
 }
@@ -61,6 +60,7 @@ interface MCPServer {
   authType?: 'none' | 'bearer' | 'basic' | 'api_key';
   authToken?: string;
   apiKeyHeader?: string;
+  readTimeoutSeconds?: number;
 }
 
 
@@ -69,7 +69,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 // 将后端数据转换为前端格式
 const transformServerFromAPI = (apiServer: any): MCPServer => {
-  const tools = apiServer.server_tools ? JSON.parse(apiServer.server_tools) : [];
+  // server_tools现在已经是数组对象，不需要JSON.parse
+  const tools = Array.isArray(apiServer.server_tools) ? apiServer.server_tools : [];
   return {
     id: apiServer.server_id,
     name: apiServer.server_name,
@@ -81,12 +82,13 @@ const transformServerFromAPI = (apiServer: any): MCPServer => {
     authType: apiServer.auth_type || 'none',
     authToken: apiServer.auth_token,
     apiKeyHeader: apiServer.api_key_header,
+    readTimeoutSeconds: apiServer.read_timeout_seconds || 5,
     tools: tools.map((tool: any) => ({
       name: tool.name,
       description: tool.description,
-      globalEnabled: tool.globalEnabled !== false,
+      globalEnabled: true, // 所有工具默认可用
       category: tool.category || 'unknown',
-      parameters: tool.parameters
+      parameters: tool.inputSchema || tool.parameters // 兼容两种格式
     }))
   };
 };
@@ -103,6 +105,7 @@ const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'fr
     auth_type: server.authType || '',
     auth_token: server.authToken,
     api_key_header: server.apiKeyHeader,
+    read_timeout_seconds: server.readTimeoutSeconds || 5,
     server_tools: server.tools ? JSON.stringify(server.tools) : '[]',
     server_config: '{}',
     team_name: 'default_team',
@@ -357,6 +360,7 @@ const MCPManagement: React.FC = () => {
       name: values.name,
       uri: values.uri,
       description: values.description,
+      readTimeoutSeconds: values.readTimeoutSeconds,
       authType: values.authType,
       authToken: values.authToken,
       apiKeyHeader: values.apiKeyHeader,
@@ -381,27 +385,6 @@ const MCPManagement: React.FC = () => {
   };
 
 
-  // 切换工具全局状态
-  const toggleToolGlobalEnabled = (serverId: string, toolName: string) => {
-    setServers(prevServers =>
-      prevServers.map(server => {
-        if (server.id === serverId) {
-          return {
-            ...server,
-            tools: server.tools.map(tool =>
-              tool.name === toolName 
-                ? { ...tool, globalEnabled: !tool.globalEnabled }
-                : tool
-            )
-          };
-        }
-        return server;
-      })
-    );
-    
-    const newState = servers.find(s => s.id === serverId)?.tools.find(t => t.name === toolName)?.globalEnabled;
-    message.success(`工具 ${toolName} 已${!newState ? '全局启用' : '全局禁用'}`);
-  };
 
   // 批量启用/禁用服务器的所有工具
   const toggleAllServerTools = (serverId: string, enableAll: boolean) => {
@@ -472,7 +455,7 @@ const MCPManagement: React.FC = () => {
           description: tool.description,
           globalEnabled: true, // 默认全局启用，可根据需要调整
           category: 'unknown', // 后端未返回类别，前端可自定义
-          parameters: tool.inputSchema
+          parameters: tool.inputSchema || tool.parameters // 统一参数字段
         }));
         setFormConnectionStatus('connected');
         setFormDiscoveredTools(discoveredTools);
@@ -489,16 +472,6 @@ const MCPManagement: React.FC = () => {
     }
   };
 
-  // 切换表单中工具的状态
-  const toggleFormToolEnabled = (toolName: string) => {
-    setFormDiscoveredTools(prevTools =>
-      prevTools.map(tool =>
-        tool.name === toolName
-          ? { ...tool, globalEnabled: !tool.globalEnabled }
-          : tool
-      )
-    );
-  };
 
   // 格式化工具描述
   const formatToolDescription = (description: string) => {
@@ -676,15 +649,6 @@ const MCPManagement: React.FC = () => {
 
   return (
     <div>
-      {/* 提示信息 */}
-      <Alert
-        message="MCP服务器管理"
-        description="管理MCP服务器连接状态和工具配置。添加、测试和配置外部MCP服务器。"
-        type="info"
-        showIcon
-        className="mb-4"
-      />
-
       {/* MCP服务器管理 */}
       <Card title="MCP服务器管理">
         <div className="mb-4">
@@ -787,36 +751,41 @@ const MCPManagement: React.FC = () => {
               {selectedServer.tools.map(tool => (
                 <Card key={tool.name} size="small" 
                       style={{ 
-                        borderColor: tool.globalEnabled ? '#52c41a' : '#d9d9d9',
-                        backgroundColor: tool.globalEnabled ? '#f6ffed' : '#fafafa'
+                        borderColor: '#52c41a',
+                        backgroundColor: '#f6ffed'
                       }}>
-                  <Row align="middle" justify="space-between">
-                    <Col span={18}>
+                  <Row align="middle">
+                    <Col span={24}>
                       <Space direction="vertical" size="small">
                         <Space>
-                          <span className={`font-medium ${tool.globalEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                          <span className="font-medium text-gray-900">
                             {tool.name}
                           </span>
                           <Tag color={getCategoryColor(tool.category)}>{tool.category}</Tag>
-                          {tool.globalEnabled && (
-                            <Tag color="green">全局启用</Tag>
-                          )}
-                          {!tool.globalEnabled && (
-                            <Tag color="default">全局禁用</Tag>
-                          )}
                         </Space>
-                        <span className={`text-sm ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
-                          {tool.description}
-                        </span>
+                        <div>
+                          <span className="text-sm text-gray-600">
+                            {tool.description}
+                          </span>
+                          {(() => {
+                            // 统一参数提取逻辑，与表单中的逻辑保持一致
+                            let params = {};
+                            if (tool.parameters?.properties) {
+                              params = tool.parameters.properties;
+                            } else if (tool.parameters && typeof tool.parameters === 'object') {
+                              params = tool.parameters;
+                            }
+                            const paramCount = Object.keys(params).length;
+                            return paramCount > 0 && (
+                              <div style={{ marginTop: 8 }}>
+                                <Tag size="small" color="blue">
+                                  {paramCount} 个参数
+                                </Tag>
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </Space>
-                    </Col>
-                    <Col span={6} className="text-right">
-                      <Switch
-                        checked={tool.globalEnabled}
-                        disabled={true}
-                        checkedChildren="启用"
-                        unCheckedChildren="禁用"
-                      />
                     </Col>
                   </Row>
                 </Card>
@@ -843,12 +812,13 @@ const MCPManagement: React.FC = () => {
             name: editingServer.name,
             uri: editingServer.uri,
             description: editingServer.description,
-            version: editingServer.version,
+            readTimeoutSeconds: editingServer.readTimeoutSeconds || 5,
             authType: editingServer.authType || 'none',
             authToken: editingServer.authToken || '',
             apiKeyHeader: editingServer.apiKeyHeader || 'X-API-Key'
           } : {
-            authType: 'none'
+            authType: 'none',
+            readTimeoutSeconds: 5
           }}
         >
           <Form.Item
@@ -862,7 +832,7 @@ const MCPManagement: React.FC = () => {
             <Input placeholder="例如：Database Tools Server" />
           </Form.Item>
 
-          <Form.Item label="连接地址" required style={{ marginBottom: 0 }}>
+          <Form.Item label="连接地址" required>
             <Row gutter={8} align="middle" wrap={false}>
               <Col flex="auto">
                 <Form.Item
@@ -895,7 +865,6 @@ const MCPManagement: React.FC = () => {
             label="认证类型"
             name="authType"
             initialValue="none"
-            style={{ marginBottom: 0 }}
           >
             <Select size="middle">
               <Option value="none">无认证</Option>
@@ -966,6 +935,22 @@ const MCPManagement: React.FC = () => {
             }}
           </Form.Item>
 
+          {/* 超时时间配置 */}
+          <Form.Item
+            label="连接超时时间"
+            name="readTimeoutSeconds"
+            initialValue={5}
+            rules={[
+              { required: true, message: '请设置超时时间' },
+              { type: 'number', min: 1, max: 300, message: '超时时间必须在1-300秒之间' }
+            ]}
+          >
+            <Input 
+              type="number"
+              suffix="秒"
+              placeholder="5"
+            />
+          </Form.Item>
 
           <Form.Item
             label="描述"
@@ -974,18 +959,11 @@ const MCPManagement: React.FC = () => {
               { max: 200, message: '描述不能超过200个字符' }
             ]}
           >
-            <Input.TextArea 
-              rows={3}
+            <Input 
               placeholder="描述该MCP服务器提供的功能和用途"
             />
           </Form.Item>
 
-          <Form.Item
-            label="版本"
-            name="version"
-          >
-            <Input placeholder="例如：1.0.0" />
-          </Form.Item>
 
           {/* 工具配置 */}
           {formDiscoveredTools.length > 0 && (
@@ -994,15 +972,24 @@ const MCPManagement: React.FC = () => {
                 size="small"
                 items={formDiscoveredTools.map(tool => {
                   const { summary, args, returns } = formatToolDescription(tool.description);
-                  const parameters = tool.parameters?.properties || {};
+                  // 处理参数显示：tool.parameters 可能是 inputSchema 格式
+                  let parameters = {};
+                  if (tool.parameters?.properties) {
+                    // 标准的 inputSchema 格式
+                    parameters = tool.parameters.properties;
+                  } else if (tool.parameters && typeof tool.parameters === 'object') {
+                    // 直接的参数对象
+                    parameters = tool.parameters;
+                  }
+                  
                   
                   return {
                     key: tool.name,
                     label: (
                       <Row align="middle" style={{ width: '100%' }}>
-                        <Col span={20}>
+                        <Col span={24}>
                           <Space>
-                            <span className={`font-medium ${tool.globalEnabled ? 'text-gray-900' : 'text-gray-400'}`}>
+                            <span className="font-medium text-gray-900">
                               {tool.name}
                             </span>
                             {Object.keys(parameters).length > 0 && (
@@ -1010,25 +997,23 @@ const MCPManagement: React.FC = () => {
                             )}
                           </Space>
                         </Col>
-                        <Col span={4} className="text-right">
-                          <Switch
-                            checked={tool.globalEnabled}
-                            onChange={(checked) => {
-                              toggleFormToolEnabled(tool.name);
-                            }}
-                            onClick={(checked, e) => e.stopPropagation()}
-                            size="small"
-                          />
-                        </Col>
                       </Row>
                     ),
                     children: (
                       <div className="space-y-2 pt-1">
                         {/* 工具描述 */}
                         {summary && (
-                          <div>
-                            <div className="text-xs font-medium text-gray-500 mb-1">描述:</div>
-                            <div className={`text-xs ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>描述:</div>
+                            <div style={{ 
+                              fontSize: 12, 
+                              color: '#595959',
+                              backgroundColor: '#fff',
+                              padding: '8px 12px',
+                              border: '1px solid #f0f0f0',
+                              borderRadius: 4,
+                              lineHeight: '1.5'
+                            }}>
                               {summary}
                             </div>
                           </div>
@@ -1036,15 +1021,32 @@ const MCPManagement: React.FC = () => {
                         
                         {/* 参数信息 */}
                         {Object.keys(parameters).length > 0 && (
-                          <div>
-                            <div className="text-xs font-medium text-gray-500 mb-1">参数:</div>
-                            <div className="space-y-1">
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>参数:</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {Object.entries(parameters).map(([paramName, paramInfo]: [string, any]) => (
-                                <div key={paramName} className="flex items-center gap-1 text-xs bg-gray-50 px-2 py-1 rounded">
-                                  <span className="font-mono text-blue-600 font-medium text-xs">{paramName}</span>
-                                  <Tag size="small" color="blue" className="text-xs">{paramInfo.type || 'unknown'}</Tag>
+                                <div key={paramName} style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'flex-start', 
+                                  gap: 8, 
+                                  fontSize: 12, 
+                                  backgroundColor: '#fafafa', 
+                                  padding: '8px 12px', 
+                                  borderRadius: 4, 
+                                  border: '1px solid #f0f0f0',
+                                  flexWrap: 'wrap'
+                                }}>
+                                  <span style={{ fontFamily: 'monospace', color: '#1890ff', fontWeight: 600, minWidth: 80 }}>
+                                    {paramName}
+                                  </span>
+                                  <Tag size="small" color="blue">{paramInfo.type || 'unknown'}</Tag>
+                                  {paramInfo.description && (
+                                    <span style={{ color: '#666666', flex: 1, marginLeft: 8 }}>
+                                      {paramInfo.description}
+                                    </span>
+                                  )}
                                   {paramInfo.default !== undefined && (
-                                    <Tag size="small" color="orange" className="text-xs">默认: {String(paramInfo.default)}</Tag>
+                                    <Tag size="small" color="orange">默认: {String(paramInfo.default)}</Tag>
                                   )}
                                 </div>
                               ))}
@@ -1054,9 +1056,17 @@ const MCPManagement: React.FC = () => {
                         
                         {/* 返回值信息 */}
                         {returns && (
-                          <div>
-                            <div className="text-xs font-medium text-gray-500 mb-1">返回:</div>
-                            <div className={`text-xs bg-green-50 px-2 py-1 rounded ${tool.globalEnabled ? 'text-gray-600' : 'text-gray-400'}`}>
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>返回:</div>
+                            <div style={{ 
+                              fontSize: 12, 
+                              backgroundColor: '#f6ffed', 
+                              padding: '8px 12px', 
+                              borderRadius: 4, 
+                              border: '1px solid #b7eb8f',
+                              color: '#52c41a',
+                              lineHeight: '1.4'
+                            }}>
                               {returns}
                             </div>
                           </div>

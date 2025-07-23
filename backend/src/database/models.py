@@ -93,6 +93,7 @@ class MCPServer(Base):
     auth_type = Column(String(20), default='', nullable=True)
     auth_token = Column(Text, nullable=True)
     api_key_header = Column(String(100), nullable=True)
+    read_timeout_seconds = Column(Integer, default=5, nullable=False)
     server_tools = Column(Text, nullable=True)
     server_config = Column(Text, nullable=True)
     team_name = Column(String(100), nullable=False, index=True)
@@ -103,6 +104,26 @@ class MCPServer(Base):
 
     def to_dict(self):
         """Convert model to dictionary."""
+        # 处理server_tools字段 - 如果是JSON字符串则解析为列表
+        server_tools = self.server_tools
+        if isinstance(server_tools, str) and server_tools:
+            try:
+                server_tools = json.loads(server_tools)
+            except (json.JSONDecodeError, ValueError):
+                server_tools = []
+        elif server_tools is None:
+            server_tools = []
+        
+        # 处理server_config字段 - 如果是JSON字符串则解析为字典
+        server_config = self.server_config
+        if isinstance(server_config, str) and server_config:
+            try:
+                server_config = json.loads(server_config)
+            except (json.JSONDecodeError, ValueError):
+                server_config = {}
+        elif server_config is None:
+            server_config = {}
+        
         return {
             'id': self.id,
             'server_id': self.server_id,
@@ -114,8 +135,9 @@ class MCPServer(Base):
             'auth_type': self.auth_type,
             'auth_token': self.auth_token,
             'api_key_header': self.api_key_header,
-            'server_tools': self.server_tools,
-            'server_config': self.server_config,
+            'read_timeout_seconds': self.read_timeout_seconds,
+            'server_tools': server_tools,
+            'server_config': server_config,
             'team_name': self.team_name,
             'create_by': self.create_by,
             'update_by': self.update_by,

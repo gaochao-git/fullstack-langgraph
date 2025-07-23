@@ -22,18 +22,23 @@ router = APIRouter()
 async def _test_mcp_connection(server_uri: str, timeout: int = 10) -> List[dict]:
     """测试MCP服务器连接并发现工具"""
     try:
-        # 将URI转换为HTTP URL格式
-        if server_uri.startswith('mcp://'):
-            # 将 mcp://localhost:3001 转换为 http://localhost:3001/sse/
-            http_url = server_uri.replace('mcp://', 'http://') + '/sse/'
-        elif server_uri.startswith('http://') or server_uri.startswith('https://'):
-            # 如果已经是HTTP URL，确保以/sse/结尾
-            if not server_uri.endswith('/sse/'):
-                http_url = server_uri.rstrip('/') + '/sse/'
-            else:
+        # 处理MCP服务器URI格式
+        # 支持的格式:
+        # - http://localhost:3001/sse
+        # - https://localhost:3001/stdio  
+        # - http://localhost:3001 (自动添加/sse/)
+        
+        if server_uri.startswith('http://') or server_uri.startswith('https://'):
+            # 检查是否已经有传输方式后缀
+            if server_uri.endswith('/sse') or server_uri.endswith('/stdio'):
+                http_url = server_uri + '/'
+            elif server_uri.endswith('/sse/') or server_uri.endswith('/stdio/'):
                 http_url = server_uri
+            else:
+                # 默认添加/sse/后缀
+                http_url = server_uri.rstrip('/') + '/sse/'
         else:
-            # 假设是简单的host:port格式
+            # 兼容旧格式，假设是简单的host:port格式
             http_url = f"http://{server_uri}/sse/"
         
         logger.info(f"测试MCP连接: {server_uri} -> {http_url}")
@@ -169,6 +174,7 @@ async def create_mcp_server(server: MCPServerCreate, db: Session = Depends(get_d
         auth_type=server.auth_type,
         auth_token=server.auth_token,
         api_key_header=server.api_key_header,
+        read_timeout_seconds=server.read_timeout_seconds,
         server_tools=json.dumps(server.server_tools) if server.server_tools else None,
         server_config=json.dumps(server.server_config) if server.server_config else None,
         team_name=server.team_name,
@@ -232,8 +238,9 @@ async def test_mcp_server(server_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="MCP server not found")
     
     try:
-        # 实际的MCP服务器连接测试
-        tools = await _test_mcp_connection(db_server.server_uri)
+        # 实际的MCP服务器连接测试，使用服务器配置的超时时间
+        timeout = db_server.read_timeout_seconds if db_server.read_timeout_seconds else 5
+        tools = await _test_mcp_connection(db_server.server_uri, timeout)
         
         # 更新连接状态为成功
         db_server.connection_status = "connected"
@@ -315,8 +322,8 @@ async def toggle_server_enable(
 async def test_server_connection(test_request: MCPTestRequest):
     """通用MCP服务器连接测试接口"""
     try:
-        # 实际的MCP服务器连接测试
-        tools = await _test_mcp_connection(test_request.url)
+        # 实际的MCP服务器连接测试，使用默认超时时间10秒
+        tools = await _test_mcp_connection(test_request.url, 10)
         
         return {
             "healthy": True,

@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS sop_prompt_templates (
   update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS mcp_servers (
+CREATE TABLE IF NOT EXISTS mcp_servers_bak (
     id SERIAL PRIMARY KEY,
     server_id VARCHAR(100) UNIQUE NOT NULL,
     server_name VARCHAR(200) NOT NULL,
@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
     auth_type VARCHAR(20) DEFAULT '',
     auth_token TEXT,
     api_key_header VARCHAR(100),
+    read_timeout_seconds INTEGER DEFAULT 5 NOT NULL,
     server_tools TEXT,
     server_config TEXT,
     team_name VARCHAR(100) NOT NULL,
