@@ -106,8 +106,8 @@ const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'fr
     auth_token: server.authToken,
     api_key_header: server.apiKeyHeader,
     read_timeout_seconds: server.readTimeoutSeconds || 5,
-    server_tools: server.tools ? JSON.stringify(server.tools) : '[]',
-    server_config: '{}',
+    server_tools: server.tools || [],
+    server_config: {},
     team_name: 'default_team',
     create_by: createBy
   };
