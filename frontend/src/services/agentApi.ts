@@ -41,11 +41,34 @@ export interface Agent {
   avg_response_time: number;
   capabilities: string[];
   mcp_config: AgentMCPConfig;
+  is_builtin: boolean;
+  tools_info?: any;
+  llm_info?: any;
+  prompt_info?: any;
 }
 
 export interface UpdateMCPConfigRequest {
   enabled_servers: string[];
   selected_tools: string[];
+}
+
+export interface CreateAgentRequest {
+  agent_id: string;
+  agent_name: string;
+  description: string;
+  capabilities: string[];
+  tools_info?: any;
+  llm_info?: any;
+  prompt_info?: any;
+}
+
+export interface UpdateAgentRequest {
+  agent_name?: string;
+  description?: string;
+  capabilities?: string[];
+  tools_info?: any;
+  llm_info?: any;
+  prompt_info?: any;
 }
 
 class AgentApiService {
@@ -124,6 +147,77 @@ class AgentApiService {
       return await response.json();
     } catch (error) {
       console.error('切换智能体状态失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 创建新智能体
+   */
+  async createAgent(agentData: CreateAgentRequest): Promise<Agent> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(agentData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`创建智能体失败: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('创建智能体失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 更新智能体信息
+   */
+  async updateAgent(agentId: string, agentData: UpdateAgentRequest): Promise<Agent> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(agentData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`更新智能体失败: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('更新智能体失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 删除智能体
+   */
+  async deleteAgent(agentId: string): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`删除智能体失败: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('删除智能体失败:', error);
       throw error;
     }
   }

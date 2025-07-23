@@ -86,3 +86,28 @@ CREATE TABLE IF NOT EXISTS mcp_servers_bak (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+  CREATE TABLE IF NOT EXISTS agent_configs (
+    agent_pk_id SERIAL PRIMARY KEY,
+    agent_id VARCHAR(100) UNIQUE NOT NULL,
+    agent_name VARCHAR(200) NOT NULL,
+    agent_description TEXT,
+    agent_capabilities TEXT,           -- JSON存储能力列表
+    agent_version VARCHAR(20) DEFAULT '1.0.0',
+    agent_status VARCHAR(20) DEFAULT 'stopped',
+    agent_enabled BOOLEAN DEFAULT TRUE,
+    is_builtin BOOLEAN DEFAULT FALSE,
+    tools_info TEXT,
+    llm_info TEXT,
+    prompt_info TEXT,
+    total_runs INTEGER DEFAULT 0,
+    success_rate FLOAT DEFAULT 0.0,
+    avg_response_time FLOAT DEFAULT 0.0,
+    last_used TIMESTAMP,
+    config_version VARCHAR(20) DEFAULT '1.0',
+    is_active BOOLEAN DEFAULT TRUE,
+    create_by VARCHAR(100) DEFAULT 'system',
+    update_by VARCHAR(100),
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );

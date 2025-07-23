@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Card, 
-  Table, 
   Button, 
   Input, 
   Select, 
@@ -11,19 +10,15 @@ import {
   Row,
   Col,
   Switch,
-  Checkbox,
   Modal,
   Descriptions,
   Badge,
   Divider,
-  Alert,
-  Progress,
   Statistic,
-  List,
   Avatar,
   Tabs,
-  Collapse,
-  Tree
+  Tree,
+  Form
 } from 'antd';
 import { 
   RobotOutlined,
@@ -31,23 +26,20 @@ import {
   EyeOutlined,
   ToolOutlined,
   ApiOutlined,
-  PlayCircleOutlined,
-  PauseCircleOutlined,
   ReloadOutlined,
-  LinkOutlined,
   DatabaseOutlined,
   MonitorOutlined,
   CloudOutlined,
   GlobalOutlined,
-  CaretRightOutlined
+  DeleteOutlined
 } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
-import type { DataNode } from 'antd/es/tree';
-import { agentApi, type Agent, type MCPServer, type MCPTool, type UpdateMCPConfigRequest } from '../services/agentApi';
+import type { DataNode, Key } from 'antd/es/tree';
+import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
 
 const { Search } = Input;
 const { Option } = Select;
 const { TabPane } = Tabs;
+const { TextArea } = Input;
 
 // 格式化工具描述
 const formatToolDescription = (description: string) => {
@@ -93,6 +85,7 @@ interface LocalAgent extends Omit<Agent, 'display_name' | 'last_used' | 'total_r
   totalRuns: number;
   successRate: number;
   avgResponseTime: number;
+  is_builtin: boolean;
   mcpConfig: {
     enabledServers: string[];
     selectedTools: string[];
@@ -144,19 +137,24 @@ const AgentManagement: React.FC = () => {
   
   // 模态框状态
   const [agentDetailModal, setAgentDetailModal] = useState(false);
-  const [mcpConfigModal, setMCPConfigModal] = useState(false);
+  const [agentEditModal, setAgentEditModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<LocalAgent | null>(null);
-  const [tempMCPConfig, setTempMCPConfig] = useState<{enabledServers: string[], selectedTools: string[]}>({
-    enabledServers: [],
-    selectedTools: []
-  });
-  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
-  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
-  const [selectedSystemTools, setSelectedSystemTools] = useState<string[]>([]);
-  const [systemCheckedKeys, setSystemCheckedKeys] = useState<string[]>([]);
-  const [systemExpandedKeys, setSystemExpandedKeys] = useState<string[]>([]);
+  const [editingAgent, setEditingAgent] = useState<LocalAgent | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   
-  const { message } = App.useApp();
+  // 表单相关状态
+  const [editForm] = Form.useForm();
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  
+  // 新建/编辑时的工具选择状态
+  const [editSystemTools, setEditSystemTools] = useState<string[]>([]);
+  const [editMCPTools, setEditMCPTools] = useState<string[]>([]);
+  const [editSystemCheckedKeys, setEditSystemCheckedKeys] = useState<string[]>([]);
+  const [editSystemExpandedKeys, setEditSystemExpandedKeys] = useState<string[]>(['system-root']);
+  const [editCheckedKeys, setEditCheckedKeys] = useState<string[]>([]);
+  const [editExpandedKeys, setEditExpandedKeys] = useState<string[]>([]);
+  
+  const { message, modal } = App.useApp();
 
   // 系统工具定义
   const systemTools = [
@@ -241,27 +239,6 @@ const AgentManagement: React.FC = () => {
     ];
   };
 
-  // 处理系统工具选择
-  const handleSystemTreeCheck = (checked: string[] | { checked: string[]; halfChecked: string[] }) => {
-    const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
-    setSystemCheckedKeys(checkedKeyArray);
-    
-    // 从选中的keys中提取工具名
-    const selectedTools = checkedKeyArray
-      .filter(key => key.startsWith('system-') && !key.endsWith('-detail'))
-      .map(key => key.replace('system-', ''));
-    
-    setSelectedSystemTools(selectedTools);
-  };
-
-  // 处理系统工具复选框切换
-  const handleSystemToolToggle = (toolName: string, checked: boolean) => {
-    if (checked) {
-      setSelectedSystemTools(prev => [...prev, toolName]);
-    } else {
-      setSelectedSystemTools(prev => prev.filter(name => name !== toolName));
-    }
-  };
 
   // 构建树形数据
   const buildTreeData = (): DataNode[] => {
@@ -446,15 +423,58 @@ const AgentManagement: React.FC = () => {
     setAgentDetailModal(true);
   };
 
-  // 配置MCP工具
-  const handleConfigureMCP = (agent: LocalAgent) => {
-    setSelectedAgent(agent);
-    setTempMCPConfig({
-      enabledServers: [...agent.mcpConfig.enabledServers],
-      selectedTools: [...agent.mcpConfig.selectedTools]
+
+  // 处理编辑表单的系统工具选择
+  const handleEditSystemTreeCheck = (checked: Key[] | { checked: Key[]; halfChecked: Key[] }) => {
+    const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
+    const stringKeys = checkedKeyArray.map(key => String(key));
+    setEditSystemCheckedKeys(stringKeys);
+    
+    const selectedTools = stringKeys
+      .filter(key => key.startsWith('system-') && !key.endsWith('-detail'))
+      .map(key => key.replace('system-', ''));
+    
+    setEditSystemTools(selectedTools);
+  };
+
+  // 处理编辑表单的MCP工具选择
+  const handleEditTreeCheck = (checked: Key[] | { checked: Key[]; halfChecked: Key[] }) => {
+    const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
+    const stringKeys = checkedKeyArray.map(key => String(key));
+    setEditCheckedKeys(stringKeys);
+    
+    const selectedTools: string[] = [];
+    
+    stringKeys.forEach(key => {
+      if (key.startsWith('tool-')) {
+        const toolName = key.replace('tool-', '');
+        selectedTools.push(toolName);
+      }
     });
     
-    // 初始化系统工具选择状态 - 分离系统工具和MCP工具
+    setEditMCPTools(selectedTools);
+  };
+
+  // 新建智能体
+  const handleCreateAgent = () => {
+    setEditingAgent(null);
+    setIsCreating(true);
+    // 重置工具选择状态
+    setEditSystemTools(['get_current_time']); // 默认给新智能体基础工具
+    setEditMCPTools([]);
+    setEditSystemCheckedKeys(['system-get_current_time']);
+    setEditCheckedKeys([]);
+    setEditSystemExpandedKeys(['system-root']);
+    setEditExpandedKeys([]);
+    setAgentEditModal(true);
+  };
+
+  // 编辑智能体
+  const handleEditAgent = async (agent: LocalAgent) => {
+    setEditingAgent(agent);
+    setIsCreating(false);
+    
+    // 初始化工具选择状态
     const mcpToolNames = mcpServers.flatMap(s => s.tools.map(t => t.name));
     const systemToolNames = agent.mcpConfig.selectedTools.filter(tool => 
       systemTools.some(st => st.name === tool)
@@ -463,95 +483,164 @@ const AgentManagement: React.FC = () => {
       mcpToolNames.includes(tool)
     );
     
-    setSelectedSystemTools(systemToolNames);
+    setEditSystemTools(systemToolNames);
+    setEditMCPTools(mcpSelectedTools);
     
-    // 初始化系统工具树状态
-    const systemInitialCheckedKeys = systemToolNames.map(name => `system-${name}`);
-    setSystemCheckedKeys(systemInitialCheckedKeys);
-    setSystemExpandedKeys(['system-root']); // 默认展开根节点
+    const systemCheckedKeys = systemToolNames.map(name => `system-${name}`);
+    const mcpCheckedKeys = mcpSelectedTools.map(name => `tool-${name}`);
     
-    // 初始化MCP工具树形选择状态
-    const initialCheckedKeys: string[] = [];
+    setEditSystemCheckedKeys(systemCheckedKeys);
+    setEditCheckedKeys(mcpCheckedKeys);
+    setEditSystemExpandedKeys(['system-root']);
+    setEditExpandedKeys([]);
     
-    // 添加已选择的服务器
-    agent.mcpConfig.enabledServers.forEach(serverId => {
-      initialCheckedKeys.push(`server-${serverId}`);
-    });
+    // 获取完整的智能体配置信息
+    try {
+      const agentDetails = await agentApi.getAgents();
+      const fullAgent = agentDetails.find(a => a.id === agent.id);
+      
+      if (fullAgent) {
+        // 设置表单初始值
+        setTimeout(() => {
+          editForm.setFieldsValue({
+            agent_id: agent.id,
+            agent_name: agent.displayName,
+            description: agent.description,
+            capabilities: agent.capabilities,
+            // LLM配置 - 从智能体配置中获取，否则使用默认值
+            model_name: (fullAgent as any).llm_info?.model_name || 'gpt-4',
+            temperature: (fullAgent as any).llm_info?.temperature || 0.7,
+            max_tokens: (fullAgent as any).llm_info?.max_tokens || 2000,
+            top_p: (fullAgent as any).llm_info?.top_p || 1.0,
+            frequency_penalty: (fullAgent as any).llm_info?.frequency_penalty || 0.0,
+            presence_penalty: (fullAgent as any).llm_info?.presence_penalty || 0.0,
+            // 提示词配置 - 从智能体配置中获取，否则使用默认值
+            system_prompt: (fullAgent as any).prompt_info?.system_prompt || `你是${agent.displayName}，请根据用户需求提供专业的帮助。`,
+            user_prompt_template: (fullAgent as any).prompt_info?.user_prompt_template || '',
+            assistant_prompt_template: (fullAgent as any).prompt_info?.assistant_prompt_template || ''
+          });
+        }, 100); // 稍微延迟以确保模态框已经打开
+      }
+    } catch (error) {
+      console.error('获取智能体详细配置失败:', error);
+    }
     
-    // 添加已选择的MCP工具
-    mcpSelectedTools.forEach(toolName => {
-      initialCheckedKeys.push(`tool-${toolName}`);
-    });
-    
-    console.log('初始化系统工具:', systemToolNames);
-    console.log('初始化MCP工具:', mcpSelectedTools);
-    
-    setCheckedKeys(initialCheckedKeys);
-    
-    // 默认展开已启用的服务器
-    setExpandedKeys(agent.mcpConfig.enabledServers.map(id => `server-${id}`));
-    
-    setMCPConfigModal(true);
+    setAgentEditModal(true);
   };
 
-  // 处理树形选择变化
-  const handleTreeCheck = (checked: string[] | { checked: string[]; halfChecked: string[] }) => {
-    const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
-    setCheckedKeys(checkedKeyArray);
+  // 删除智能体
+  const handleDeleteAgent = async (agent: LocalAgent) => {
+    console.log('删除智能体被调用:', agent.id, 'is_builtin:', agent.is_builtin);
     
-    // 从选中的keys中提取服务器和工具
-    const enabledServers: string[] = [];
-    const selectedTools: string[] = [];
-    
-    checkedKeyArray.forEach(key => {
-      if (key.startsWith('server-')) {
-        const serverId = key.replace('server-', '');
-        enabledServers.push(serverId);
-      } else if (key.startsWith('tool-')) {
-        const toolName = key.replace('tool-', '');
-        selectedTools.push(toolName);
+    if (agent.is_builtin) {
+      message.warning('不能删除内置智能体');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除智能体 "${agent.displayName}" 吗？此操作不可撤销。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        console.log('开始删除智能体:', agent.id);
+        try {
+          await agentApi.deleteAgent(agent.id);
+          setAgents(prevAgents => prevAgents.filter(a => a.id !== agent.id));
+          message.success('智能体已删除');
+          console.log('智能体删除成功:', agent.id);
+        } catch (error) {
+          console.error('删除智能体失败:', error);
+          message.error('删除智能体失败，请重试');
+        }
       }
     });
-    
-    setTempMCPConfig({
-      enabledServers,
-      selectedTools
-    });
   };
 
-  // 保存MCP配置
-  const handleSaveMCPConfig = async () => {
-    if (selectedAgent) {
-      try {
-        // 合并系统工具和MCP工具
-        const allSelectedTools = [...selectedSystemTools, ...tempMCPConfig.selectedTools];
-        
-        await agentApi.updateAgentMCPConfig(selectedAgent.id, {
-          enabled_servers: tempMCPConfig.enabledServers,
-          selected_tools: allSelectedTools
-        });
-        
+  // 保存智能体（新建或编辑）
+  const handleSaveAgent = async (values: any) => {
+    setFormSubmitting(true);
+    try {
+      // 构建工具配置
+      const toolsConfig = {
+        system_tools: editSystemTools,
+        mcp_tools: mcpServers
+          .filter(server => server.status === 'connected')
+          .map(server => ({
+            server_id: server.id,
+            server_name: server.name,
+            tools: server.tools
+              .filter(tool => editMCPTools.includes(tool.name))
+              .map(tool => tool.name)
+          }))
+          .filter(server => server.tools.length > 0)
+      };
+
+      // 构建LLM配置
+      const llmConfig = {
+        model_name: values.model_name || 'gpt-4',
+        temperature: values.temperature || 0.7,
+        max_tokens: values.max_tokens || 2000,
+        top_p: values.top_p || 1.0,
+        frequency_penalty: values.frequency_penalty || 0.0,
+        presence_penalty: values.presence_penalty || 0.0
+      };
+
+      // 构建提示词配置
+      const promptConfig = {
+        system_prompt: values.system_prompt || `你是${values.agent_name}，请根据用户需求提供专业的帮助。`,
+        user_prompt_template: values.user_prompt_template || '',
+        assistant_prompt_template: values.assistant_prompt_template || ''
+      };
+
+      if (isCreating) {
+        // 新建智能体
+        const newAgentData: CreateAgentRequest = {
+          agent_id: values.agent_id,
+          agent_name: values.agent_name,
+          description: values.description || '',
+          capabilities: values.capabilities || [],
+          tools_info: toolsConfig,
+          llm_info: llmConfig,
+          prompt_info: promptConfig
+        };
+
+        const newAgent = await agentApi.createAgent(newAgentData);
+        setAgents(prevAgents => [...prevAgents, transformAgentToLocal(newAgent)]);
+        message.success('智能体创建成功');
+      } else if (editingAgent) {
+        // 编辑智能体
+        const updateData: UpdateAgentRequest = {
+          agent_name: values.agent_name,
+          description: values.description,
+          capabilities: values.capabilities,
+          tools_info: toolsConfig,
+          llm_info: llmConfig,
+          prompt_info: promptConfig
+        };
+
+        const updatedAgent = await agentApi.updateAgent(editingAgent.id, updateData);
         setAgents(prevAgents =>
-          prevAgents.map(agent => {
-            if (agent.id === selectedAgent.id) {
-              return {
-                ...agent,
-                mcpConfig: {
-                  ...agent.mcpConfig,
-                  enabledServers: tempMCPConfig.enabledServers,
-                  selectedTools: allSelectedTools
-                }
-              };
-            }
-            return agent;
-          })
+          prevAgents.map(agent => 
+            agent.id === editingAgent.id ? transformAgentToLocal(updatedAgent) : agent
+          )
         );
-        setMCPConfigModal(false);
-        message.success('工具配置已保存');
-      } catch (error) {
-        console.error('保存工具配置失败:', error);
-        message.error('保存工具配置失败，请重试');
+        message.success('智能体更新成功');
       }
+
+      setAgentEditModal(false);
+      editForm.resetFields();
+      // 重置工具选择状态
+      setEditSystemTools([]);
+      setEditMCPTools([]);
+      setEditSystemCheckedKeys([]);
+      setEditCheckedKeys([]);
+    } catch (error) {
+      console.error('保存智能体失败:', error);
+      message.error('保存智能体失败，请重试');
+    } finally {
+      setFormSubmitting(false);
     }
   };
 
@@ -589,6 +678,13 @@ const AgentManagement: React.FC = () => {
             <Col xs={24} sm={12} md={12}>
               <Space>
                 <Button 
+                  type="primary"
+                  icon={<RobotOutlined />}
+                  onClick={handleCreateAgent}
+                >
+                  新建智能体
+                </Button>
+                <Button 
                   icon={<ReloadOutlined />}
                   loading={loading}
                   onClick={loadData}
@@ -616,21 +712,29 @@ const AgentManagement: React.FC = () => {
                     详情
                   </Button>,
                   <Button 
-                    key="mcp"
-                    type="text" 
-                    icon={<ApiOutlined />}
-                    onClick={() => handleConfigureMCP(agent)}
-                  >
-                    MCP配置
-                  </Button>,
-                  <Button 
-                    key="setting"
+                    key="edit"
                     type="text" 
                     icon={<SettingOutlined />}
-                    onClick={() => message.info('智能体配置功能开发中...')}
+                    onClick={() => handleEditAgent(agent)}
                   >
-                    设置
-                  </Button>
+                    编辑
+                  </Button>,
+                  ...(!agent.is_builtin ? [
+                    <Button 
+                      key="delete"
+                      type="text" 
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('删除按钮被点击:', agent.id);
+                        handleDeleteAgent(agent);
+                      }}
+                    >
+                      删除
+                    </Button>
+                  ] : [])
                 ]}
               >
                 <Card.Meta
@@ -780,170 +884,386 @@ const AgentManagement: React.FC = () => {
         )}
       </Modal>
 
-      {/* MCP工具配置模态框 */}
+
+      {/* 智能体编辑模态框 */}
       <Modal
-        title={
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <ApiOutlined className="mr-2" />
-              为 {selectedAgent?.displayName} 配置MCP工具
-            </div>
-            <div className="text-sm text-gray-500">
-              已选: {tempMCPConfig.enabledServers.length}服务器 / {selectedSystemTools.length + tempMCPConfig.selectedTools.length}工具
-            </div>
-          </div>
-        }
-        open={mcpConfigModal}
-        onCancel={() => setMCPConfigModal(false)}
-        onOk={handleSaveMCPConfig}
-        width={800}
-        okText="保存配置"
-        cancelText="取消"
+        title={isCreating ? "新建智能体" : "编辑智能体"}
+        open={agentEditModal}
+        onCancel={() => {
+          setAgentEditModal(false);
+          editForm.resetFields();
+          setEditSystemTools([]);
+          setEditMCPTools([]);
+          setEditSystemCheckedKeys([]);
+          setEditCheckedKeys([]);
+        }}
+        width={900}
+        footer={null}
       >
-        {selectedAgent && (
-          <div>
-            {/* 顶部操作栏 */}
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <Row gutter={16} align="middle">
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleSaveAgent}
+          initialValues={editingAgent ? {
+            agent_id: editingAgent.id,
+            agent_name: editingAgent.displayName,
+            description: editingAgent.description,
+            capabilities: editingAgent.capabilities,
+            // LLM配置默认值
+            model_name: 'gpt-4',
+            temperature: 0.7,
+            max_tokens: 2000,
+            top_p: 1.0,
+            frequency_penalty: 0.0,
+            presence_penalty: 0.0,
+            // 提示词配置默认值
+            system_prompt: `你是${editingAgent.displayName}，请根据用户需求提供专业的帮助。`,
+            user_prompt_template: '',
+            assistant_prompt_template: ''
+          } : {
+            capabilities: [],
+            // LLM配置默认值
+            model_name: 'gpt-4',
+            temperature: 0.7,
+            max_tokens: 2000,
+            top_p: 1.0,
+            frequency_penalty: 0.0,
+            presence_penalty: 0.0,
+            // 提示词配置默认值
+            system_prompt: '',
+            user_prompt_template: '',
+            assistant_prompt_template: ''
+          }}
+        >
+          <Tabs defaultActiveKey="basic" type="card">
+            {/* 基本信息 */}
+            <TabPane tab="基本信息" key="basic">
+              {isCreating && (
+                <Form.Item
+                  label="智能体ID"
+                  name="agent_id"
+                  rules={[
+                    { required: true, message: '请输入智能体ID' },
+                    { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '智能体ID必须以字母开头，只能包含字母、数字和下划线' }
+                  ]}
+                >
+                  <Input placeholder="例如: my_custom_agent" />
+                </Form.Item>
+              )}
+
+              <Form.Item
+                label="智能体名称"
+                name="agent_name"
+                rules={[{ required: true, message: '请输入智能体名称' }]}
+              >
+                <Input placeholder="例如: 我的自定义智能体" />
+              </Form.Item>
+
+              <Form.Item
+                label="描述"
+                name="description"
+              >
+                <TextArea 
+                  rows={3}
+                  placeholder="描述这个智能体的功能和用途..."
+                  maxLength={500}
+                  showCount
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="核心能力"
+                name="capabilities"
+              >
+                <Select
+                  mode="tags"
+                  placeholder="添加智能体的核心能力标签，按回车确认"
+                  style={{ width: '100%' }}
+                  tokenSeparators={[',']}
+                />
+              </Form.Item>
+            </TabPane>
+
+            {/* 工具配置 */}
+            <TabPane tab="工具配置" key="tools">
+              <div className="space-y-4">
+                {/* 顶部操作栏 */}
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <Row gutter={16} align="middle">
+                    <Col span={12}>
+                      <Space>
+                        <Button 
+                          size="small"
+                          onClick={() => {
+                            // 全选系统工具
+                            const allSystemToolNames = systemTools.map(t => t.name);
+                            setEditSystemTools(allSystemToolNames);
+                            setEditSystemCheckedKeys(allSystemToolNames.map(name => `system-${name}`));
+                            
+                            // 全选MCP工具
+                            const allConnectedMCPKeys: string[] = [];
+                            const allMCPToolNames: string[] = [];
+                            mcpServers
+                              .filter(s => s.status === 'connected')
+                              .forEach(server => {
+                                allConnectedMCPKeys.push(`server-${server.id}`);
+                                server.tools.forEach(tool => {
+                                  allConnectedMCPKeys.push(`tool-${tool.name}`);
+                                  allMCPToolNames.push(tool.name);
+                                });
+                              });
+                            setEditCheckedKeys(allConnectedMCPKeys);
+                            setEditMCPTools(allMCPToolNames);
+                          }}
+                        >
+                          全选可用
+                        </Button>
+                        <Button 
+                          size="small"
+                          onClick={() => {
+                            // 清空系统工具选择
+                            setEditSystemTools([]);
+                            setEditSystemCheckedKeys([]);
+                            
+                            // 清空MCP工具选择
+                            setEditCheckedKeys([]);
+                            setEditMCPTools([]);
+                          }}
+                        >
+                          清空选择
+                        </Button>
+                        <Button 
+                          size="small"
+                          onClick={() => {
+                            // 展开系统工具树
+                            setEditSystemExpandedKeys(['system-root']);
+                            // 展开MCP工具树
+                            setEditExpandedKeys(mcpServers.map(s => `server-${s.id}`));
+                          }}
+                        >
+                          展开全部
+                        </Button>
+                        <Button 
+                          size="small"
+                          onClick={() => {
+                            // 收起系统工具树
+                            setEditSystemExpandedKeys([]);
+                            // 收起MCP工具树
+                            setEditExpandedKeys([]);
+                          }}
+                        >
+                          收起全部
+                        </Button>
+                      </Space>
+                    </Col>
+                    <Col span={12} className="text-right">
+                      <Space>
+                        <span className="text-sm text-gray-600">
+                          可用服务器: {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          总工具数: {systemTools.length + mcpServers.reduce((sum, s) => sum + s.tools.length, 0)}
+                        </span>
+                      </Space>
+                    </Col>
+                  </Row>
+                </div>
+                
+                {/* 系统工具配置 */}
+                <div>
+                  <div className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <ToolOutlined className="mr-2" />
+                      系统工具配置
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      已选: {editSystemTools.length}/{systemTools.length}
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
+                    <Tree
+                      checkable
+                      checkedKeys={editSystemCheckedKeys}
+                      expandedKeys={editSystemExpandedKeys}
+                      onCheck={handleEditSystemTreeCheck}
+                      onExpand={(expandedKeys) => setEditSystemExpandedKeys(expandedKeys.map(key => String(key)))}
+                      treeData={buildSystemTreeData()}
+                      showLine
+                      showIcon={false}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* MCP工具配置 */}
+                <div>
+                  <div className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <ApiOutlined className="mr-2" />
+                      MCP工具配置
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      已选: {editMCPTools.length}工具
+                    </div>
+                  </div>
+                  <div className="border rounded-lg p-4 max-h-60 overflow-y-auto">
+                    {mcpServers.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <div>暂无MCP服务器</div>
+                      </div>
+                    ) : (
+                      <Tree
+                        checkable
+                        checkedKeys={editCheckedKeys}
+                        expandedKeys={editExpandedKeys}
+                        onCheck={handleEditTreeCheck}
+                        onExpand={(expandedKeys) => setEditExpandedKeys(expandedKeys.map(key => String(key)))}
+                        treeData={buildTreeData()}
+                        showLine
+                        showIcon={false}
+                        className="w-full"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </TabPane>
+
+            {/* LLM配置 */}
+            <TabPane tab="大模型配置" key="llm">
+              <Row gutter={16}>
                 <Col span={12}>
-                  <Space>
-                    <Button 
-                      size="small"
-                      onClick={() => {
-                        // 全选系统工具
-                        const systemToolNames = systemTools.map(t => t.name);
-                        setSelectedSystemTools(systemToolNames);
-                        setSystemCheckedKeys(systemToolNames.map(name => `system-${name}`));
-                        
-                        // 全选MCP工具
-                        const allConnectedKeys: string[] = [];
-                        mcpServers
-                          .filter(s => s.status === 'connected')
-                          .forEach(server => {
-                            allConnectedKeys.push(`server-${server.id}`);
-                            server.tools.forEach(tool => {
-                              allConnectedKeys.push(`tool-${tool.name}`);
-                            });
-                          });
-                        setCheckedKeys(allConnectedKeys);
-                        handleTreeCheck(allConnectedKeys);
-                      }}
-                    >
-                      全选可用
-                    </Button>
-                    <Button 
-                      size="small"
-                      onClick={() => {
-                        // 清空系统工具选择
-                        setSelectedSystemTools([]);
-                        setSystemCheckedKeys([]);
-                        
-                        // 清空MCP工具选择
-                        setCheckedKeys([]);
-                        setTempMCPConfig({ enabledServers: [], selectedTools: [] });
-                      }}
-                    >
-                      清空选择
-                    </Button>
-                    <Button 
-                      size="small"
-                      onClick={() => {
-                        // 展开系统工具树
-                        setSystemExpandedKeys(['system-root']);
-                        // 展开MCP工具树
-                        setExpandedKeys(mcpServers.map(s => `server-${s.id}`));
-                      }}
-                    >
-                      展开全部
-                    </Button>
-                    <Button 
-                      size="small"
-                      onClick={() => {
-                        // 收起系统工具树
-                        setSystemExpandedKeys([]);
-                        // 收起MCP工具树
-                        setExpandedKeys([]);
-                      }}
-                    >
-                      收起全部
-                    </Button>
-                  </Space>
+                  <Form.Item
+                    label="模型名称"
+                    name="model_name"
+                    rules={[{ required: true, message: '请选择模型' }]}
+                  >
+                    <Select placeholder="选择模型">
+                      <Option value="gpt-4">GPT-4</Option>
+                      <Option value="gpt-4-turbo">GPT-4 Turbo</Option>
+                      <Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Option>
+                      <Option value="claude-3-opus">Claude-3 Opus</Option>
+                      <Option value="claude-3-sonnet">Claude-3 Sonnet</Option>
+                      <Option value="claude-3-haiku">Claude-3 Haiku</Option>
+                    </Select>
+                  </Form.Item>
                 </Col>
-                <Col span={12} className="text-right">
-                  <Space>
-                    <span className="text-sm text-gray-600">
-                      可用服务器: {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length}
-                    </span>
-                    <span className="text-sm text-gray-600">
-                      总工具数: {mcpServers.reduce((sum, s) => sum + s.tools.length, 0)}
-                    </span>
-                  </Space>
+                <Col span={12}>
+                  <Form.Item
+                    label="最大Token数"
+                    name="max_tokens"
+                    rules={[{ required: true, message: '请输入最大Token数' }]}
+                  >
+                    <Input type="number" min={100} max={8000} placeholder="2000" />
+                  </Form.Item>
                 </Col>
               </Row>
-            </div>
 
-            {/* 系统工具选择 */}
-            <div className="mb-4">
-              <div className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
-                <div className="flex items-center">
-                  <ToolOutlined className="mr-2" />
-                  系统工具 (可选择)
-                </div>
-                <div className="text-xs text-gray-500">
-                  已选: {selectedSystemTools.length}/{systemTools.length}
-                </div>
-              </div>
-              <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
-                <Tree
-                  checkable
-                  checkedKeys={systemCheckedKeys}
-                  expandedKeys={systemExpandedKeys}
-                  onCheck={handleSystemTreeCheck}
-                  onExpand={setSystemExpandedKeys}
-                  treeData={buildSystemTreeData()}
-                  showLine
-                  showIcon={false}
-                  className="w-full"
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    label="温度 (Temperature)"
+                    name="temperature"
+                    rules={[{ required: true, message: '请输入温度值' }]}
+                  >
+                    <Input type="number" min={0} max={2} step={0.1} placeholder="0.7" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="Top P"
+                    name="top_p"
+                  >
+                    <Input type="number" min={0} max={1} step={0.1} placeholder="1.0" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    label="频率惩罚 (Frequency Penalty)"
+                    name="frequency_penalty"
+                  >
+                    <Input type="number" min={-2} max={2} step={0.1} placeholder="0.0" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    label="存在惩罚 (Presence Penalty)"
+                    name="presence_penalty"
+                  >
+                    <Input type="number" min={-2} max={2} step={0.1} placeholder="0.0" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </TabPane>
+
+            {/* 提示词配置 */}
+            <TabPane tab="提示词配置" key="prompt">
+              <Form.Item
+                label="系统提示词"
+                name="system_prompt"
+                rules={[{ required: true, message: '请输入系统提示词' }]}
+              >
+                <TextArea 
+                  rows={4}
+                  placeholder="定义智能体的角色、行为准则和回答风格..."
+                  maxLength={2000}
+                  showCount
                 />
-              </div>
-            </div>
+              </Form.Item>
 
-            {/* MCP工具选择器 */}
-            <div className="mb-4">
-              <div className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
-                <div className="flex items-center">
-                  <ApiOutlined className="mr-2" />
-                  MCP工具 (可选择)
-                </div>
-                <div className="text-xs text-gray-500">
-                  已选: {tempMCPConfig.enabledServers.length}服务器 / {tempMCPConfig.selectedTools.length}工具
-                </div>
-              </div>
-              <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
-                {mcpServers.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div>加载中...</div>
-                  </div>
-                ) : (
-                  <Tree
-                    checkable
-                    checkedKeys={checkedKeys}
-                    expandedKeys={expandedKeys}
-                    onCheck={handleTreeCheck}
-                    onExpand={setExpandedKeys}
-                    treeData={buildTreeData()}
-                    showLine
-                    showIcon={false}
-                    className="w-full"
-                    height={300}
-                  />
-                )}
-              </div>
-            </div>
+              <Form.Item
+                label="用户提示词模板"
+                name="user_prompt_template"
+                extra="可选，用于格式化用户输入"
+              >
+                <TextArea 
+                  rows={3}
+                  placeholder="例如: 用户问题：{user_input}\n请详细回答上述问题。"
+                  maxLength={1000}
+                  showCount
+                />
+              </Form.Item>
 
+              <Form.Item
+                label="助手回复模板"
+                name="assistant_prompt_template"
+                extra="可选，用于格式化助手回复"
+              >
+                <TextArea 
+                  rows={3}
+                  placeholder="例如: 基于以上分析，我的建议是：{assistant_response}"
+                  maxLength={1000}
+                  showCount
+                />
+              </Form.Item>
+            </TabPane>
+          </Tabs>
 
+          <div className="flex justify-end space-x-2 mt-4 pt-4 border-t">
+            <Button 
+              onClick={() => {
+                setAgentEditModal(false);
+                editForm.resetFields();
+                setEditSystemTools([]);
+                setEditMCPTools([]);
+                setEditSystemCheckedKeys([]);
+                setEditCheckedKeys([]);
+              }}
+            >
+              取消
+            </Button>
+            <Button 
+              type="primary" 
+              htmlType="submit"
+              loading={formSubmitting}
+            >
+              {isCreating ? '创建智能体' : '保存修改'}
+            </Button>
           </div>
-        )}
+        </Form>
       </Modal>
     </div>
   );
