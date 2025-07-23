@@ -21,7 +21,9 @@ import {
   Statistic,
   List,
   Avatar,
-  Tabs
+  Tabs,
+  Collapse,
+  Tree
 } from 'antd';
 import { 
   RobotOutlined,
@@ -36,28 +38,61 @@ import {
   DatabaseOutlined,
   MonitorOutlined,
   CloudOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  CaretRightOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { DataNode } from 'antd/es/tree';
+import { agentApi, type Agent, type MCPServer, type MCPTool, type UpdateMCPConfigRequest } from '../services/agentApi';
 
 const { Search } = Input;
 const { Option } = Select;
 const { TabPane } = Tabs;
 
-// 智能体相关类型定义
-interface Agent {
-  id: string;
-  name: string;
+// 格式化工具描述
+const formatToolDescription = (description: string) => {
+  const lines = description.split('\n');
+  const summary = lines[0] || description;
+  
+  let args = '';
+  let returns = '';
+  let inArgs = false;
+  let inReturns = false;
+  
+  for (const line of lines) {
+    if (line.trim().startsWith('Args:')) {
+      inArgs = true;
+      inReturns = false;
+      continue;
+    }
+    if (line.trim().startsWith('Returns:')) {
+      inReturns = true;
+      inArgs = false;
+      continue;
+    }
+    
+    if (inArgs && line.trim()) {
+      args += line.trim() + '\n';
+    }
+    if (inReturns && line.trim()) {
+      returns += line.trim() + '\n';
+    }
+  }
+  
+  return {
+    summary: summary.replace(/^执行|^获取|^分析/, '').trim(),
+    args: args.trim(),
+    returns: returns.trim()
+  };
+};
+
+// 本地状态类型（兼容旧的驼峰命名）
+interface LocalAgent extends Omit<Agent, 'display_name' | 'last_used' | 'total_runs' | 'success_rate' | 'avg_response_time' | 'mcp_config'> {
   displayName: string;
-  description: string;
-  status: 'running' | 'stopped' | 'error';
-  enabled: boolean;
-  version: string;
   lastUsed?: string;
   totalRuns: number;
   successRate: number;
   avgResponseTime: number;
-  capabilities: string[];
   mcpConfig: {
     enabledServers: string[];
     selectedTools: string[];
@@ -65,128 +100,44 @@ interface Agent {
   };
 }
 
-interface MCPTool {
-  name: string;
-  description: string;
-  enabled: boolean;
-  category: string;
+interface LocalMCPTool extends Omit<MCPTool, 'server_id' | 'server_name'> {
   serverId: string;
   serverName: string;
 }
 
-interface MCPServer {
-  id: string;
-  name: string;
+interface LocalMCPServer extends MCPServer {
   status: 'connected' | 'disconnected' | 'error';
-  tools: MCPTool[];
+  tools: LocalMCPTool[];
 }
 
-// Mock数据
-const mockAgents: Agent[] = [
-  {
-    id: 'diagnostic_agent',
-    name: 'diagnostic_agent',
-    displayName: '故障诊断智能体',
-    description: '专业的系统故障诊断和问题分析智能体，能够快速定位和解决各类技术问题',
-    status: 'running',
-    enabled: true,
-    version: '2.1.0',
-    lastUsed: '2025-07-22 14:30:00',
-    totalRuns: 1247,
-    successRate: 94.5,
-    avgResponseTime: 2.3,
-    capabilities: ['数据库诊断', '系统监控', '日志分析', '性能优化'],
-    mcpConfig: {
-      enabledServers: ['server-1', 'server-2'],
-      selectedTools: ['mysql_query', 'postgres_query', 'system_metrics', 'log_analyzer'],
-      totalTools: 8
-    }
-  },
-  {
-    id: 'research_agent',
-    name: 'research_agent',
-    displayName: '研究分析智能体',
-    description: '强大的信息研究和数据分析智能体，擅长网络搜索、数据整理和深度分析',
-    status: 'running',
-    enabled: true,
-    version: '1.8.2',
-    lastUsed: '2025-07-22 13:45:00',
-    totalRuns: 892,
-    successRate: 96.2,
-    avgResponseTime: 3.1,
-    capabilities: ['网络搜索', '数据分析', '信息整理', '报告生成'],
-    mcpConfig: {
-      enabledServers: ['server-2', 'server-4'],
-      selectedTools: ['system_metrics', 'log_analyzer', 'aws_ec2_list'],
-      totalTools: 5
-    }
-  },
-  {
-    id: 'security_agent',
-    name: 'security_agent',
-    displayName: '安全防护智能体',
-    description: '专注于网络安全和系统防护的智能体，能够检测威胁和提供安全建议',
-    status: 'stopped',
-    enabled: false,
-    version: '1.5.1',
-    lastUsed: '2025-07-21 09:20:00',
-    totalRuns: 456,
-    successRate: 91.8,
-    avgResponseTime: 1.9,
-    capabilities: ['威胁检测', '漏洞扫描', '安全评估', '防护建议'],
-    mcpConfig: {
-      enabledServers: ['server-3'],
-      selectedTools: ['port_scan', 'ping_test'],
-      totalTools: 3
-    }
+// 数据转换工具函数
+const transformAgentToLocal = (agent: Agent): LocalAgent => ({
+  ...agent,
+  displayName: agent.display_name,
+  lastUsed: agent.last_used,
+  totalRuns: agent.total_runs,
+  successRate: agent.success_rate,
+  avgResponseTime: agent.avg_response_time,
+  mcpConfig: {
+    enabledServers: agent.mcp_config.enabled_servers,
+    selectedTools: agent.mcp_config.selected_tools,
+    totalTools: agent.mcp_config.total_tools
   }
-];
+});
 
-const mockMCPServers: MCPServer[] = [
-  {
-    id: 'server-1',
-    name: 'Database Tools Server',
-    status: 'connected',
-    tools: [
-      { name: 'mysql_query', description: 'Execute MySQL queries', enabled: false, category: 'database', serverId: 'server-1', serverName: 'Database Tools Server' },
-      { name: 'postgres_query', description: 'Execute PostgreSQL queries', enabled: false, category: 'database', serverId: 'server-1', serverName: 'Database Tools Server' },
-      { name: 'db_health_check', description: 'Check database health', enabled: false, category: 'monitoring', serverId: 'server-1', serverName: 'Database Tools Server' }
-    ]
-  },
-  {
-    id: 'server-2',
-    name: 'System Monitor Server',
-    status: 'connected',
-    tools: [
-      { name: 'system_metrics', description: 'Get system metrics', enabled: false, category: 'monitoring', serverId: 'server-2', serverName: 'System Monitor Server' },
-      { name: 'log_analyzer', description: 'Analyze system logs', enabled: false, category: 'analysis', serverId: 'server-2', serverName: 'System Monitor Server' },
-      { name: 'process_monitor', description: 'Monitor processes', enabled: false, category: 'monitoring', serverId: 'server-2', serverName: 'System Monitor Server' }
-    ]
-  },
-  {
-    id: 'server-3',
-    name: 'Network Tools Server',
-    status: 'error',
-    tools: [
-      { name: 'ping_test', description: 'Test network connectivity', enabled: false, category: 'network', serverId: 'server-3', serverName: 'Network Tools Server' },
-      { name: 'port_scan', description: 'Scan open ports', enabled: false, category: 'network', serverId: 'server-3', serverName: 'Network Tools Server' },
-      { name: 'traceroute', description: 'Trace network path', enabled: false, category: 'network', serverId: 'server-3', serverName: 'Network Tools Server' }
-    ]
-  },
-  {
-    id: 'server-4',
-    name: 'Cloud API Server',
-    status: 'connected',
-    tools: [
-      { name: 'aws_ec2_list', description: 'List AWS EC2 instances', enabled: false, category: 'cloud', serverId: 'server-4', serverName: 'Cloud API Server' },
-      { name: 'azure_resource_monitor', description: 'Monitor Azure resources', enabled: false, category: 'cloud', serverId: 'server-4', serverName: 'Cloud API Server' }
-    ]
-  }
-];
+const transformMCPServerToLocal = (server: MCPServer): LocalMCPServer => ({
+  ...server,
+  status: server.status as 'connected' | 'disconnected' | 'error',
+  tools: server.tools.map(tool => ({
+    ...tool,
+    serverId: tool.server_id,
+    serverName: tool.server_name
+  }))
+});
 
 const AgentManagement: React.FC = () => {
-  const [agents, setAgents] = useState<Agent[]>(mockAgents);
-  const [mcpServers] = useState<MCPServer[]>(mockMCPServers);
+  const [agents, setAgents] = useState<LocalAgent[]>([]);
+  const [mcpServers, setMcpServers] = useState<LocalMCPServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -194,16 +145,222 @@ const AgentManagement: React.FC = () => {
   // 模态框状态
   const [agentDetailModal, setAgentDetailModal] = useState(false);
   const [mcpConfigModal, setMCPConfigModal] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<LocalAgent | null>(null);
   const [tempMCPConfig, setTempMCPConfig] = useState<{enabledServers: string[], selectedTools: string[]}>({
     enabledServers: [],
     selectedTools: []
   });
+  const [checkedKeys, setCheckedKeys] = useState<string[]>([]);
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
+  const [selectedSystemTools, setSelectedSystemTools] = useState<string[]>([]);
+  const [systemCheckedKeys, setSystemCheckedKeys] = useState<string[]>([]);
+  const [systemExpandedKeys, setSystemExpandedKeys] = useState<string[]>([]);
   
   const { message } = App.useApp();
 
+  // 系统工具定义
+  const systemTools = [
+    { 
+      name: 'get_sop_content', 
+      category: 'sop', 
+      description: '获取指定SOP的完整内容。用于查看标准操作程序的详细步骤和说明。\n\nArgs:\n    sop_id: SOP的唯一标识符\n\nReturns:\n    包含SOP完整内容的JSON字符串，包括标题、步骤、注意事项等'
+    },
+    { 
+      name: 'get_sop_detail', 
+      category: 'sop', 
+      description: '获取SOP的详细信息和元数据。用于了解SOP的基本信息、分类和适用场景。\n\nArgs:\n    sop_id: SOP的唯一标识符\n\nReturns:\n    包含SOP详细信息的JSON字符串，包括创建时间、更新时间、分类、严重级别等'
+    },
+    { 
+      name: 'list_sops', 
+      category: 'sop', 
+      description: '列出所有可用的SOP清单。用于浏览和发现相关的标准操作程序。\n\nArgs:\n    category: 可选，SOP分类筛选\n    limit: 可选，返回数量限制，默认为50\n\nReturns:\n    包含SOP列表的JSON字符串，每个条目包含ID、标题、分类等基本信息'
+    },
+    { 
+      name: 'search_sops', 
+      category: 'sop', 
+      description: '搜索相关的SOP文档。用于根据关键词快速找到相关的操作程序。\n\nArgs:\n    query: 搜索关键词\n    category: 可选，限定搜索的分类\n\nReturns:\n    包含匹配SOP列表的JSON字符串，按相关性排序'
+    },
+    { 
+      name: 'get_current_time', 
+      category: 'general', 
+      description: '获取当前的系统时间。用于记录操作时间点或进行时间相关的判断。\n\nArgs:\n    format: 可选，时间格式，默认为ISO 8601格式\n    timezone: 可选，时区，默认为系统时区\n\nReturns:\n    格式化的当前时间字符串'
+    }
+  ];
+
+  // 构建系统工具树形数据
+  const buildSystemTreeData = (): DataNode[] => {
+    return [
+      {
+        title: '内置工具',
+        key: 'system-root',
+        children: systemTools.map(tool => {
+          const { summary, args, returns } = formatToolDescription(tool.description);
+          
+          return {
+            title: `${tool.name} [${tool.category}]`,
+            key: `system-${tool.name}`,
+            children: [
+              {
+                title: (
+                  <div className="space-y-3 p-2">
+                    <div>
+                      <div className="text-sm font-medium text-gray-800 mb-2">工具描述</div>
+                      <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                        {summary}
+                      </div>
+                    </div>
+                    
+                    {args && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-800 mb-2">参数说明</div>
+                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs">{args}</pre>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {returns && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-800 mb-2">返回值说明</div>
+                        <div className="text-sm text-gray-600 bg-green-50 p-3 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs">{returns}</pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ),
+                key: `system-${tool.name}-detail`,
+                isLeaf: true,
+                selectable: false,
+                checkable: false
+              }
+            ]
+          };
+        })
+      }
+    ];
+  };
+
+  // 处理系统工具选择
+  const handleSystemTreeCheck = (checked: string[] | { checked: string[]; halfChecked: string[] }) => {
+    const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
+    setSystemCheckedKeys(checkedKeyArray);
+    
+    // 从选中的keys中提取工具名
+    const selectedTools = checkedKeyArray
+      .filter(key => key.startsWith('system-') && !key.endsWith('-detail'))
+      .map(key => key.replace('system-', ''));
+    
+    setSelectedSystemTools(selectedTools);
+  };
+
+  // 处理系统工具复选框切换
+  const handleSystemToolToggle = (toolName: string, checked: boolean) => {
+    if (checked) {
+      setSelectedSystemTools(prev => [...prev, toolName]);
+    } else {
+      setSelectedSystemTools(prev => prev.filter(name => name !== toolName));
+    }
+  };
+
+  // 构建树形数据
+  const buildTreeData = (): DataNode[] => {
+    if (!mcpServers || mcpServers.length === 0) {
+      return [
+        {
+          title: '暂无MCP服务器数据',
+          key: 'no-data',
+          disabled: true,
+          isLeaf: true
+        }
+      ];
+    }
+    
+    console.log('构建树形数据，服务器数量:', mcpServers.length);
+    
+    return mcpServers.map(server => {
+      console.log('处理服务器:', server.name, '工具数量:', server.tools?.length);
+      
+      return {
+        title: `${server.name} (${server.status}) - ${server.tools?.length || 0}工具`,
+        key: `server-${server.id}`,
+        disabled: server.status !== 'connected',
+        children: (server.tools || []).map(tool => {
+          const { summary, args, returns } = formatToolDescription(tool.description);
+          
+          return {
+            title: `${tool.name} [${tool.category}]`,
+            key: `tool-${tool.name}`,
+            disabled: server.status !== 'connected',
+            isLeaf: true,
+            children: [
+              {
+                title: (
+                  <div className="space-y-3 p-2">
+                    <div>
+                      <div className="text-sm font-medium text-gray-800 mb-2">工具描述</div>
+                      <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+                        {tool.description}
+                      </div>
+                    </div>
+                    
+                    {args && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-800 mb-2">参数说明</div>
+                        <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs">{args}</pre>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {returns && (
+                      <div>
+                        <div className="text-sm font-medium text-gray-800 mb-2">返回值说明</div>
+                        <div className="text-sm text-gray-600 bg-green-50 p-3 rounded">
+                          <pre className="whitespace-pre-wrap font-mono text-xs">{returns}</pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ),
+                key: `tool-${tool.name}-detail`,
+                isLeaf: true,
+                selectable: false,
+                checkable: false
+              }
+            ]
+          };
+        })
+      };
+    });
+  };
+
+  // 数据加载
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [agentsData, mcpServersData] = await Promise.all([
+        agentApi.getAgents(),
+        agentApi.getMCPServers()
+      ]);
+      
+      setAgents(agentsData.map(transformAgentToLocal));
+      setMcpServers(mcpServersData.map(transformMCPServerToLocal));
+    } catch (error) {
+      console.error('加载数据失败:', error);
+      message.error('加载数据失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 组件挂载时加载数据
+  useEffect(() => {
+    loadData();
+  }, []);
+
   // 获取状态颜色
-  const getStatusColor = (status: Agent['status']): string => {
+  const getStatusColor = (status: string): string => {
     const colors = {
       running: 'green',
       stopped: 'orange',
@@ -213,7 +370,7 @@ const AgentManagement: React.FC = () => {
   };
 
   // 获取状态文本
-  const getStatusText = (status: Agent['status']): string => {
+  const getStatusText = (status: string): string => {
     const texts = {
       running: '运行中',
       stopped: '已停止',
@@ -229,7 +386,9 @@ const AgentManagement: React.FC = () => {
       monitoring: <MonitorOutlined />,
       analysis: <EyeOutlined />,
       network: <GlobalOutlined />,
-      cloud: <CloudOutlined />
+      cloud: <CloudOutlined />,
+      sop: <SettingOutlined />,
+      general: <ToolOutlined />
     };
     return icons[category] || <ToolOutlined />;
   };
@@ -241,7 +400,9 @@ const AgentManagement: React.FC = () => {
       monitoring: 'green',
       analysis: 'purple',
       network: 'orange',
-      cloud: 'cyan'
+      cloud: 'cyan',
+      sop: 'gold',
+      general: 'gray'
     };
     return colors[category] || 'default';
   };
@@ -256,95 +417,145 @@ const AgentManagement: React.FC = () => {
   });
 
   // 切换智能体启用状态
-  const toggleAgentEnabled = (agentId: string) => {
-    setAgents(prevAgents =>
-      prevAgents.map(agent => {
-        if (agent.id === agentId) {
-          const newEnabled = !agent.enabled;
-          return { 
-            ...agent, 
-            enabled: newEnabled,
-            status: newEnabled ? 'running' : 'stopped'
-          };
-        }
-        return agent;
-      })
-    );
-    message.success('智能体状态已更新');
-  };
-
-  // 查看智能体详情
-  const handleViewAgent = (agent: Agent) => {
-    setSelectedAgent(agent);
-    setAgentDetailModal(true);
-  };
-
-  // 配置MCP工具
-  const handleConfigureMCP = (agent: Agent) => {
-    setSelectedAgent(agent);
-    setTempMCPConfig({
-      enabledServers: [...agent.mcpConfig.enabledServers],
-      selectedTools: [...agent.mcpConfig.selectedTools]
-    });
-    setMCPConfigModal(true);
-  };
-
-  // 保存MCP配置
-  const handleSaveMCPConfig = () => {
-    if (selectedAgent) {
+  const toggleAgentEnabled = async (agentId: string) => {
+    try {
+      await agentApi.toggleAgentStatus(agentId);
+      
       setAgents(prevAgents =>
         prevAgents.map(agent => {
-          if (agent.id === selectedAgent.id) {
-            return {
-              ...agent,
-              mcpConfig: {
-                ...agent.mcpConfig,
-                enabledServers: tempMCPConfig.enabledServers,
-                selectedTools: tempMCPConfig.selectedTools
-              }
+          if (agent.id === agentId) {
+            const newEnabled = !agent.enabled;
+            return { 
+              ...agent, 
+              enabled: newEnabled,
+              status: newEnabled ? 'running' : 'stopped'
             };
           }
           return agent;
         })
       );
-      setMCPConfigModal(false);
-      message.success('MCP配置已保存');
+      message.success('智能体状态已更新');
+    } catch (error) {
+      console.error('切换智能体状态失败:', error);
+      message.error('切换智能体状态失败，请重试');
     }
   };
 
-  // 切换服务器选择
-  const toggleServerSelection = (serverId: string, checked: boolean) => {
-    if (checked) {
-      setTempMCPConfig(prev => ({
-        ...prev,
-        enabledServers: [...prev.enabledServers, serverId]
-      }));
-    } else {
-      setTempMCPConfig(prev => ({
-        ...prev,
-        enabledServers: prev.enabledServers.filter(id => id !== serverId),
-        selectedTools: prev.selectedTools.filter(tool => {
-          const server = mcpServers.find(s => s.id === serverId);
-          return !server?.tools.some(t => t.name === tool);
-        })
-      }));
+  // 查看智能体详情
+  const handleViewAgent = (agent: LocalAgent) => {
+    setSelectedAgent(agent);
+    setAgentDetailModal(true);
+  };
+
+  // 配置MCP工具
+  const handleConfigureMCP = (agent: LocalAgent) => {
+    setSelectedAgent(agent);
+    setTempMCPConfig({
+      enabledServers: [...agent.mcpConfig.enabledServers],
+      selectedTools: [...agent.mcpConfig.selectedTools]
+    });
+    
+    // 初始化系统工具选择状态 - 分离系统工具和MCP工具
+    const mcpToolNames = mcpServers.flatMap(s => s.tools.map(t => t.name));
+    const systemToolNames = agent.mcpConfig.selectedTools.filter(tool => 
+      systemTools.some(st => st.name === tool)
+    );
+    const mcpSelectedTools = agent.mcpConfig.selectedTools.filter(tool => 
+      mcpToolNames.includes(tool)
+    );
+    
+    setSelectedSystemTools(systemToolNames);
+    
+    // 初始化系统工具树状态
+    const systemInitialCheckedKeys = systemToolNames.map(name => `system-${name}`);
+    setSystemCheckedKeys(systemInitialCheckedKeys);
+    setSystemExpandedKeys(['system-root']); // 默认展开根节点
+    
+    // 初始化MCP工具树形选择状态
+    const initialCheckedKeys: string[] = [];
+    
+    // 添加已选择的服务器
+    agent.mcpConfig.enabledServers.forEach(serverId => {
+      initialCheckedKeys.push(`server-${serverId}`);
+    });
+    
+    // 添加已选择的MCP工具
+    mcpSelectedTools.forEach(toolName => {
+      initialCheckedKeys.push(`tool-${toolName}`);
+    });
+    
+    console.log('初始化系统工具:', systemToolNames);
+    console.log('初始化MCP工具:', mcpSelectedTools);
+    
+    setCheckedKeys(initialCheckedKeys);
+    
+    // 默认展开已启用的服务器
+    setExpandedKeys(agent.mcpConfig.enabledServers.map(id => `server-${id}`));
+    
+    setMCPConfigModal(true);
+  };
+
+  // 处理树形选择变化
+  const handleTreeCheck = (checked: string[] | { checked: string[]; halfChecked: string[] }) => {
+    const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
+    setCheckedKeys(checkedKeyArray);
+    
+    // 从选中的keys中提取服务器和工具
+    const enabledServers: string[] = [];
+    const selectedTools: string[] = [];
+    
+    checkedKeyArray.forEach(key => {
+      if (key.startsWith('server-')) {
+        const serverId = key.replace('server-', '');
+        enabledServers.push(serverId);
+      } else if (key.startsWith('tool-')) {
+        const toolName = key.replace('tool-', '');
+        selectedTools.push(toolName);
+      }
+    });
+    
+    setTempMCPConfig({
+      enabledServers,
+      selectedTools
+    });
+  };
+
+  // 保存MCP配置
+  const handleSaveMCPConfig = async () => {
+    if (selectedAgent) {
+      try {
+        // 合并系统工具和MCP工具
+        const allSelectedTools = [...selectedSystemTools, ...tempMCPConfig.selectedTools];
+        
+        await agentApi.updateAgentMCPConfig(selectedAgent.id, {
+          enabled_servers: tempMCPConfig.enabledServers,
+          selected_tools: allSelectedTools
+        });
+        
+        setAgents(prevAgents =>
+          prevAgents.map(agent => {
+            if (agent.id === selectedAgent.id) {
+              return {
+                ...agent,
+                mcpConfig: {
+                  ...agent.mcpConfig,
+                  enabledServers: tempMCPConfig.enabledServers,
+                  selectedTools: allSelectedTools
+                }
+              };
+            }
+            return agent;
+          })
+        );
+        setMCPConfigModal(false);
+        message.success('工具配置已保存');
+      } catch (error) {
+        console.error('保存工具配置失败:', error);
+        message.error('保存工具配置失败，请重试');
+      }
     }
   };
 
-  // 切换工具选择
-  const toggleToolSelection = (toolName: string, checked: boolean) => {
-    if (checked) {
-      setTempMCPConfig(prev => ({
-        ...prev,
-        selectedTools: [...prev.selectedTools, toolName]
-      }));
-    } else {
-      setTempMCPConfig(prev => ({
-        ...prev,
-        selectedTools: prev.selectedTools.filter(tool => tool !== toolName)
-      }));
-    }
-  };
 
 
   return (
@@ -380,7 +591,8 @@ const AgentManagement: React.FC = () => {
               <Space>
                 <Button 
                   icon={<ReloadOutlined />}
-                  onClick={() => message.success('数据已刷新')}
+                  loading={loading}
+                  onClick={loadData}
                 >
                   刷新
                 </Button>
@@ -441,7 +653,7 @@ const AgentManagement: React.FC = () => {
                         <div><span className="text-gray-500">运行次数: </span><span className="font-semibold text-gray-800">{agent.totalRuns}</span></div>
                         <div className="flex flex-wrap gap-x-4">
                           <span><span className="text-gray-500">服务器: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.enabledServers.length}</span></span>
-                          <span><span className="text-gray-500">工具: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.selectedTools.length}/{agent.mcpConfig.totalTools}</span></span>
+                          <span><span className="text-gray-500">工具: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.selectedTools.length}</span></span>
                         </div>
                       </div>
 
@@ -571,80 +783,166 @@ const AgentManagement: React.FC = () => {
 
       {/* MCP工具配置模态框 */}
       <Modal
-        title="MCP工具配置"
+        title={
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <ApiOutlined className="mr-2" />
+              为 {selectedAgent?.displayName} 配置MCP工具
+            </div>
+            <div className="text-sm text-gray-500">
+              已选: {tempMCPConfig.enabledServers.length}服务器 / {selectedSystemTools.length + tempMCPConfig.selectedTools.length}工具
+            </div>
+          </div>
+        }
         open={mcpConfigModal}
         onCancel={() => setMCPConfigModal(false)}
         onOk={handleSaveMCPConfig}
-        width={1000}
+        width={800}
         okText="保存配置"
         cancelText="取消"
       >
         {selectedAgent && (
           <div>
-            <Alert
-              message="MCP工具配置"
-              description={`为 ${selectedAgent.displayName} 选择需要的MCP服务器和工具。只有启用的工具会被加载到智能体中。`}
-              type="info"
-              showIcon
-              className="mb-4"
-            />
-            
-            {mcpServers.map(server => (
-              <Card key={server.id} size="small" className="mb-3">
-                <div className="mb-3">
+            {/* 顶部操作栏 */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <Row gutter={16} align="middle">
+                <Col span={12}>
                   <Space>
-                    <Checkbox
-                      checked={tempMCPConfig.enabledServers.includes(server.id)}
-                      onChange={(e) => toggleServerSelection(server.id, e.target.checked)}
-                      disabled={server.status !== 'connected'}
+                    <Button 
+                      size="small"
+                      onClick={() => {
+                        // 全选系统工具
+                        const systemToolNames = systemTools.map(t => t.name);
+                        setSelectedSystemTools(systemToolNames);
+                        setSystemCheckedKeys(systemToolNames.map(name => `system-${name}`));
+                        
+                        // 全选MCP工具
+                        const allConnectedKeys: string[] = [];
+                        mcpServers
+                          .filter(s => s.status === 'connected')
+                          .forEach(server => {
+                            allConnectedKeys.push(`server-${server.id}`);
+                            server.tools.forEach(tool => {
+                              allConnectedKeys.push(`tool-${tool.name}`);
+                            });
+                          });
+                        setCheckedKeys(allConnectedKeys);
+                        handleTreeCheck(allConnectedKeys);
+                      }}
                     >
-                      <strong>{server.name}</strong>
-                    </Checkbox>
-                    <Badge 
-                      status={server.status === 'connected' ? 'success' : 
-                             server.status === 'error' ? 'error' : 'warning'} 
-                      text={server.status}
-                    />
+                      全选可用
+                    </Button>
+                    <Button 
+                      size="small"
+                      onClick={() => {
+                        // 清空系统工具选择
+                        setSelectedSystemTools([]);
+                        setSystemCheckedKeys([]);
+                        
+                        // 清空MCP工具选择
+                        setCheckedKeys([]);
+                        setTempMCPConfig({ enabledServers: [], selectedTools: [] });
+                      }}
+                    >
+                      清空选择
+                    </Button>
+                    <Button 
+                      size="small"
+                      onClick={() => {
+                        // 展开系统工具树
+                        setSystemExpandedKeys(['system-root']);
+                        // 展开MCP工具树
+                        setExpandedKeys(mcpServers.map(s => `server-${s.id}`));
+                      }}
+                    >
+                      展开全部
+                    </Button>
+                    <Button 
+                      size="small"
+                      onClick={() => {
+                        // 收起系统工具树
+                        setSystemExpandedKeys([]);
+                        // 收起MCP工具树
+                        setExpandedKeys([]);
+                      }}
+                    >
+                      收起全部
+                    </Button>
                   </Space>
+                </Col>
+                <Col span={12} className="text-right">
+                  <Space>
+                    <span className="text-sm text-gray-600">
+                      可用服务器: {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length}
+                    </span>
+                    <span className="text-sm text-gray-600">
+                      总工具数: {mcpServers.reduce((sum, s) => sum + s.tools.length, 0)}
+                    </span>
+                  </Space>
+                </Col>
+              </Row>
+            </div>
+
+            {/* 系统工具选择 */}
+            <div className="mb-4">
+              <div className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
+                <div className="flex items-center">
+                  <ToolOutlined className="mr-2" />
+                  系统工具 (可选择)
                 </div>
-                
-                <div className="pl-6">
-                  <Row gutter={[16, 8]}>
-                    {server.tools.map(tool => (
-                      <Col key={tool.name} span={12}>
-                        <Checkbox
-                          checked={tempMCPConfig.selectedTools.includes(tool.name)}
-                          onChange={(e) => toggleToolSelection(tool.name, e.target.checked)}
-                          disabled={
-                            !tempMCPConfig.enabledServers.includes(server.id) || 
-                            server.status !== 'connected'
-                          }
-                        >
-                          <Space>
-                            {getCategoryIcon(tool.category)}
-                            <span>{tool.name}</span>
-                            <Tag size="small" color={getCategoryColor(tool.category)}>
-                              {tool.category}
-                            </Tag>
-                          </Space>
-                        </Checkbox>
-                        <div className="text-xs text-gray-500 ml-6">{tool.description}</div>
-                      </Col>
-                    ))}
-                  </Row>
+                <div className="text-xs text-gray-500">
+                  已选: {selectedSystemTools.length}/{systemTools.length}
                 </div>
-              </Card>
-            ))}
-            
-            <div className="mt-4 p-3 bg-gray-50 rounded">
-              <strong>配置摘要:</strong>
-              <div className="mt-2">
-                <span className="text-gray-600">选中服务器: </span>
-                <span className="font-medium">{tempMCPConfig.enabledServers.length}</span>
-                <span className="mx-4 text-gray-600">选中工具: </span>
-                <span className="font-medium">{tempMCPConfig.selectedTools.length}</span>
+              </div>
+              <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
+                <Tree
+                  checkable
+                  checkedKeys={systemCheckedKeys}
+                  expandedKeys={systemExpandedKeys}
+                  onCheck={handleSystemTreeCheck}
+                  onExpand={setSystemExpandedKeys}
+                  treeData={buildSystemTreeData()}
+                  showLine
+                  showIcon={false}
+                  className="w-full"
+                />
               </div>
             </div>
+
+            {/* MCP工具选择器 */}
+            <div className="mb-4">
+              <div className="text-sm font-medium text-gray-800 mb-2 flex items-center justify-between">
+                <div className="flex items-center">
+                  <ApiOutlined className="mr-2" />
+                  MCP工具 (可选择)
+                </div>
+                <div className="text-xs text-gray-500">
+                  已选: {tempMCPConfig.enabledServers.length}服务器 / {tempMCPConfig.selectedTools.length}工具
+                </div>
+              </div>
+              <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
+                {mcpServers.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <div>加载中...</div>
+                  </div>
+                ) : (
+                  <Tree
+                    checkable
+                    checkedKeys={checkedKeys}
+                    expandedKeys={expandedKeys}
+                    onCheck={handleTreeCheck}
+                    onExpand={setExpandedKeys}
+                    treeData={buildTreeData()}
+                    showLine
+                    showIcon={false}
+                    className="w-full"
+                    height={300}
+                  />
+                )}
+              </div>
+            </div>
+
+
           </div>
         )}
       </Modal>
