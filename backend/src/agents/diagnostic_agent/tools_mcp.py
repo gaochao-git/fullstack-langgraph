@@ -23,9 +23,9 @@ class MCPToolsIntegrator:
         }
     
     async def get_mcp_tools(self):
-        """获取MCP工具"""
+        """获取MCP工具 - 按照官方推荐的简单方式"""
         try:
-            # 使用官方推荐的简单方式
+            # 官方推荐的简单用法
             client = MultiServerMCPClient(self.server_config)
             mcp_tools = await client.get_tools()
             
