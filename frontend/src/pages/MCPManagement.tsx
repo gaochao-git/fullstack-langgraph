@@ -822,7 +822,7 @@ const MCPManagement: React.FC = () => {
                   rules={[{ required: true, message: '请输入连接地址' }]}
                 >
                   <Input 
-                    placeholder="例如：mcp://localhost:3001 或 http://localhost:8080" 
+                    placeholder="http://localhost:8080/sse" 
                   />
                 </Form.Item>
               </Col>
