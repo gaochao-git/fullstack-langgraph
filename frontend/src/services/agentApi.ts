@@ -53,7 +53,7 @@ export interface UpdateMCPConfigRequest {
 }
 
 export interface CreateAgentRequest {
-  agent_id: string;
+  agent_id?: string; // 改为可选
   agent_name: string;
   description: string;
   capabilities: string[];

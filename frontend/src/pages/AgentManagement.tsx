@@ -33,7 +33,7 @@ import {
   GlobalOutlined,
   DeleteOutlined
 } from '@ant-design/icons';
-import type { DataNode, Key } from 'antd/es/tree';
+import type { DataNode } from 'antd/es/tree';
 import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
 
 const { Search } = Input;
@@ -93,14 +93,9 @@ interface LocalAgent extends Omit<Agent, 'display_name' | 'last_used' | 'total_r
   };
 }
 
-interface LocalMCPTool extends Omit<MCPTool, 'server_id' | 'server_name'> {
-  serverId: string;
-  serverName: string;
-}
-
 interface LocalMCPServer extends MCPServer {
   status: 'connected' | 'disconnected' | 'error';
-  tools: LocalMCPTool[];
+  // tools: LocalMCPTool[]; // 改为 MCPTool[]
 }
 
 // 数据转换工具函数
@@ -121,11 +116,13 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
 const transformMCPServerToLocal = (server: MCPServer): LocalMCPServer => ({
   ...server,
   status: server.status as 'connected' | 'disconnected' | 'error',
-  tools: server.tools.map(tool => ({
-    ...tool,
-    serverId: tool.server_id,
-    serverName: tool.server_name
-  }))
+  // tools: server.tools.map(tool => ({
+  //   ...tool,
+  //   serverId: tool.server_id,
+  //   serverName: tool.server_name
+  // }))
+  // 直接用 tools: server.tools
+  tools: server.tools
 });
 
 const AgentManagement: React.FC = () => {
@@ -153,6 +150,10 @@ const AgentManagement: React.FC = () => {
   const [editSystemExpandedKeys, setEditSystemExpandedKeys] = useState<string[]>(['system-root']);
   const [editCheckedKeys, setEditCheckedKeys] = useState<string[]>([]);
   const [editExpandedKeys, setEditExpandedKeys] = useState<string[]>([]);
+  
+  // 1. 新增 state
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [agentToDelete, setAgentToDelete] = useState<LocalAgent | null>(null);
   
   const { message, modal } = App.useApp();
 
@@ -337,22 +338,22 @@ const AgentManagement: React.FC = () => {
 
   // 获取状态颜色
   const getStatusColor = (status: string): string => {
-    const colors = {
+    const colors: Record<string, string> = {
       running: 'green',
       stopped: 'orange',
       error: 'red'
     };
-    return colors[status];
+    return colors[status] || 'default';
   };
 
   // 获取状态文本
   const getStatusText = (status: string): string => {
-    const texts = {
+    const texts: Record<string, string> = {
       running: '运行中',
       stopped: '已停止',
       error: '错误'
     };
-    return texts[status];
+    return texts[status] || status;
   };
 
   // 获取工具类别图标
@@ -425,7 +426,7 @@ const AgentManagement: React.FC = () => {
 
 
   // 处理编辑表单的系统工具选择
-  const handleEditSystemTreeCheck = (checked: Key[] | { checked: Key[]; halfChecked: Key[] }) => {
+  const handleEditSystemTreeCheck = (checked: React.Key[] | { checked: React.Key[]; halfChecked: React.Key[] }) => {
     const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
     const stringKeys = checkedKeyArray.map(key => String(key));
     setEditSystemCheckedKeys(stringKeys);
@@ -438,7 +439,7 @@ const AgentManagement: React.FC = () => {
   };
 
   // 处理编辑表单的MCP工具选择
-  const handleEditTreeCheck = (checked: Key[] | { checked: Key[]; halfChecked: Key[] }) => {
+  const handleEditTreeCheck = (checked: React.Key[] | { checked: React.Key[]; halfChecked: React.Key[] }) => {
     const checkedKeyArray = Array.isArray(checked) ? checked : checked.checked;
     const stringKeys = checkedKeyArray.map(key => String(key));
     setEditCheckedKeys(stringKeys);
@@ -529,33 +530,13 @@ const AgentManagement: React.FC = () => {
   };
 
   // 删除智能体
-  const handleDeleteAgent = async (agent: LocalAgent) => {
-    console.log('删除智能体被调用:', agent.id, 'is_builtin:', agent.is_builtin);
-    
+  const handleDeleteAgent = (agent: LocalAgent) => {
     if (agent.is_builtin) {
       message.warning('不能删除内置智能体');
       return;
     }
-
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除智能体 "${agent.displayName}" 吗？此操作不可撤销。`,
-      okText: '确认删除',
-      okType: 'danger',
-      cancelText: '取消',
-      onOk: async () => {
-        console.log('开始删除智能体:', agent.id);
-        try {
-          await agentApi.deleteAgent(agent.id);
-          setAgents(prevAgents => prevAgents.filter(a => a.id !== agent.id));
-          message.success('智能体已删除');
-          console.log('智能体删除成功:', agent.id);
-        } catch (error) {
-          console.error('删除智能体失败:', error);
-          message.error('删除智能体失败，请重试');
-        }
-      }
-    });
+    setAgentToDelete(agent);
+    setDeleteModalVisible(true);
   };
 
   // 保存智能体（新建或编辑）
@@ -597,7 +578,6 @@ const AgentManagement: React.FC = () => {
       if (isCreating) {
         // 新建智能体
         const newAgentData: CreateAgentRequest = {
-          agent_id: values.agent_id,
           agent_name: values.agent_name,
           description: values.description || '',
           capabilities: values.capabilities || [],
@@ -763,7 +743,7 @@ const AgentManagement: React.FC = () => {
                       {/* 核心能力 */}
                       <div className="flex flex-wrap gap-1">
                         {agent.capabilities.slice(0, 3).map(capability => (
-                          <Tag key={capability} size="small" color="blue" className="text-xs">{capability}</Tag>
+                          <Tag key={capability} color="blue" className="text-xs">{capability}</Tag>
                         ))}
                       </div>
                     </div>
@@ -938,19 +918,7 @@ const AgentManagement: React.FC = () => {
           <Tabs defaultActiveKey="basic" type="card">
             {/* 基本信息 */}
             <TabPane tab="基本信息" key="basic">
-              {isCreating && (
-                <Form.Item
-                  label="智能体ID"
-                  name="agent_id"
-                  rules={[
-                    { required: true, message: '请输入智能体ID' },
-                    { pattern: /^[a-zA-Z][a-zA-Z0-9_]*$/, message: '智能体ID必须以字母开头，只能包含字母、数字和下划线' }
-                  ]}
-                >
-                  <Input placeholder="例如: my_custom_agent" />
-                </Form.Item>
-              )}
-
+              {/* 移除智能体ID输入框 */}
               <Form.Item
                 label="智能体名称"
                 name="agent_name"
@@ -958,7 +926,6 @@ const AgentManagement: React.FC = () => {
               >
                 <Input placeholder="例如: 我的自定义智能体" />
               </Form.Item>
-
               <Form.Item
                 label="描述"
                 name="description"
@@ -970,7 +937,6 @@ const AgentManagement: React.FC = () => {
                   showCount
                 />
               </Form.Item>
-
               <Form.Item
                 label="核心能力"
                 name="capabilities"
@@ -1264,6 +1230,36 @@ const AgentManagement: React.FC = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* 确认删除模态框 */}
+      <Modal
+        title="确认删除"
+        open={deleteModalVisible}
+        onOk={async () => {
+          if (!agentToDelete) return;
+          try {
+            await agentApi.deleteAgent(agentToDelete.id);
+            setAgents(prevAgents => prevAgents.filter(a => a.id !== agentToDelete.id));
+            message.success('智能体已删除');
+          } catch (error) {
+            message.error('删除智能体失败，请重试');
+          } finally {
+            setDeleteModalVisible(false);
+            setAgentToDelete(null);
+          }
+        }}
+        onCancel={() => {
+          setDeleteModalVisible(false);
+          setAgentToDelete(null);
+        }}
+        okText="确认删除"
+        okType="danger"
+        cancelText="取消"
+      >
+        {agentToDelete && (
+          <div>确定要删除智能体 "{agentToDelete.displayName}" 吗？此操作不可撤销。</div>
+        )}
       </Modal>
     </div>
   );

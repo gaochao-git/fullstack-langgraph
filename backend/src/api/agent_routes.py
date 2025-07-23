@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update
 import json
+import uuid
 
 from src.database.config import get_async_session
 from src.database.models import MCPServer, AgentConfig
@@ -63,7 +64,7 @@ class UpdateMCPConfigRequest(BaseModel):
     selected_tools: List[str]
 
 class CreateAgentRequest(BaseModel):
-    agent_id: str
+    agent_id: Optional[str] = None
     agent_name: str
     description: str
     capabilities: List[str]
@@ -496,10 +497,12 @@ async def toggle_agent_status(agent_id: str):
 async def create_agent(agent_data: CreateAgentRequest):
     """创建新的智能体"""
     try:
+        # 自动生成 agent_id（如果没传）
+        agent_id = agent_data.agent_id or str(uuid.uuid4())
         # 检查agent_id是否已存在
         async for session in get_async_session():
             result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_data.agent_id)
+                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
             )
             existing_agent = result.scalar_one_or_none()
             
@@ -524,7 +527,7 @@ async def create_agent(agent_data: CreateAgentRequest):
             
             # 创建新智能体
             new_agent = AgentConfig(
-                agent_id=agent_data.agent_id,
+                agent_id=agent_id,
                 agent_name=agent_data.agent_name,
                 agent_description=agent_data.description,
                 agent_capabilities=agent_data.capabilities,
