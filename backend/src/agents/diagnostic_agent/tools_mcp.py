@@ -27,14 +27,22 @@ class MCPToolsIntegrator:
         try:
             # 官方推荐的简单用法
             client = MultiServerMCPClient(self.server_config)
-            mcp_tools = await client.get_tools()
+            all_mcp_tools = await client.get_tools()
             
-            logger.info(f"✅ 成功获取 {len(mcp_tools)} 个MCP工具")
-            return mcp_tools
+            # 过滤工具 - 可以根据需要排除某些工具
+            filtered_tools = self._filter_tools(all_mcp_tools)
+            
+            logger.info(f"✅ 成功获取 {len(all_mcp_tools)} 个MCP工具，过滤后 {len(filtered_tools)} 个")
+            return filtered_tools
             
         except Exception as e:
             logger.warning(f"⚠️  获取MCP工具失败: {e}，将只使用系统工具")
             return []
+    
+    def _filter_tools(self, tools):
+        """过滤MCP工具"""
+        excluded_tools = ['execute_system_command']
+        return [tool for tool in tools if tool.name not in excluded_tools]
     
     def get_system_tools(self, enable_approval: bool = False):
         """获取指定的系统工具：SOP相关 + 时间工具"""
