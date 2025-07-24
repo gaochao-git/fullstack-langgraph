@@ -12,6 +12,7 @@ import {
   AppstoreOutlined,
   BookOutlined,
   CustomerServiceOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import ResearchAgent from "./agents/research_agent/ResearchAgent";
@@ -112,30 +113,30 @@ function AppContent() {
             background: 'rgba(255,255,255,0.08)',
             margin: 0
           }}>
-            <button
-              type="button"
-              onClick={() => setCollapsed(!collapsed)}
-              style={{
-                fontSize: '16px',
-                width: 36,
-                height: 36,
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                marginRight: '8px',
-                color: '#fff'
-              }}
-            >
-              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            </button>
             {!collapsed && (
               <span style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>
                 智能运维平台
               </span>
             )}
             {/* 主题切换按钮 */}
-            <div style={{ marginLeft: 'auto' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
               <ThemeToggleSimple />
+              <button
+                type="button"
+                onClick={() => setCollapsed(!collapsed)}
+                style={{
+                  fontSize: '16px',
+                  width: 36,
+                  height: 36,
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  marginLeft: '8px',
+                  color: '#fff'
+                }}
+              >
+                {collapsed ? <MenuUnfoldOutlined style={{ fontSize: 16 }} /> : <MenuFoldOutlined style={{ fontSize: 16 }} />}
+              </button>
             </div>
           </div>
           <Menu
@@ -157,6 +158,7 @@ function AppContent() {
           open={mobileMenuVisible}
           bodyStyle={{ padding: 0 }}
           width={250}
+          closeIcon={<CloseOutlined style={{ fontSize: 16 }} />}
         >
           <div style={{
             display: 'flex',
@@ -180,7 +182,7 @@ function AppContent() {
                 color: '#1677ff'
               }}
             >
-              <MenuUnfoldOutlined />
+              <MenuUnfoldOutlined style={{ fontSize: 16 }} />
             </button>
             <span style={{ color: '#1677ff', fontWeight: 600, fontSize: 16 }}>
               智能运维平台
@@ -206,9 +208,51 @@ function AppContent() {
             style={{ 
               padding: isMobile ? '12px' : '16px',
               overflow: 'auto',
-              height: '100%'
+              height: '100%',
+              paddingTop: isMobile ? 56 : undefined // 预留头部空间
             }}
           >
+            {/* 移动端自定义头部 */}
+            {isMobile && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100vw',
+                  height: 48,
+                  background: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderBottom: '1px solid #f0f0f0',
+                  zIndex: 1001,
+                  boxSizing: 'border-box',
+                  padding: '0 12px',
+                  fontWeight: 600
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuVisible(true)}
+                  style={{
+                    fontSize: 16,
+                    background: 'none',
+                    border: 'none',
+                    color: '#1677ff',
+                    padding: 4,
+                    borderRadius: 6,
+                    marginRight: 8
+                  }}
+                  aria-label="打开菜单"
+                >
+                  <MenuFoldOutlined style={{ fontSize: 16 }} />
+                </button>
+                <span style={{ flex: 1, textAlign: 'center', color: '#222', fontSize: 18, fontWeight: 600 }}>
+                  智能运维平台
+                </span>
+                {/* 右侧可加更多按钮 */}
+              </div>
+            )}
             <Routes>
               <Route
                 path="/"
