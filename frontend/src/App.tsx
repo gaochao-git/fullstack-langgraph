@@ -8,6 +8,10 @@ import {
   MenuUnfoldOutlined,
   LinkOutlined,
   ApiOutlined,
+  SettingOutlined,
+  AppstoreOutlined,
+  BookOutlined,
+  CustomerServiceOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import ResearchAgent from "./agents/research_agent/ResearchAgent";
@@ -48,29 +52,48 @@ function AppContent() {
 
   const menuItems = [
     {
-      key: '1',
-      icon: <RobotOutlined />,
-      label: <Link to="/">智能体</Link>,
+      key: 'user-service',
+      icon: <CustomerServiceOutlined />,
+      label: '用户服务',
+      children: [
+        {
+          key: '1',
+          icon: <AppstoreOutlined />,
+          label: <Link to="/">智能体广场</Link>,
+        },
+        {
+          key: 'knowledge',
+          icon: <BookOutlined />,
+          label: <Link to="/knowledge">知识中心</Link>,
+        },
+      ],
     },
     {
-      key: '2',
-      icon: <UserOutlined />,
-      label: <Link to="/agents">智能体管理</Link>,
-    },
-    {
-      key: '3',
-      icon: <FileTextOutlined />,
-      label: <Link to="/sop">SOP管理</Link>,
-    },
-    {
-      key: '4',
-      icon: <LinkOutlined />,
-      label: <Link to="/mcp">MCP管理</Link>,
-    },
-    {
-      key: '5',
-      icon: <ApiOutlined />,
-      label: <Link to="/models">模型管理</Link>,
+      key: 'management',
+      icon: <SettingOutlined />,
+      label: '系统管理',
+      children: [
+        {
+          key: '2',
+          icon: <UserOutlined />,
+          label: <Link to="/agents">智能体管理</Link>,
+        },
+        {
+          key: '3',
+          icon: <FileTextOutlined />,
+          label: <Link to="/sop">SOP管理</Link>,
+        },
+        {
+          key: '4',
+          icon: <LinkOutlined />,
+          label: <Link to="/mcp">MCP管理</Link>,
+        },
+        {
+          key: '5',
+          icon: <ApiOutlined />,
+          label: <Link to="/models">模型管理</Link>,
+        },
+      ],
     },
   ];
 
