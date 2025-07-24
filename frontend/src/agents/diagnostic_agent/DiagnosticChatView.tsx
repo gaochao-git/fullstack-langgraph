@@ -701,6 +701,9 @@ interface DiagnosticChatViewProps {
   onInterruptResume?: (approved: boolean) => void;
   onNewSession?: () => void; // 新增：新建会话回调
   onHistoryToggle?: () => void; // 新增：历史会话抽屉切换回调
+  availableModels?: Array<{id: string, name: string, provider: string, type: string}>; // 新增：可用模型列表
+  currentModel?: string; // 新增：当前选中的模型
+  onModelChange?: (modelType: string) => void; // 新增：模型切换回调
 }
 
 // 诊断聊天视图组件
@@ -715,6 +718,9 @@ export function DiagnosticChatView({
   onInterruptResume,
   onNewSession,
   onHistoryToggle,
+  availableModels = [],
+  currentModel,
+  onModelChange,
 }: DiagnosticChatViewProps) {
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -1084,13 +1090,58 @@ export function DiagnosticChatView({
           borderTop: '2px solid #60A5FA',
         }}
       >
-        <form onSubmit={handleSubmit} className="flex gap-2 p-4">
+        <form onSubmit={handleSubmit} className="flex gap-1 sm:gap-2 p-2 sm:p-4">
+          {/* 模型选择器 - 优化版本 */}
+          {availableModels.length > 0 ? (
+            <div className="relative">
+              <select
+                value={currentModel || ''}
+                onChange={(e) => onModelChange?.(e.target.value)}
+                className="px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-200 cursor-pointer min-w-[80px] max-w-[120px] sm:min-w-[100px] sm:max-w-[140px]"
+                style={{ 
+                  backgroundColor: '#1E293B', 
+                  borderColor: '#60A5FA', 
+                  borderWidth: '2px', 
+                  color: '#F1F5F9' 
+                }}
+                disabled={isLoading || !!interrupt}
+                title={`当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}`}
+              >
+                {availableModels.map((model) => {
+                  // 简化模型名称显示
+                  const getShortName = (name: string) => {
+                    if (name.includes('deepseek')) return 'DeepSeek';
+                    if (name.includes('qwen2.5')) return 'Qwen2.5';
+                    if (name.includes('qwen')) return 'Qwen';
+                    if (name.includes('gpt')) return 'GPT';
+                    if (name.includes('claude')) return 'Claude';
+                    return name.substring(0, 10);
+                  };
+                  
+                  return (
+                    <option 
+                      key={model.id} 
+                      value={model.type}
+                      style={{ backgroundColor: '#1E293B', color: '#F1F5F9' }}
+                    >
+                      {getShortName(model.name)}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          ) : (
+            <div className="px-2 py-2 text-xs text-gray-400 animate-pulse">
+              🤖
+            </div>
+          )}
+          
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={interrupt ? "请先确认或取消工具执行..." : "请描述您遇到的问题..."}
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400"
+            placeholder={interrupt ? "请先确认或取消工具执行..." : (window.innerWidth < 640 ? "请描述问题..." : "请描述您遇到的问题...")}
+            className="flex-1 px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-sm sm:text-base"
             style={{ backgroundColor: '#1E293B', borderColor: '#60A5FA', borderWidth: '2px', color: '#F1F5F9' }}
             disabled={isLoading || !!interrupt}
           />
@@ -1103,12 +1154,12 @@ export function DiagnosticChatView({
                 e.stopPropagation();
                 onCancel();
               }}
-              className="px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30 whitespace-nowrap"
+              className="px-3 sm:px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30 text-sm sm:text-base"
               style={{
                 animation: 'buttonPulse 1.5s ease-in-out infinite'
               }}
             >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="flex items-center gap-1 sm:gap-2">
                 <span 
                   style={{
                     display: 'inline-block',
@@ -1120,14 +1171,15 @@ export function DiagnosticChatView({
                     animation: 'buttonSpin 1s linear infinite'
                   }}
                 />
-                取消
+                <span className="hidden sm:inline">取消</span>
+                <span className="sm:hidden">×</span>
               </span>
             </Button>
           ) : (
             <Button
               type="submit"
               disabled={!inputValue.trim()}
-              className="bg-cyan-500 text-white px-6 py-2 rounded-lg hover:bg-cyan-600 disabled:opacity-50 shadow-lg border border-cyan-400 whitespace-nowrap"
+              className="bg-cyan-500 text-white px-4 py-2 rounded-lg hover:bg-cyan-600 disabled:opacity-50 shadow-lg border border-cyan-400 whitespace-nowrap"
             >
               发送
             </Button>

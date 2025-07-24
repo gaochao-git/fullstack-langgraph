@@ -58,9 +58,20 @@ class Configuration(BaseModel):
         """Create a ChatOpenAI instance with the configured settings."""
         from langchain_openai import ChatOpenAI
         
+        # 确定实际使用的模型和参数
+        actual_model = model_name or self.query_generator_model
+        actual_temperature = temperature if temperature is not None else self.model_temperature
+        
+        # 打印模型使用信息
+        print(f"🤖 创建LLM实例:")
+        print(f"   模型: {actual_model}")
+        print(f"   温度: {actual_temperature}")
+        print(f"   API端点: {self.model_base_url}")
+        print(f"   API密钥: {self.get_api_key()[:15]}..." if self.get_api_key() else "   API密钥: 未设置")
+        
         return ChatOpenAI(
-            model=model_name or self.query_generator_model,
-            temperature=temperature if temperature is not None else self.model_temperature,
+            model=actual_model,
+            temperature=actual_temperature,
             max_retries=self.model_max_retries,
             api_key=self.get_api_key(),
             base_url=self.model_base_url,
@@ -76,8 +87,22 @@ class Configuration(BaseModel):
         )
 
         # Try to load configuration from database first
-        agent_name = configurable.get("agent_name", "diagnostic_agent") 
-        db_config = AgentConfigService.get_model_config_from_agent(agent_name)
+        # 优先从configurable获取，fallback到assistant_id（从LangGraph上下文）
+        agent_name = configurable.get("agent_name") 
+        if not agent_name:
+            # 尝试从config的其他地方获取assistant_id
+            agent_name = config.get("assistant_id", "diagnostic_agent") if config else "diagnostic_agent"
+        
+        selected_model = configurable.get("selected_model")
+        
+        print(f"📊 配置加载:")
+        print(f"   智能体: {agent_name}")
+        print(f"   选择的模型: {selected_model or '使用默认配置'}")
+        print(f"   完整配置: {config}")
+        
+        db_config = AgentConfigService.get_model_config_from_agent(agent_name, selected_model)
+        
+        print(f"   数据库配置: 模型={db_config.get('model_name')}, 温度={db_config.get('temperature')}")
         
         # Get raw values from database, environment, or config (in that order)
         raw_values: dict[str, Any] = {}
@@ -106,9 +131,9 @@ class Configuration(BaseModel):
         return cls(**values)
     
     @classmethod
-    def from_agent_config(cls, agent_name: str = "diagnostic_agent") -> "Configuration":
+    def from_agent_config(cls, agent_name: str = "diagnostic_agent", selected_model: str = None) -> "Configuration":
         """Create a Configuration instance directly from agent database configuration."""
-        db_config = AgentConfigService.get_model_config_from_agent(agent_name)
+        db_config = AgentConfigService.get_model_config_from_agent(agent_name, selected_model)
         
         # Map database configuration to Configuration fields
         config_values = {

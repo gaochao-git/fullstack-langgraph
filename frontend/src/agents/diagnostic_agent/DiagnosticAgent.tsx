@@ -36,6 +36,14 @@ interface HistoryThread {
   update_at: string;
 }
 
+// 模型信息类型定义
+interface ModelInfo {
+  id: string;
+  name: string;
+  provider: string;
+  type: string;
+}
+
 // 内部组件，管理单个会话的所有状态
 function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
@@ -45,6 +53,10 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false); // 历史会话抽屉状态
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  
+  // 模型管理状态
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
+  const [currentModel, setCurrentModel] = useState<string>('');
 
   // 从URL参数中获取线程ID
   const getThreadIdFromUrl = () => {
@@ -96,6 +108,38 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
     },
   });
 
+  // 获取智能体的可用模型列表
+  useEffect(() => {
+    const fetchAgentAvailableModels = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/agents/diagnostic_agent/available-models`);
+        if (response.ok) {
+          const result = await response.json();
+          console.log('智能体可用模型API返回:', result);
+          
+          // 处理API返回的数据结构
+          const models: ModelInfo[] = (result.data?.models || []).map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            provider: item.provider,
+            type: item.type
+          }));
+          setAvailableModels(models);
+          console.log('智能体可用模型列表:', models);
+          
+          // 设置默认选中第一个模型
+          if (models.length > 0 && !currentModel) {
+            setCurrentModel(models[0].type);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch agent available models:', error);
+      }
+    };
+
+    fetchAgentAvailableModels();
+  }, [currentModel]);
+
   // 当新线程创建时，将线程ID同步到URL
   useEffect(() => {
     if (thread.threadId && !getThreadIdFromUrl()) {
@@ -136,17 +180,46 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
           id: Date.now().toString(),
         },
       ];
-      thread.submit({
+      // 构建完整的提交数据，包含模型选择信息
+      const submitData = {
         messages: newMessages,
         user_name: "zhangsan123", // 临时固定用户名，后续可从用户系统获取
-      });
+      };
+      
+      const submitConfig = currentModel ? {
+        configurable: {
+          selected_model: currentModel
+        }
+      } : undefined;
+      
+      console.log('🚀 前端提交数据:', submitData);
+      console.log('🚀 前端提交配置:', submitConfig);
+      
+      // 尝试将config直接放在第二个参数中
+      const submitOptions = submitConfig ? 
+        { 
+          config: submitConfig,
+          user_name: "zhangsan123"
+        } : 
+        { 
+          user_name: "zhangsan123" 
+        };
+      
+      console.log('🚀 最终提交选项:', submitOptions);
+      thread.submit(submitData, submitOptions);
     },
-    [thread]
+    [thread, currentModel]
   );
 
   const handleCancel = useCallback(() => {
     thread.stop();
   }, [thread]);
+
+  // 模型切换处理函数
+  const handleModelChange = useCallback((modelType: string) => {
+    setCurrentModel(modelType);
+    console.log('切换到模型:', modelType);
+  }, []);
 
   const handleInterruptResume = useCallback((approved: boolean) => {
 
@@ -233,6 +306,9 @@ function DiagnosticSession({ onNewSession }: { onNewSession: () => void }) {
             onInterruptResume={handleInterruptResume}
             onNewSession={onNewSession}
             onHistoryToggle={handleToggleHistoryDrawer}
+            availableModels={availableModels}
+            currentModel={currentModel}
+            onModelChange={handleModelChange}
           />
         )}
       </main>

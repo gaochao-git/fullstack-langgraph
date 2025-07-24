@@ -3,7 +3,7 @@ Agent configuration service for dynamic loading from database.
 """
 
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from ..database.config import get_db
 from ..database.models import AgentConfig
@@ -33,16 +33,19 @@ class AgentConfigService:
             if not agent:
                 return None
                 
-            # Convert to dictionary with all configuration fields
+            # 使用to_dict方法来确保正确的JSON解析
+            agent_dict = agent.to_dict()
+            
+            # 提取需要的字段
             config = {
-                'agent_name': agent.agent_name,
-                'description': agent.agent_description,
-                'capabilities': agent.agent_capabilities if isinstance(agent.agent_capabilities, list) else [],
-                'llm_config': agent.llm_info if agent.llm_info else {},
-                'prompt_config': agent.prompt_info if agent.prompt_info else {},
-                'tools_config': agent.tools_info if agent.tools_info else {},
-                'enabled': agent.agent_enabled,
-                'status': agent.agent_status
+                'agent_name': agent_dict.get('agent_name', ''),
+                'description': agent_dict.get('description', ''),
+                'capabilities': agent_dict.get('capabilities', []),
+                'llm_config': agent_dict.get('llm_info', {}),
+                'prompt_config': agent_dict.get('prompt_info', {}),
+                'tools_config': agent_dict.get('tools_info', {}),
+                'enabled': agent_dict.get('enabled', True),
+                'status': agent_dict.get('status', 'stopped')
             }
             
             return config
@@ -55,12 +58,13 @@ class AgentConfigService:
             db.close()
     
     @staticmethod 
-    def get_model_config_from_agent(agent_name: str) -> Dict[str, Any]:
+    def get_model_config_from_agent(agent_name: str, selected_model: str = None) -> Dict[str, Any]:
         """
         Extract model configuration from agent settings.
         
         Args:
             agent_name: Name of the agent
+            selected_model: Optional model to override the default configured model
             
         Returns:
             Dictionary containing model configuration with fallback defaults
@@ -70,7 +74,7 @@ class AgentConfigService:
         if not agent_config or not agent_config.get('llm_config'):
             # Return default configuration if agent not found or no LLM config
             return {
-                'model_name': 'deepseek-chat',
+                'model_name': selected_model or 'deepseek-chat',
                 'temperature': 0.1,
                 'max_tokens': 2000,
                 'base_url': 'https://api.deepseek.com',
@@ -125,7 +129,10 @@ class AgentConfigService:
             except (ValueError, TypeError):
                 presence_penalty = 0.0
         
-        model_name = llm_config.get('model_name', 'deepseek-chat')
+        # Use selected_model if provided, otherwise use configured model
+        model_name = selected_model or llm_config.get('model_name', 'deepseek-chat')
+        
+        print(f"🔧 模型选择逻辑: selected_model={selected_model}, configured_model={llm_config.get('model_name')}, final_model={model_name}")
         
         # Get model info from database (includes endpoint_url and api_key)
         model_info = AgentConfigService._get_model_info_from_db(model_name)
@@ -244,6 +251,74 @@ class AgentConfigService:
         except Exception as e:
             print(f"Error getting model info for {model_name}: {e}")
             return {}
+            
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_agent_available_models(agent_name: str) -> List[Dict[str, Any]]:
+        """
+        Get available models configured for a specific agent.
+        
+        Args:
+            agent_name: Name of the agent
+            
+        Returns:
+            List of available models with their details
+        """
+        agent_config = AgentConfigService.get_agent_config(agent_name)
+        
+        if not agent_config or not agent_config.get('llm_config'):
+            return []
+            
+        # get_agent_config返回的llm_config可能还是字符串，需要再次解析
+        llm_config = agent_config['llm_config']
+        
+        # 如果是字符串，尝试解析JSON
+        if isinstance(llm_config, str):
+            try:
+                import json
+                llm_config = json.loads(llm_config)
+            except (json.JSONDecodeError, ValueError):
+                return []
+        
+        if not isinstance(llm_config, dict):
+            return []
+            
+        # Get available models list from agent configuration
+        available_model_types = llm_config.get('available_models', [])
+        
+        if not available_model_types:
+            return []
+            
+        # Get model details from database for each available model
+        db_gen = get_db()
+        db: Session = next(db_gen)
+        
+        try:
+            from ..database.models import AIModelConfig
+            
+            models = []
+            for model_type in available_model_types:
+                model = db.query(AIModelConfig).filter(
+                    AIModelConfig.model_type == model_type,
+                    AIModelConfig.model_status == 'active'
+                ).first()
+                
+                if model:
+                    models.append({
+                        'id': model.model_id,
+                        'name': model.model_name,
+                        'provider': model.model_provider,
+                        'type': model.model_type,
+                        'endpoint': model.endpoint_url
+                    })
+            
+            return models
+            
+        except Exception as e:
+            print(f"Error getting agent available models for {agent_name}: {e}")
+            return []
             
         finally:
             db.close()

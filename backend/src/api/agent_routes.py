@@ -718,3 +718,26 @@ async def delete_agent(agent_id: str):
     except Exception as e:
         logger.error(f"删除智能体 {agent_id} 失败: {e}")
         raise HTTPException(status_code=500, detail="删除智能体失败")
+
+
+@router.get("/{agent_id}/available-models")
+async def get_agent_available_models(agent_id: str):
+    """获取指定智能体的可用模型列表"""
+    try:
+        from ..services.agent_config_service import AgentConfigService
+        
+        # 获取智能体的可用模型
+        models = AgentConfigService.get_agent_available_models(agent_id)
+        
+        return {
+            "code": 200,
+            "data": {
+                "agent_id": agent_id,
+                "models": models
+            },
+            "message": "获取智能体可用模型成功"
+        }
+        
+    except Exception as e:
+        logger.error(f"获取智能体 {agent_id} 可用模型失败: {e}")
+        raise HTTPException(status_code=500, detail="获取智能体可用模型失败")
