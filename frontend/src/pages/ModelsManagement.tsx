@@ -38,7 +38,7 @@ const MODEL_PROVIDERS = {
     icon: '🦙',
     color: '#52c41a',
     defaultEndpoint: 'http://localhost:11434',
-    models: ['llama2', 'llama3', 'codellama', 'mistral', 'qwen']
+    models: ['qwen3:4b', 'qwen3:8b', 'qwen3:0.6b', 'deepseek-r1:1.5b', 'llama2', 'llama3', 'codellama', 'mistral']
   },
   deepseek: {
     name: 'DeepSeek',
@@ -99,6 +99,7 @@ const ModelsManagement = () => {
   const [models, setModels] = useState<ModelConfig[]>(mockModels);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
+  const [formTestStatus, setFormTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [form] = Form.useForm();
 
   // 获取状态颜色
@@ -124,6 +125,7 @@ const ModelsManagement = () => {
   // 添加模型
   const handleAddModel = () => {
     setEditingModel(null);
+    setFormTestStatus('idle');
     form.resetFields();
     setModalVisible(true);
   };
@@ -131,6 +133,7 @@ const ModelsManagement = () => {
   // 编辑模型
   const handleEditModel = (model: ModelConfig) => {
     setEditingModel(model);
+    setFormTestStatus('idle');
     form.setFieldsValue(model);
     setModalVisible(true);
   };
@@ -149,6 +152,33 @@ const ModelsManagement = () => {
       message.destroy();
       message.success('连接测试成功');
     }, 2000);
+  };
+
+  // 表单中的测试连接
+  const handleFormTestConnection = async () => {
+    try {
+      const values = await form.validateFields(['endpoint', 'provider', 'model', 'apiKey']);
+      setFormTestStatus('testing');
+      
+      // 模拟测试连接
+      setTimeout(() => {
+        const success = Math.random() > 0.3; // 70% 成功率
+        if (success) {
+          setFormTestStatus('success');
+          message.success('连接测试成功');
+        } else {
+          setFormTestStatus('error');
+          message.error('连接测试失败，请检查配置');
+        }
+        
+        // 3秒后重置状态
+        setTimeout(() => {
+          setFormTestStatus('idle');
+        }, 3000);
+      }, 2000);
+    } catch (error) {
+      message.error('请先完善连接配置信息');
+    }
   };
 
   // 保存模型
@@ -179,6 +209,7 @@ const ModelsManagement = () => {
     
     setModalVisible(false);
     form.resetFields();
+    setFormTestStatus('idle');
   };
 
   // 表格列定义
@@ -298,7 +329,10 @@ const ModelsManagement = () => {
       <Modal
         title={editingModel ? '编辑模型' : '添加模型'}
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          setModalVisible(false);
+          setFormTestStatus('idle');
+        }}
         footer={null}
         width={600}
       >
@@ -370,12 +404,38 @@ const ModelsManagement = () => {
             }}
           </Form.Item>
 
-          <Form.Item
-            label="端点地址"
-            name="endpoint"
-            rules={[{ required: true, message: '请输入端点地址' }]}
-          >
-            <Input placeholder="https://api.example.com" />
+          <Form.Item label="端点地址" required>
+            <Row gutter={8} align="middle" wrap={false}>
+              <Col flex="auto">
+                <Form.Item
+                  name="endpoint"
+                  noStyle
+                  rules={[{ required: true, message: '请输入端点地址' }]}
+                >
+                  <Input placeholder="https://api.example.com" />
+                </Form.Item>
+              </Col>
+              <Col>
+                <Button 
+                  type="primary"
+                  loading={formTestStatus === 'testing'}
+                  onClick={handleFormTestConnection}
+                  icon={<ExperimentOutlined />}
+                  style={{
+                    borderColor: formTestStatus === 'success' ? '#52c41a' : 
+                                formTestStatus === 'error' ? '#ff4d4f' : undefined,
+                    backgroundColor: formTestStatus === 'success' ? '#f6ffed' : 
+                                   formTestStatus === 'error' ? '#fff2f0' : undefined,
+                    color: formTestStatus === 'success' ? '#52c41a' : 
+                          formTestStatus === 'error' ? '#ff4d4f' : undefined
+                  }}
+                >
+                  {formTestStatus === 'testing' ? '测试中' : 
+                   formTestStatus === 'success' ? '测试成功' :
+                   formTestStatus === 'error' ? '测试失败' : '测试连接'}
+                </Button>
+              </Col>
+            </Row>
           </Form.Item>
 
           <Form.Item
