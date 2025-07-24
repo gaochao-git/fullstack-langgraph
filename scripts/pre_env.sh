@@ -159,7 +159,7 @@ cleanup_environment() {
     echo "  - systemd服务: omind.service"
 }
 
-# 检测Python环境功能
+# 统一Python环境检测函数
 detect_python_environment() {
     echo "🔍 检测Python环境..."
     
@@ -182,7 +182,7 @@ detect_python_environment() {
         fi
     fi
     
-    # 自动检测Python环境
+    # 自动检测Python环境，降级到系统Python
     echo "🔍 尝试系统Python环境..."
     for python_cmd in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3 python; do
         if command -v "$python_cmd" >/dev/null 2>&1; then
@@ -291,14 +291,8 @@ init_environment() {
         exit 1
     fi
     
-    # 更新脚本中的Python路径配置
-    echo "🔧 更新脚本配置..."
-    if [ -f "scripts/start_mcp.sh" ]; then
-        sed -i.bak "s|VALID_PYTHON_PATH=.*|VALID_PYTHON_PATH=(\"$FULL_DEPLOY_PATH/venv\")|g" scripts/start_mcp.sh
-    fi
-    if [ -f "scripts/start_backend.sh" ]; then
-        sed -i.bak "s|VALID_PYTHON_PATH=.*|VALID_PYTHON_PATH=(\"$FULL_DEPLOY_PATH/venv\")|g" scripts/start_backend.sh
-    fi
+    # 脚本已使用统一的Python环境检测逻辑，无需额外配置
+    echo "✅ 脚本使用统一Python环境检测逻辑"
     
     # 设置脚本执行权限
     chmod +x scripts/*.sh

@@ -373,7 +373,7 @@ echo_success "文件更新完成"
 # 7. 更新依赖
 echo_info "步骤 7/8: 检查并更新Python依赖..."
 
-# 检测Python环境函数
+# 统一Python环境检测函数
 detect_python_env() {
     # 优先使用部署目录下的venv环境
     local VENV_PYTHON="$DEPLOY_DIR/venv/bin/python3"
@@ -385,7 +385,7 @@ detect_python_env() {
         echo_warning "未找到部署venv环境: $VENV_PYTHON"
     fi
     
-    # 如果venv环境不可用，尝试系统Python
+    # 如果venv环境不可用，降级到系统Python
     echo_info "尝试系统Python环境..."
     for python_cmd in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3 python; do
         if command -v "$python_cmd" >/dev/null 2>&1; then

@@ -3,7 +3,11 @@
 # MCP服务器状态检查脚本
 # 检查所有MCP服务器的运行状态
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../mcp_servers" && pwd)"
+# 切换到项目根目录
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
+
+SCRIPT_DIR="$PROJECT_ROOT/mcp_servers"
 cd "$SCRIPT_DIR"
 
 echo "检查MCP服务器状态..."

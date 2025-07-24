@@ -8,50 +8,19 @@
 # ====================
 
 # 切换到项目根目录
-cd "$(dirname "$0")/.."
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$PROJECT_ROOT"
 
-# 检测可用的Python环境
-PYTHON_CMD=""
-echo "🔍 检测Python环境..."
-
-# 优先使用部署目录下的venv环境
-VENV_PYTHON="$(pwd)/venv/bin/python3"
-if [ -f "$VENV_PYTHON" ]; then
-    echo "   发现部署venv环境: $VENV_PYTHON"
-    source "$(pwd)/venv/bin/activate"
-    if python --version &> /dev/null; then
-        PYTHON_CMD="python"
-        echo "✅ 使用部署venv环境: $(pwd)/venv ($(python --version))"
-    else
-        echo "⚠️ 部署venv环境激活失败"
-    fi
-else
-    echo "⚠️ 未找到部署venv环境: $VENV_PYTHON"
-fi
-
-# 如果venv环境不可用，尝试系统Python
-if [ -z "$PYTHON_CMD" ]; then
-    echo "🔍 尝试系统Python环境..."
-    for python_cmd in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3 python; do
-        if command -v "$python_cmd" >/dev/null 2>&1; then
-            PYTHON_VERSION=$($python_cmd --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
-            echo "   发现Python: $python_cmd (版本: $PYTHON_VERSION)"
-            if [[ "$PYTHON_VERSION" =~ ^3\.(1[0-9]|[6-9])$ ]]; then
-                PYTHON_CMD="$python_cmd"
-                echo "✅ 使用系统Python: $python_cmd (版本: $PYTHON_VERSION)"
-                break
-            fi
-        fi
-    done
-fi
-
-if [ -z "$PYTHON_CMD" ]; then
-    echo "❌ 错误: 未找到有效的Python环境"
-    echo "请确保存在以下之一:"
-    echo "  1. 部署目录下的venv环境: $(pwd)/venv/bin/python3"
-    echo "  2. 系统Python 3.6+ 环境"
+# 检查venv环境
+VENV_PYTHON="$PROJECT_ROOT/venv/bin/python3"
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "❌ 错误: 未找到venv环境: $VENV_PYTHON"
+    echo "请先在项目根目录创建venv环境"
     exit 1
 fi
+
+echo "✅ 使用venv环境: $VENV_PYTHON"
+PYTHON_CMD="$VENV_PYTHON"
 
 # 创建必要的目录
 mkdir -p mcp_servers/logs mcp_servers/pids
