@@ -53,6 +53,14 @@
         "tool": "execute_system_command",
         "args": "top -b -n1 | head -12; iotop -b -n1 | head -10",
         "requires_approval": false
+      },
+      {
+        "step": 7,
+        "description": "故障自愈",
+        "ai_generated": true,
+        "tool": "execute_mysql_query",
+        "args": "如果是由于慢查询导致的，则kill掉慢查询的连接，快速恢复业务",
+        "requires_approval": false
       }
     ],
     "tools_required": ["execute_mysql_query", "get_es_data", "get_es_indices", "get_es_trends_data", "get_zabbix_metric_data", "get_zabbix_metrics", "execute_system_command"],

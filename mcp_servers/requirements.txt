@@ -10,3 +10,6 @@ paramiko==3.5.1
 
 # Elasticsearch工具依赖
 requests==2.32.4
+
+# 管理脚本依赖
+PyYAML==6.0.1
