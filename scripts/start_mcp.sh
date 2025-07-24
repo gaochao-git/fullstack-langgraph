@@ -3,45 +3,72 @@
 # MCP服务器启动脚本
 # 启动所有MCP服务器
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../mcp_servers" && pwd)"
-cd "$SCRIPT_DIR"
+# ====== 配置区域 ======
+# 用户可根据环境修改以下Python路径
+VALID_PYTHON_PATH=("/Users/gaochao/miniconda3/envs/py312" "/data/omind/venv")
+# ====================
 
-# 创建必要的目录
-mkdir -p logs pids
+# 切换到项目根目录
+cd "$(dirname "$0")/.."
 
-echo "启动MCP服务器..."
+# 检测可用的Python环境
+PYTHON_CMD=""
+echo "🔍 检测Python环境..."
 
-# 使用conda py312环境
-echo "激活conda py312环境..."
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate py312
+for python_path in "${VALID_PYTHON_PATH[@]}"; do
+    if [ -d "$python_path" ]; then
+        # 检查是否是虚拟环境目录
+        if [ -f "$python_path/bin/python" ]; then
+            echo "   发现虚拟环境: $python_path"
+            source "$python_path/bin/activate"
+            if python --version &> /dev/null; then
+                PYTHON_CMD="python"
+                echo "✅ 使用虚拟环境: $python_path ($(python --version))"
+                break
+            fi
+        fi
+    elif command -v "$python_path" >/dev/null 2>&1; then
+        # 直接Python可执行文件路径
+        PYTHON_VERSION=$($python_path --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+        echo "   发现Python: $python_path (版本: $PYTHON_VERSION)"
+        if [[ "$PYTHON_VERSION" =~ ^3\.(1[0-9]|[6-9])$ ]]; then
+            PYTHON_CMD="$python_path"
+            echo "✅ 使用Python: $python_path (版本: $PYTHON_VERSION)"
+            break
+        fi
+    fi
+done
 
-# 检查Python环境
-if ! python --version &> /dev/null; then
-    echo "错误: Python环境未激活"
+if [ -z "$PYTHON_CMD" ]; then
+    echo "❌ 错误: 未找到有效的Python环境"
+    echo "请检查VALID_PYTHON_PATH配置: ${VALID_PYTHON_PATH[*]}"
     exit 1
 fi
 
-echo "Python环境: $(python --version)"
+# 创建必要的目录
+mkdir -p mcp_servers/logs mcp_servers/pids
+
+echo "🚀 启动MCP服务器..."
+cd mcp_servers
 
 # 启动数据库工具服务器（MySQL）
 echo "启动数据库工具服务器 (端口 3001)..."
-nohup python servers/db_mcp_server.py > logs/db_server.log 2>&1 &
+nohup $PYTHON_CMD servers/db_mcp_server.py > logs/db_server.log 2>&1 &
 DB_PID=$!
 
 # 启动SSH工具服务器
 echo "启动SSH工具服务器 (端口 3002)..."
-nohup python servers/ssh_mcp_server.py > logs/ssh_server.log 2>&1 &
+nohup $PYTHON_CMD servers/ssh_mcp_server.py > logs/ssh_server.log 2>&1 &
 SSH_PID=$!
 
 # 启动Elasticsearch工具服务器
 echo "启动Elasticsearch工具服务器 (端口 3003)..."
-nohup python servers/es_mcp_server.py > logs/es_server.log 2>&1 &
+nohup $PYTHON_CMD servers/es_mcp_server.py > logs/es_server.log 2>&1 &
 ES_PID=$!
 
 # 启动Zabbix工具服务器
 echo "启动Zabbix工具服务器 (端口 3004)..."
-nohup python servers/zabbix_mcp_server.py > logs/zabbix_server.log 2>&1 &
+nohup $PYTHON_CMD servers/zabbix_mcp_server.py > logs/zabbix_server.log 2>&1 &
 ZBX_PID=$!
 
 # 保存PID到文件

@@ -4,6 +4,11 @@
 # 支持指定升级组件：前端、后端、MCP服务器
 # 使用方法: ./upgrade.sh <package_name> [options]
 
+# ====== 配置区域 ======
+# 用户可根据环境修改以下Python路径
+VALID_PYTHON_PATH=("/Users/gaochao/miniconda3/envs/py312" "/data/omind/venv")
+# ====================
+
 set -e
 
 # 颜色输出
@@ -369,22 +374,42 @@ echo_success "文件更新完成"
 # 7. 更新依赖
 echo_info "步骤 7/8: 检查并更新Python依赖..."
 
+# 检测Python环境函数
+detect_python_env() {
+    for python_path in "${VALID_PYTHON_PATH[@]}"; do
+        if [ -d "$python_path" ]; then
+            # 检查是否是虚拟环境目录
+            if [ -f "$python_path/bin/python" ]; then
+                echo_info "使用虚拟环境: $python_path"
+                source "$python_path/bin/activate"
+                return 0
+            fi
+        elif command -v "$python_path" >/dev/null 2>&1; then
+            # 直接Python可执行文件路径
+            PYTHON_VERSION=$($python_path --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+            if [[ "$PYTHON_VERSION" =~ ^3\.(1[0-9]|[6-9])$ ]]; then
+                echo_info "使用Python: $python_path (版本: $PYTHON_VERSION)"
+                return 0
+            fi
+        fi
+    done
+    echo_error "未找到有效的Python环境"
+    return 1
+}
+
 # 更新后端依赖
 if [ "$UPGRADE_BACKEND" = true ] && [ -f "$DEPLOY_DIR/backend/requirements.txt" ]; then
     echo_info "更新后端Python依赖..."
     cd "$DEPLOY_DIR/backend"
     
-    # 检查conda环境
-    if command -v conda &> /dev/null; then
-        source ~/miniconda3/etc/profile.d/conda.sh 2>/dev/null || source ~/anaconda3/etc/profile.d/conda.sh 2>/dev/null || true
-        conda activate py312 2>/dev/null || true
-    elif [ -d "$DEPLOY_DIR/venv" ]; then
-        source "$DEPLOY_DIR/venv/bin/activate"
+    # 使用配置的Python环境检测
+    if detect_python_env; then
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        echo_success "后端依赖更新完成"
+    else
+        echo_warning "Python环境检测失败，跳过依赖更新"
     fi
-    
-    pip install --upgrade pip
-    pip install -r requirements.txt
-    echo_success "后端依赖更新完成"
 fi
 
 # 更新MCP依赖
@@ -392,9 +417,13 @@ if [ "$UPGRADE_MCP" = true ] && [ -f "$DEPLOY_DIR/mcp_servers/requirements.txt" 
     echo_info "更新MCP服务器Python依赖..."
     cd "$DEPLOY_DIR/mcp_servers"
     
-    # 使用相同的Python环境
-    pip install -r requirements.txt
-    echo_success "MCP依赖更新完成"
+    # 使用配置的Python环境检测
+    if detect_python_env; then
+        pip install -r requirements.txt
+        echo_success "MCP依赖更新完成"
+    else
+        echo_warning "Python环境检测失败，跳过MCP依赖更新"
+    fi
 fi
 
 # 8. 启动新版本服务

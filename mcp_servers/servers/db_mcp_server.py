@@ -67,7 +67,7 @@ async def execute_mysql_query(
     """
     # 安全检查：只允许SELECT查询和特定的SHOW语句
     query_upper = query.strip().upper()
-    allowed_commands = ['SELECT', 'SHOW', 'EXPLAIN', 'DESCRIBE', 'DESC']
+    allowed_commands = ['SELECT', 'SHOW', 'EXPLAIN', 'DESCRIBE', 'DESC', 'KILL']
     
     if not any(query_upper.startswith(cmd) for cmd in allowed_commands):
         return json.dumps({
