@@ -1,6 +1,6 @@
 # MCP服务器依赖
-fastmcp==0.4.0
-uvicorn==0.35.0
+fastmcp==2.10.6
+uvicorn==0.34.3
 
 # 数据库工具依赖
 PyMySQL==1.1.1
@@ -12,4 +12,4 @@ paramiko==3.5.1
 requests==2.32.4
 
 # 管理脚本依赖
-PyYAML==6.0.1
+PyYAML==6.0.2
