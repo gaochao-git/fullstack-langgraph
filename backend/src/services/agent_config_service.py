@@ -1,0 +1,307 @@
+"""
+Agent configuration service for dynamic loading from database.
+"""
+
+import asyncio
+from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
+from ..database.config import get_db
+from ..database.models import AgentConfig
+
+
+class AgentConfigService:
+    """Service to manage agent configurations from database."""
+    
+    @staticmethod
+    def get_agent_config(agent_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get agent configuration from database.
+        
+        Args:
+            agent_name: Name of the agent to get configuration for
+            
+        Returns:
+            Dictionary containing agent configuration or None if not found
+        """
+        db_gen = get_db()
+        db: Session = next(db_gen)
+        
+        try:
+            # Query agent by agent_id (which corresponds to agent name)
+            agent = db.query(AgentConfig).filter(AgentConfig.agent_id == agent_name).first()
+            
+            if not agent:
+                return None
+                
+            # Convert to dictionary with all configuration fields
+            config = {
+                'agent_name': agent.agent_name,
+                'description': agent.agent_description,
+                'capabilities': agent.agent_capabilities if isinstance(agent.agent_capabilities, list) else [],
+                'llm_config': agent.llm_info if agent.llm_info else {},
+                'prompt_config': agent.prompt_info if agent.prompt_info else {},
+                'tools_config': agent.tools_info if agent.tools_info else {},
+                'enabled': agent.agent_enabled,
+                'status': agent.agent_status
+            }
+            
+            return config
+            
+        except Exception as e:
+            print(f"Error loading agent config for {agent_name}: {e}")
+            return None
+            
+        finally:
+            db.close()
+    
+    @staticmethod 
+    def get_model_config_from_agent(agent_name: str) -> Dict[str, Any]:
+        """
+        Extract model configuration from agent settings.
+        
+        Args:
+            agent_name: Name of the agent
+            
+        Returns:
+            Dictionary containing model configuration with fallback defaults
+        """
+        agent_config = AgentConfigService.get_agent_config(agent_name)
+        
+        if not agent_config or not agent_config.get('llm_config'):
+            # Return default configuration if agent not found or no LLM config
+            return {
+                'model_name': 'deepseek-chat',
+                'temperature': 0.1,
+                'max_tokens': 2000,
+                'base_url': 'https://api.deepseek.com',
+                'available_models': ['deepseek-chat']
+            }
+        
+        llm_config = agent_config['llm_config']
+        
+        # Handle case where llm_config might be a JSON string
+        if isinstance(llm_config, str):
+            try:
+                import json
+                llm_config = json.loads(llm_config)
+            except (json.JSONDecodeError, ValueError):
+                llm_config = {}
+        elif not isinstance(llm_config, dict):
+            llm_config = {}
+        
+        # Extract configuration with fallbacks and type conversion
+        temperature = llm_config.get('temperature', 0.1)
+        if isinstance(temperature, str):
+            try:
+                temperature = float(temperature)
+            except (ValueError, TypeError):
+                temperature = 0.1
+        
+        max_tokens = llm_config.get('max_tokens', 2000)
+        if isinstance(max_tokens, str):
+            try:
+                max_tokens = int(max_tokens)
+            except (ValueError, TypeError):
+                max_tokens = 2000
+        
+        top_p = llm_config.get('top_p', 1.0)
+        if isinstance(top_p, str):
+            try:
+                top_p = float(top_p)
+            except (ValueError, TypeError):
+                top_p = 1.0
+        
+        frequency_penalty = llm_config.get('frequency_penalty', 0.0)
+        if isinstance(frequency_penalty, str):
+            try:
+                frequency_penalty = float(frequency_penalty)
+            except (ValueError, TypeError):
+                frequency_penalty = 0.0
+        
+        presence_penalty = llm_config.get('presence_penalty', 0.0)
+        if isinstance(presence_penalty, str):
+            try:
+                presence_penalty = float(presence_penalty)
+            except (ValueError, TypeError):
+                presence_penalty = 0.0
+        
+        model_name = llm_config.get('model_name', 'deepseek-chat')
+        base_url = AgentConfigService._get_base_url_for_model(model_name)
+        
+        # Try to get API key from database for this model
+        api_key = AgentConfigService._get_api_key_for_model(model_name)
+        
+        result = {
+            'model_name': model_name,
+            'temperature': temperature,
+            'max_tokens': max_tokens,
+            'top_p': top_p,
+            'frequency_penalty': frequency_penalty,
+            'presence_penalty': presence_penalty,
+            'available_models': llm_config.get('available_models', ['deepseek-chat']),
+            'base_url': base_url
+        }
+        
+        # Add API key if found in database
+        if api_key:
+            result['api_key'] = api_key
+            
+        return result
+    
+    @staticmethod
+    def get_prompt_config_from_agent(agent_name: str) -> Dict[str, str]:
+        """
+        Extract prompt configuration from agent settings.
+        
+        Args:
+            agent_name: Name of the agent
+            
+        Returns:
+            Dictionary containing prompt configuration
+        """
+        agent_config = AgentConfigService.get_agent_config(agent_name)
+        
+        if not agent_config or not agent_config.get('prompt_config'):
+            # Return default system prompt if not configured
+            return {
+                'system_prompt': f'你是一个专业的智能运维助手，名为{agent_name}。请根据用户需求提供专业的帮助。',
+                'user_prompt_template': '',
+                'assistant_prompt_template': ''
+            }
+        
+        prompt_config = agent_config['prompt_config']
+        
+        # Handle case where prompt_config might be a JSON string
+        if isinstance(prompt_config, str):
+            try:
+                import json
+                # Try to parse as JSON first
+                parsed_config = json.loads(prompt_config)
+                if isinstance(parsed_config, dict):
+                    prompt_config = parsed_config
+                else:
+                    # If parsed but not a dict, treat original string as system_prompt
+                    prompt_config = {'system_prompt': prompt_config}
+            except (json.JSONDecodeError, ValueError):
+                # If not valid JSON, treat as plain system prompt
+                prompt_config = {'system_prompt': prompt_config}
+        
+        # Handle case where prompt_config might be other types
+        if isinstance(prompt_config, str):
+            return {
+                'system_prompt': prompt_config,
+                'user_prompt_template': '',
+                'assistant_prompt_template': ''
+            }
+        elif isinstance(prompt_config, dict):
+            return {
+                'system_prompt': prompt_config.get('system_prompt', f'你是一个专业的智能运维助手，名为{agent_name}。'),
+                'user_prompt_template': prompt_config.get('user_prompt_template', ''),
+                'assistant_prompt_template': prompt_config.get('assistant_prompt_template', '')
+            }
+        else:
+            # Fallback for unexpected types
+            return {
+                'system_prompt': f'你是一个专业的智能运维助手，名为{agent_name}。请根据用户需求提供专业的帮助。',
+                'user_prompt_template': '',
+                'assistant_prompt_template': ''
+            }
+    
+    @staticmethod
+    def _get_base_url_for_model(model_name: str) -> str:
+        """
+        Map model name to appropriate base URL.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            Appropriate base URL for the model
+        """
+        # Basic model to provider mapping
+        if 'deepseek' in model_name.lower():
+            return 'https://api.deepseek.com'
+        elif 'gpt-' in model_name.lower() or 'openai' in model_name.lower():
+            return 'https://api.openai.com/v1'
+        elif 'claude' in model_name.lower():
+            return 'https://api.anthropic.com'
+        elif 'qwen' in model_name.lower():
+            return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+        else:
+            # Default fallback
+            return 'https://api.deepseek.com'
+    
+    @staticmethod
+    def _get_api_key_for_model(model_name: str) -> Optional[str]:
+        """
+        Get API key for a specific model from database.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            API key if found, None otherwise
+        """
+        db_gen = get_db()
+        db: Session = next(db_gen)
+        
+        try:
+            # Import here to avoid circular imports
+            from ..database.models import AIModelConfig
+            
+            # Query model by model_type (which matches model_name)
+            model = db.query(AIModelConfig).filter(
+                AIModelConfig.model_type == model_name,
+                AIModelConfig.model_status == 'active'
+            ).first()
+            
+            if model and model.api_key_value:
+                return model.api_key_value
+            
+            return None
+            
+        except Exception as e:
+            print(f"Error getting API key for model {model_name}: {e}")
+            return None
+            
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_available_models_from_db() -> Dict[str, Any]:
+        """
+        Get available active models from database.
+        
+        Returns:
+            Dictionary mapping model names to their configurations
+        """
+        db_gen = get_db()
+        db: Session = next(db_gen)
+        
+        try:
+            # Import here to avoid circular imports
+            from ..database.models import AIModelConfig
+            
+            # Query active models
+            models = db.query(AIModelConfig).filter(
+                AIModelConfig.model_status == 'active'
+            ).all()
+            
+            model_map = {}
+            for model in models:
+                model_map[model.model_type] = {
+                    'name': model.model_name,
+                    'provider': model.model_provider,
+                    'endpoint': model.endpoint_url,
+                    'api_key': model.api_key_value,
+                    'model_type': model.model_type
+                }
+            
+            return model_map
+            
+        except Exception as e:
+            print(f"Error loading available models: {e}")
+            return {}
+            
+        finally:
+            db.close()

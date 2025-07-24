@@ -3,8 +3,10 @@
 专门管理智能运维助手的提示词
 """
 
-# 智能运维助手的系统提示词 - 当前唯一使用的提示词
-SYSTEM_PROMPT = """你是一个专业的智能运维助手，具备以下核心能力：
+from ...services.agent_config_service import AgentConfigService
+
+# 默认智能运维助手的系统提示词 - 作为后备方案
+DEFAULT_SYSTEM_PROMPT = """你是一个专业的智能运维助手，具备以下核心能力：
 
 🔧 **技术支持**：
 - 回答各种运维、开发、系统管理相关问题
@@ -36,5 +38,32 @@ SYSTEM_PROMPT = """你是一个专业的智能运维助手，具备以下核心�
 
 请以友好、专业的态度协助用户解决技术问题，灵活使用工具来提供准确的帮助。"""
 
+def get_system_prompt(agent_name: str = "diagnostic_agent") -> str:
+    """
+    获取智能体的系统提示词，优先从数据库获取，否则使用默认提示词。
+    
+    Args:
+        agent_name: 智能体名称
+        
+    Returns:
+        系统提示词字符串
+    """
+    try:
+        prompt_config = AgentConfigService.get_prompt_config_from_agent(agent_name)
+        system_prompt = prompt_config.get('system_prompt', '').strip()
+        
+        # 如果数据库中有有效的系统提示词，使用它
+        if system_prompt:
+            return system_prompt
+            
+    except Exception as e:
+        print(f"Warning: Failed to load system prompt from database for {agent_name}: {e}")
+    
+    # 后备方案：使用默认提示词
+    return DEFAULT_SYSTEM_PROMPT
+
+# 保持向后兼容性
+SYSTEM_PROMPT = get_system_prompt()
+
 # 导出提示词
-__all__ = ["SYSTEM_PROMPT"]
+__all__ = ["get_system_prompt", "SYSTEM_PROMPT", "DEFAULT_SYSTEM_PROMPT"]

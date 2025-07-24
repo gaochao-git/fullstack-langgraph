@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
+from ...services.agent_config_service import AgentConfigService
 
 
 class Configuration(BaseModel):
@@ -42,6 +43,8 @@ class Configuration(BaseModel):
                 api_key = os.environ.get("ZHIPUAI_API_KEY")
             case url if "moonshot.cn" in url:
                 api_key = os.environ.get("MOONSHOT_API_KEY")
+            case url if "dashscope.aliyuncs.com" in url:
+                api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("ALIBABA_CLOUD_API_KEY")
             case _:
                 # Default fallback
                 api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
@@ -72,13 +75,52 @@ class Configuration(BaseModel):
             config["configurable"] if config and "configurable" in config else {}
         )
 
-        # Get raw values from environment or config
-        raw_values: dict[str, Any] = {
-            name: os.environ.get(name.upper(), configurable.get(name))
-            for name in cls.model_fields.keys()
-        }
+        # Try to load configuration from database first
+        agent_name = configurable.get("agent_name", "diagnostic_agent") 
+        db_config = AgentConfigService.get_model_config_from_agent(agent_name)
+        
+        # Get raw values from database, environment, or config (in that order)
+        raw_values: dict[str, Any] = {}
+        for name in cls.model_fields.keys():
+            value = None
+            
+            # Map database config to configuration fields
+            if name == "query_generator_model" or name == "reflection_model" or name == "answer_model":
+                value = db_config.get("model_name")
+            elif name == "model_temperature":
+                value = db_config.get("temperature")
+            elif name == "model_base_url":
+                value = db_config.get("base_url")
+            elif name == "model_api_key":
+                value = db_config.get("api_key")
+            
+            # Fallback to environment or configurable
+            if value is None:
+                value = os.environ.get(name.upper(), configurable.get(name))
+                
+            raw_values[name] = value
 
         # Filter out None values
         values = {k: v for k, v in raw_values.items() if v is not None}
 
         return cls(**values)
+    
+    @classmethod
+    def from_agent_config(cls, agent_name: str = "diagnostic_agent") -> "Configuration":
+        """Create a Configuration instance directly from agent database configuration."""
+        db_config = AgentConfigService.get_model_config_from_agent(agent_name)
+        
+        # Map database configuration to Configuration fields
+        config_values = {
+            "query_generator_model": db_config.get("model_name", "deepseek-chat"),
+            "reflection_model": db_config.get("model_name", "deepseek-chat"), 
+            "answer_model": db_config.get("model_name", "deepseek-chat"),
+            "model_temperature": db_config.get("temperature", 0.1),
+            "model_base_url": db_config.get("base_url", "https://api.deepseek.com"),
+        }
+        
+        # Add API key if available from database
+        if db_config.get("api_key"):
+            config_values["model_api_key"] = db_config.get("api_key")
+        
+        return cls(**config_values)

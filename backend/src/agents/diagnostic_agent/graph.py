@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from .configuration import Configuration
 from .state import DiagnosticState
 from .utils import compile_graph_with_checkpointer
-from .prompts import SYSTEM_PROMPT
+from .prompts import get_system_prompt
 from .tools_mcp import get_diagnostic_tools
 
 def create_main_graph(enable_tool_approval: bool = False):
@@ -23,7 +23,13 @@ def create_main_graph(enable_tool_approval: bool = False):
     async def create_agent(state: DiagnosticState, config: RunnableConfig):
         llm = get_llm_from_config(config)
         tools = await get_diagnostic_tools(enable_tool_approval)
-        agent = create_react_agent(model=llm, tools=tools, prompt=SYSTEM_PROMPT)
+        
+        # 获取智能体名称并获取对应的系统提示词
+        configurable = config.get("configurable", {}) if config else {}
+        agent_name = configurable.get("agent_name", "diagnostic_agent")
+        system_prompt = get_system_prompt(agent_name)
+        
+        agent = create_react_agent(model=llm, tools=tools, prompt=system_prompt)
         return await agent.ainvoke(state, config)
     
     builder = StateGraph(DiagnosticState, config_schema=Configuration)
