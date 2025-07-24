@@ -18,7 +18,8 @@ import {
   Avatar,
   Tabs,
   Tree,
-  Form
+  Form,
+  Tooltip
 } from 'antd';
 import { 
   RobotOutlined,
@@ -130,6 +131,7 @@ const transformMCPServerToLocal = (server: MCPServer): LocalMCPServer => ({
 const AgentManagement: React.FC = () => {
   const [agents, setAgents] = useState<LocalAgent[]>([]);
   const [mcpServers, setMcpServers] = useState<LocalMCPServer[]>([]);
+  const [availableModels, setAvailableModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -314,13 +316,30 @@ const AgentManagement: React.FC = () => {
     });
   };
 
+  // 加载可用模型
+  const loadAvailableModels = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/ai-models');
+      const data = await response.json();
+      if (data.code === 200) {
+        const activeModels = data.data.items.filter((model: any) => model.status === 'active');
+        setAvailableModels(activeModels);
+      }
+    } catch (error) {
+      console.error('加载可用模型失败:', error);
+      // 如果加载失败，使用默认模型
+      setAvailableModels([]);
+    }
+  };
+
   // 数据加载
   const loadData = async () => {
     setLoading(true);
     try {
       const [agentsData, mcpServersData] = await Promise.all([
         agentApi.getAgents(),
-        agentApi.getMCPServers()
+        agentApi.getMCPServers(),
+        loadAvailableModels()
       ]);
       
       setAgents(agentsData.map(transformAgentToLocal));
@@ -521,7 +540,7 @@ const AgentManagement: React.FC = () => {
             description: agent.description,
             capabilities: agent.capabilities,
             // LLM配置 - 从智能体配置中获取，否则使用默认值
-            model_name: (fullAgent as any).llm_info?.model_name || 'gpt-4',
+            available_models: (fullAgent as any).llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
             temperature: (fullAgent as any).llm_info?.temperature || 0.7,
             max_tokens: (fullAgent as any).llm_info?.max_tokens || 2000,
             top_p: (fullAgent as any).llm_info?.top_p || 1.0,
@@ -571,8 +590,10 @@ const AgentManagement: React.FC = () => {
       };
 
       // 构建LLM配置
+      const availableModelsList = values.available_models || ['gpt-4'];
       const llmConfig = {
-        model_name: values.model_name || 'gpt-4',
+        available_models: availableModelsList,
+        model_name: availableModelsList[0], // 使用第一个模型作为默认模型
         temperature: values.temperature || 0.7,
         max_tokens: values.max_tokens || 2000,
         top_p: values.top_p || 1.0,
@@ -905,7 +926,7 @@ const AgentManagement: React.FC = () => {
             description: editingAgent.description,
             capabilities: editingAgent.capabilities,
             // LLM配置默认值
-            model_name: 'gpt-4',
+            available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
             temperature: 0.7,
             max_tokens: 2000,
             top_p: 1.0,
@@ -918,7 +939,7 @@ const AgentManagement: React.FC = () => {
           } : {
             capabilities: [],
             // LLM配置默认值
-            model_name: 'gpt-4',
+            available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
             temperature: 0.7,
             max_tokens: 2000,
             top_p: 1.0,
@@ -1113,46 +1134,72 @@ const AgentManagement: React.FC = () => {
             {/* LLM配置 */}
             <TabPane tab="大模型配置" key="llm">
               <Row gutter={16}>
-                <Col span={12}>
+                <Col span={24}>
                   <Form.Item
-                    label="模型名称"
-                    name="model_name"
-                    rules={[{ required: true, message: '请选择模型' }]}
+                    label="可用模型"
+                    name="available_models"
+                    rules={[{ required: true, message: '请至少选择一个模型' }]}
                   >
-                    <Select placeholder="选择模型">
-                      <Option value="gpt-4">GPT-4</Option>
-                      <Option value="gpt-4-turbo">GPT-4 Turbo</Option>
-                      <Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Option>
-                      <Option value="claude-3-opus">Claude-3 Opus</Option>
-                      <Option value="claude-3-sonnet">Claude-3 Sonnet</Option>
-                      <Option value="claude-3-haiku">Claude-3 Haiku</Option>
+                    <Select 
+                      mode="multiple" 
+                      placeholder="选择智能体可以使用的模型" 
+                      showSearch
+                      optionFilterProp="children"
+                    >
+                      {availableModels.length > 0 ? (
+                        availableModels.map(model => (
+                          <Option key={model.id} value={model.model}>
+                            <span style={{ fontWeight: 500 }}>{model.name}</span>
+                            <span style={{ marginLeft: 8, color: '#666', fontSize: '12px' }}>
+                              ({model.provider})
+                            </span>
+                          </Option>
+                        ))
+                      ) : (
+                        <>
+                          <Option value="gpt-4">GPT-4 (备用)</Option>
+                          <Option value="gpt-3.5-turbo">GPT-3.5 Turbo (备用)</Option>
+                        </>
+                      )}
                     </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item
-                    label="最大Token数"
-                    name="max_tokens"
-                    rules={[{ required: true, message: '请输入最大Token数' }]}
-                  >
-                    <Input type="number" min={100} max={8000} placeholder="2000" />
                   </Form.Item>
                 </Col>
               </Row>
 
               <Row gutter={16}>
-                <Col span={12}>
+                <Col span={8}>
                   <Form.Item
-                    label="温度 (Temperature)"
+                    label={
+                      <Tooltip title="模型单次生成的最大字符数量，影响回答长度">
+                        最大Token数
+                      </Tooltip>
+                    }
+                    name="max_tokens"
+                    rules={[{ required: true, message: '请输入最大Token数' }]}
+                  >
+                    <Input type="number" placeholder="2000" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label={
+                      <Tooltip title="控制输出的随机性和创造性，0-2之间，值越高越随机">
+                        温度
+                      </Tooltip>
+                    }
                     name="temperature"
                     rules={[{ required: true, message: '请输入温度值' }]}
                   >
                     <Input type="number" min={0} max={2} step={0.1} placeholder="0.7" />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                <Col span={8}>
                   <Form.Item
-                    label="Top P"
+                    label={
+                      <Tooltip title="核采样参数，控制候选词汇范围，0-1之间，值越小越保守">
+                        Top P
+                      </Tooltip>
+                    }
                     name="top_p"
                   >
                     <Input type="number" min={0} max={1} step={0.1} placeholder="1.0" />
@@ -1163,7 +1210,11 @@ const AgentManagement: React.FC = () => {
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item
-                    label="频率惩罚 (Frequency Penalty)"
+                    label={
+                      <Tooltip title="降低重复词汇出现频率，-2到2之间，正值减少重复">
+                        频率惩罚
+                      </Tooltip>
+                    }
                     name="frequency_penalty"
                   >
                     <Input type="number" min={-2} max={2} step={0.1} placeholder="0.0" />
@@ -1171,7 +1222,11 @@ const AgentManagement: React.FC = () => {
                 </Col>
                 <Col span={12}>
                   <Form.Item
-                    label="存在惩罚 (Presence Penalty)"
+                    label={
+                      <Tooltip title="鼓励讨论新话题，-2到2之间，正值增加新内容倾向">
+                        存在惩罚
+                      </Tooltip>
+                    }
                     name="presence_penalty"
                   >
                     <Input type="number" min={-2} max={2} step={0.1} placeholder="0.0" />
