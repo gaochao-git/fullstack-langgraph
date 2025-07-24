@@ -174,7 +174,7 @@ cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind_deploy.sh" << 'EOF'
 
 set -e
 
-DEPLOY_PATH="${DEPLOY_PATH:-/data/omind_prd}"
+DEPLOY_PATH="${DEPLOY_PATH:-/data/omind}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 颜色输出
@@ -196,7 +196,7 @@ show_usage() {
     echo "  $0 [选项]"
     echo ""
     echo "选项:"
-    echo "  -p, --path PATH       部署路径 (默认: /data/omind_prd)"
+    echo "  -p, --path PATH       部署路径 (默认: /data/omind)"
     echo "  --backend-only        仅部署后端服务"
     echo "  --mcp-only           仅部署MCP服务器"
     echo "  --no-install         跳过依赖安装"
@@ -456,7 +456,7 @@ server {
     
     # 前端静态文件
     location / {
-        root /data/omind_prd/frontend_dist;  # 替换为实际路径
+        root /data/omind/frontend_dist;  # 替换为实际路径
         index index.html;
         try_files $uri $uri/ /index.html;
         
@@ -510,14 +510,14 @@ After=network.target
 Type=forking
 User=root
 Group=root
-WorkingDirectory=/data/omind_prd
+WorkingDirectory=/data/omind
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-Environment=PYTHONPATH=/data/omind_prd
+Environment=PYTHONPATH=/data/omind
 
 # 启动和停止命令
-ExecStart=/data/omind_prd/scripts/start_backend.sh
-ExecStop=/data/omind_prd/scripts/stop_backend.sh
-ExecReload=/bin/bash -c '/data/omind_prd/scripts/stop_backend.sh && /data/omind_prd/scripts/start_backend.sh'
+ExecStart=/data/omind/scripts/start_backend.sh
+ExecStop=/data/omind/scripts/stop_backend.sh
+ExecReload=/bin/bash -c '/data/omind/scripts/stop_backend.sh && /data/omind/scripts/start_backend.sh'
 
 # 重启策略
 Restart=on-failure
@@ -590,14 +590,14 @@ sudo apt update && sudo apt install -y python3 python3-pip nginx curl
 
 ### 2. 创建部署目录
 ```bash
-sudo mkdir -p /data/omind_prd
-sudo chown $(whoami):$(whoami) /data/omind_prd
+sudo mkdir -p /data/omind
+sudo chown $(whoami):$(whoami) /data/omind
 ```
 
 ### 3. 复制文件
 ```bash
-cp -r * /data/omind_prd/
-cd /data/omind_prd
+cp -r * /data/omind/
+cd /data/omind
 ```
 
 ### 4. 安装Python依赖
@@ -654,7 +654,7 @@ sudo systemctl start omind
 curl http://localhost:8000/api/
 
 # 检查MCP服务器
-cd /data/omind_prd/mcp_servers
+cd /data/omind/mcp_servers
 ./status_servers.sh
 ```
 
@@ -667,7 +667,7 @@ cd /data/omind_prd/mcp_servers
 
 ```bash
 # 进入部署目录
-cd /data/omind_prd
+cd /data/omind
 
 # 查看所有服务状态
 ./status_all.sh  # 如果存在
@@ -726,8 +726,8 @@ pip3 install -r requirements.txt --force-reinstall
 **Q: 权限问题**
 ```bash
 # 修复权限
-sudo chown -R $(whoami):$(whoami) /data/omind_prd
-find /data/omind_prd -name "*.sh" -exec chmod +x {} \;
+sudo chown -R $(whoami):$(whoami) /data/omind
+find /data/omind -name "*.sh" -exec chmod +x {} \;
 ```
 
 **Q: 服务启动失败**

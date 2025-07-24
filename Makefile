@@ -58,7 +58,7 @@ test:
 # Build production deployment package
 build:
 	@echo "📦 Building production deployment package..."
-	@./build_production.sh
+	@./build_omind.sh
 
 # Keep old alias for compatibility
 build-prod: build
@@ -66,15 +66,6 @@ build-prod: build
 # Deploy to remote server
 deploy:
 	@echo "🚀 Deploying to remote server..."
-	@if [ ! -d "production_build" ]; then \
-		echo "❌ No build found. Run 'make build' first."; \
-		exit 1; \
-	fi
-	@LATEST_PACKAGE=$$(ls -t production_build/*.tar.gz 2>/dev/null | head -n1); \
-	if [ -z "$$LATEST_PACKAGE" ]; then \
-		echo "❌ No deployment package found. Run 'make build' first."; \
-		exit 1; \
-	fi; \
 	echo "📦 Deploying $$LATEST_PACKAGE..."; \
 	echo "📡 Copying to root@82.156.146.51:/tmp/"; \
 	scp "$$LATEST_PACKAGE" root@82.156.146.51:/tmp/ && \

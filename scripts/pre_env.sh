@@ -319,7 +319,7 @@ init_environment() {
     echo "📝 配置nginx..."
     if [ -f "nginx.conf" ] && command -v nginx >/dev/null 2>&1; then
         # 更新nginx配置中的路径
-        sed "s|/data/omind_prd|$FULL_DEPLOY_PATH|g" nginx.conf > /tmp/omind_nginx.conf
+        sed "s|/data/omind|$FULL_DEPLOY_PATH|g" nginx.conf > /tmp/omind_nginx.conf
         sudo cp /tmp/omind_nginx.conf /etc/nginx/conf.d/omind.conf 2>/dev/null || {
             echo "⚠️ 无sudo权限，请手动配置nginx："
             echo "   sudo cp /tmp/omind_nginx.conf /etc/nginx/conf.d/omind.conf"

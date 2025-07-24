@@ -151,7 +151,7 @@ if [ "$UPGRADE_ALL" = true ]; then
 fi
 
 # 定义路径
-DEPLOY_DIR="/data/omind_prd"
+DEPLOY_DIR="/data/omind"
 TMP_DIR="/tmp"
 PACKAGE_PATH="$TMP_DIR/${PACKAGE_NAME}.tar.gz"
 EXTRACT_PATH="$TMP_DIR/$PACKAGE_NAME"
@@ -232,9 +232,9 @@ echo_success "解压完成"
 if [ "$NO_BACKUP" = false ]; then
     echo_info "步骤 4/8: 备份当前版本..."
     
-    BACKUP_NAME="omind_prd_backup_$(date +%Y%m%d_%H%M%S)"
+    BACKUP_NAME="omind_backup_$(date +%Y%m%d_%H%M%S)"
     cd /data
-    cp -r omind_prd "$BACKUP_NAME"
+    cp -r omind "$BACKUP_NAME"
     
     echo_success "备份完成: /data/$BACKUP_NAME"
 else
@@ -507,8 +507,8 @@ fi
 if [ "$NO_BACKUP" = false ]; then
     echo ""
     echo_info "回滚方法 (如果需要):"
-    echo_info "  cd /data && rm -rf omind_prd && mv $BACKUP_NAME omind_prd"
-    echo_info "  cd omind_prd/scripts && ./start_backend.sh && ./start_mcp.sh"
+    echo_info "  cd /data && rm -rf omind && mv $BACKUP_NAME omind"
+    echo_info "  cd omind/scripts && ./start_backend.sh && ./start_mcp.sh"
 fi
 
 echo ""
