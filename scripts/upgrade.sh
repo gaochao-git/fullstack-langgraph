@@ -152,11 +152,24 @@ fi
 # 定义路径
 DEPLOY_DIR="/data/omind"
 TMP_DIR="/tmp"
-PACKAGE_PATH="$TMP_DIR/${PACKAGE_NAME}.tar.gz"
-EXTRACT_PATH="$TMP_DIR/$PACKAGE_NAME"
+
+# PACKAGE_NAME应该是完整的绝对路径，如 /tmp/omind-20250724_202321.tar.gz
+PACKAGE_PATH="$PACKAGE_NAME"
+
+# 检查包文件是否存在
+if [ ! -f "$PACKAGE_PATH" ]; then
+    echo_error "部署包不存在: $PACKAGE_PATH"
+    echo_info "请确保包文件路径正确"
+    exit 1
+fi
+
+# 从完整路径提取文件名（不含扩展名）作为解压目录名
+BASENAME=$(basename "$PACKAGE_PATH" .tar.gz)
+EXTRACT_PATH="$TMP_DIR/$BASENAME"
 
 echo_info "开始 OMind 智能运维平台升级"
-echo_info "升级包: $PACKAGE_NAME"
+echo_info "升级包路径: $PACKAGE_PATH"
+echo_info "解压目录: $EXTRACT_PATH"
 echo ""
 
 # 显示升级组件
@@ -218,7 +231,7 @@ if [ -d "$EXTRACT_PATH" ]; then
 fi
 
 cd "$TMP_DIR"
-tar -xzf "${PACKAGE_NAME}.tar.gz"
+tar -xzf "$PACKAGE_PATH"
 
 if [ ! -d "$EXTRACT_PATH" ]; then
     echo_error "解压失败，目录不存在: $EXTRACT_PATH"
