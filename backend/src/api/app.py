@@ -36,6 +36,7 @@ from .streaming import (
 from .sop_routes import router as sop_router
 from .mcp_routes import router as mcp_router
 from .agent_routes import router as agent_router
+from .ai_model_routes import router as ai_model_router
 
 # Define the FastAPI app
 app = FastAPI(title="LangGraph Server", version="1.0.0")
@@ -125,6 +126,7 @@ class AssistantResponse(BaseModel):
 app.include_router(sop_router)
 app.include_router(mcp_router, prefix="/api/mcp", tags=["mcp"])
 app.include_router(agent_router)
+app.include_router(ai_model_router, prefix="/api", tags=["ai-models"])
 
 # Thread Management Endpoints - 使用导入的函数
 @app.post("/threads", response_model=ThreadResponse)

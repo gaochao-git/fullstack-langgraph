@@ -111,3 +111,20 @@ CREATE TABLE IF NOT EXISTS mcp_servers_bak (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS ai_model_configs (
+  id BIGSERIAL PRIMARY KEY,
+  model_id VARCHAR(100) UNIQUE NOT NULL,
+  model_name VARCHAR(200) NOT NULL,
+  model_provider VARCHAR(50) NOT NULL, 
+  model_type VARCHAR(100) NOT NULL,
+  endpoint_url VARCHAR(500) NOT NULL,
+  api_key_value TEXT,
+  model_description TEXT,
+  model_status VARCHAR(20) DEFAULT 'inactive',
+  config_data TEXT,
+  create_by VARCHAR(100) NOT NULL,
+  update_by VARCHAR(100),
+  create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
