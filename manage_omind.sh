@@ -50,14 +50,13 @@ show_help() {
     echo "选项:"
     echo "  --deploy-path=PATH 指定部署路径 (默认: $DEFAULT_DEPLOY_PATH)"
     echo "  --python-path=PATH 指定Python可执行文件路径"
-    echo "  --package=NAME     指定升级包名称 (仅upgrade命令)"
+    echo "  --package=PATH     指定升级包绝对路径 (仅upgrade和init命令)"
     echo ""
     echo "示例:"
-    echo "  $0 init                                              # 初始化到默认路径"
-    echo "  $0 init --deploy-path=/opt --python-path=/usr/bin/python3.12"
+    echo "  $0 init --deploy-path=/data --python-path=/usr/bin/python3 --package=/tmp/omind-xxx.tar.gz"
     echo "  $0 start --deploy-path=/opt                          # 启动指定路径的服务"
     echo "  $0 status                                            # 查看默认路径的服务状态"
-    echo "  $0 upgrade --package=omind-20250724_164901          # 升级到指定版本"
+    echo "  $0 upgrade --package=/tmp/omind-20250724_164901.tar.gz  # 升级到指定版本"
     echo "  $0 cleanup --deploy-path=/opt                        # 清理指定路径的环境"
     echo ""
     echo "服务管理:"
@@ -120,7 +119,7 @@ fi
 
 # 设置完整部署路径和配置文件路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$SCRIPT_DIR/.omind_config"
+CONFIG_FILE="$HOME/.omindinfo"
 
 # 读取现有配置文件
 load_config() {
@@ -132,10 +131,6 @@ load_config() {
             DEPLOY_PATH="$SAVED_DEPLOY_PATH"
             echo_info "使用保存的部署路径: $DEPLOY_PATH"
         fi
-        if [ "$CUSTOM_PYTHON_PATH_SET" = false ] && [ -n "$SAVED_PYTHON_PATH" ]; then
-            CUSTOM_PYTHON_PATH="$SAVED_PYTHON_PATH"
-            echo_info "使用保存的Python路径: $CUSTOM_PYTHON_PATH"
-        fi
     fi
 }
 
@@ -146,7 +141,17 @@ save_config() {
 # OMind 配置文件 - 由 manage_omind.sh 自动生成
 # 生成时间: $(date)
 SAVED_DEPLOY_PATH="$DEPLOY_PATH"
-SAVED_PYTHON_PATH="$CUSTOM_PYTHON_PATH"
+EOF
+    echo_success "配置已保存"
+}
+
+# 保存配置到文件（包含包信息）
+save_config_with_package() {
+    echo_info "保存配置到: $CONFIG_FILE"
+    cat > "$CONFIG_FILE" << EOF
+# OMind 配置文件 - 由 manage_omind.sh 自动生成
+# 生成时间: $(date)
+SAVED_DEPLOY_PATH="$DEPLOY_PATH"
 EOF
     echo_success "配置已保存"
 }
@@ -184,8 +189,64 @@ check_deployment() {
 cmd_init() {
     echo_info "初始化OMind环境..."
     
-    # 保存配置到隐藏文件
-    save_config
+    # 检查必需参数
+    if [ -z "$PACKAGE_NAME" ]; then
+        echo_error "init命令需要指定包绝对路径"
+        echo_info "使用: $0 init --deploy-path=/data --python-path=/usr/bin/python3 --package=/tmp/omind-xxx.tar.gz"
+        exit 1
+    fi
+    
+    if [ -z "$CUSTOM_PYTHON_PATH" ]; then
+        echo_error "init命令需要指定Python路径"
+        echo_info "使用: $0 init --deploy-path=/data --python-path=/usr/bin/python3 --package=/tmp/omind-xxx.tar.gz"
+        exit 1
+    fi
+    
+    # 如果指定了包名，先解压包
+    if [ -n "$PACKAGE_NAME" ]; then
+        echo_info "解压部署包: $PACKAGE_NAME"
+        
+        # --package 必须指定绝对路径
+        if [[ "$PACKAGE_NAME" != /* ]]; then
+            echo_error "包路径必须是绝对路径: $PACKAGE_NAME"
+            echo_info "请使用绝对路径，例如:"
+            echo_info "  --package=/tmp/omind-20250724_185515.tar.gz"
+            echo_info "  --package=/home/user/omind-production-xxx.tar.gz"
+            exit 1
+        fi
+        
+        # 检查包文件是否存在
+        if [ ! -f "$PACKAGE_NAME" ]; then
+            echo_error "包文件不存在: $PACKAGE_NAME"
+            echo_info "请确保指定正确的绝对路径"
+            exit 1
+        fi
+        
+        PACKAGE_FILE="$PACKAGE_NAME"
+        
+        # 解压到临时目录
+        TEMP_DIR="/tmp/omind_extract_$$"
+        mkdir -p "$TEMP_DIR"
+        echo_info "解压 $PACKAGE_FILE 到 $TEMP_DIR"
+        tar -xzf "$PACKAGE_FILE" -C "$TEMP_DIR"
+        
+        # 找到解压后的目录
+        EXTRACTED_DIR=$(find "$TEMP_DIR" -maxdepth 1 -type d -name "omind-*" | head -n1)
+        if [ -z "$EXTRACTED_DIR" ]; then
+            echo_error "解压后未找到 omind-* 目录"
+            rm -rf "$TEMP_DIR"
+            exit 1
+        fi
+        
+        echo_info "找到解压目录: $EXTRACTED_DIR"
+        
+        # 更新脚本目录为解压后的目录
+        SCRIPT_DIR="$EXTRACTED_DIR"
+        echo_info "使用解压后的脚本目录: $SCRIPT_DIR"
+    fi
+    
+    # 保存配置到隐藏文件，包含包信息
+    save_config_with_package
     
     # 构建pre_env.sh参数
     PRE_ENV_ARGS="--init --deploy-path=$DEPLOY_PATH"
@@ -204,6 +265,12 @@ cmd_init() {
     
     echo_success "OMind环境初始化完成！"
     echo_info "配置已保存，后续命令将自动使用相同配置"
+    
+    # 清理临时目录
+    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR"
+        echo_info "已清理临时目录"
+    fi
 }
 
 # 启动服务
@@ -316,8 +383,8 @@ cmd_upgrade() {
     check_deployment
     
     if [ -z "$PACKAGE_NAME" ]; then
-        echo_error "升级命令需要指定包名称"
-        echo_info "使用: $0 upgrade --package=omind-20250724_164901"
+        echo_error "升级命令需要指定包绝对路径"
+        echo_info "使用: $0 upgrade --package=/tmp/omind-20250724_164901.tar.gz"
         exit 1
     fi
     

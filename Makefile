@@ -81,13 +81,7 @@ trans:
 	scp "$$LATEST_PACKAGE" manage_omind.sh root@82.156.146.51:/tmp/ && \
 	echo "✅ Successfully transferred:" && \
 	echo "   - Package: /tmp/$$(basename $$LATEST_PACKAGE)" && \
-	echo "   - Script:  /tmp/manage_omind.sh" && \
-	echo "" && \
-	echo "🚀 To deploy on remote server, run:" && \
-	echo "   ssh root@82.156.146.51" && \
-	echo "   cd /tmp && tar -xzf $$(basename $$LATEST_PACKAGE)" && \
-	echo "   cd $$(basename $$LATEST_PACKAGE .tar.gz) && ./omind_deploy.sh" && \
-	echo "   # OR use manage script: ./manage_omind.sh init"
+	echo "   - Script:  /tmp/manage_omind.sh"
 
 
 # Clean build artifacts
@@ -96,4 +90,4 @@ clean:
 	@cd frontend && rm -rf dist node_modules/.cache
 	@cd backend && find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@cd backend && find . -name "*.pyc" -delete 2>/dev/null || true
-	@rm -rf production_build 
+	@rm -rf production_build

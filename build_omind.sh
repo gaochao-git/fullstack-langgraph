@@ -795,7 +795,7 @@ rm -rf "$TEMP_BUILD_DIR"
 # 计算包信息
 PACKAGE_PATH="$BUILD_DIR/${PACKAGE_NAME}.tar.gz"
 PACKAGE_SIZE=$(du -h "$PACKAGE_PATH" | cut -f1)
-PACKAGE_MD5=$(md5sum "$PACKAGE_PATH" 2>/dev/null | cut -d' ' -f1 || md5 "$PACKAGE_PATH" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+PACKAGE_MD5=$(md5sum "$PACKAGE_PATH" 2>/dev/null | cut -d' ' -f1 || md5 -q "$PACKAGE_PATH" 2>/dev/null)
 
 log_success "🎉 OMind 智能运维平台打包完成！"
 
@@ -809,13 +809,20 @@ log_info "  文件数量: $MANIFEST_COUNT"
 echo ""
 log_info "🚀 部署步骤:"
 log_info "1. 传输到目标服务器:"
-log_info "   scp $PACKAGE_PATH user@server:/tmp/"
+log_info "   make trans"
 log_info ""
-log_info "2. 在目标服务器上部署:"
-log_info "   cd /tmp"
-log_info "   tar -xzf ${PACKAGE_NAME}.tar.gz"
-log_info "   cd ${PACKAGE_NAME}/"
-log_info "   ./omind_deploy.sh"
+log_info "2. 在目标服务器上使用 manage_omind.sh 进行运维:"
+log_info "   初始化项目:"
+log_info "   ./manage_omind.sh init --deploy-path=/data --python-path=/usr/bin/python3 --package=/tmp/${PACKAGE_NAME}.tar.gz"
+log_info ""
+log_info "   启动所有服务:"
+log_info "   ./manage_omind.sh start"
+log_info ""
+log_info "   关闭所有服务:"
+log_info "   ./manage_omind.sh stop"
+log_info ""
+log_info "   升级版本:"
+log_info "   ./manage_omind.sh upgrade --package=/tmp/${PACKAGE_NAME}.tar.gz"
 
 echo ""
 log_info "🌐 部署后访问地址:"
