@@ -288,38 +288,19 @@ init_environment() {
     # 安装后端依赖
     echo "📦 安装后端依赖..."
     if [ -f "backend/requirements.txt" ]; then
-        cd backend
-        # 对于老版本Python，安装兼容版本
-        if [[ "$PYTHON_VERSION" =~ ^3\.6$ ]]; then
-            echo "⚠️ Python 3.6 环境，安装兼容版本的依赖..."
-            pip install "fastapi>=0.68.0,<0.84.0" "uvicorn>=0.15.0,<0.17.0"
-            pip install httpx aiofiles python-multipart
-            pip install sqlalchemy pymysql
-            pip install "elasticsearch>=7.0.0,<8.0.0"
-            pip install paramiko requests pyyaml
-        else
-            pip install -r requirements.txt
-        fi
-        cd ..
+        pip install -r backend/requirements.txt
     else
-        echo "⚠️ backend/requirements.txt 不存在，跳过后端依赖安装"
+        echo "⚠️ backend/requirements.txt 不存在"
+        exit 1
     fi
     
     # 安装MCP服务器依赖
     echo "📦 安装MCP服务器依赖..."
     if [ -f "mcp_servers/requirements.txt" ]; then
-        cd mcp_servers
-        if [[ "$PYTHON_VERSION" =~ ^3\.6$ ]]; then
-            echo "⚠️ Python 3.6 环境，安装兼容版本的MCP依赖..."
-            pip install httpx paramiko pymysql
-            pip install "elasticsearch>=7.0.0,<8.0.0"
-            pip install requests pyyaml
-        else
-            pip install -r requirements.txt
-        fi
-        cd ..
+        pip install -r mcp_servers/requirements.txt
     else
-        echo "⚠️ mcp_servers/requirements.txt 不存在，跳过MCP依赖安装"
+        echo "⚠️ mcp_servers/requirements.txt 不存在"
+        exit 1
     fi
     
     # 更新脚本中的Python路径配置
