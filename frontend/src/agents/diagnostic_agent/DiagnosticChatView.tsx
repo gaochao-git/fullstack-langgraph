@@ -1091,23 +1091,23 @@ export function DiagnosticChatView({
         }}
       >
         <form onSubmit={handleSubmit} className="flex gap-1 sm:gap-2 p-2 sm:p-4">
-          {/* 模型选择器 - 优化版本 */}
-          {availableModels.length > 0 ? (
-            <div className="relative">
-              <select
-                value={currentModel || ''}
-                onChange={(e) => onModelChange?.(e.target.value)}
-                className="px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-200 cursor-pointer min-w-[80px] max-w-[120px] sm:min-w-[100px] sm:max-w-[140px]"
-                style={{ 
-                  backgroundColor: '#1E293B', 
-                  borderColor: '#60A5FA', 
-                  borderWidth: '2px', 
-                  color: '#F1F5F9' 
-                }}
-                disabled={isLoading || !!interrupt}
-                title={`当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}`}
-              >
-                {availableModels.map((model) => {
+          {/* 模型选择器 - 固定占位版本 */}
+          <div className="relative">
+            <select
+              value={currentModel || ''}
+              onChange={(e) => onModelChange?.(e.target.value)}
+              className="px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-200 cursor-pointer min-w-[80px] max-w-[120px] sm:min-w-[100px] sm:max-w-[140px]"
+              style={{ 
+                backgroundColor: '#1E293B', 
+                borderColor: '#60A5FA', 
+                borderWidth: '2px', 
+                color: '#F1F5F9' 
+              }}
+              disabled={isLoading || !!interrupt || availableModels.length === 0}
+              title={availableModels.length > 0 ? `当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}` : '正在加载模型...'}
+            >
+              {availableModels.length > 0 ? (
+                availableModels.map((model) => {
                   // 简化模型名称显示
                   const getShortName = (name: string) => {
                     if (name.includes('deepseek')) return 'DeepSeek';
@@ -1127,14 +1127,14 @@ export function DiagnosticChatView({
                       {getShortName(model.name)}
                     </option>
                   );
-                })}
-              </select>
-            </div>
-          ) : (
-            <div className="px-2 py-2 text-xs text-gray-400 animate-pulse">
-              🤖
-            </div>
-          )}
+                })
+              ) : (
+                <option value="" disabled style={{ backgroundColor: '#1E293B', color: '#F1F5F9' }}>
+                  加载中...
+                </option>
+              )}
+            </select>
+          </div>
           
           <input
             type="text"
