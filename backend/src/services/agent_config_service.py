@@ -126,10 +126,9 @@ class AgentConfigService:
                 presence_penalty = 0.0
         
         model_name = llm_config.get('model_name', 'deepseek-chat')
-        base_url = AgentConfigService._get_base_url_for_model(model_name)
         
-        # Try to get API key from database for this model
-        api_key = AgentConfigService._get_api_key_for_model(model_name)
+        # Get model info from database (includes endpoint_url and api_key)
+        model_info = AgentConfigService._get_model_info_from_db(model_name)
         
         result = {
             'model_name': model_name,
@@ -139,12 +138,12 @@ class AgentConfigService:
             'frequency_penalty': frequency_penalty,
             'presence_penalty': presence_penalty,
             'available_models': llm_config.get('available_models', ['deepseek-chat']),
-            'base_url': base_url
+            'base_url': model_info.get('endpoint_url', 'https://api.deepseek.com')
         }
         
         # Add API key if found in database
-        if api_key:
-            result['api_key'] = api_key
+        if model_info.get('api_key'):
+            result['api_key'] = model_info.get('api_key')
             
         return result
     
@@ -207,40 +206,17 @@ class AgentConfigService:
                 'assistant_prompt_template': ''
             }
     
-    @staticmethod
-    def _get_base_url_for_model(model_name: str) -> str:
-        """
-        Map model name to appropriate base URL.
-        
-        Args:
-            model_name: Name of the model
-            
-        Returns:
-            Appropriate base URL for the model
-        """
-        # Basic model to provider mapping
-        if 'deepseek' in model_name.lower():
-            return 'https://api.deepseek.com'
-        elif 'gpt-' in model_name.lower() or 'openai' in model_name.lower():
-            return 'https://api.openai.com/v1'
-        elif 'claude' in model_name.lower():
-            return 'https://api.anthropic.com'
-        elif 'qwen' in model_name.lower():
-            return 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-        else:
-            # Default fallback
-            return 'https://api.deepseek.com'
     
     @staticmethod
-    def _get_api_key_for_model(model_name: str) -> Optional[str]:
+    def _get_model_info_from_db(model_name: str) -> Dict[str, str]:
         """
-        Get API key for a specific model from database.
+        Get complete model information from database.
         
         Args:
             model_name: Name of the model
             
         Returns:
-            API key if found, None otherwise
+            Dictionary containing model info (endpoint_url, api_key, etc.)
         """
         db_gen = get_db()
         db: Session = next(db_gen)
@@ -255,14 +231,19 @@ class AgentConfigService:
                 AIModelConfig.model_status == 'active'
             ).first()
             
-            if model and model.api_key_value:
-                return model.api_key_value
+            if model:
+                return {
+                    'endpoint_url': model.endpoint_url,
+                    'api_key': model.api_key_value,
+                    'provider': model.model_provider,
+                    'model_name': model.model_name
+                }
             
-            return None
+            return {}
             
         except Exception as e:
-            print(f"Error getting API key for model {model_name}: {e}")
-            return None
+            print(f"Error getting model info for {model_name}: {e}")
+            return {}
             
         finally:
             db.close()
