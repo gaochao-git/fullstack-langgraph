@@ -5,8 +5,7 @@
 # 使用方法: ./upgrade.sh <package_name> [options]
 
 # ====== 配置区域 ======
-# 用户可根据环境修改以下Python路径
-VALID_PYTHON_PATH=("/Users/gaochao/miniconda3/envs/py312" "/data/omind/venv")
+# Python环境将使用部署时创建的venv环境
 # ====================
 
 set -e
@@ -376,24 +375,32 @@ echo_info "步骤 7/8: 检查并更新Python依赖..."
 
 # 检测Python环境函数
 detect_python_env() {
-    for python_path in "${VALID_PYTHON_PATH[@]}"; do
-        if [ -d "$python_path" ]; then
-            # 检查是否是虚拟环境目录
-            if [ -f "$python_path/bin/python" ]; then
-                echo_info "使用虚拟环境: $python_path"
-                source "$python_path/bin/activate"
-                return 0
-            fi
-        elif command -v "$python_path" >/dev/null 2>&1; then
-            # 直接Python可执行文件路径
-            PYTHON_VERSION=$($python_path --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+    # 优先使用部署目录下的venv环境
+    local VENV_PYTHON="$DEPLOY_DIR/venv/bin/python3"
+    if [ -f "$VENV_PYTHON" ]; then
+        echo_info "使用部署venv环境: $DEPLOY_DIR/venv"
+        source "$DEPLOY_DIR/venv/bin/activate"
+        return 0
+    else
+        echo_warning "未找到部署venv环境: $VENV_PYTHON"
+    fi
+    
+    # 如果venv环境不可用，尝试系统Python
+    echo_info "尝试系统Python环境..."
+    for python_cmd in python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python3.6 python3 python; do
+        if command -v "$python_cmd" >/dev/null 2>&1; then
+            PYTHON_VERSION=$($python_cmd --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
             if [[ "$PYTHON_VERSION" =~ ^3\.(1[0-9]|[6-9])$ ]]; then
-                echo_info "使用Python: $python_path (版本: $PYTHON_VERSION)"
+                echo_info "使用系统Python: $python_cmd (版本: $PYTHON_VERSION)"
                 return 0
             fi
         fi
     done
+    
     echo_error "未找到有效的Python环境"
+    echo_error "请确保存在以下之一:"
+    echo_error "  1. 部署目录下的venv环境: $DEPLOY_DIR/venv/bin/python3"
+    echo_error "  2. 系统Python 3.6+ 环境"
     return 1
 }
 

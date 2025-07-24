@@ -4,12 +4,6 @@
 # 统一管理初始化、启动、停止、升级、清理等操作
 # 使用方法: ./manage_omind.sh <command> [options]
 
-# ====== 配置区域 ======
-# 用户可根据环境修改以下配置
-DEFAULT_DEPLOY_PATH="/data"
-VALID_PYTHON_PATH=("/Users/gaochao/miniconda3/envs/py312" "/data/omind/venv")
-# ====================
-
 set -e
 
 # 颜色输出
@@ -25,7 +19,7 @@ echo_warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 echo_error() { echo -e "${RED}❌ $1${NC}"; }
 
 # 默认参数
-DEPLOY_PATH="$DEFAULT_DEPLOY_PATH"
+DEPLOY_PATH=""
 CUSTOM_PYTHON_PATH=""
 PACKAGE_NAME=""
 CUSTOM_DEPLOY_PATH_SET=false
@@ -48,7 +42,7 @@ show_help() {
     echo "  help         显示此帮助信息"
     echo ""
     echo "选项:"
-    echo "  --deploy-path=PATH 指定部署路径 (默认: $DEFAULT_DEPLOY_PATH)"
+    echo "  --deploy-path=PATH 指定部署路径"
     echo "  --python-path=PATH 指定Python可执行文件路径"
     echo "  --package=PATH     指定升级包绝对路径 (仅upgrade和init命令)"
     echo ""
@@ -57,7 +51,7 @@ show_help() {
     echo "  $0 start --deploy-path=/opt                          # 启动指定路径的服务"
     echo "  $0 status                                            # 查看默认路径的服务状态"
     echo "  $0 upgrade --package=/tmp/omind-20250724_164901.tar.gz  # 升级到指定版本"
-    echo "  $0 cleanup --deploy-path=/opt                        # 清理指定路径的环境"
+    echo "  $0 cleanup                                           # 清理环境（自动读取保存的配置）"
     echo ""
     echo "服务管理:"
     echo "  init    -> 创建环境、安装依赖、配置服务（保存配置）"
