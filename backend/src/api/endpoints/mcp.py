@@ -10,9 +10,9 @@ import logging
 import aiohttp
 import asyncio
 
-from ..database.config import get_db
-from ..database.models import MCPServer
-from ..schemas.mcp import MCPServerCreate, MCPServerUpdate, MCPServerResponse, MCPTestRequest, MCPTestResponse
+from ...db.config import get_db
+from ...db.models import MCPServer
+from ...schemas.mcp import MCPServerCreate, MCPServerUpdate, MCPServerResponse, MCPTestRequest, MCPTestResponse
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,8 @@ Agent configuration service for dynamic loading from database.
 import asyncio
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from ..database.config import get_db
-from ..database.models import AgentConfig
+from ..db.config import get_db
+from ..db.models import AgentConfig
 
 
 class AgentConfigService:
@@ -231,7 +231,7 @@ class AgentConfigService:
         
         try:
             # Import here to avoid circular imports
-            from ..database.models import AIModelConfig
+            from ..db.models import AIModelConfig
             
             # Query model by model_type (which matches model_name)
             model = db.query(AIModelConfig).filter(
@@ -297,7 +297,7 @@ class AgentConfigService:
         db: Session = next(db_gen)
         
         try:
-            from ..database.models import AIModelConfig
+            from ..db.models import AIModelConfig
             
             models = []
             for model_type in available_model_types:
@@ -337,7 +337,7 @@ class AgentConfigService:
         
         try:
             # Import here to avoid circular imports
-            from ..database.models import AIModelConfig
+            from ..db.models import AIModelConfig
             
             # Query active models
             models = db.query(AIModelConfig).filter(

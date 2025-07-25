@@ -35,10 +35,10 @@ from .streaming import (
     RunCreate, stream_run_standard,
     init_refs
 )
-from .sop_routes import router as sop_router
-from .mcp_routes import router as mcp_router
-from .agent_routes import router as agent_router
-from .ai_model_routes import router as ai_model_router
+from .endpoints.sop import router as sop_router
+from .endpoints.mcp import router as mcp_router
+from .endpoints.agents import router as agent_router
+from .endpoints.ai_models import router as ai_model_router
 
 # Define the FastAPI app
 app = FastAPI(title="LangGraph Server", version="1.0.0")
@@ -58,7 +58,7 @@ async def startup_event():
     
     # 初始化SOP数据库（如果连接失败则跳过）
     try:
-        from ..database.config import init_database, test_database_connection
+        from ..db.config import init_database, test_database_connection
         db_connected = await test_database_connection()
         if db_connected:
             await init_database()

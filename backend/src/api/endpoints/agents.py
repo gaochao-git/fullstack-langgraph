@@ -11,8 +11,8 @@ from sqlalchemy import select, insert, update
 import json
 import uuid
 
-from src.database.config import get_async_session
-from src.database.models import MCPServer, AgentConfig
+from ...db.config import get_async_session
+from ...db.models import MCPServer, AgentConfig
 from src.agents.diagnostic_agent.tools_mcp import mcp_integrator
 
 logger = logging.getLogger(__name__)
@@ -789,7 +789,7 @@ async def delete_agent(agent_id: str):
 async def get_agent_available_models(agent_id: str):
     """获取指定智能体的可用模型列表"""
     try:
-        from ..services.agent_config_service import AgentConfigService
+        from ...services.agent_config_service import AgentConfigService
         
         # 获取智能体的可用模型
         models = AgentConfigService.get_agent_available_models(agent_id)

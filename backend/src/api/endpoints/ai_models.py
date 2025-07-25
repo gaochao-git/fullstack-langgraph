@@ -11,8 +11,8 @@ import aiohttp
 import asyncio
 from pydantic import BaseModel
 
-from ..database.config import get_db
-from ..database.models import AIModelConfig
+from ...db.config import get_db
+from ...db.models import AIModelConfig
 
 logger = logging.getLogger(__name__)
 

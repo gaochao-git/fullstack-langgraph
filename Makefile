@@ -90,4 +90,4 @@ clean:
 	@cd frontend && rm -rf dist node_modules/.cache
 	@cd backend && find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@cd backend && find . -name "*.pyc" -delete 2>/dev/null || true
-	@rm -rf production_build
+	@rm -rf dist

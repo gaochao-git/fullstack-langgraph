@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from ..database.config import get_async_session
-from ..schemas.sop import (
+from ...db.config import get_async_session
+from ...schemas.sop import (
     SOPTemplateCreate, SOPTemplateUpdate, SOPTemplateResponse,
     SOPQueryParams, SOPListResponse, ApiResponse
 )
-from ..services.sop_service import SOPService
+from ...services.sop_service import SOPService
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 import json
 import logging
 
-from ..database.models import SOPTemplate
+from ..db.models import SOPTemplate
 from ..schemas.sop import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
 
 logger = logging.getLogger(__name__)
