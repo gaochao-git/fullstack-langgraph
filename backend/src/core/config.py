@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     POSTGRES_DB: Optional[str] = None
     # Checkpoint配置
     CHECKPOINTER_TYPE: str = "postgres"
-    POSTGRES_CHECKPOINT_URI: Optional[str] = None
+    CHECKPOINT_URI: Optional[str] = None
     
     # MySQL配置
     MYSQL_HOST: Optional[str] = None
