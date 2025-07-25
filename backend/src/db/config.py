@@ -1,4 +1,5 @@
 """Database configuration and setup."""
+import asyncio
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -25,9 +26,59 @@ elif DATABASE_TYPE == "mysql":
 else:
     raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
 
-# Create engines  
-sync_engine = create_engine(SYNC_DATABASE_URL, echo=False)
-async_engine = create_async_engine(ASYNC_DATABASE_URL, echo=False)
+# Create engines with connection pooling and reconnection
+if DATABASE_TYPE == "mysql":
+    # MySQL特定的连接池配置
+    sync_engine = create_engine(
+        SYNC_DATABASE_URL, 
+        echo=False,
+        # 连接池配置
+        pool_size=20,                   # 连接池大小
+        max_overflow=30,                # 超出连接池大小的最大连接数
+        pool_pre_ping=True,            # 连接前ping测试，自动重连
+        pool_recycle=3600,             # 连接回收时间(1小时)
+        # MySQL连接参数
+        connect_args={
+            "connect_timeout": 10,      # 连接超时10秒
+            "read_timeout": 30,         # 读取超时30秒  
+            "write_timeout": 30,        # 写入超时30秒
+            "charset": "utf8mb4"
+        }
+    )
+    
+    async_engine = create_async_engine(
+        ASYNC_DATABASE_URL,
+        echo=False,
+        # 连接池配置
+        pool_size=20,
+        max_overflow=30,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        # MySQL异步连接参数
+        connect_args={
+            "connect_timeout": 10,
+            "charset": "utf8mb4"
+        }
+    )
+else:
+    # PostgreSQL配置
+    sync_engine = create_engine(
+        SYNC_DATABASE_URL, 
+        echo=False,
+        pool_size=20,
+        max_overflow=30,
+        pool_pre_ping=True,
+        pool_recycle=3600
+    )
+    
+    async_engine = create_async_engine(
+        ASYNC_DATABASE_URL,
+        echo=False,
+        pool_size=20,
+        max_overflow=30,
+        pool_pre_ping=True,
+        pool_recycle=3600
+    )
 
 # Create session makers
 AsyncSessionLocal = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
@@ -38,30 +89,71 @@ Base = declarative_base()
 
 
 async def get_async_session():
-    """Get async database session."""
-    async with AsyncSessionLocal() as session:
+    """Get async database session with reconnection handling."""
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
-            yield session
-        finally:
-            await session.close()
+            async with AsyncSessionLocal() as session:
+                # 测试连接
+                from sqlalchemy import text
+                await session.execute(text("SELECT 1"))
+                yield session
+                return
+        except Exception as e:
+            retry_count += 1
+            if retry_count >= max_retries:
+                raise e
+            await asyncio.sleep(0.5)  # 等待0.5秒后重试
 
 
 def get_sync_session():
-    """Get sync database session."""
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
+    """Get sync database session with reconnection handling."""
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        session = SessionLocal()
+        try:
+            # 测试连接
+            from sqlalchemy import text
+            session.execute(text("SELECT 1"))
+            yield session
+            return
+        except Exception as e:
+            session.close()
+            retry_count += 1
+            if retry_count >= max_retries:
+                raise e
+            import time
+            time.sleep(0.5)  # 等待0.5秒后重试
+        finally:
+            session.close()
 
 
 def get_db():
-    """Get database session for FastAPI dependency injection."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    """Get database session for FastAPI dependency injection with reconnection."""
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        db = SessionLocal()
+        try:
+            # 测试连接
+            from sqlalchemy import text
+            db.execute(text("SELECT 1"))
+            yield db
+            return
+        except Exception as e:
+            db.close()
+            retry_count += 1
+            if retry_count >= max_retries:
+                raise e
+            import time
+            time.sleep(0.5)  # 等待0.5秒后重试
+        finally:
+            db.close()
 
 
 async def init_database():
