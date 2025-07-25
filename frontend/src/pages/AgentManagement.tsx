@@ -32,8 +32,10 @@ import {
   MonitorOutlined,
   CloudOutlined,
   GlobalOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  MessageOutlined
 } from '@ant-design/icons';
+import AgentChatDialog from '../components/AgentChatDialog';
 import type { DataNode } from 'antd/es/tree';
 import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
 
@@ -109,6 +111,8 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
   avgResponseTime: agent.avg_response_time,
   // 保证 is_builtin 始终为 'yes' 或 'no'
   is_builtin: agent.is_builtin === true || agent.is_builtin === 'yes' ? 'yes' : 'no',
+  // 将 enabled 转换为 boolean，兼容 "yes"/"no" 和 true/false
+  enabled: agent.enabled === true || agent.enabled === 'yes',
   mcpConfig: {
     enabledServers: agent.mcp_config.enabled_servers,
     selectedTools: agent.mcp_config.selected_tools,
@@ -158,6 +162,10 @@ const AgentManagement: React.FC = () => {
   // 1. 新增 state
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<LocalAgent | null>(null);
+  
+  // 对话相关状态
+  const [chatDialogVisible, setChatDialogVisible] = useState(false);
+  const [selectedChatAgent, setSelectedChatAgent] = useState<LocalAgent | null>(null);
   
   const { message, modal } = App.useApp();
 
@@ -429,19 +437,9 @@ const AgentManagement: React.FC = () => {
     try {
       await agentApi.toggleAgentStatus(agentId);
       
-      setAgents(prevAgents =>
-        prevAgents.map(agent => {
-          if (agent.id === agentId) {
-            const newEnabled = !agent.enabled;
-            return { 
-              ...agent, 
-              enabled: newEnabled,
-              status: newEnabled ? 'running' : 'stopped'
-            };
-          }
-          return agent;
-        })
-      );
+      // 重新从后端获取最新数据
+      await loadData();
+      
       message.success('智能体状态已更新');
     } catch (error) {
       console.error('切换智能体状态失败:', error);
@@ -558,6 +556,16 @@ const AgentManagement: React.FC = () => {
     }
     
     setAgentEditModal(true);
+  };
+
+  // 开始对话
+  const handleStartChat = (agent: LocalAgent) => {
+    if (!agent.enabled) {
+      message.warning('请先启用该智能体');
+      return;
+    }
+    setSelectedChatAgent(agent);
+    setChatDialogVisible(true);
   };
 
   // 删除智能体
@@ -715,6 +723,15 @@ const AgentManagement: React.FC = () => {
               <Card
                 className="h-full"
                 actions={[
+                  <Button 
+                    key="chat"
+                    type="text" 
+                    icon={<MessageOutlined />}
+                    onClick={() => handleStartChat(agent)}
+                    disabled={!agent.enabled}
+                  >
+                    对话
+                  </Button>,
                   <Button 
                     key="detail"
                     type="text" 
@@ -1331,6 +1348,22 @@ const AgentManagement: React.FC = () => {
           <div>确定要删除智能体 "{agentToDelete.displayName}" 吗？此操作不可撤销。</div>
         )}
       </Modal>
+
+      {/* 智能体对话模态框 */}
+      <AgentChatDialog
+        open={chatDialogVisible}
+        onClose={() => {
+          setChatDialogVisible(false);
+          setSelectedChatAgent(null);
+        }}
+        agent={selectedChatAgent ? {
+          id: selectedChatAgent.id,
+          name: selectedChatAgent.name,
+          display_name: selectedChatAgent.displayName,
+          description: selectedChatAgent.description,
+          capabilities: selectedChatAgent.capabilities
+        } : null}
+      />
     </div>
   );
 };

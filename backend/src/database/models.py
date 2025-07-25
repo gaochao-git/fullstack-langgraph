@@ -157,8 +157,8 @@ class AgentConfig(Base):
     agent_capabilities = Column(JSONType, nullable=True, default=list)   # 能力列表
     agent_version = Column(String(20), default='1.0.0', nullable=False) # 智能体版本
     agent_status = Column(String(20), default='stopped', nullable=False) # 运行状态
-    agent_enabled = Column(Boolean, default=True, nullable=False)        # 是否启用
-    is_builtin = Column(Boolean, default=False, nullable=False)    # 是否为内置智能体
+    agent_enabled = Column(String(10), default='yes', nullable=False)        # 是否启用
+    is_builtin = Column(String(10), default='no', nullable=False)    # 是否为内置智能体
     tools_info = Column(JSONType, nullable=True, default=dict)     # 工具配置
     llm_info = Column(JSONType, nullable=True, default=dict)       # 大模型配置
     prompt_info = Column(JSONType, nullable=True, default=dict)    # 提示词配置
@@ -241,8 +241,8 @@ class AgentConfig(Base):
             'capabilities': capabilities,
             'version': self.agent_version,
             'status': self.agent_status,
-            'enabled': self.agent_enabled,
-            'is_builtin': self.is_builtin,
+            'enabled': self.agent_enabled == 'yes' if isinstance(self.agent_enabled, str) else self.agent_enabled,
+            'is_builtin': self.is_builtin == 'yes' if isinstance(self.is_builtin, str) else self.is_builtin,
             # 运行统计
             'total_runs': self.total_runs,
             'success_rate': self.success_rate,

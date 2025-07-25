@@ -88,13 +88,13 @@ BUILTIN_AGENTS = {
         "display_name": "故障诊断智能体",
         "description": "专业的系统故障诊断和问题分析智能体，能够快速定位和解决各类技术问题",
         "status": "running",
-        "enabled": True,
+        "enabled": 'yes',
         "version": "2.1.0",
         "total_runs": 1247,
         "success_rate": 94.5,
         "avg_response_time": 2.3,
         "capabilities": ["数据库诊断", "系统监控", "日志分析", "性能优化"],
-        "is_builtin": True
+        "is_builtin": 'yes'
     },
     "research_agent": {
         "id": "research_agent",
@@ -102,13 +102,13 @@ BUILTIN_AGENTS = {
         "display_name": "研究分析智能体",
         "description": "强大的信息研究和数据分析智能体，擅长网络搜索、数据整理和深度分析",
         "status": "running",
-        "enabled": True,
+        "enabled": 'yes',
         "version": "1.8.2",
         "total_runs": 892,
         "success_rate": 96.2,
         "avg_response_time": 3.1,
         "capabilities": ["网络搜索", "数据分析", "信息整理", "报告生成"],
-        "is_builtin": True
+        "is_builtin": 'yes'
     },
     "security_agent": {
         "id": "security_agent",
@@ -116,13 +116,13 @@ BUILTIN_AGENTS = {
         "display_name": "安全防护智能体", 
         "description": "专注于网络安全和系统防护的智能体，能够检测威胁和提供安全建议",
         "status": "stopped",
-        "enabled": False,
+        "enabled": 'no',
         "version": "1.5.1",
         "total_runs": 456,
         "success_rate": 91.8,
         "avg_response_time": 1.9,
         "capabilities": ["威胁检测", "漏洞扫描", "安全评估", "防护建议"],
-        "is_builtin": True
+        "is_builtin": 'yes'
     }
 }
 
@@ -183,7 +183,7 @@ async def get_mcp_servers_info() -> List[MCPServerInfo]:
         logger.error(f"获取MCP服务器信息失败: {e}")
         return []
 
-async def get_or_create_agent_config(agent_id: str, agent_name: str) -> Dict[str, Any]:
+async def get_or_create_agent_config(agent_id: str, agent_name: str, is_builtin: bool = False) -> Dict[str, Any]:
     """获取或创建智能体MCP配置"""
     try:
         async for session in get_async_session():
@@ -250,6 +250,7 @@ async def get_or_create_agent_config(agent_id: str, agent_name: str) -> Dict[str
                     insert(AgentConfig).values(
                         agent_id=agent_id,
                         agent_name=agent_name,
+                        is_builtin='yes' if is_builtin else 'no',
                         tools_info=json.dumps(tools_config),
                         llm_info=json.dumps(llm_config),
                         prompt_info=json.dumps(prompt_config),
@@ -309,38 +310,71 @@ async def get_agents():
                     except:
                         prompt_info = {}
                 
-                agents.append(Agent(
-                    id=agent_dict['agent_id'],
-                    name=agent_dict['name'],
-                    display_name=agent_dict['display_name'],
-                    description=agent_dict['description'],
-                    status=agent_dict['status'],
-                    enabled=agent_dict['enabled'],
-                    version=agent_dict['version'],
-                    last_used=agent_dict['last_used'],
-                    total_runs=agent_dict['total_runs'],
-                    success_rate=agent_dict['success_rate'],
-                    avg_response_time=agent_dict['avg_response_time'],
-                    capabilities=agent_dict['capabilities'],
-                    is_builtin=agent_dict.get('is_builtin', False),
-                    mcp_config=AgentMCPConfig(
-                        enabled_servers=agent_dict['mcp_config']['enabled_servers'],
-                        selected_tools=agent_dict['mcp_config']['selected_tools'],
-                        total_tools=agent_dict['mcp_config']['total_tools']
-                    ),
-                    # 完整配置信息
-                    tools_info=tools_info,
-                    llm_info=llm_info,
-                    prompt_info=prompt_info
-                ))
+                # 根据数据库中的 is_builtin 字段判断智能体类型
+                agent_id = agent_dict['agent_id']
+                is_builtin_from_db = db_agent.is_builtin  # 直接从数据库对象获取原始字符串值
+                
+                if is_builtin_from_db == 'yes' and agent_id in BUILTIN_AGENTS:
+                    # 内置智能体：使用代码中的定义覆盖基本信息，数据库中的动态数据保留
+                    builtin_config = BUILTIN_AGENTS[agent_id]
+                    agents.append(Agent(
+                        id=agent_id,
+                        name=builtin_config['name'],
+                        display_name=builtin_config['display_name'],
+                        description=builtin_config['description'],
+                        status=builtin_config['status'],
+                        enabled=agent_dict['enabled'],  # 启用状态从数据库读取
+                        version=builtin_config['version'],
+                        last_used=agent_dict['last_used'],  # 使用统计从数据库读取
+                        total_runs=agent_dict['total_runs'],
+                        success_rate=agent_dict['success_rate'],
+                        avg_response_time=agent_dict['avg_response_time'],
+                        capabilities=builtin_config['capabilities'],
+                        is_builtin=True,
+                        mcp_config=AgentMCPConfig(
+                            enabled_servers=agent_dict['mcp_config']['enabled_servers'],
+                            selected_tools=agent_dict['mcp_config']['selected_tools'],
+                            total_tools=agent_dict['mcp_config']['total_tools']
+                        ),
+                        # 完整配置信息
+                        tools_info=tools_info,
+                        llm_info=llm_info,
+                        prompt_info=prompt_info
+                    ))
+                else:
+                    # 自定义智能体或数据库中标记为非内置的智能体，完全使用数据库数据
+                    agents.append(Agent(
+                        id=agent_dict['agent_id'],
+                        name=agent_dict['name'],
+                        display_name=agent_dict['display_name'],
+                        description=agent_dict['description'],
+                        status=agent_dict['status'],
+                        enabled=agent_dict['enabled'],
+                        version=agent_dict['version'],
+                        last_used=agent_dict['last_used'],
+                        total_runs=agent_dict['total_runs'],
+                        success_rate=agent_dict['success_rate'],
+                        avg_response_time=agent_dict['avg_response_time'],
+                        capabilities=agent_dict['capabilities'],
+                        is_builtin=agent_dict.get('is_builtin', False),  # 自定义智能体，使用转换后的布尔值
+                        mcp_config=AgentMCPConfig(
+                            enabled_servers=agent_dict['mcp_config']['enabled_servers'],
+                            selected_tools=agent_dict['mcp_config']['selected_tools'],
+                            total_tools=agent_dict['mcp_config']['total_tools']
+                        ),
+                        # 完整配置信息
+                        tools_info=tools_info,
+                        llm_info=llm_info,
+                        prompt_info=prompt_info
+                    ))
             
             # 如果数据库中没有内置智能体，则创建它们
             existing_agent_ids = {agent.agent_id for agent in db_agents}
             
             for agent_id, agent_config in BUILTIN_AGENTS.items():
                 if agent_id not in existing_agent_ids:
-                    # 创建内置智能体配置
-                    await get_or_create_agent_config(agent_id, agent_config['display_name'])
+                    # 创建内置智能体配置（标记为内置）
+                    await get_or_create_agent_config(agent_id, agent_config['display_name'], is_builtin=True)
                     
                     # 构建内置智能体数据
                     mcp_config = AgentMCPConfig(
@@ -479,11 +513,42 @@ async def update_agent_mcp_config(
 async def toggle_agent_status(agent_id: str):
     """切换智能体启用状态"""
     try:
-        if agent_id not in BUILTIN_AGENTS:
-            raise HTTPException(status_code=404, detail="智能体不存在")
-        
-        # 这里可以实现实际的启用/禁用逻辑
-        logger.info(f"切换智能体 {agent_id} 状态")
+        async for session in get_async_session():
+            # 查全智能体（包括内置和自定义）
+            result = await session.execute(
+                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+            )
+            agent = result.scalar_one_or_none()
+            
+            if not agent:
+                # 如果是内置智能体但数据库中没有记录，创建记录
+                if agent_id in BUILTIN_AGENTS:
+                    agent_config = AgentConfig(
+                        agent_id=agent_id,
+                        agent_name=agent_id,
+                        agent_enabled='no',  # 默认禁用，然后切换为启用
+                        is_builtin='yes',
+                        tools_info={},
+                        llm_info={},
+                        prompt_info={},
+                        create_by='system',
+                        update_by='system'
+                    )
+                    session.add(agent_config)
+                    await session.flush()
+                    agent = agent_config
+                else:
+                    raise HTTPException(status_code=404, detail="智能体不存在")
+            
+            # 切换启用状态 - 处理字符串格式的布尔值
+            current_enabled = agent.agent_enabled == 'yes' if isinstance(agent.agent_enabled, str) else agent.agent_enabled
+            new_enabled_value = 'no' if current_enabled else 'yes'
+            
+            agent.agent_enabled = new_enabled_value
+            agent.update_by = 'system'
+            
+            await session.commit()
+            logger.info(f"智能体 {agent_id} 状态已更新为: {'启用' if new_enabled_value == 'yes' else '禁用'}")
         
         return {"success": True, "message": "智能体状态已更新"}
         
@@ -533,8 +598,8 @@ async def create_agent(agent_data: CreateAgentRequest):
                 agent_capabilities=agent_data.capabilities,
                 agent_version='1.0.0',
                 agent_status='stopped',
-                agent_enabled=True,
-                is_builtin=False,
+                agent_enabled='yes',
+                is_builtin='no',
                 tools_info=agent_data.tools_info or default_tools_config,
                 llm_info=agent_data.llm_info or default_llm_config,
                 prompt_info=agent_data.prompt_info or default_prompt_config,
@@ -705,7 +770,7 @@ async def delete_agent(agent_id: str):
                 raise HTTPException(status_code=404, detail="智能体不存在")
             
             # 不允许删除内置智能体
-            if agent.is_builtin:
+            if agent.is_builtin == 'yes':
                 raise HTTPException(status_code=400, detail="不能删除内置智能体")
             
             await session.delete(agent)
@@ -741,3 +806,82 @@ async def get_agent_available_models(agent_id: str):
     except Exception as e:
         logger.error(f"获取智能体 {agent_id} 可用模型失败: {e}")
         raise HTTPException(status_code=500, detail="获取智能体可用模型失败")
+
+# 对话相关请求模型
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    response: str
+    conversation_id: str
+
+@router.post("/{agent_id}/chat", response_model=ChatResponse)
+async def chat_with_agent(agent_id: str, chat_request: ChatRequest):
+    """与智能体进行对话"""
+    try:
+        # 查找智能体
+        async for session in get_async_session():
+            result = await session.execute(
+                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+            )
+            agent = result.scalar_one_or_none()
+            
+            # 如果数据库中没有找到，检查是否是内置智能体
+            if not agent and agent_id in BUILTIN_AGENTS:
+                await get_or_create_agent_config(agent_id, BUILTIN_AGENTS[agent_id]['display_name'], is_builtin=True)
+                result = await session.execute(
+                    select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+                )
+                agent = result.scalar_one_or_none()
+            
+            if not agent:
+                raise HTTPException(status_code=404, detail="智能体不存在")
+            
+            # 检查智能体是否启用
+            agent_enabled = agent.agent_enabled == 'yes' if isinstance(agent.agent_enabled, str) else agent.agent_enabled
+            if not agent_enabled:
+                raise HTTPException(status_code=400, detail="智能体未启用")
+            
+            # 获取智能体配置
+            tools_info = agent.tools_info if isinstance(agent.tools_info, dict) else json.loads(agent.tools_info or '{}')
+            llm_info = agent.llm_info if isinstance(agent.llm_info, dict) else json.loads(agent.llm_info or '{}')
+            prompt_info = agent.prompt_info if isinstance(agent.prompt_info, dict) else json.loads(agent.prompt_info or '{}')
+            
+            # 生成会话ID（如果没有提供）
+            conversation_id = chat_request.conversation_id or f"chat_{agent_id}_{uuid.uuid4().hex[:8]}"
+            
+            # 获取系统提示词
+            system_prompt = prompt_info.get('system_prompt', f'你是{agent.agent_name}，请根据用户需求提供专业的帮助。')
+            
+            # 构建响应（这里是简化版本，实际实现需要根据智能体类型调用相应的处理逻辑）
+            response_text = f"[{agent.agent_name}] 收到您的消息：{chat_request.message}\n\n基于我的配置和能力，我将为您提供帮助。"
+            
+            # 如果是内置智能体，可以添加特殊处理逻辑
+            if agent_id == "diagnostic_agent":
+                response_text += "\n\n作为故障诊断智能体，我可以帮助您分析系统问题、查看日志、诊断性能等。"
+            elif agent_id == "research_agent":
+                response_text += "\n\n作为研究分析智能体，我可以帮助您进行信息搜索、数据分析、内容整理等。"
+            elif agent_id == "security_agent":
+                response_text += "\n\n作为安全防护智能体，我可以帮助您进行安全评估、威胁检测、漏洞分析等。"
+            else:
+                # 自定义智能体
+                capabilities = agent.agent_capabilities or []
+                if capabilities:
+                    response_text += f"\n\n我的核心能力包括：{', '.join(capabilities[:3])}等。"
+            
+            # 更新智能体使用统计（简化版本）
+            agent.agent_total_runs = (agent.agent_total_runs or 0) + 1
+            agent.agent_last_used = "刚刚"
+            await session.commit()
+            
+            return ChatResponse(
+                response=response_text,
+                conversation_id=conversation_id
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"与智能体 {agent_id} 对话失败: {e}")
+        raise HTTPException(status_code=500, detail="对话处理失败")

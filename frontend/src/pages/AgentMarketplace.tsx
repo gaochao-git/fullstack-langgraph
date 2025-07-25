@@ -1,46 +1,110 @@
-import { useState } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Statistic, Space } from "antd";
-import { DatabaseOutlined, RobotOutlined, SettingOutlined } from "@ant-design/icons";
+import { useState, useEffect } from "react";
+import { Card, Row, Col, Typography, Tag, Avatar, Statistic, Space, Spin, message } from "antd";
+import { DatabaseOutlined, RobotOutlined, SettingOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { agentApi } from "../services/agentApi";
 
 const { Title, Text, Paragraph } = Typography;
-
-// 模拟智能体数据
-const mockAgents = [
-  {
-    id: "research_agent",
-    name: "研究助手",
-    description: "强大的研究助手，可以帮助你进行网络搜索、信息整理和深度分析。支持多轮对话和上下文理解。",
-    icon: <RobotOutlined />,
-    status: "active",
-    creator: "系统管理员",
-    createTime: "2024-01-15",
-    tags: ["研究", "搜索", "分析"],
-    usageCount: 1256,
-    rating: 4.8,
-  },
-  {
-    id: "diagnostic_agent",
-    name: "故障诊断助手",
-    description: "智能系统监控与故障诊断，实时分析系统性能指标，快速定位问题根因。",
-    icon: <SettingOutlined />,
-    status: "active",
-    creator: "DevOps团队",
-    createTime: "2024-01-10",
-    tags: ["监控", "诊断", "性能分析"],
-    usageCount: 892,
-    rating: 4.6,
-  },
-];
+interface Agent {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  status: string;
+  enabled: boolean;
+  tools_info: {
+    system_tools: string[];
+    mcp_tools: any[];
+  };
+  llm_info: {
+    model_name: string;
+    temperature: number;
+    max_tokens: number;
+  };
+  prompt_info: {
+    system_prompt: string;
+  };
+  mcp_config: {
+    total_tools: number;
+    selected_tools: string[];
+  };
+  is_builtin: boolean;
+}
 
 const AgentMarketplace = () => {
   const navigate = useNavigate();
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 获取智能体数据
+  const loadAgents = async () => {
+    try {
+      setLoading(true);
+      const response = await agentApi.getAgents();
+      // 只显示启用状态的智能体，兼容 "yes"/"no" 和 true/false
+      const activeAgents = response.filter((agent: Agent) => 
+        agent.enabled === true || agent.enabled === 'yes'
+      );
+      setAgents(activeAgents);
+    } catch (error) {
+      console.error('加载智能体失败:', error);
+      message.error('加载智能体列表失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAgents();
+  }, []);
 
   const handleAgentClick = (agentId: string) => {
     navigate(`/agents/${agentId}`);
   };
 
-  const renderAgentCard = (agent: any) => (
+  // 获取智能体图标
+  const getAgentIcon = (agentId: string) => {
+    switch (agentId) {
+      case 'research_agent':
+        return <RobotOutlined />;
+      case 'diagnostic_agent':
+        return <SettingOutlined />;
+      case 'security_agent':
+        return <UserOutlined />;
+      default:
+        return <RobotOutlined />;
+    }
+  };
+
+  // 获取智能体标签
+  const getAgentTags = (agent: Agent) => {
+    const tags = [];
+    
+    // 根据智能体类型添加标签
+    switch (agent.id) {
+      case 'research_agent':
+        tags.push('研究', '搜索', '分析');
+        break;
+      case 'diagnostic_agent':
+        tags.push('监控', '诊断', '性能分析');
+        break;
+      case 'security_agent':
+        tags.push('安全', '防护', '检测');
+        break;
+      default:
+        tags.push('智能助手');
+    }
+    
+    // 根据工具配置添加标签
+    const totalTools = agent.mcp_config?.total_tools || 0;
+    if (totalTools > 0) {
+      tags.push(`${totalTools}个工具`);
+    }
+    
+    return tags;
+  };
+
+  const renderAgentCard = (agent: Agent) => (
     <Card
       key={agent.id}
       hoverable
@@ -48,24 +112,27 @@ const AgentMarketplace = () => {
       onClick={() => handleAgentClick(agent.id)}
     >
       <Card.Meta
-        avatar={
-          <Avatar size={48} style={{ backgroundColor: "#1677ff" }} icon={agent.icon} />
-        }
         title={
-          <Space>
-            {agent.name}
-            <Tag color={agent.status === "active" ? "success" : "default"}>
-              {agent.status === "active" ? "运行中" : "已停止"}
-            </Tag>
-          </Space>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <Avatar 
+                size={36} 
+                style={{ backgroundColor: "#1677ff" }} 
+                icon={getAgentIcon(agent.id)} 
+              />
+              <span style={{ fontWeight: 600, fontSize: 18, color: '#262626' }}>
+                {agent.display_name || agent.name}
+              </span>
+            </div>
+          </div>
         }
         description={
           <div>
             <Paragraph ellipsis={{ rows: 2, expandable: false }} style={{ marginBottom: 12 }}>
-              {agent.description}
+              {agent.description || '智能助手，能够帮助您完成各种任务'}
             </Paragraph>
             <div style={{ marginBottom: 8 }}>
-              {agent.tags.map((tag: string) => (
+              {getAgentTags(agent).map((tag: string) => (
                 <Tag key={tag} color="blue" style={{ marginBottom: 4 }}>
                   {tag}
                 </Tag>
@@ -80,18 +147,27 @@ const AgentMarketplace = () => {
               }}
             >
               <Text type="secondary" style={{ fontSize: 12 }}>
-                创建者: {agent.creator}
+                模型: {agent.llm_info?.model_name || '默认模型'}
               </Text>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {agent.createTime}
+                {agent.is_builtin ? '内置智能体' : '自定义'}
               </Text>
             </div>
             <Row gutter={16}>
               <Col span={12}>
-                <Statistic title="使用次数" value={agent.usageCount} valueStyle={{ fontSize: 14 }} />
+                <Statistic 
+                  title="工具数量" 
+                  value={agent.mcp_config?.total_tools || 0} 
+                  valueStyle={{ fontSize: 14 }} 
+                />
               </Col>
               <Col span={12}>
-                <Statistic title="评分" value={agent.rating} precision={1} valueStyle={{ fontSize: 14 }} />
+                <Statistic 
+                  title="温度" 
+                  value={agent.llm_info?.temperature || 0} 
+                  precision={1}
+                  valueStyle={{ fontSize: 14 }} 
+                />
               </Col>
             </Row>
           </div>
@@ -99,6 +175,17 @@ const AgentMarketplace = () => {
       />
     </Card>
   );
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px' }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 16 }}>
+          <Text type="secondary">加载智能体列表中...</Text>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -114,16 +201,29 @@ const AgentMarketplace = () => {
           <Title level={3} style={{ margin: 0 }}>
             智能体广场
           </Title>
-          <Text type="secondary">发现和使用各种智能助手</Text>
+          <Text type="secondary">发现和使用各种智能助手 ({agents.length} 个可用)</Text>
         </div>
       </div>
-      <Row gutter={[24, 24]}>
-        {mockAgents.map((agent) => (
-          <Col key={agent.id} xs={24} sm={12} lg={8} xl={6}>
-            {renderAgentCard(agent)}
-          </Col>
-        ))}
-      </Row>
+      
+      {agents.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <RobotOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
+          <div style={{ marginTop: 16 }}>
+            <Text type="secondary">暂无可用的智能体</Text>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <Text type="secondary">请在智能体管理中创建并启用智能体</Text>
+          </div>
+        </div>
+      ) : (
+        <Row gutter={[24, 24]}>
+          {agents.map((agent) => (
+            <Col key={agent.id} xs={24} sm={12} lg={8} xl={6}>
+              {renderAgentCard(agent)}
+            </Col>
+          ))}
+        </Row>
+      )}
     </div>
   );
 };

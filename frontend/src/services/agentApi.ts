@@ -131,7 +131,7 @@ class AgentApiService {
   /**
    * 切换智能体启用状态
    */
-  async toggleAgentStatus(agentId: string): Promise<void> {
+  async toggleAgentStatus(agentId: string): Promise<any> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/toggle`, {
         method: 'PUT',
@@ -144,7 +144,14 @@ class AgentApiService {
         throw new Error(`切换智能体状态失败: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // 检查后端返回的业务状态
+      if (!result.success) {
+        throw new Error(result.message || '切换智能体状态失败');
+      }
+      
+      return result;
     } catch (error) {
       console.error('切换智能体状态失败:', error);
       throw error;

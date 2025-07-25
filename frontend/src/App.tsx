@@ -21,6 +21,7 @@ import SOPManagementSimple from "./pages/SOPManagementSimple";
 import MCPManagement from "./pages/MCPManagement";
 import AgentManagement from "./pages/AgentManagement";
 import ModelsManagement from "./pages/ModelsManagement";
+import AgentMarketplace from "./pages/AgentMarketplace";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
@@ -262,31 +263,7 @@ function AppContent() {
               </div>
             )}
             <Routes>
-              <Route
-                path="/"
-                element={
-                  <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-                    <Link to="/agents/research_agent" className="block">
-                      <div className={`${isDark ? 'bg-slate-700 border border-slate-600' : 'bg-white'} rounded-lg shadow-sm hover:shadow-md transition-all duration-300 ${isMobile ? 'p-4' : 'p-6'}`}>
-                        <RobotOutlined className={`text-blue-500 mb-3 ${isMobile ? 'text-xl' : 'text-2xl'}`} />
-                        <h2 className={`font-semibold mb-2 ${isMobile ? 'text-lg' : 'text-xl'} ${isDark ? 'text-white' : 'text-gray-900'}`}>研究助手</h2>
-                        <p className={`${isDark ? 'text-gray-300' : 'text-gray-600'} ${isMobile ? 'text-sm' : 'text-base'}`}>
-                          强大的研究助手，可以帮助你进行网络搜索、信息整理和深度分析。
-                        </p>
-                      </div>
-                    </Link>
-                    <Link to="/agents/diagnostic_agent" className="block">
-                      <div className={`${isDark ? 'bg-slate-700 border border-slate-600' : 'bg-white'} rounded-lg shadow-sm hover:shadow-md transition-all duration-300 ${isMobile ? 'p-4' : 'p-6'}`}>
-                        <RobotOutlined className={`text-green-500 mb-3 ${isMobile ? 'text-xl' : 'text-2xl'}`} />
-                        <h2 className={`font-semibold mb-2 ${isMobile ? 'text-lg' : 'text-xl'} ${isDark ? 'text-white' : 'text-gray-900'}`}>故障诊断助手</h2>
-                        <p className={`${isDark ? 'text-gray-300' : 'text-gray-600'} ${isMobile ? 'text-sm' : 'text-base'}`}>
-                          智能系统监控与故障诊断，实时分析系统性能指标。
-                        </p>
-                      </div>
-                    </Link>
-                  </div>
-                }
-              />
+              <Route path="/" element={<AgentMarketplace />} />
               <Route path="/agents/research_agent" element={<ResearchAgent />} />
               <Route path="/agents/diagnostic_agent" element={<DiagnosticAgent />} />
               <Route path="/agents" element={<AgentManagement />} />
