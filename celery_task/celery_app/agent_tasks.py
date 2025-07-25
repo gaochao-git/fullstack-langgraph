@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 AGENT_API_BASE_URL = os.getenv('AGENT_API_BASE_URL', 'http://192.168.1.10:8000')
 
 
-@app.task(bind=True, max_retries=2, soft_time_limit=300, time_limit=360)
+@app.task(bind=True, max_retries=0, soft_time_limit=300, time_limit=360)
 def call_agent_task(self, agent_id, message, user_name="system", conversation_id=None):
     """
     调用智能体的异步任务
@@ -170,8 +170,8 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
             }
             record_agent_task_result(task_id, agent_id, 'FAILED', error_result)
             
-            # 重试任务
-            raise Exception(error_msg)
+            # 不重试，直接返回失败结果
+            return error_result
             
     except requests.exceptions.RequestException as e:
         error_msg = f"智能体API请求异常: {str(e)}"
@@ -187,8 +187,8 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
         }
         record_agent_task_result(task_id, agent_id, 'FAILED', error_result)
         
-        # 重试任务
-        self.retry(exc=e, countdown=10)  # 10秒后重试
+        # 不重试，直接返回失败结果
+        return error_result
         
     except Exception as exc:
         error_msg = f"智能体任务执行出错: {str(exc)}"
@@ -204,10 +204,8 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
         }
         record_agent_task_result(task_id, agent_id, 'FAILED', error_result)
         
-        # 根据重试次数调整等待时间
-        retry_delay = min(30 * (self.request.retries + 1), 120)  # 30秒递增，最多2分钟
-        logger.info(f"任务将在 {retry_delay} 秒后重试 (第 {self.request.retries + 1} 次重试)")
-        self.retry(exc=exc, countdown=retry_delay)
+        # 不重试，直接返回失败结果
+        return error_result
 
 
 @app.task
