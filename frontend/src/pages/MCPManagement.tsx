@@ -512,8 +512,7 @@ const MCPManagement: React.FC = () => {
       title: '服务器名称',
       dataIndex: 'name',
       key: 'name',
-      width: 200,
-      fixed: 'left',
+      width: 150,
       render: (name: string, record: MCPServer) => (
         <Space>
           <ApiOutlined />
@@ -601,8 +600,7 @@ const MCPManagement: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 180,
-      fixed: 'right',
+      width: 160,
       render: (_, record: MCPServer) => (
         <Space size="small">
           <Button 
@@ -701,7 +699,7 @@ const MCPManagement: React.FC = () => {
           dataSource={filteredServers}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1000 }}
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,

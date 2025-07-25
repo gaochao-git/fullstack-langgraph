@@ -165,15 +165,14 @@ const SOPManagementSimple: React.FC = () => {
       title: 'SOP ID',
       dataIndex: 'sop_id',
       key: 'sop_id',
-      width: 120,
-      fixed: 'left'
+      width: 100
     },
     {
       title: 'SOP标题',
       dataIndex: 'sop_title',
       key: 'sop_title',
       ellipsis: true,
-      width: 200
+      width: 150
     },
     {
       title: '分类',
@@ -221,8 +220,7 @@ const SOPManagementSimple: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 150,
-      fixed: 'right',
+      width: 130,
       render: (_, record) => (
         <Space size="small">
           <Button 
@@ -324,7 +322,7 @@ const SOPManagementSimple: React.FC = () => {
           dataSource={sops}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 800 }}
           pagination={{
             current: currentPage,
             pageSize: pageSize,

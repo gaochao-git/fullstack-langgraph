@@ -1,5 +1,5 @@
 import { Routes, Route, Link } from "react-router-dom";
-import { Layout, Menu, Typography, theme, Drawer, ConfigProvider, App as AntdApp } from "antd";
+import { Layout, Menu, Drawer, ConfigProvider, App as AntdApp } from "antd";
 import {
   RobotOutlined,
   UserOutlined,
@@ -24,8 +24,7 @@ import ModelsManagement from "./pages/ModelsManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
-const { Header, Sider, Content } = Layout;
-const { Title } = Typography;
+const { Sider, Content } = Layout;
 
 // 主应用组件（包装在主题提供者内部）
 function AppContent() {
@@ -33,15 +32,14 @@ function AppContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const { antdTheme, isDark } = useTheme();
-  const {
-    token: { colorBgContainer },
-  } = theme.useToken();
+  // Theme token removed as not used
 
   // 检测屏幕尺寸
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 768) {
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+      if (width < 768) {
         setCollapsed(true);
       }
     };
@@ -157,7 +155,7 @@ function AppContent() {
           onClose={() => setMobileMenuVisible(false)}
           open={mobileMenuVisible}
           bodyStyle={{ padding: 0 }}
-          width={250}
+          width={Math.min(280, window.innerWidth * 0.85)}
           closeIcon={<CloseOutlined style={{ fontSize: 16 }} />}
         >
           <div style={{
@@ -197,6 +195,11 @@ function AppContent() {
             defaultSelectedKeys={['1']}
             items={menuItems}
             onClick={() => setMobileMenuVisible(false)}
+            style={{
+              fontSize: '16px',
+              border: 'none'
+            }}
+            className="mobile-menu-optimized"
           />
         </Drawer>
       )}
@@ -221,10 +224,10 @@ function AppContent() {
                   left: 0,
                   width: '100vw',
                   height: 48,
-                  background: '#fff',
+                  background: isDark ? '#1f1f1f' : '#fff',
                   display: 'flex',
                   alignItems: 'center',
-                  borderBottom: '1px solid #f0f0f0',
+                  borderBottom: isDark ? '1px solid #333' : '1px solid #f0f0f0',
                   zIndex: 1001,
                   boxSizing: 'border-box',
                   padding: '0 12px',
@@ -239,15 +242,20 @@ function AppContent() {
                     background: 'none',
                     border: 'none',
                     color: '#1677ff',
-                    padding: 4,
+                    padding: '8px',
                     borderRadius: 6,
-                    marginRight: 8
+                    marginRight: 8,
+                    minWidth: 44,
+                    minHeight: 44,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
                   }}
                   aria-label="打开菜单"
                 >
                   <MenuFoldOutlined style={{ fontSize: 16 }} />
                 </button>
-                <span style={{ flex: 1, textAlign: 'center', color: '#222', fontSize: 18, fontWeight: 600 }}>
+                <span style={{ flex: 1, textAlign: 'center', color: isDark ? '#fff' : '#222', fontSize: 18, fontWeight: 600 }}>
                   智能运维平台
                 </span>
                 {/* 右侧可加更多按钮 */}
