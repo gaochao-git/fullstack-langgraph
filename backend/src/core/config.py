@@ -23,12 +23,27 @@ class Settings(BaseSettings):
     WORKERS: int = 1
     
     # 数据库配置  
-    DATABASE_TYPE: str = "postgresql"
+    DATABASE_TYPE: str = "mysql"  # 改为默认使用MySQL
     DATABASE_USER: Optional[str] = None
     DATABASE_PASSWORD: Optional[str] = None  
     DATABASE_HOST: str = "localhost"
-    DATABASE_PORT: int = 5432
+    DATABASE_PORT: int = 3306  # MySQL默认端口
     DATABASE_NAME: Optional[str] = None
+    DATABASE_URL: Optional[str] = None
+    
+    # PostgreSQL兼容配置（为了向后兼容）
+    POSTGRES_USER: Optional[str] = None
+    POSTGRES_PASSWORD: Optional[str] = None
+    POSTGRES_HOST: Optional[str] = None
+    POSTGRES_PORT: Optional[int] = None
+    POSTGRES_DB: Optional[str] = None
+    
+    # MySQL配置
+    MYSQL_USER: Optional[str] = None
+    MYSQL_PASSWORD: Optional[str] = None
+    MYSQL_HOST: Optional[str] = None
+    MYSQL_PORT: Optional[int] = None
+    MYSQL_DB: Optional[str] = None
     # Checkpoint配置
     CHECKPOINTER_TYPE: str = "postgres"
     CHECKPOINTER_HOST: Optional[str] = None
@@ -70,15 +85,27 @@ def get_database_url() -> str:
     if settings.DATABASE_URL:
         return settings.DATABASE_URL
     
-    # 优先使用DATABASE_*环境变量
-    user = settings.DATABASE_USER or settings.POSTGRES_USER
-    password = settings.DATABASE_PASSWORD or settings.POSTGRES_PASSWORD
-    host = settings.DATABASE_HOST or settings.POSTGRES_HOST
-    port = settings.DATABASE_PORT or settings.POSTGRES_PORT
-    db_name = settings.DATABASE_NAME or settings.POSTGRES_DB
-    
-    if all([user, password, db_name]):
-        return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+    # 根据DATABASE_TYPE选择相应的配置
+    if settings.DATABASE_TYPE == "mysql":
+        # 优先使用DATABASE_*环境变量，其次使用MYSQL_*
+        user = settings.DATABASE_USER or settings.MYSQL_USER
+        password = settings.DATABASE_PASSWORD or settings.MYSQL_PASSWORD
+        host = settings.DATABASE_HOST or settings.MYSQL_HOST or "localhost"
+        port = settings.DATABASE_PORT or settings.MYSQL_PORT or 3306
+        db_name = settings.DATABASE_NAME or settings.MYSQL_DB
+        
+        if all([user, password, db_name]):
+            return f"mysql://{user}:{password}@{host}:{port}/{db_name}"
+    else:
+        # PostgreSQL配置
+        user = settings.DATABASE_USER or settings.POSTGRES_USER
+        password = settings.DATABASE_PASSWORD or settings.POSTGRES_PASSWORD
+        host = settings.DATABASE_HOST or settings.POSTGRES_HOST or "localhost"
+        port = settings.DATABASE_PORT or settings.POSTGRES_PORT or 5432
+        db_name = settings.DATABASE_NAME or settings.POSTGRES_DB
+        
+        if all([user, password, db_name]):
+            return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
     
     raise ValueError("DATABASE_URL or database credentials must be provided")
 
