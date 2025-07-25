@@ -115,7 +115,7 @@ ASSISTANTS = {
         "graph": diagnostic_graph,
         "config_class": DiagnosticConfiguration,
         "description": "Diagnostic agent for system troubleshooting"
-    }
+    },
 }
 
 class AssistantResponse(BaseModel):

@@ -22,6 +22,7 @@ import MCPManagement from "./pages/MCPManagement";
 import AgentManagement from "./pages/AgentManagement";
 import ModelsManagement from "./pages/ModelsManagement";
 import AgentMarketplace from "./pages/AgentMarketplace";
+import GenericAgentChat from "./pages/GenericAgentChat";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
@@ -266,6 +267,7 @@ function AppContent() {
               <Route path="/" element={<AgentMarketplace />} />
               <Route path="/agents/research_agent" element={<ResearchAgent />} />
               <Route path="/agents/diagnostic_agent" element={<DiagnosticAgent />} />
+              <Route path="/agents/:agentId" element={<GenericAgentChat />} />
               <Route path="/agents" element={<AgentManagement />} />
               <Route path="/sop" element={<SOPManagementSimple />} />
               <Route path="/mcp" element={<MCPManagement />} />

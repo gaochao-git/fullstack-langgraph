@@ -2,7 +2,7 @@ import os
 from pydantic import BaseModel, Field
 from typing import Any, Optional, List, Dict
 from langchain_core.runnables import RunnableConfig
-from src.services.agent_config import AgentConfigService
+from src.services.agent_config_service import AgentConfigService
 
 
 class Configuration(BaseModel):
