@@ -533,8 +533,9 @@ const MCPManagement: React.FC = () => {
       render: (uri: string) => (
         <div style={{ minWidth: 200, maxWidth: 300 }}>
           <code 
-            className="text-sm px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
+            className="px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
             style={{ 
+              fontSize: '11px',
               scrollbarWidth: 'thin',
               backgroundColor: isDark ? '#374151' : '#f3f4f6',
               color: isDark ? '#e5e7eb' : '#374151',
