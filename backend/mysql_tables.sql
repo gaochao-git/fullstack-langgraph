@@ -94,6 +94,35 @@ CREATE TABLE `ai_model_configs` (
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI模型配置表';
 
--- 创建完成提示
--- SELECT 'MySQL表结构创建完成！' AS message;
--- SELECT 'Tables created: sop_prompt_templates, mcp_servers, agent_configs, ai_model_configs' AS info;
+-- 5. 用户表 (Users)
+-- 用于存储用户基本信息
+CREATE TABLE `users` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，自增',
+    `user_name` VARCHAR(100) NOT NULL UNIQUE COMMENT '用户名，全局唯一',
+    `display_name` VARCHAR(200) COMMENT '用户显示名称',
+    `email` VARCHAR(255) COMMENT '用户邮箱地址',
+    `user_type` VARCHAR(20) NOT NULL DEFAULT 'regular' COMMENT '用户类型（admin/regular/guest）',
+    `is_active` BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否处于活跃状态',
+    `last_login` DATETIME COMMENT '最后登录时间',
+    `avatar_url` VARCHAR(500) COMMENT '用户头像URL',
+    `preferences` JSON COMMENT '用户偏好设置，JSON格式',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户基本信息表';
+
+-- 6. 用户线程关联表 (User Threads)
+-- 用于存储用户与对话线程的关联关系
+CREATE TABLE `user_threads` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，自增',
+    `user_name` VARCHAR(100) NOT NULL COMMENT '用户名，关联users表',
+    `thread_id` VARCHAR(255) NOT NULL COMMENT '线程ID，对应LangGraph的thread_id',
+    `thread_title` VARCHAR(500) COMMENT '线程标题，用户可自定义',
+    `agent_id` VARCHAR(100) COMMENT '关联的智能体ID',
+    `is_archived` BOOLEAN NOT NULL DEFAULT FALSE COMMENT '是否已归档',
+    `message_count` INT NOT NULL DEFAULT 0 COMMENT '消息数量统计',
+    `last_message_time` DATETIME COMMENT '最后消息时间',
+    `create_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    -- 联合唯一索引
+    UNIQUE KEY `uk_user_thread` (`user_name`, `thread_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户线程关联表';
