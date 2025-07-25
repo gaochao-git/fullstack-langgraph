@@ -902,7 +902,7 @@ export function DiagnosticChatView({
           "flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 relative transition-colors duration-200",
           isDark 
             ? "bg-gradient-to-b from-gray-900 to-gray-800" 
-            : "bg-gradient-to-b from-gray-50 to-white"
+            : "bg-gradient-to-b from-white to-gray-50"
         )}
         style={{ minHeight: 0, maxHeight: 'calc(100vh - 190px)' }}
         onScroll={handleScroll}
@@ -1140,125 +1140,130 @@ export function DiagnosticChatView({
             : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
         )}
       >
-        <form onSubmit={handleSubmit} className="flex gap-1 sm:gap-2 p-2 sm:p-4">
-          {/* 模型选择器 - 固定占位版本 */}
-          <div className="relative">
-            <select
-              value={currentModel || ''}
-              onChange={(e) => onModelChange?.(e.target.value)}
+        <form onSubmit={handleSubmit} className="p-2 sm:p-4">
+          {/* 地址栏样式的输入容器 */}
+          <div className={cn(
+            "flex items-center border-2 rounded-lg overflow-hidden shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-400",
+            isDark 
+              ? "bg-gray-800 border-gray-600" 
+              : "bg-white border-gray-300"
+          )}>
+            {/* 模型选择器 - 作为地址栏的协议部分 */}
+            <div className={cn(
+              "flex items-center border-r px-3 py-2.5",
+              isDark 
+                ? "border-gray-600" 
+                : "border-gray-300"
+            )}>
+              <select
+                value={currentModel || ''}
+                onChange={(e) => onModelChange?.(e.target.value)}
+                className={cn(
+                  "bg-transparent text-sm font-medium cursor-pointer focus:outline-none",
+                  isDark ? "text-gray-200" : "text-gray-700"
+                )}
+                disabled={isLoading || !!interrupt || availableModels.length === 0}
+                title={availableModels.length > 0 ? `当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}` : '正在加载模型...'}
+              >
+                {availableModels.length > 0 ? (
+                  availableModels.map((model) => {
+                    // 简化模型名称显示
+                    const getShortName = (name: string) => {
+                      if (name.includes('deepseek')) return 'DeepSeek';
+                      if (name.includes('qwen2.5')) return 'Qwen2.5';
+                      if (name.includes('qwen')) return 'Qwen';
+                      if (name.includes('gpt')) return 'GPT';
+                      if (name.includes('claude')) return 'Claude';
+                      return name.substring(0, 10);
+                    };
+                    
+                    return (
+                      <option 
+                        key={model.id} 
+                        value={model.type}
+                      >
+                        {getShortName(model.name)}
+                      </option>
+                    );
+                  })
+                ) : (
+                  <option value="" disabled>
+                    加载中...
+                  </option>
+                )}
+              </select>
+            </div>
+            
+            {/* 输入框 - 作为地址栏的主体部分 */}
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder={interrupt ? "请先确认或取消工具执行..." : (window.innerWidth < 640 ? "请描述问题..." : "请描述您遇到的问题...")}
               className={cn(
-                "px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-xs sm:text-sm transition-all duration-200 cursor-pointer min-w-[80px] max-w-[120px] sm:min-w-[100px] sm:max-w-[140px]",
+                "flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-sm sm:text-base",
                 isDark 
-                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 bg-gray-800 border-blue-400 text-gray-100" 
-                  : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 bg-white border-blue-300 text-white"
+                  ? "text-gray-100 placeholder-gray-400" 
+                  : "text-gray-900 placeholder-gray-500"
               )}
-              style={{ 
-                backgroundColor: isDark ? '#1F2937' : '#ffffff', 
-                borderColor: isDark ? '#60A5FA' : '#93C5FD', 
-                borderWidth: '2px', 
-                color: isDark ? '#F1F5F9' : '#111827'
-              }}
-              disabled={isLoading || !!interrupt || availableModels.length === 0}
-              title={availableModels.length > 0 ? `当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}` : '正在加载模型...'}
-            >
-              {availableModels.length > 0 ? (
-                availableModels.map((model) => {
-                  // 简化模型名称显示
-                  const getShortName = (name: string) => {
-                    if (name.includes('deepseek')) return 'DeepSeek';
-                    if (name.includes('qwen2.5')) return 'Qwen2.5';
-                    if (name.includes('qwen')) return 'Qwen';
-                    if (name.includes('gpt')) return 'GPT';
-                    if (name.includes('claude')) return 'Claude';
-                    return name.substring(0, 10);
-                  };
-                  
-                  return (
-                    <option 
-                      key={model.id} 
-                      value={model.type}
-                      style={{ 
-                        backgroundColor: isDark ? '#1F2937' : '#ffffff', 
-                        color: isDark ? '#F1F5F9' : '#111827'
-                      }}
-                    >
-                      {getShortName(model.name)}
-                    </option>
-                  );
-                })
-              ) : (
-                <option 
-                  value="" 
-                  disabled 
-                  style={{ 
-                    backgroundColor: isDark ? '#1F2937' : '#ffffff', 
-                    color: isDark ? '#F1F5F9' : '#111827'
+              disabled={isLoading || !!interrupt}
+            />
+            
+            {/* 发送/取消按钮 - 作为地址栏的操作部分 */}
+            <div className={cn(
+              "flex items-center border-l px-2",
+              isDark 
+                ? "border-gray-600" 
+                : "border-gray-300"
+            )}>
+              {(isLoading || interrupt) ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onCancel();
+                  }}
+                  className={cn(
+                    "p-2 rounded hover:bg-opacity-80 transition-colors duration-200 flex items-center gap-1",
+                    "text-orange-500 hover:bg-orange-100"
+                  )}
+                  style={{
+                    animation: 'buttonPulse 1.5s ease-in-out infinite'
                   }}
                 >
-                  加载中...
-                </option>
+                  <span 
+                    style={{
+                      display: 'inline-block',
+                      width: '12px',
+                      height: '12px',
+                      border: '2px solid currentColor',
+                      borderTop: '2px solid transparent',
+                      borderRadius: '50%',
+                      animation: 'buttonSpin 1s linear infinite'
+                    }}
+                  />
+                  <span className="hidden sm:inline text-sm">取消</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!inputValue.trim()}
+                  className={cn(
+                    "p-2 rounded transition-colors duration-200 flex items-center gap-1",
+                    !inputValue.trim()
+                      ? "text-gray-400 cursor-not-allowed"
+                      : "text-cyan-500 hover:bg-cyan-50 hover:text-cyan-600"
+                  )}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                  </svg>
+                  <span className="hidden sm:inline text-sm">发送</span>
+                </button>
               )}
-            </select>
+            </div>
           </div>
-          
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={interrupt ? "请先确认或取消工具执行..." : (window.innerWidth < 640 ? "请描述问题..." : "请描述您遇到的问题...")}
-            className={cn(
-              "flex-1 px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-sm sm:text-base transition-colors duration-200",
-              isDark 
-                ? "bg-gray-800 border-blue-400 text-gray-100 placeholder-gray-400" 
-                : "bg-white border-blue-300 text-gray-900 placeholder-gray-500"
-            )}
-            style={{ 
-              backgroundColor: isDark ? '#1F2937' : '#ffffff', 
-              borderColor: isDark ? '#60A5FA' : '#93C5FD', 
-              borderWidth: '2px', 
-              color: isDark ? '#F1F5F9' : '#111827'
-            }}
-            disabled={isLoading || !!interrupt}
-          />
-          {(isLoading || interrupt) ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onCancel();
-              }}
-              className="px-3 sm:px-4 py-2 text-orange-300 border-orange-400 hover:bg-orange-900/30 text-sm sm:text-base"
-              style={{
-                animation: 'buttonPulse 1.5s ease-in-out infinite'
-              }}
-            >
-              <span className="flex items-center gap-1 sm:gap-2">
-                <span 
-                  style={{
-                    display: 'inline-block',
-                    width: '12px',
-                    height: '12px',
-                    border: '2px solid currentColor',
-                    borderTop: '2px solid transparent',
-                    borderRadius: '50%',
-                    animation: 'buttonSpin 1s linear infinite'
-                  }}
-                />
-                <span className="hidden sm:inline">取消</span>
-                <span className="sm:hidden">×</span>
-              </span>
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              disabled={!inputValue.trim()}
-              className="bg-cyan-500 text-white px-4 py-2 rounded-lg hover:bg-cyan-600 disabled:opacity-50 shadow-lg border border-cyan-400 whitespace-nowrap"
-            >
-              发送
-            </Button>
-          )}
         </form>
       </div>
     </div>

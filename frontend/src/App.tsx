@@ -165,7 +165,7 @@ function AppContent() {
             alignItems: 'center',
             height: 48,
             padding: '0 12px',
-            background: 'rgba(22,119,255,0.08)',
+            background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(22,119,255,0.08)',
             margin: 0
           }}>
             <button
@@ -179,12 +179,12 @@ function AppContent() {
                 background: 'none',
                 cursor: 'pointer',
                 marginRight: '8px',
-                color: '#1677ff'
+                color: isDark ? '#60A5FA' : '#1677ff'
               }}
             >
               <MenuUnfoldOutlined style={{ fontSize: 16 }} />
             </button>
-            <span style={{ color: '#1677ff', fontWeight: 600, fontSize: 16 }}>
+            <span style={{ color: isDark ? '#60A5FA' : '#1677ff', fontWeight: 600, fontSize: 16 }}>
               智能运维平台
             </span>
             {/* 移动端主题切换按钮 */}
