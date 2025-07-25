@@ -7,8 +7,6 @@ import os
 import io
 import base64
 from typing import Dict, Any, Optional, Union
-from PIL import Image
-
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
