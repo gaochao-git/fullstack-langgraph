@@ -150,7 +150,7 @@ const AgentMarketplace = () => {
                 模型: {agent.llm_info?.model_name || '默认模型'}
               </Text>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {agent.is_builtin ? '内置智能体' : '自定义'}
+                {agent.is_builtin === 'yes' ? '内置智能体' : '自定义'}
               </Text>
             </div>
             <Row gutter={16}>

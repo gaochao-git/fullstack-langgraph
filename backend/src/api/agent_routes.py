@@ -53,7 +53,7 @@ class Agent(BaseModel):
     avg_response_time: float
     capabilities: List[str]
     mcp_config: AgentMCPConfig
-    is_builtin: bool = False
+    is_builtin: str = 'no'
     # 完整配置信息
     tools_info: Optional[Dict[str, Any]] = None
     llm_info: Optional[Dict[str, Any]] = None
@@ -312,7 +312,7 @@ async def get_agents():
                 
                 # 根据数据库中的 is_builtin 字段判断智能体类型
                 agent_id = agent_dict['agent_id']
-                is_builtin_from_db = db_agent.is_builtin  # 直接从数据库对象获取原始字符串值
+                is_builtin_from_db = agent_dict.get('is_builtin', 'no')  # 现在直接是字符串
                 
                 if is_builtin_from_db == 'yes' and agent_id in BUILTIN_AGENTS:
                     # 内置智能体：使用代码中的定义覆盖基本信息，数据库中的动态数据保留
@@ -330,7 +330,7 @@ async def get_agents():
                         success_rate=agent_dict['success_rate'],
                         avg_response_time=agent_dict['avg_response_time'],
                         capabilities=builtin_config['capabilities'],
-                        is_builtin=True,
+                        is_builtin=is_builtin_from_db,  # 使用数据库中的实际值
                         mcp_config=AgentMCPConfig(
                             enabled_servers=agent_dict['mcp_config']['enabled_servers'],
                             selected_tools=agent_dict['mcp_config']['selected_tools'],
@@ -356,7 +356,7 @@ async def get_agents():
                         success_rate=agent_dict['success_rate'],
                         avg_response_time=agent_dict['avg_response_time'],
                         capabilities=agent_dict['capabilities'],
-                        is_builtin=agent_dict.get('is_builtin', False),  # 自定义智能体，使用转换后的布尔值
+                        is_builtin=agent_dict.get('is_builtin', 'no'),  # 自定义智能体
                         mcp_config=AgentMCPConfig(
                             enabled_servers=agent_dict['mcp_config']['enabled_servers'],
                             selected_tools=agent_dict['mcp_config']['selected_tools'],
@@ -386,7 +386,7 @@ async def get_agents():
                     agents.append(Agent(
                         **agent_config,
                         last_used=None,
-                        is_builtin=True,
+                        is_builtin='yes',
                         mcp_config=mcp_config,
                         # 内置智能体的默认配置
                         tools_info=None,

@@ -242,7 +242,7 @@ class AgentConfig(Base):
             'version': self.agent_version,
             'status': self.agent_status,
             'enabled': self.agent_enabled == 'yes' if isinstance(self.agent_enabled, str) else self.agent_enabled,
-            'is_builtin': self.is_builtin == 'yes' if isinstance(self.is_builtin, str) else self.is_builtin,
+            'is_builtin': self.is_builtin,  # 直接返回字符串 'yes'/'no'
             # 运行统计
             'total_runs': self.total_runs,
             'success_rate': self.success_rate,

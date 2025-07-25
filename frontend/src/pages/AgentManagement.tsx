@@ -110,7 +110,7 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
   successRate: agent.success_rate,
   avgResponseTime: agent.avg_response_time,
   // 保证 is_builtin 始终为 'yes' 或 'no'
-  is_builtin: agent.is_builtin === true || agent.is_builtin === 'yes' ? 'yes' : 'no',
+  is_builtin: agent.is_builtin,
   // 将 enabled 转换为 boolean，兼容 "yes"/"no" 和 true/false
   enabled: agent.enabled === true || agent.enabled === 'yes',
   mcpConfig: {

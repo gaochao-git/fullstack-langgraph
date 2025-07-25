@@ -41,7 +41,7 @@ export interface Agent {
   avg_response_time: number;
   capabilities: string[];
   mcp_config: AgentMCPConfig;
-  is_builtin: boolean;
+  is_builtin: string; // 'yes' | 'no'
   tools_info?: any;
   llm_info?: any;
   prompt_info?: any;
