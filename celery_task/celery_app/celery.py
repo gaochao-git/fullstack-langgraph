@@ -7,7 +7,7 @@ app = Celery('celery_app')
 app.config_from_object('celery_app.config')
 
 # 自动发现任务
-app.autodiscover_tasks(['celery_app'])
+app.autodiscover_tasks(['celery_app', 'celery_app.agent_tasks'])
 
 if __name__ == '__main__':
     app.start() 

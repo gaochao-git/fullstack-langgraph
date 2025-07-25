@@ -24,6 +24,8 @@ class DatabaseScheduler(Scheduler):
             
             self._schedule = {}
             
+            print(f"数据库调度器: 加载了 {len(db_tasks)} 个启用的任务")
+            
             for task in db_tasks:
                 # 解析参数
                 args = json.loads(task.task_args) if task.task_args else []
@@ -60,7 +62,7 @@ class DatabaseScheduler(Scheduler):
             session.close()
     
     def tick(self, *args, **kwargs):
-        # 每分钟检查一次数据库更新
-        if datetime.now() - self._last_timestamp > timedelta(minutes=1):
+        # 每30秒检查一次数据库更新
+        if datetime.now() - self._last_timestamp > timedelta(seconds=30):
             self.update_from_database()
         return super(DatabaseScheduler, self).tick(*args, **kwargs) 

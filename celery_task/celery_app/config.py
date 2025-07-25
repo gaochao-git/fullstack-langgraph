@@ -20,6 +20,9 @@ broker_connection_retry_on_startup = True
 # 添加自定义调度器配置
 beat_scheduler = 'celery_app.scheduler.DatabaseScheduler'
 
+# 设置 Beat 最大循环间隔为30秒，提高新任务检测速度
+beat_max_loop_interval = 30
+
 # MySQL 配置
 DATABASE_CONFIG = {
     'host': '82.156.146.51',
