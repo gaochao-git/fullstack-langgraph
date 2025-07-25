@@ -432,43 +432,61 @@ def periodic_research_summary():
 
 def record_agent_task_result(task_id, agent_id, status, result_data):
     """记录智能体任务执行结果到数据库"""
-    session = get_session()
-    try:
-        task_run = PeriodicTaskRun(
-            task_name=f'call_agent_{agent_id}',
-            task_schedule_time=datetime.now(),
-            task_execute_time=datetime.now(),
-            task_status=status,
-            task_result=json.dumps(result_data, ensure_ascii=False),
-            create_by='system',
-            update_by='system'
-        )
-        session.add(task_run)
-        session.commit()
-    except Exception as e:
-        logger.error(f"记录智能体任务结果失败: {str(e)}")
-        session.rollback()
-    finally:
-        session.close()
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        session = get_session()
+        try:
+            task_run = PeriodicTaskRun(
+                task_name=f'call_agent_{agent_id}',
+                task_schedule_time=datetime.now(),
+                task_execute_time=datetime.now(),
+                task_status=status,
+                task_result=json.dumps(result_data, ensure_ascii=False),
+                create_by='system',
+                update_by='system'
+            )
+            session.add(task_run)
+            session.commit()
+            logger.info(f"成功记录智能体任务结果: {task_id}")
+            break
+        except Exception as e:
+            retry_count += 1
+            logger.warning(f"记录智能体任务结果失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
+            session.rollback()
+            if retry_count >= max_retries:
+                logger.error(f"记录智能体任务结果最终失败: {str(e)}")
+        finally:
+            session.close()
 
 
 def record_periodic_task_result(task_name, execution_time, status, result_data):
     """记录定时任务执行结果到数据库"""
-    session = get_session()
-    try:
-        task_run = PeriodicTaskRun(
-            task_name=task_name,
-            task_schedule_time=execution_time,
-            task_execute_time=execution_time,
-            task_status=status,
-            task_result=json.dumps(result_data, ensure_ascii=False),
-            create_by='system',
-            update_by='system'
-        )
-        session.add(task_run)
-        session.commit()
-    except Exception as e:
-        logger.error(f"记录定时任务结果失败: {str(e)}")
-        session.rollback()
-    finally:
-        session.close()
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        session = get_session()
+        try:
+            task_run = PeriodicTaskRun(
+                task_name=task_name,
+                task_schedule_time=execution_time,
+                task_execute_time=execution_time,
+                task_status=status,
+                task_result=json.dumps(result_data, ensure_ascii=False),
+                create_by='system',
+                update_by='system'
+            )
+            session.add(task_run)
+            session.commit()
+            logger.info(f"成功记录定时任务结果: {task_name}")
+            break
+        except Exception as e:
+            retry_count += 1
+            logger.warning(f"记录定时任务结果失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
+            session.rollback()
+            if retry_count >= max_retries:
+                logger.error(f"记录定时任务结果最终失败: {str(e)}")
+        finally:
+            session.close()

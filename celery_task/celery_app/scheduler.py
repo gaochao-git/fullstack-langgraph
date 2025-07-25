@@ -18,48 +18,58 @@ class DatabaseScheduler(Scheduler):
     
     def update_from_database(self):
         """从数据库更新定时任务"""
-        session = get_session()
-        try:
-            db_tasks = session.query(PeriodicTask).filter_by(task_enabled=True).all()
-            
-            self._schedule = {}
-            
-            print(f"数据库调度器: 加载了 {len(db_tasks)} 个启用的任务")
-            
-            for task in db_tasks:
-                # 解析参数
-                args = json.loads(task.task_args) if task.task_args else []
-                kwargs = json.loads(task.task_kwargs) if task.task_kwargs else {}
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            session = get_session()
+            try:
+                db_tasks = session.query(PeriodicTask).filter_by(task_enabled=True).all()
                 
-                # 创建调度
-                if task.task_interval is not None:
-                    # 间隔调度
-                    schedule_obj = schedule(timedelta(seconds=task.task_interval))
-                else:
-                    # Crontab 调度
-                    schedule_obj = crontab(
-                        minute=task.task_crontab_minute or '*',
-                        hour=task.task_crontab_hour or '*',
-                        day_of_week=task.task_crontab_day_of_week or '*',
-                        day_of_month=task.task_crontab_day_of_month or '*',
-                        month_of_year=task.task_crontab_month_of_year or '*'
-                    )
+                self._schedule = {}
                 
-                # 添加到调度中
-                self._schedule[task.task_name] = {
-                    'task': task.task_path,
-                    'schedule': schedule_obj,
-                    'args': args,
-                    'kwargs': kwargs,
-                    'options': {'expires': 60.0}
-                }
-            
-            self._last_timestamp = datetime.now()
-            
-        except Exception as e:
-            print(f"更新定时任务时出错: {e}")
-        finally:
-            session.close()
+                print(f"数据库调度器: 加载了 {len(db_tasks)} 个启用的任务")
+                
+                for task in db_tasks:
+                    # 解析参数
+                    args = json.loads(task.task_args) if task.task_args else []
+                    kwargs = json.loads(task.task_kwargs) if task.task_kwargs else {}
+                    
+                    # 创建调度
+                    if task.task_interval is not None:
+                        # 间隔调度
+                        schedule_obj = schedule(timedelta(seconds=task.task_interval))
+                    else:
+                        # Crontab 调度
+                        schedule_obj = crontab(
+                            minute=task.task_crontab_minute or '*',
+                            hour=task.task_crontab_hour or '*',
+                            day_of_week=task.task_crontab_day_of_week or '*',
+                            day_of_month=task.task_crontab_day_of_month or '*',
+                            month_of_year=task.task_crontab_month_of_year or '*'
+                        )
+                    
+                    # 添加到调度中
+                    self._schedule[task.task_name] = {
+                        'task': task.task_path,
+                        'schedule': schedule_obj,
+                        'args': args,
+                        'kwargs': kwargs,
+                        'options': {'expires': 60.0}
+                    }
+                
+                self._last_timestamp = datetime.now()
+                break  # 成功则退出重试循环
+                
+            except Exception as e:
+                retry_count += 1
+                print(f"更新定时任务时出错 (尝试 {retry_count}/{max_retries}): {e}")
+                if retry_count >= max_retries:
+                    print(f"更新定时任务最终失败，使用空调度: {e}")
+                    self._schedule = {}
+                    self._last_timestamp = datetime.now()
+            finally:
+                session.close()
     
     def tick(self, *args, **kwargs):
         # 每30秒检查一次数据库更新

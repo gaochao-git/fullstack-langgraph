@@ -8,9 +8,24 @@ from celery_app.config import DATABASE_CONFIG
 # 注册 PyMySQL 作为 MySQLdb
 pymysql.install_as_MySQLdb()
 
-# 创建数据库连接
+# 创建数据库连接，配置连接池和重连机制
 DB_URL = f"mysql://{DATABASE_CONFIG['user']}:{DATABASE_CONFIG['password']}@{DATABASE_CONFIG['host']}:{DATABASE_CONFIG['port']}/{DATABASE_CONFIG['database']}"
-engine = create_engine(DB_URL, echo=False)
+engine = create_engine(
+    DB_URL, 
+    echo=False,
+    # 连接池配置
+    pool_size=10,                    # 连接池大小
+    max_overflow=20,                 # 超出连接池大小的最大连接数
+    pool_pre_ping=True,             # 连接前ping测试，自动重连
+    pool_recycle=3600,              # 连接回收时间(1小时)
+    # 连接超时配置
+    connect_args={
+        "connect_timeout": 10,       # 连接超时10秒
+        "read_timeout": 30,          # 读取超时30秒
+        "write_timeout": 30,         # 写入超时30秒
+        "charset": "utf8mb4"
+    }
+)
 Session = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -86,6 +101,20 @@ class PeriodicTask(Base):
 def init_db():
     Base.metadata.create_all(engine)
 
-# 获取数据库会话
+# 获取数据库会话（带重连机制）
 def get_session():
-    return Session() 
+    """获取数据库会话,自动处理连接断开"""
+    from sqlalchemy import text
+    
+    session = Session()
+    
+    # 测试连接是否有效
+    try:
+        # 执行简单查询测试连接
+        session.execute(text("SELECT 1"))
+        return session
+    except Exception as e:
+        # 连接失败时关闭session并重新创建
+        session.close()
+        # 创建新的session
+        return Session() 
