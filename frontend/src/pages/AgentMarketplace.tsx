@@ -3,6 +3,7 @@ import { Card, Row, Col, Typography, Tag, Avatar, Statistic, Space, Spin, messag
 import { DatabaseOutlined, RobotOutlined, SettingOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { agentApi } from "../services/agentApi";
+import { useTheme } from "../contexts/ThemeContext";
 
 const { Title, Text, Paragraph } = Typography;
 interface Agent {
@@ -33,6 +34,7 @@ interface Agent {
 
 const AgentMarketplace = () => {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -120,7 +122,7 @@ const AgentMarketplace = () => {
                 style={{ backgroundColor: "#1677ff" }} 
                 icon={getAgentIcon(agent.id)} 
               />
-              <span style={{ fontWeight: 600, fontSize: 18, color: '#262626' }}>
+              <span style={{ fontWeight: 600, fontSize: 18, color: isDark ? '#ffffff' : '#262626' }}>
                 {agent.display_name || agent.name}
               </span>
             </div>
