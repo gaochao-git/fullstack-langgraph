@@ -1,20 +1,19 @@
 """Database configuration and setup."""
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv
 
-load_dotenv()
+# 使用新的配置系统
+from ..core.config import settings
 
-# Database configuration
-DATABASE_TYPE = os.getenv("DATABASE_TYPE", "postgresql")  # postgresql or mysql
-DATABASE_HOST = os.getenv("DATABASE_HOST", "localhost")
-DATABASE_PORT = os.getenv("DATABASE_PORT", "5432" if DATABASE_TYPE == "postgresql" else "3306")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "langgraph_db")
-DATABASE_USER = os.getenv("DATABASE_USER", "postgres" if DATABASE_TYPE == "postgresql" else "root")
-DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "password")
+# 数据库配置从统一配置获取
+DATABASE_TYPE = settings.DATABASE_TYPE
+DATABASE_HOST = settings.DATABASE_HOST
+DATABASE_PORT = settings.DATABASE_PORT
+DATABASE_NAME = settings.DATABASE_NAME
+DATABASE_USER = settings.DATABASE_USER
+DATABASE_PASSWORD = settings.DATABASE_PASSWORD
 
 # Build database URL
 if DATABASE_TYPE == "postgresql":
@@ -26,7 +25,7 @@ elif DATABASE_TYPE == "mysql":
 else:
     raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
 
-# Create engines
+# Create engines  
 sync_engine = create_engine(SYNC_DATABASE_URL, echo=False)
 async_engine = create_async_engine(ASYNC_DATABASE_URL, echo=False)
 
