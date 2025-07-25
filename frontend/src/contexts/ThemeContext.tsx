@@ -117,10 +117,27 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       Input: {
         fontSize: 14,
         controlHeight: 36,
+        ...(isDark && {
+          colorBgContainer: '#1f2937',
+          colorBorder: '#374151',
+        }),
       },
       Select: {
         fontSize: 14,
         controlHeight: 36,
+        ...(isDark && {
+          colorBgContainer: '#1f2937',
+          colorBorder: '#374151',
+        }),
+      },
+      Table: {
+        fontSize: 14,
+        ...(isDark && {
+          colorBgContainer: '#1f2937',
+          colorBorderSecondary: '#374151',
+          colorFillAlter: '#374151',
+          colorFillContent: '#1f2937',
+        }),
       },
       // 其他组件配置...
     },

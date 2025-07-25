@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Card, 
   Row, 
@@ -227,6 +228,7 @@ const discoverOllamaModels = async (endpoint: string): Promise<string[]> => {
 };
 
 const ModelsManagement = () => {
+  const { isDark } = useTheme();
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -502,7 +504,8 @@ const ModelsManagement = () => {
         <code style={{ 
           fontSize: '11px', 
           padding: '2px 4px', 
-          background: '#f5f5f5', 
+          background: isDark ? '#374151' : '#f5f5f5',
+          color: isDark ? '#e5e7eb' : '#374151',
           borderRadius: '2px',
           wordBreak: 'break-all'
         }}>

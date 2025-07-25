@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { 
   Card, 
   Table, 
@@ -115,6 +116,7 @@ const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'fr
 
 
 const MCPManagement: React.FC = () => {
+  const { isDark } = useTheme();
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
@@ -531,8 +533,13 @@ const MCPManagement: React.FC = () => {
       render: (uri: string) => (
         <div style={{ minWidth: 200, maxWidth: 300 }}>
           <code 
-            className="text-sm bg-gray-100 px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
-            style={{ scrollbarWidth: 'thin' }}
+            className="text-sm px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
+            style={{ 
+              scrollbarWidth: 'thin',
+              backgroundColor: isDark ? '#374151' : '#f3f4f6',
+              color: isDark ? '#e5e7eb' : '#374151',
+              border: `1px solid ${isDark ? '#4b5563' : '#d1d5db'}`
+            }}
           >
             {uri}
           </code>
@@ -771,13 +778,13 @@ const MCPManagement: React.FC = () => {
                       {/* 工具描述 */}
                       {summary && (
                         <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>描述:</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#9ca3af' : '#8c8c8c', marginBottom: 8 }}>描述:</div>
                           <div style={{ 
                             fontSize: 12, 
-                            color: '#595959',
-                            backgroundColor: '#fff',
+                            color: isDark ? '#d1d5db' : '#595959',
+                            backgroundColor: isDark ? '#374151' : '#fff',
                             padding: '8px 12px',
-                            border: '1px solid #f0f0f0',
+                            border: `1px solid ${isDark ? '#4b5563' : '#f0f0f0'}`,
                             borderRadius: 4,
                             lineHeight: '1.5'
                           }}>
@@ -789,7 +796,7 @@ const MCPManagement: React.FC = () => {
                       {/* 参数信息 */}
                       {Object.keys(parameters).length > 0 && (
                         <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>参数:</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#9ca3af' : '#8c8c8c', marginBottom: 8 }}>参数:</div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {Object.entries(parameters).map(([paramName, paramInfo]: [string, any]) => (
                               <div key={paramName} style={{ 
@@ -797,18 +804,18 @@ const MCPManagement: React.FC = () => {
                                 alignItems: 'flex-start', 
                                 gap: 8, 
                                 fontSize: 12, 
-                                backgroundColor: '#fafafa', 
+                                backgroundColor: isDark ? '#374151' : '#fafafa', 
                                 padding: '8px 12px', 
                                 borderRadius: 4, 
-                                border: '1px solid #f0f0f0',
+                                border: `1px solid ${isDark ? '#4b5563' : '#f0f0f0'}`,
                                 flexWrap: 'wrap'
                               }}>
-                                <span style={{ fontFamily: 'monospace', color: '#1890ff', fontWeight: 600, minWidth: 80 }}>
+                                <span style={{ fontFamily: 'monospace', color: isDark ? '#60a5fa' : '#1890ff', fontWeight: 600, minWidth: 80 }}>
                                   {paramName}
                                 </span>
                                 <Tag size="small" color="blue">{paramInfo.type || 'unknown'}</Tag>
                                 {paramInfo.description && (
-                                  <span style={{ color: '#666666', flex: 1, marginLeft: 8 }}>
+                                  <span style={{ color: isDark ? '#9ca3af' : '#666666', flex: 1, marginLeft: 8 }}>
                                     {paramInfo.description}
                                   </span>
                                 )}
@@ -824,14 +831,14 @@ const MCPManagement: React.FC = () => {
                       {/* 返回值信息 */}
                       {returns && (
                         <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>返回:</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#9ca3af' : '#8c8c8c', marginBottom: 8 }}>返回:</div>
                           <div style={{ 
                             fontSize: 12, 
-                            backgroundColor: '#f6ffed', 
+                            backgroundColor: isDark ? '#065f46' : '#f6ffed', 
                             padding: '8px 12px', 
                             borderRadius: 4, 
-                            border: '1px solid #b7eb8f',
-                            color: '#52c41a',
+                            border: `1px solid ${isDark ? '#059669' : '#b7eb8f'}`,
+                            color: isDark ? '#10b981' : '#52c41a',
                             lineHeight: '1.4'
                           }}>
                             {returns}
@@ -1057,13 +1064,13 @@ const MCPManagement: React.FC = () => {
                         {/* 工具描述 */}
                         {summary && (
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>描述:</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#9ca3af' : '#8c8c8c', marginBottom: 8 }}>描述:</div>
                             <div style={{ 
                               fontSize: 12, 
-                              color: '#595959',
-                              backgroundColor: '#fff',
+                              color: isDark ? '#d1d5db' : '#595959',
+                              backgroundColor: isDark ? '#374151' : '#fff',
                               padding: '8px 12px',
-                              border: '1px solid #f0f0f0',
+                              border: `1px solid ${isDark ? '#4b5563' : '#f0f0f0'}`,
                               borderRadius: 4,
                               lineHeight: '1.5'
                             }}>
@@ -1075,7 +1082,7 @@ const MCPManagement: React.FC = () => {
                         {/* 参数信息 */}
                         {Object.keys(parameters).length > 0 && (
                           <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>参数:</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#9ca3af' : '#8c8c8c', marginBottom: 8 }}>参数:</div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                               {Object.entries(parameters).map(([paramName, paramInfo]: [string, any]) => (
                                 <div key={paramName} style={{ 
@@ -1083,18 +1090,18 @@ const MCPManagement: React.FC = () => {
                                   alignItems: 'flex-start', 
                                   gap: 8, 
                                   fontSize: 12, 
-                                  backgroundColor: '#fafafa', 
+                                  backgroundColor: isDark ? '#374151' : '#fafafa', 
                                   padding: '8px 12px', 
                                   borderRadius: 4, 
-                                  border: '1px solid #f0f0f0',
+                                  border: `1px solid ${isDark ? '#4b5563' : '#f0f0f0'}`,
                                   flexWrap: 'wrap'
                                 }}>
-                                  <span style={{ fontFamily: 'monospace', color: '#1890ff', fontWeight: 600, minWidth: 80 }}>
+                                  <span style={{ fontFamily: 'monospace', color: isDark ? '#60a5fa' : '#1890ff', fontWeight: 600, minWidth: 80 }}>
                                     {paramName}
                                   </span>
                                   <Tag size="small" color="blue">{paramInfo.type || 'unknown'}</Tag>
                                   {paramInfo.description && (
-                                    <span style={{ color: '#666666', flex: 1, marginLeft: 8 }}>
+                                    <span style={{ color: isDark ? '#9ca3af' : '#666666', flex: 1, marginLeft: 8 }}>
                                       {paramInfo.description}
                                     </span>
                                   )}
@@ -1110,14 +1117,14 @@ const MCPManagement: React.FC = () => {
                         {/* 返回值信息 */}
                         {returns && (
                           <div style={{ marginBottom: 8 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#8c8c8c', marginBottom: 8 }}>返回:</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: isDark ? '#9ca3af' : '#8c8c8c', marginBottom: 8 }}>返回:</div>
                             <div style={{ 
                               fontSize: 12, 
-                              backgroundColor: '#f6ffed', 
+                              backgroundColor: isDark ? '#065f46' : '#f6ffed', 
                               padding: '8px 12px', 
                               borderRadius: 4, 
-                              border: '1px solid #b7eb8f',
-                              color: '#52c41a',
+                              border: `1px solid ${isDark ? '#059669' : '#b7eb8f'}`,
+                              color: isDark ? '#10b981' : '#52c41a',
                               lineHeight: '1.4'
                             }}>
                               {returns}
