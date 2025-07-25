@@ -12,7 +12,8 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 logger = logging.getLogger(__name__)
 
 # 全局连接字符串配置 - 从环境变量读取
-POSTGRES_CONNECTION_STRING = os.getenv("CHECKPOINT_URI")
+from ..core.config import get_checkpoint_uri
+CHECK_POINT_URI = get_checkpoint_uri()
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
@@ -20,7 +21,7 @@ async def test_postgres_connection():
     """启动时测试PostgreSQL连接"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     try:
-        async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
+        async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
             await checkpointer.setup()
             logger.info("✅ PostgreSQL连接测试成功")
     except Exception as e:
@@ -31,7 +32,7 @@ async def recover_thread_from_postgres(thread_id: str):
     """从PostgreSQL checkpointer中恢复线程信息，查到返回dict，查不到返回None"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     try:
-        async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
+        async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
             await checkpointer.setup()
             config = {"configurable": {"thread_id": thread_id}}
             history = [c async for c in checkpointer.alist(config, limit=1)]

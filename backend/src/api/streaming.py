@@ -12,7 +12,7 @@ from typing import Optional
 from .utils import (
     prepare_graph_config, 
     serialize_value,
-    POSTGRES_CONNECTION_STRING,
+    CHECK_POINT_URI,
     recover_thread_from_postgres
 )
 from .user_threads_db import (
@@ -182,7 +182,7 @@ async def handle_postgres_streaming(request_body, thread_id):
     logger.info(f"🔍 智能体类型: {'内置' if is_builtin else '自定义'}")
     
     # 按照官方模式：在async with内完成整个请求周期
-    async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
+    async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
         await checkpointer.setup()
         
         if is_builtin:

@@ -8,7 +8,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # 导入与LangGraph相同的连接配置
-from .utils import POSTGRES_CONNECTION_STRING
+from .utils import CHECK_POINT_URI
 
 # 全局数据库连接池
 db_pool = None
@@ -20,7 +20,7 @@ async def init_user_threads_db():
     try:
         import asyncpg
         # 使用与LangGraph相同的连接字符串
-        db_pool = await asyncpg.create_pool(POSTGRES_CONNECTION_STRING)
+        db_pool = await asyncpg.create_pool(CHECK_POINT_URI)
         logger.info("用户线程数据库连接池初始化成功 - PostgreSQL")
         
     except ImportError:

@@ -23,55 +23,30 @@ class Settings(BaseSettings):
     WORKERS: int = 1
     
     # 数据库配置  
-    DATABASE_URL: Optional[str] = None
     DATABASE_TYPE: str = "postgresql"
-    # 支持两种命名方式：DATABASE_* 和 POSTGRES_*
     DATABASE_USER: Optional[str] = None
     DATABASE_PASSWORD: Optional[str] = None  
     DATABASE_HOST: str = "localhost"
     DATABASE_PORT: int = 5432
     DATABASE_NAME: Optional[str] = None
-    # 别名支持
-    POSTGRES_USER: Optional[str] = None
-    POSTGRES_PASSWORD: Optional[str] = None
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_DB: Optional[str] = None
     # Checkpoint配置
     CHECKPOINTER_TYPE: str = "postgres"
-    CHECKPOINT_URI: Optional[str] = None
-    
-    # MySQL配置
-    MYSQL_HOST: Optional[str] = None
-    MYSQL_PORT: int = 3306
-    MYSQL_USER: Optional[str] = None
-    MYSQL_PASSWORD: Optional[str] = None
-    MYSQL_DB: Optional[str] = None
-    
+    CHECKPOINTER_HOST: Optional[str] = None
+    CHECKPOINTER_PORT: int = 5432
+    CHECKPOINTER_DB: str = "langgraph_memory"
+    CHECKPOINTER_USER: Optional[str] = None
+    CHECKPOINTER_PASSWORD: Optional[str] = None
     # Redis配置
     REDIS_URL: Optional[str] = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    
     # API配置
     API_V1_STR: str = "/api/v1"
     CORS_ORIGINS: List[str] = ["*"]
-    
     # 安全配置
     SECRET_KEY: str = "your-secret-key-change-in-production"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
-    # 外部服务配置
-    ELASTICSEARCH_URL: Optional[str] = None
-    ZABBIX_URL: Optional[str] = None
-    ZABBIX_USER: Optional[str] = None
-    ZABBIX_PASSWORD: Optional[str] = None
-    
-    # OpenAI配置
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_BASE_URL: Optional[str] = None
-    
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30    
     # DeepSeek配置
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_BASE_URL: Optional[str] = None
@@ -123,5 +98,11 @@ def get_redis_url() -> str:
     """获取Redis连接URL"""
     if settings.REDIS_URL:
         return settings.REDIS_URL
-    
     return f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
+
+
+def get_checkpoint_uri() -> str:
+    """获取checkpoint连接url"""
+    if not all([settings.CHECKPOINTER_HOST, settings.CHECKPOINTER_PORT, settings.CHECKPOINTER_USER, settings.CHECKPOINTER_PASSWORD, settings.CHECKPOINTER_DB]):
+        return None
+    return f"postgresql://{settings.CHECKPOINTER_USER}:{settings.CHECKPOINTER_PASSWORD}@{settings.CHECKPOINTER_HOST}:{settings.CHECKPOINTER_PORT}/{settings.CHECKPOINTER_DB}"
