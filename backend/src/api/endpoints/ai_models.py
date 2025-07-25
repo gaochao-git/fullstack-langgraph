@@ -171,7 +171,7 @@ async def _discover_ollama_models(endpoint_url: str, timeout: int = 15) -> List[
         return []
 
 
-@router.get("/ai-models", response_model=Dict[str, Any])
+@router.get("/", response_model=Dict[str, Any])
 async def get_ai_models(
     page: int = Query(1, ge=1),
     size: int = Query(10, ge=1, le=100),
@@ -222,7 +222,7 @@ async def get_ai_models(
         raise HTTPException(status_code=500, detail=f"获取模型列表失败: {str(e)}")
 
 
-@router.post("/ai-models", response_model=Dict[str, Any])
+@router.post("/", response_model=Dict[str, Any])
 async def create_ai_model(
     model_data: AIModelCreateRequest,
     db: Session = Depends(get_db)
@@ -270,7 +270,7 @@ async def create_ai_model(
         raise HTTPException(status_code=500, detail=f"创建模型失败: {str(e)}")
 
 
-@router.put("/ai-models/{model_id}", response_model=Dict[str, Any])
+@router.put("/{model_id}", response_model=Dict[str, Any])
 async def update_ai_model(
     model_id: str,
     model_data: AIModelUpdateRequest,
@@ -311,7 +311,7 @@ async def update_ai_model(
         raise HTTPException(status_code=500, detail=f"更新模型失败: {str(e)}")
 
 
-@router.delete("/ai-models/{model_id}", response_model=Dict[str, Any])
+@router.delete("/{model_id}", response_model=Dict[str, Any])
 async def delete_ai_model(
     model_id: str,
     db: Session = Depends(get_db)
@@ -340,7 +340,7 @@ async def delete_ai_model(
         raise HTTPException(status_code=500, detail=f"删除模型失败: {str(e)}")
 
 
-@router.get("/ai-models/{model_id}", response_model=Dict[str, Any])
+@router.get("/{model_id}", response_model=Dict[str, Any])
 async def get_ai_model(
     model_id: str,
     db: Session = Depends(get_db)
@@ -364,7 +364,7 @@ async def get_ai_model(
         raise HTTPException(status_code=500, detail=f"获取模型失败: {str(e)}")
 
 
-@router.post("/ai-models/test-connection", response_model=Dict[str, Any])
+@router.post("/test-connection", response_model=Dict[str, Any])
 async def test_ai_model_connection(
     test_data: AIModelTestRequest
 ):
@@ -396,7 +396,7 @@ async def test_ai_model_connection(
         }
 
 
-@router.post("/ai-models/discover-ollama", response_model=Dict[str, Any])
+@router.post("/discover-ollama", response_model=Dict[str, Any])
 async def discover_ollama_models(
     discover_data: OllamaDiscoverRequest
 ):

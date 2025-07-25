@@ -13,7 +13,7 @@ from ...services.sop_service import SOPService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/sops", tags=["SOP Management"])
+router = APIRouter(tags=["SOP Management"])
 
 
 @router.post("/", response_model=ApiResponse)

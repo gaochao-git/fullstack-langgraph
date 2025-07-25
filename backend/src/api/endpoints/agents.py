@@ -17,7 +17,7 @@ from src.agents.diagnostic_agent.tools_mcp import mcp_integrator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/agents", tags=["agents"])
+router = APIRouter(tags=["agents"])
 
 # 数据模型
 class MCPTool(BaseModel):

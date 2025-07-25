@@ -15,45 +15,19 @@ from .endpoints.ai_models import router as ai_models_router
 api_router = APIRouter()
 
 # 注册各个子路由
-api_router.include_router(
-    agents_router,
-    prefix="/agents",
-    tags=["agents"]
-)
-
-api_router.include_router(
-    sop_router,
-    prefix="/sops",
-    tags=["sop"]
-)
-
-api_router.include_router(
-    mcp_router,
-    prefix="/mcp",
-    tags=["mcp"]
-)
-
-api_router.include_router(
-    ai_models_router,
-    prefix="/ai-models",
-    tags=["ai-models"]
-)
+api_router.include_router(agents_router,prefix="/agents",tags=["agents"])
+api_router.include_router(sop_router,prefix="/sops",tags=["sop"])
+api_router.include_router(mcp_router,prefix="/mcp",tags=["mcp"])
+api_router.include_router(ai_models_router,prefix="/ai-models",tags=["ai-models"])
 
 
 @api_router.get("/health")
 async def health_check():
     """健康检查端点"""
-    return {
-        "status": "healthy",
-        "message": "LangGraph Platform API is running"
-    }
+    return {"status": "healthy", "message": "Omind API is running"}
 
 
 @api_router.get("/version")
 async def get_version():
     """获取API版本信息"""
-    return {
-        "version": "1.0.0",
-        "api_version": "v1",
-        "description": "LangGraph Platform API"
-    }
+    return {"version": "1.0.0","api_version": "v1","description": "OMIND API"}

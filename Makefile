@@ -38,7 +38,7 @@ dev-frontend:
 
 dev-backend:
 	@echo "🔧 Starting backend development server with hot reload..."
-	@cd backend && uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+	@cd backend && uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 # Development MCP servers
 dev-mcp:
@@ -53,7 +53,7 @@ dev:
 # Production server
 prod:
 	@echo "🏭 Starting production server..."
-	@cd backend && uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+	@cd backend && uvicorn src.main:app --host 0.0.0.0 --port 8000
 
 # Test
 test:

@@ -1,28 +1,73 @@
 """
 FastAPI应用入口文件
-标准的FastAPI应用启动入口
 """
 
-import os
+import pathlib
 import logging
-from fastapi import FastAPI
+import os
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+from fastapi import FastAPI, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # 加载环境变量
 load_dotenv()
 
-# 导入API路由
-from api.app import app as legacy_app
+# 导入核心模块
+from .core.config import settings
+from .api.router import api_router
 
-# 创建FastAPI应用实例
+# 导入智能体相关
+from src.agents.diagnostic_agent.graph import graph as diagnostic_graph
+from src.agents.research_agent.graph import graph as research_graph
+from src.agents.generic_agent.graph import create_main_graph
+from src.agents.diagnostic_agent.configuration import Configuration as DiagnosticConfiguration
+from src.agents.research_agent.configuration import Configuration as ResearchConfiguration
+from src.agents.generic_agent.configuration import Configuration as GenericConfiguration
+
+# 导入API相关模块
+from .api.utils import test_postgres_connection
+from .api.threads import (
+    ThreadCreate, ThreadResponse,
+    create_thread, get_thread_history_post
+)
+from .api.streaming import RunCreate, stream_run_standard, init_refs
+
+
+def setup_logging():
+    """配置日志系统"""
+    log_dir = os.getenv("LOG_DIR", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    log_filename = os.path.join(log_dir, f"backend_{datetime.now().strftime('%Y%m%d')}.log")
+    
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format=log_format,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_filename, encoding='utf-8')
+        ]
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"📝 日志配置完成，级别: {log_level}, 文件: {log_filename}")
+    return logger
+
+
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
     
+    # 创建应用
     app = FastAPI(
-        title="LangGraph Platform API",
+        title=settings.APP_NAME,
         description="智能诊断平台后端API",
-        version="1.0.0",
+        version=settings.APP_VERSION,
         docs_url="/docs",
         redoc_url="/redoc"
     )
@@ -30,39 +75,139 @@ def create_app() -> FastAPI:
     # 配置CORS中间件
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # 生产环境应该限制具体域名
+        allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
     
     # 配置日志
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    logger = setup_logging()
+    
+    # 静态智能体配置
+    ASSISTANTS = {
+        "diagnostic_agent": {
+            "assistant_id": "diagnostic_agent",
+            "graph": diagnostic_graph,
+            "config_class": DiagnosticConfiguration,
+            "description": "Diagnostic agent for system troubleshooting"
+        },
+        "research_agent": {
+            "assistant_id": "research_agent",
+            "graph": research_graph,
+            "config_class": ResearchConfiguration,
+            "description": "Research agent for information gathering and analysis"
+        },
+        "generic_agent": {
+            "assistant_id": "generic_agent",
+            "graph": create_main_graph(),
+            "config_class": GenericConfiguration,
+            "description": "Generic agent for custom agents configuration"
+        }
+    }
+    
+    @app.on_event("startup")
+    async def startup_event():
+        """应用启动事件"""
+        logger.info("🚀 启动LangGraph Platform API...")
+        
+        # 测试PostgreSQL连接
+        await test_postgres_connection()
+        
+        # 初始化智能体配置
+        logger.info(f"📊 初始化智能体配置: {list(ASSISTANTS.keys())}")
+        init_refs(ASSISTANTS)
+        
+        # 初始化用户线程数据库
+        from .api.user_threads_db import init_user_threads_db
+        await init_user_threads_db()
+        
+        # 初始化SOP数据库
+        try:
+            from .db.config import init_database, test_database_connection
+            db_connected = await test_database_connection()
+            if db_connected:
+                await init_database()
+                logger.info("✅ SOP数据库初始化成功")
+            else:
+                logger.warning("⚠️  SOP数据库连接失败，跳过数据库初始化")
+        except Exception as e:
+            logger.warning(f"⚠️  SOP数据库初始化失败: {e}，API将继续启动但SOP功能可能不可用")
+    
+    # 注册API路由
+    app.include_router(api_router, prefix="/api")
+    
+    # 线程管理端点
+    @app.post("/threads", response_model=ThreadResponse)
+    async def create_thread_endpoint(thread_create: ThreadCreate):
+        return await create_thread(thread_create)
+    
+    @app.post("/threads/{thread_id}/history")
+    async def get_thread_history_post_endpoint(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
+        return await get_thread_history_post(thread_id, request_body)
+    
+    @app.post("/threads/{thread_id}/runs/stream")
+    async def stream_run_standard_endpoint(thread_id: str, request_body: RunCreate):
+        return await stream_run_standard(thread_id, request_body)
+    
+    # 用户线程管理
+    @app.get("/users/{user_name}/threads")
+    async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int = 0):
+        """获取用户的所有线程"""
+        from .api.user_threads_db import get_user_threads
+        threads = await get_user_threads(user_name, limit, offset)
+        return {"user_name": user_name, "threads": threads, "total": len(threads)}
+    
+    # 智能体状态查询
+    @app.get("/api/admin/assistants-status")
+    async def get_assistants_status():
+        """获取核心智能体架构状态"""
+        return {
+            "core_assistants": list(ASSISTANTS.keys()),
+            "message": "所有智能体配置完全基于数据库，无需刷新"
+        }
+    
+    class AssistantResponse(BaseModel):
+        assistant_id: str
+        description: str
+    
+    # 前端静态文件服务
+    def create_frontend_router(build_dir="../frontend/dist"):
+        """创建前端静态文件路由"""
+        build_path = pathlib.Path(__file__).parent.parent.parent / build_dir
+        
+        if not build_path.is_dir() or not (build_path / "index.html").is_file():
+            logger.warning(f"前端构建目录未找到: {build_path}")
+            from starlette.routing import Route
+            
+            async def dummy_frontend(request):
+                return Response(
+                    "Frontend not built. Run 'npm run build' in the frontend directory.",
+                    media_type="text/plain",
+                    status_code=503,
+                )
+            
+            return Route("/{path:path}", endpoint=dummy_frontend)
+        
+        return StaticFiles(directory=build_path, html=True)
+    
+    # 挂载前端
+    app.mount("/app", create_frontend_router(), name="frontend")
     
     return app
+
 
 # 创建应用实例
 app = create_app()
 
-# 临时：包含原有的app.py中的所有路由和配置
-# TODO: 逐步迁移到新的结构中
-from api.app import *
 
 if __name__ == "__main__":
     import uvicorn
     
-    # 从环境变量获取配置
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 8000))
-    debug = os.getenv("DEBUG", "false").lower() == "true"
-    
     uvicorn.run(
         "main:app",
-        host=host,
-        port=port,
-        reload=debug,
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.DEBUG,
         log_level="info"
     )
