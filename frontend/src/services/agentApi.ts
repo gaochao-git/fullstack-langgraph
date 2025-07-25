@@ -265,6 +265,22 @@ class AgentApiService {
       throw error;
     }
   }
+
+  /**
+   * 获取智能体可用模型
+   */
+  async getAgentAvailableModels(agentId: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/available-models`);
+      if (!response.ok) {
+        throw new Error(`获取可用模型失败: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('获取可用模型失败:', error);
+      return [];
+    }
+  }
 }
 
 export const agentApi = new AgentApiService();

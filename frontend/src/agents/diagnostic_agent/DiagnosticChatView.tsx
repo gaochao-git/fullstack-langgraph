@@ -9,6 +9,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -689,6 +690,22 @@ interface DialogRound {
   assistant: Message[];
 }
 
+// 智能体信息类型
+interface Agent {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string;
+  capabilities: string[];
+  is_builtin: string;
+}
+
+// 自定义欢迎组件接口
+interface WelcomeComponentProps {
+  agent: Agent | null;
+  onSubmit: (message: string) => void;
+}
+
 // 诊断聊天视图组件 Props 扩展
 interface DiagnosticChatViewProps {
   messages: Message[];
@@ -704,6 +721,8 @@ interface DiagnosticChatViewProps {
   availableModels?: Array<{id: string, name: string, provider: string, type: string}>; // 新增：可用模型列表
   currentModel?: string; // 新增：当前选中的模型
   onModelChange?: (modelType: string) => void; // 新增：模型切换回调
+  WelcomeComponent?: React.ComponentType<WelcomeComponentProps>; // 新增：自定义欢迎组件
+  agent?: Agent | null; // 新增：智能体信息
 }
 
 // 诊断聊天视图组件
@@ -721,7 +740,10 @@ export function DiagnosticChatView({
   availableModels = [],
   currentModel,
   onModelChange,
+  WelcomeComponent,
+  agent,
 }: DiagnosticChatViewProps) {
+  const { isDark } = useTheme();
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
@@ -828,10 +850,17 @@ export function DiagnosticChatView({
       </style>
       
       {/* 头部工具栏 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-blue-600/30" style={{ background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 50%)' }}>
+      <div className={cn(
+        "flex items-center justify-between px-4 py-3 border-b transition-colors duration-200",
+        isDark 
+          ? "bg-gray-800 border-gray-700" 
+          : "bg-white border-gray-200"
+      )}>
         <div className="flex items-center gap-2">
-          <Bot className="h-5 w-5 text-cyan-400" />
-          <span className="font-semibold text-white">故障诊断助手</span>
+          <Bot className={cn("h-5 w-5", isDark ? "text-cyan-400" : "text-blue-600")} />
+          <span className={cn("font-semibold", isDark ? "text-white" : "text-gray-900")}>
+            {agent?.display_name || '故障诊断助手'}
+          </span>
         </div>
         
         <div className="flex items-center gap-2">
@@ -839,7 +868,12 @@ export function DiagnosticChatView({
             onClick={onNewSession}
             variant="outline"
             size="sm"
-            className="bg-blue-600/20 hover:bg-blue-600/40 border-blue-500 text-blue-200 hover:text-white text-xs px-3 py-1.5 h-7"
+            className={cn(
+              "text-xs px-3 py-1.5 h-7 transition-colors duration-200",
+              isDark 
+                ? "bg-blue-600/20 hover:bg-blue-600/40 border-blue-500 text-blue-200 hover:text-white" 
+                : "bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-700 hover:text-blue-800"
+            )}
           >
             <Plus className="h-3 w-3 mr-1" />
             新建会话
@@ -848,7 +882,12 @@ export function DiagnosticChatView({
             onClick={onHistoryToggle}
             variant="outline"
             size="sm"
-            className="bg-purple-600/20 hover:bg-purple-600/40 border-purple-500 text-purple-200 hover:text-white text-xs px-3 py-1.5 h-7"
+            className={cn(
+              "text-xs px-3 py-1.5 h-7 transition-colors duration-200",
+              isDark 
+                ? "bg-purple-600/20 hover:bg-purple-600/40 border-purple-500 text-purple-200 hover:text-white" 
+                : "bg-purple-50 hover:bg-purple-100 border-purple-300 text-purple-700 hover:text-purple-800"
+            )}
           >
             <History className="h-3 w-3 mr-1" />
             历史会话
@@ -859,18 +898,30 @@ export function DiagnosticChatView({
       {/* 消息区 */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 relative"
-        style={{ background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', minHeight: 0, maxHeight: 'calc(100vh - 190px)' }}
+        className={cn(
+          "flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 relative transition-colors duration-200",
+          isDark 
+            ? "bg-gradient-to-b from-gray-900 to-gray-800" 
+            : "bg-gradient-to-b from-gray-50 to-white"
+        )}
+        style={{ minHeight: 0, maxHeight: 'calc(100vh - 190px)' }}
         onScroll={handleScroll}
       >
         <div className="flex flex-col overflow-x-hidden">
           {messages.length === 0 && (
             <div className="w-full">
-              <FaultWelcomeSimple 
-                onDiagnose={() => {}} 
-                onContinueChat={() => {}}
-                onStartDiagnosis={handleStartDiagnosis}
-              />
+              {WelcomeComponent ? (
+                <WelcomeComponent 
+                  agent={agent || null}
+                  onSubmit={onSubmit}
+                />
+              ) : (
+                <FaultWelcomeSimple 
+                  onDiagnose={() => {}} 
+                  onContinueChat={() => {}}
+                  onStartDiagnosis={handleStartDiagnosis}
+                />
+              )}
             </div>
           )}
           {dialogRounds.map((round, idx) => (
@@ -1082,13 +1133,12 @@ export function DiagnosticChatView({
       
       {/* 输入区固定底部 */}
       <div
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          background: 'linear-gradient(90deg, #1E40AF 0%, #3B82F6 100%)',
-          zIndex: 10,
-          borderTop: '2px solid #60A5FA',
-        }}
+        className={cn(
+          "sticky bottom-0 z-10 border-t-2 transition-colors duration-200",
+          isDark 
+            ? "bg-gradient-to-r from-gray-800 to-gray-700 border-gray-600" 
+            : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
+        )}
       >
         <form onSubmit={handleSubmit} className="flex gap-1 sm:gap-2 p-2 sm:p-4">
           {/* 模型选择器 - 固定占位版本 */}
@@ -1096,12 +1146,17 @@ export function DiagnosticChatView({
             <select
               value={currentModel || ''}
               onChange={(e) => onModelChange?.(e.target.value)}
-              className="px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all duration-200 cursor-pointer min-w-[80px] max-w-[120px] sm:min-w-[100px] sm:max-w-[140px]"
+              className={cn(
+                "px-2 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-xs sm:text-sm transition-all duration-200 cursor-pointer min-w-[80px] max-w-[120px] sm:min-w-[100px] sm:max-w-[140px]",
+                isDark 
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 bg-gray-800 border-blue-400 text-gray-100" 
+                  : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 bg-white border-blue-300 text-white"
+              )}
               style={{ 
-                backgroundColor: '#1E293B', 
-                borderColor: '#60A5FA', 
+                backgroundColor: isDark ? '#1F2937' : '#ffffff', 
+                borderColor: isDark ? '#60A5FA' : '#93C5FD', 
                 borderWidth: '2px', 
-                color: '#F1F5F9' 
+                color: isDark ? '#F1F5F9' : '#111827'
               }}
               disabled={isLoading || !!interrupt || availableModels.length === 0}
               title={availableModels.length > 0 ? `当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}` : '正在加载模型...'}
@@ -1122,14 +1177,24 @@ export function DiagnosticChatView({
                     <option 
                       key={model.id} 
                       value={model.type}
-                      style={{ backgroundColor: '#1E293B', color: '#F1F5F9' }}
+                      style={{ 
+                        backgroundColor: isDark ? '#1F2937' : '#ffffff', 
+                        color: isDark ? '#F1F5F9' : '#111827'
+                      }}
                     >
                       {getShortName(model.name)}
                     </option>
                   );
                 })
               ) : (
-                <option value="" disabled style={{ backgroundColor: '#1E293B', color: '#F1F5F9' }}>
+                <option 
+                  value="" 
+                  disabled 
+                  style={{ 
+                    backgroundColor: isDark ? '#1F2937' : '#ffffff', 
+                    color: isDark ? '#F1F5F9' : '#111827'
+                  }}
+                >
                   加载中...
                 </option>
               )}
@@ -1141,8 +1206,18 @@ export function DiagnosticChatView({
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={interrupt ? "请先确认或取消工具执行..." : (window.innerWidth < 640 ? "请描述问题..." : "请描述您遇到的问题...")}
-            className="flex-1 px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-sm sm:text-base"
-            style={{ backgroundColor: '#1E293B', borderColor: '#60A5FA', borderWidth: '2px', color: '#F1F5F9' }}
+            className={cn(
+              "flex-1 px-3 sm:px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 text-sm sm:text-base transition-colors duration-200",
+              isDark 
+                ? "bg-gray-800 border-blue-400 text-gray-100 placeholder-gray-400" 
+                : "bg-white border-blue-300 text-gray-900 placeholder-gray-500"
+            )}
+            style={{ 
+              backgroundColor: isDark ? '#1F2937' : '#ffffff', 
+              borderColor: isDark ? '#60A5FA' : '#93C5FD', 
+              borderWidth: '2px', 
+              color: isDark ? '#F1F5F9' : '#111827'
+            }}
             disabled={isLoading || !!interrupt}
           />
           {(isLoading || interrupt) ? (

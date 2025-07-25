@@ -104,17 +104,17 @@ function AppContent() {
         <Layout style={{ minHeight: "100vh" }}>
       {/* 桌面端侧边栏 */}
       {!isMobile && (
-        <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
+        <Sider trigger={null} collapsible collapsed={collapsed} theme={isDark ? "dark" : "light"}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
             height: 48,
             padding: '0 12px',
-            background: 'rgba(255,255,255,0.08)',
+            background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
             margin: 0
           }}>
             {!collapsed && (
-              <span style={{ color: '#fff', fontWeight: 600, fontSize: 16 }}>
+              <span style={{ color: isDark ? '#fff' : '#000', fontWeight: 600, fontSize: 16 }}>
                 智能运维平台
               </span>
             )}
@@ -132,7 +132,7 @@ function AppContent() {
                   background: 'none',
                   cursor: 'pointer',
                   marginLeft: '8px',
-                  color: '#fff'
+                  color: isDark ? '#fff' : '#000'
                 }}
               >
                 {collapsed ? <MenuUnfoldOutlined style={{ fontSize: 16 }} /> : <MenuFoldOutlined style={{ fontSize: 16 }} />}
@@ -140,7 +140,7 @@ function AppContent() {
             </div>
           </div>
           <Menu
-            theme="dark"
+            theme={isDark ? "dark" : "light"}
             mode="inline"
             defaultSelectedKeys={['1']}
             items={menuItems}
