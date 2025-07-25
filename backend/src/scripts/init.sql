@@ -88,7 +88,7 @@ CREATE TABLE IF NOT EXISTS mcp_servers_bak (
 );
 
   CREATE TABLE IF NOT EXISTS agent_configs (
-    agent_pk_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     agent_id VARCHAR(100) UNIQUE NOT NULL,
     agent_name VARCHAR(200) NOT NULL,
     agent_description TEXT,

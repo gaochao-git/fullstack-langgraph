@@ -47,7 +47,7 @@ CREATE TABLE `mcp_servers` (
 -- 3. 智能体配置表 (Agent Configurations)
 -- 用于存储智能体的完整配置信息
 CREATE TABLE `agent_configs` (
-    `agent_pk_id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，自增',
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，自增',
     `agent_id` VARCHAR(100) NOT NULL UNIQUE COMMENT '智能体唯一标识符',
     `agent_name` VARCHAR(200) NOT NULL COMMENT '智能体显示名称',
     `agent_description` TEXT COMMENT '智能体功能描述',

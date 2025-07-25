@@ -150,7 +150,7 @@ class AgentConfig(Base):
     """Agent Configuration model for storing complete agent configurations."""
     __tablename__ = "agent_configs"
 
-    agent_pk_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     agent_id = Column(String(100), unique=True, index=True, nullable=False)
     agent_name = Column(String(200), nullable=False)
     agent_description = Column(Text, nullable=True)                      # 智能体描述
@@ -232,7 +232,7 @@ class AgentConfig(Base):
             capabilities = []
 
         return {
-            'id': self.agent_pk_id,
+            'id': self.id,
             'agent_id': self.agent_id,
             'name': self.agent_id,  # 前端兼容
             'agent_name': self.agent_name,
