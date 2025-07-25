@@ -60,8 +60,8 @@ const GenericAgentChat: React.FC = () => {
       return agent.id;
     }
     
-    // 自定义智能体使用diagnostic_agent作为基础
-    return "diagnostic_agent";
+    // 自定义智能体使用generic_agent
+    return "generic_agent";
   };
 
   // 使用LangGraph SDK的useStream hook

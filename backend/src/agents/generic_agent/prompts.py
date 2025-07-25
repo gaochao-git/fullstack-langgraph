@@ -6,7 +6,7 @@
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
-from src.services.agent_config import AgentConfigService
+from src.services.agent_config_service import AgentConfigService
 
 
 def get_current_date() -> str:
@@ -198,21 +198,33 @@ def generate_system_prompt(
 def get_system_prompt_from_config(agent_id: str, **kwargs) -> str:
     """从配置服务获取系统提示词
     
-    优先级：kwargs参数 > 数据库配置 > 默认模板
+    优先级：数据库中的system_prompt > 生成的默认提示词
     """
+    print(f"🔍 通用Agent - 获取系统提示词 for agent_id: {agent_id}")
     
     # 从数据库加载配置
     config_service = AgentConfigService()
     config = config_service.get_agent_config(agent_id) or {}
     
-    # 合并参数
+    print(f"🔍 通用Agent - 从数据库获取到的配置: {config}")
+    
+    # 优先使用数据库中的system_prompt
+    prompt_config = config.get("prompt_config", {})
+    if isinstance(prompt_config, dict):
+        system_prompt = prompt_config.get("system_prompt", "").strip()
+        if system_prompt:
+            print(f"✅ 通用Agent - 使用数据库中的系统提示词 (长度: {len(system_prompt)})")
+            return system_prompt
+    
+    print(f"⚠️ 通用Agent - 数据库中没有找到有效的系统提示词，使用生成的默认提示词")
+    
+    # 后备方案：生成默认提示词
     params = {
         "agent_name": config.get("agent_name", "智能助手"),
-        "role_description": config.get("role_description", "智能助手"),
+        "role_description": config.get("description", "智能助手"),
         "enabled_tools": config.get("enabled_tool_categories", []),
         "require_approval_tools": config.get("require_approval_tools", []),
         "personality_traits": config.get("personality_traits", ["helpful", "professional"]),
-        "custom_template": config.get("system_prompt_template"),
         **kwargs
     }
     

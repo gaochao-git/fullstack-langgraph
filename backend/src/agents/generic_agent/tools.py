@@ -444,10 +444,12 @@ def get_langchain_tools_by_categories(categories: List[str]) -> List[Any]:
         description = tool_info["description"]
         
         # 使用闭包避免变量绑定问题
-        def make_tool(func_ref, name, desc):
-            @tool(name=name, description=desc)
+        def make_tool(func_ref, tool_name, desc):
+            @tool(description=desc)
             def tool_wrapper(**kwargs):
                 return func_ref(**kwargs)
+            # 手动设置工具名称
+            tool_wrapper.name = tool_name
             return tool_wrapper
         
         langchain_tools.append(make_tool(func, tool_name, description))

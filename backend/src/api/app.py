@@ -19,8 +19,10 @@ load_dotenv()
 # Import graphs
 from src.agents.diagnostic_agent.graph import graph as diagnostic_graph
 from src.agents.research_agent.graph import graph as research_graph
+from src.agents.generic_agent.graph import create_main_graph
 from src.agents.diagnostic_agent.configuration import Configuration as DiagnosticConfiguration
 from src.agents.research_agent.configuration import Configuration as ResearchConfiguration
+from src.agents.generic_agent.configuration import Configuration as GenericConfiguration
 
 # Import API modules
 from .utils import test_postgres_connection
@@ -115,6 +117,12 @@ ASSISTANTS = {
         "graph": diagnostic_graph,
         "config_class": DiagnosticConfiguration,
         "description": "Diagnostic agent for system troubleshooting"
+    },
+    "generic_agent": {
+        "assistant_id": "generic_agent",
+        "graph": create_main_graph(),
+        "config_class": GenericConfiguration,
+        "description": "Generic agent for custom agents configuration"
     },
 }
 

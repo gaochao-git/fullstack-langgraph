@@ -188,24 +188,49 @@ class Configuration(BaseModel):
         
         return cls(**values)
     
+    def get_api_key(self) -> str:
+        """获取API密钥，参考diagnostic_agent的实现"""
+        # 这里简化处理，主要使用环境变量
+        api_key = None
+        
+        if self.model_provider.lower() == "deepseek":
+            api_key = os.environ.get("DEEPSEEK_API_KEY")
+        elif self.model_provider.lower() == "openai":
+            api_key = os.environ.get("OPENAI_API_KEY")
+        else:
+            # 默认尝试DEEPSEEK_API_KEY
+            api_key = os.environ.get("DEEPSEEK_API_KEY")
+        
+        if not api_key:
+            raise ValueError(f"No API key found for provider {self.model_provider}. Please set the appropriate environment variable.")
+        
+        return api_key
+
     def create_llm(self, model_name: Optional[str] = None, temperature: Optional[float] = None):
         """创建LLM实例，参考diagnostic_agent的实现"""
-        from src.utils.llm_factory import create_llm_from_config
+        from langchain_openai import ChatOpenAI
         
         # 使用传入的参数或配置中的默认值
         actual_model = model_name or self.model_name
         actual_temp = temperature if temperature is not None else self.model_temperature
         
-        # 构建LLM配置
-        llm_config = {
-            "provider": self.model_provider,
-            "model": actual_model,
-            "temperature": actual_temp,
-            "max_tokens": self.model_max_tokens,
-            "max_retries": self.model_max_retries
-        }
+        # 获取base_url - 根据provider设置默认值
+        base_url = "https://api.deepseek.com" if self.model_provider.lower() == "deepseek" else "https://api.openai.com/v1"
         
-        return create_llm_from_config(llm_config)
+        print(f"🤖 创建通用Agent LLM实例:")
+        print(f"   提供商: {self.model_provider}")
+        print(f"   模型: {actual_model}")
+        print(f"   温度: {actual_temp}")
+        print(f"   API端点: {base_url}")
+        
+        return ChatOpenAI(
+            model=actual_model,
+            temperature=actual_temp,
+            max_tokens=self.model_max_tokens,
+            max_retries=self.model_max_retries,
+            api_key=self.get_api_key(),
+            base_url=base_url,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """将配置转换为字典，用于保存到数据库"""

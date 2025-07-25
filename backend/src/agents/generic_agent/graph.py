@@ -62,11 +62,14 @@ def create_main_graph():
             custom_template=agent_config.system_prompt_template
         )
         
-        # 创建ReAct agent
+        print(f"🤖 系统提示词长度: {len(system_prompt)}")
+        print(f"🤖 系统提示词预览: {system_prompt[:100]}...")
+        
+        # 创建ReAct agent - 确保prompt是string类型
         agent = create_react_agent(
             model=llm, 
             tools=tools, 
-            state_modifier=system_prompt
+            prompt=str(system_prompt)
         )
         
         # 执行agent
@@ -89,3 +92,6 @@ def create_graph():
 
 # 创建默认图实例
 graph = create_graph()
+
+# 导出builder用于动态编译
+builder = create_main_graph()

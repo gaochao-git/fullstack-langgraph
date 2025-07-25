@@ -157,16 +157,35 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应"""
-    from src.agents.diagnostic_agent.graph import builder
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     
-    logger.info(f"🔍 PostgreSQL模式 - 按照官方模式使用async with")
-    # 不再操作threads_store
+    assistant_id = request_body.assistant_id
+    logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
+    
+    # 检查configurable中的agent_id来判断是内置还是自定义智能体
+    config = getattr(request_body, 'config', None)
+    configurable = config.get('configurable', {}) if config else {}
+    agent_id = configurable.get('agent_id')
+    
+    logger.info(f"🔍 检测到agent_id: {agent_id}")
     
     # 按照官方模式：在async with内完成整个请求周期
     async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
         await checkpointer.setup()
-        graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+        
+        # 判断使用哪个图
+        if assistant_id in ['diagnostic_agent', 'research_agent']:
+            # 内置智能体使用专用图
+            if assistant_id == 'diagnostic_agent':
+                from src.agents.diagnostic_agent.graph import builder
+                graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+            elif assistant_id == 'research_agent':
+                from src.agents.research_agent.graph import builder
+                graph = builder.compile(checkpointer=checkpointer, name="research-agent")
+        else:
+            # 自定义智能体使用generic_agent图
+            from src.agents.generic_agent.graph import builder
+            graph = builder.compile(checkpointer=checkpointer, name="generic-agent")
         
         # 在同一个async with内执行完整的流式处理
         async for item in stream_with_graph_postgres(graph, request_body, thread_id):
