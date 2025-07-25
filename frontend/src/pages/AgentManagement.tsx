@@ -43,6 +43,7 @@ const { Search } = Input;
 const { Option } = Select;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // 格式化工具描述
 const formatToolDescription = (description: string) => {
@@ -327,7 +328,7 @@ const AgentManagement: React.FC = () => {
   // 加载可用模型
   const loadAvailableModels = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/ai-models');
+      const response = await fetch(`${API_BASE_URL}/api/ai-models`);
       const data = await response.json();
       if (data.code === 200) {
         const activeModels = data.data.items.filter((model: any) => model.status === 'active');
