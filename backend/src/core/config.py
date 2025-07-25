@@ -31,19 +31,6 @@ class Settings(BaseSettings):
     DATABASE_NAME: Optional[str] = None
     DATABASE_URL: Optional[str] = None
     
-    # PostgreSQL兼容配置（为了向后兼容）
-    POSTGRES_USER: Optional[str] = None
-    POSTGRES_PASSWORD: Optional[str] = None
-    POSTGRES_HOST: Optional[str] = None
-    POSTGRES_PORT: Optional[int] = None
-    POSTGRES_DB: Optional[str] = None
-    
-    # MySQL配置
-    MYSQL_USER: Optional[str] = None
-    MYSQL_PASSWORD: Optional[str] = None
-    MYSQL_HOST: Optional[str] = None
-    MYSQL_PORT: Optional[int] = None
-    MYSQL_DB: Optional[str] = None
     # Checkpoint配置
     CHECKPOINTER_TYPE: str = "postgres"
     CHECKPOINTER_HOST: Optional[str] = None
