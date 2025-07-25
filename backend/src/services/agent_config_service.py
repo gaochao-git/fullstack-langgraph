@@ -45,7 +45,8 @@ class AgentConfigService:
                 'prompt_config': agent_dict.get('prompt_info', {}),
                 'tools_config': agent_dict.get('tools_info', {}),
                 'enabled': agent_dict.get('enabled', True),
-                'status': agent_dict.get('status', 'stopped')
+                'status': agent_dict.get('status', 'stopped'),
+                'is_builtin': agent_dict.get('is_builtin', 'no')  # 添加is_builtin字段
             }
             
             return config

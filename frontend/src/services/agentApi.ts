@@ -89,6 +89,43 @@ class AgentApiService {
   }
 
   /**
+   * 刷新后端智能体配置（无需重启服务）
+   */
+  async refreshAssistants(): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/refresh-assistants`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`刷新智能体配置失败: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('刷新智能体配置失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取后端智能体状态
+   */
+  async getAssistantsStatus(): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/assistants-status`);
+      if (!response.ok) {
+        throw new Error(`获取智能体状态失败: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('获取智能体状态失败:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 获取MCP服务器信息
    */
   async getMCPServers(): Promise<MCPServer[]> {

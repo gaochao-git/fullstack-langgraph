@@ -47,7 +47,9 @@ app = FastAPI(title="LangGraph Server", version="1.0.0")
 @app.on_event("startup")
 async def startup_event():
     await test_postgres_connection()
-    # 初始化各模块的存储引用（只初始化ASSISTANTS）
+    
+    # 初始化各模块的存储引用
+    print(f"📊 初始化智能体配置: {list(ASSISTANTS.keys())}")
     init_refs(ASSISTANTS)
     
     # 初始化用户线程数据库连接
@@ -104,26 +106,26 @@ logger = logging.getLogger(__name__)
 logger.info(f"📝 日志配置完成，级别: {log_level}, 文件: {log_filename}")
 
 
-# Available assistants based on langgraph.json
+# 静态的核心智能体配置 - 仅包含必需的图和配置类
 ASSISTANTS = {
+    "diagnostic_agent": {
+        "assistant_id": "diagnostic_agent",
+        "graph": diagnostic_graph,
+        "config_class": DiagnosticConfiguration,
+        "description": "Diagnostic agent for system troubleshooting"
+    },
     "research_agent": {
         "assistant_id": "research_agent",
         "graph": research_graph,
         "config_class": ResearchConfiguration,
         "description": "Research agent for information gathering and analysis"
     },
-    "diagnostic_agent": {
-        "assistant_id": "diagnostic_agent", 
-        "graph": diagnostic_graph,
-        "config_class": DiagnosticConfiguration,
-        "description": "Diagnostic agent for system troubleshooting"
-    },
     "generic_agent": {
         "assistant_id": "generic_agent",
         "graph": create_main_graph(),
         "config_class": GenericConfiguration,
         "description": "Generic agent for custom agents configuration"
-    },
+    }
 }
 
 class AssistantResponse(BaseModel):
@@ -196,17 +198,14 @@ async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int
 #         for assistant_id, assistant in ASSISTANTS.items()
 #     ]
 
-# @app.get("/assistants/{assistant_id}", response_model=AssistantResponse)
-# async def get_assistant(assistant_id: str):
-#     """Get assistant details"""
-#     if assistant_id not in ASSISTANTS:
-#         raise HTTPException(status_code=404, detail="Assistant not found")
-    
-#     assistant = ASSISTANTS[assistant_id]
-#     return AssistantResponse(
-#         assistant_id=assistant_id,
-#         description=assistant["description"]
-#     )
+# 智能体状态查询接口（仅用于监控）
+@app.get("/api/admin/assistants-status")
+async def get_assistants_status():
+    """获取核心智能体架构状态"""
+    return {
+        "core_assistants": list(ASSISTANTS.keys()),
+        "message": "所有智能体配置完全基于数据库，无需刷新"
+    }
 
 
 def create_frontend_router(build_dir="../frontend/dist"):

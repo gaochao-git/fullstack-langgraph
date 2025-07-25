@@ -51,17 +51,20 @@ const GenericAgentChat: React.FC = () => {
     return threadIdFromUrl ? { threadId: threadIdFromUrl } : {};
   };
 
-  // 根据智能体类型选择不同的assistantId
+  // 根据数据库中的is_builtin字段选择assistantId
   const getAssistantId = () => {
-    if (!agent) return "diagnostic_agent"; // 默认使用diagnostic_agent
+    if (!agent) return "diagnostic_agent"; // 默认fallback
     
-    // 内置智能体直接使用其ID
-    if (agent.id === 'diagnostic_agent' || agent.id === 'research_agent') {
+    // 检查数据库中的is_builtin字段
+    const isBuiltin = agent.is_builtin === 'yes';
+    
+    if (isBuiltin) {
+      // 内置智能体直接使用其ID
       return agent.id;
+    } else {
+      // 自定义智能体使用generic_agent
+      return "generic_agent";
     }
-    
-    // 自定义智能体使用generic_agent
-    return "generic_agent";
   };
 
   // 使用LangGraph SDK的useStream hook
@@ -74,13 +77,7 @@ const GenericAgentChat: React.FC = () => {
     ...getThreadIdConfig(),
     config: {
       configurable: {
-        agent_id: agentId, // 传递URL参数中的agentId
-        custom_agent_config: agent?.id !== getAssistantId() ? {
-          // 如果是自定义智能体，传递其配置
-          agent_name: agent?.display_name,
-          system_prompt: agent?.description,
-          capabilities: agent?.capabilities
-        } : undefined
+        agent_id: agentId // 始终传递真实的agent_id，让后端从数据库加载配置
       }
     },
     onError: (error: any) => {
@@ -160,17 +157,11 @@ const GenericAgentChat: React.FC = () => {
         messages: newMessages,
       };
       
-      // 根据智能体类型传递不同的配置
+      // 传递真实的agent_id，让后端从数据库加载完整配置
       const submitOptions = {
         config: {
           configurable: {
-            agent_id: agentId,
-            custom_agent_config: agent?.id !== getAssistantId() ? {
-              // 如果是自定义智能体，传递其配置
-              agent_name: agent?.display_name,
-              system_prompt: agent?.description,
-              capabilities: agent?.capabilities
-            } : undefined
+            agent_id: agentId
           }
         }
       };

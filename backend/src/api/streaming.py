@@ -156,46 +156,82 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
         logger.info("Skipping end event due to interrupt - waiting for user approval")
 
 async def handle_postgres_streaming(request_body, thread_id):
-    """处理PostgreSQL模式的流式响应"""
+    """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from src.services.agent_config_service import AgentConfigService
     
     assistant_id = request_body.assistant_id
     logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
     
-    # 检查configurable中的agent_id来判断是内置还是自定义智能体
+    # 检查configurable中的agent_id
     config = getattr(request_body, 'config', None)
     configurable = config.get('configurable', {}) if config else {}
-    agent_id = configurable.get('agent_id')
+    agent_id = configurable.get('agent_id', assistant_id)
     
-    logger.info(f"🔍 检测到agent_id: {agent_id}")
+    logger.info(f"🔍 实际处理的agent_id: {agent_id}")
+    
+    # 从数据库获取智能体配置
+    config_service = AgentConfigService()
+    agent_config = config_service.get_agent_config(agent_id)
+    
+    if not agent_config:
+        raise Exception(f"数据库中未找到智能体配置: {agent_id}")
+    
+    # 根据数据库中的is_builtin字段判断使用哪个图
+    is_builtin = agent_config.get('is_builtin') == 'yes'
+    logger.info(f"🔍 智能体类型: {'内置' if is_builtin else '自定义'}")
     
     # 按照官方模式：在async with内完成整个请求周期
     async with AsyncPostgresSaver.from_conn_string(POSTGRES_CONNECTION_STRING) as checkpointer:
         await checkpointer.setup()
         
-        # 判断使用哪个图
-        if assistant_id in ['diagnostic_agent', 'research_agent']:
+        if is_builtin:
             # 内置智能体使用专用图
-            if assistant_id == 'diagnostic_agent':
+            if agent_id == 'diagnostic_agent':
                 from src.agents.diagnostic_agent.graph import builder
                 graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
-            elif assistant_id == 'research_agent':
+            elif agent_id == 'research_agent':
                 from src.agents.research_agent.graph import builder
                 graph = builder.compile(checkpointer=checkpointer, name="research-agent")
+            else:
+                raise Exception(f"不支持的内置智能体: {agent_id}")
         else:
             # 自定义智能体使用generic_agent图
             from src.agents.generic_agent.graph import builder
-            graph = builder.compile(checkpointer=checkpointer, name="generic-agent")
+            graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
         
         # 在同一个async with内执行完整的流式处理
         async for item in stream_with_graph_postgres(graph, request_body, thread_id):
             yield item
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
-    """Standard LangGraph streaming endpoint"""
-    # 不再操作ASSISTANTS
-    if request_body.assistant_id not in ASSISTANTS: 
-        raise HTTPException(status_code=400, detail="Invalid assistant_id")
+    """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
+    from src.services.agent_config_service import AgentConfigService
+    
+    # 动态检查智能体是否存在
+    assistant_id = request_body.assistant_id
+    config = getattr(request_body, 'config', None)
+    configurable = config.get('configurable', {}) if config else {}
+    agent_id = configurable.get('agent_id', assistant_id)
+    
+    # 检查数据库中是否存在该智能体
+    config_service = AgentConfigService()
+    agent_config = config_service.get_agent_config(agent_id)
+    
+    if not agent_config:
+        raise HTTPException(status_code=400, detail=f"智能体不存在: {agent_id}")
+    
+    # 验证智能体类型和assistant_id的匹配
+    is_builtin = agent_config.get('is_builtin') == 'yes'
+    
+    if is_builtin:
+        # 内置智能体：assistant_id应该等于agent_id
+        if assistant_id != agent_id:
+            raise HTTPException(status_code=400, detail=f"内置智能体assistant_id应为: {agent_id}, 当前: {assistant_id}")
+    else:
+        # 自定义智能体：assistant_id应该是generic_agent
+        if assistant_id != 'generic_agent':
+            raise HTTPException(status_code=400, detail=f"自定义智能体应使用 generic_agent，当前: {assistant_id}")
     
     # 创建用户线程关联（如果提供了用户名且关联不存在）
     # 用户名可能在 request_body.user_name 或 request_body.input.user_name 中
