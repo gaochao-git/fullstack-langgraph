@@ -84,7 +84,7 @@ interface ModelConfig {
 }
 
 // API配置
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 // API调用函数
 const fetchModels = async (): Promise<ModelConfig[]> => {
@@ -246,7 +246,12 @@ const ModelsManagement = () => {
       setModels(modelList);
     } catch (error) {
       console.error('加载模型列表失败:', error);
-      message.error('加载模型列表失败');
+      // 更友好的错误提示
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        message.error('无法连接到后端服务，请检查网络连接或服务是否启动');
+      } else {
+        message.error(`加载模型列表失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -458,34 +463,49 @@ const ModelsManagement = () => {
       title: '模型名称',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, record: ModelConfig) => (
-        <Space>
-          <span style={{ fontSize: '18px' }}>{MODEL_PROVIDERS[record.provider].icon}</span>
-          <div>
-            <div style={{ fontWeight: 500 }}>{text}</div>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {MODEL_PROVIDERS[record.provider].name} - {record.model}
-            </Text>
-          </div>
-        </Space>
+      width: 150,
+      render: (text: string) => (
+        <div style={{ fontWeight: 500 }}>
+          {text}
+        </div>
       ),
     },
     {
       title: '服务商',
       dataIndex: 'provider',
       key: 'provider',
+      width: 120,
       render: (provider: keyof typeof MODEL_PROVIDERS) => (
-        <Tag color={MODEL_PROVIDERS[provider].color}>
-          {MODEL_PROVIDERS[provider].name}
-        </Tag>
+        <Space>
+          <span style={{ fontSize: '16px' }}>{MODEL_PROVIDERS[provider].icon}</span>
+          <Tag color={MODEL_PROVIDERS[provider].color}>
+            {MODEL_PROVIDERS[provider].name}
+          </Tag>
+        </Space>
+      ),
+    },
+    {
+      title: '模型',
+      dataIndex: 'model',
+      key: 'model',
+      width: 150,
+      render: (text: string) => (
+        <Text style={{ fontSize: '13px', fontFamily: 'monospace' }}>{text}</Text>
       ),
     },
     {
       title: '端点地址',
       dataIndex: 'endpoint',
       key: 'endpoint',
+      width: 250,
       render: (text: string) => (
-        <code style={{ fontSize: '12px', padding: '2px 4px', background: '#f5f5f5', borderRadius: '2px' }}>
+        <code style={{ 
+          fontSize: '11px', 
+          padding: '2px 4px', 
+          background: '#f5f5f5', 
+          borderRadius: '2px',
+          wordBreak: 'break-all'
+        }}>
           {text}
         </code>
       ),
@@ -494,6 +514,7 @@ const ModelsManagement = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
+      width: 100,
       render: (status: string) => (
         <Badge status={getStatusColor(status) as any} text={getStatusText(status)} />
       ),
@@ -502,6 +523,7 @@ const ModelsManagement = () => {
       title: '更新时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      width: 150,
       render: (text: string) => (
         <Text type="secondary" style={{ fontSize: '12px' }}>{text}</Text>
       ),
@@ -509,8 +531,10 @@ const ModelsManagement = () => {
     {
       title: '操作',
       key: 'actions',
+      width: 180,
+      fixed: window.innerWidth >= 768 ? 'right' as const : undefined,
       render: (_, record: ModelConfig) => (
-        <Space>
+        <Space size={window.innerWidth < 768 ? 4 : 8}>
           <Tooltip title="测试连接">
             <Button 
               size="small" 
@@ -559,12 +583,24 @@ const ModelsManagement = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ 
+        marginBottom: 24, 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
+        flexDirection: window.innerWidth < 768 ? 'column' : 'row',
+        gap: window.innerWidth < 768 ? 12 : 0
+      }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>模型管理</Title>
           <Text type="secondary">配置和管理AI模型服务</Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAddModel}>
+        <Button 
+          type="primary" 
+          icon={<PlusOutlined />} 
+          onClick={handleAddModel}
+          style={window.innerWidth < 768 ? { alignSelf: 'flex-end' } : {}}
+        >
           添加模型
         </Button>
       </div>
@@ -575,10 +611,17 @@ const ModelsManagement = () => {
           dataSource={models}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 1200 }}
+          locale={{
+            emptyText: models.length === 0 && !loading ? 
+              '暂无模型数据，请检查后端服务连接状态' : 
+              '暂无数据'
+          }}
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 个模型`
+            showTotal: (total) => `共 ${total} 个模型`,
+            simple: window.innerWidth < 768
           }}
         />
       </Card>
@@ -593,7 +636,8 @@ const ModelsManagement = () => {
           setDiscoveredModels([]);
         }}
         footer={null}
-        width={600}
+        width={window.innerWidth < 768 ? '95vw' : 600}
+        style={window.innerWidth < 768 ? { top: 20 } : {}}
       >
         <Form
           form={form}
