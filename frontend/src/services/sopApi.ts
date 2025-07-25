@@ -7,9 +7,7 @@ import {
   SOPStep,
   SOPSeverity
 } from '../types/sop';
-
-// API基础配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { baseFetch } from '../utils/baseFetch';
 
 // Mock数据 - 将来替换为真实API调用
 const mockSOPTemplates: SOPTemplate[] = [

@@ -5,9 +5,7 @@ import {
   SOPListResponse,
   ApiResponse
 } from '../types/sop';
-
-// API基础配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { baseFetch } from '../utils/baseFetch';
 
 // 工具函数
 export class SOPUtils {
@@ -47,7 +45,7 @@ export class SOPApi {
   // 获取SOP列表
   static async getSOPs(params: SOPQueryParams = {}): Promise<ApiResponse<SOPListResponse>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/sops/list`, {
+      const response = await baseFetch('/api/sops/list', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

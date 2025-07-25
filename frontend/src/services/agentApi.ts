@@ -2,7 +2,7 @@
  * 智能体管理API服务
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { baseFetch } from '../utils/baseFetch';
 
 // 类型定义
 export interface MCPTool {
@@ -77,7 +77,7 @@ class AgentApiService {
    */
   async getAgents(): Promise<Agent[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/`);
+      const response = await baseFetch('/api/agents/');
       if (!response.ok) {
         throw new Error(`获取智能体列表失败: ${response.statusText}`);
       }
@@ -93,11 +93,8 @@ class AgentApiService {
    */
   async refreshAssistants(): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/refresh-assistants`, {
+      const response = await baseFetch('/api/admin/refresh-assistants', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
       if (!response.ok) {
         throw new Error(`刷新智能体配置失败: ${response.statusText}`);
@@ -114,7 +111,7 @@ class AgentApiService {
    */
   async getAssistantsStatus(): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/assistants-status`);
+      const response = await baseFetch('/api/admin/assistants-status');
       if (!response.ok) {
         throw new Error(`获取智能体状态失败: ${response.statusText}`);
       }
@@ -130,7 +127,7 @@ class AgentApiService {
    */
   async getMCPServers(): Promise<MCPServer[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/mcp-servers`);
+      const response = await baseFetch('/api/agents/mcp-servers');
       if (!response.ok) {
         throw new Error(`获取MCP服务器信息失败: ${response.statusText}`);
       }
@@ -146,11 +143,8 @@ class AgentApiService {
    */
   async updateAgentMCPConfig(agentId: string, config: UpdateMCPConfigRequest): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/mcp-config`, {
+      const response = await baseFetch(`/api/agents/${agentId}/mcp-config`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(config),
       });
       
@@ -170,11 +164,8 @@ class AgentApiService {
    */
   async toggleAgentStatus(agentId: string): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/toggle`, {
+      const response = await baseFetch(`/api/agents/${agentId}/toggle`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
       
       if (!response.ok) {
@@ -200,11 +191,8 @@ class AgentApiService {
    */
   async createAgent(agentData: CreateAgentRequest): Promise<Agent> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/`, {
+      const response = await baseFetch('/api/agents/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(agentData),
       });
       
@@ -224,11 +212,8 @@ class AgentApiService {
    */
   async updateAgent(agentId: string, agentData: UpdateAgentRequest): Promise<Agent> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}`, {
+      const response = await baseFetch(`/api/agents/${agentId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(agentData),
       });
       
@@ -248,11 +233,8 @@ class AgentApiService {
    */
   async deleteAgent(agentId: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}`, {
+      const response = await baseFetch(`/api/agents/${agentId}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
       });
       
       if (!response.ok) {
@@ -271,7 +253,7 @@ class AgentApiService {
    */
   async getAgentAvailableModels(agentId: string): Promise<any[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agents/${agentId}/available-models`);
+      const response = await baseFetch(`/api/agents/${agentId}/available-models`);
       if (!response.ok) {
         throw new Error(`获取可用模型失败: ${response.statusText}`);
       }

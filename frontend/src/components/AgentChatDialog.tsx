@@ -18,6 +18,7 @@ import {
   UserOutlined,
   LoadingOutlined
 } from "@ant-design/icons";
+import { baseFetch } from '../utils/baseFetch';
 
 const { TextArea } = Input;
 const { Text, Title } = Typography;
@@ -86,11 +87,8 @@ const AgentChatDialog: React.FC<AgentChatDialogProps> = ({
 
     try {
       // 调用后端API发送消息
-      const response = await fetch(`http://localhost:8000/api/agents/${agent.id}/chat`, {
+      const response = await baseFetch(`/api/agents/${agent.id}/chat`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           message: userMessage.content,
           conversation_id: `chat_${agent.id}_${Date.now()}`
