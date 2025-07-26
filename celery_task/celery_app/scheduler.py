@@ -118,3 +118,4 @@ class DatabaseScheduler(Scheduler):
                 print(f"       last_run_at: None (首次运行)")
             
         return super(DatabaseScheduler, self).tick(*args, **kwargs) 
+        
