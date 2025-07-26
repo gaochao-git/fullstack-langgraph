@@ -5,6 +5,14 @@
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+import pytz
+
+# 定义上海时区
+SHANGHAI_TZ = pytz.timezone('Asia/Shanghai')
+
+def now_shanghai():
+    """返回上海时区的当前时间"""
+    return datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
 from sqlalchemy import select, insert, update, delete
 from sqlalchemy.exc import IntegrityError
 
@@ -127,7 +135,7 @@ async def update_thread_title(
                 )
                 .values(
                     thread_title=new_title,
-                    update_at=datetime.utcnow()
+                    update_at=now_shanghai()
                 )
             )
             
@@ -165,7 +173,7 @@ async def archive_thread(
                 )
                 .values(
                     is_archived=archived,
-                    update_at=datetime.utcnow()
+                    update_at=now_shanghai()
                 )
             )
             
@@ -247,8 +255,8 @@ async def update_thread_message_count(
                 )
                 .values(
                     message_count=new_count,
-                    last_message_time=datetime.utcnow(),
-                    update_at=datetime.utcnow()
+                    last_message_time=now_shanghai(),
+                    update_at=now_shanghai()
                 )
             )
             

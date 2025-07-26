@@ -1,5 +1,13 @@
 """Database models for SOP management."""
 from datetime import datetime
+import pytz
+
+# 定义上海时区
+SHANGHAI_TZ = pytz.timezone('Asia/Shanghai')
+
+def now_shanghai():
+    """返回上海时区的当前时间"""
+    return datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.mysql import JSON
@@ -56,8 +64,8 @@ class SOPTemplate(Base):
     team_name = Column(String(100), nullable=False, index=True)
     create_by = Column(String(100), nullable=False)
     update_by = Column(String(100), nullable=True)
-    create_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    create_time = Column(DateTime, default=now_shanghai, nullable=False)
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -99,8 +107,8 @@ class MCPServer(Base):
     team_name = Column(String(100), nullable=False, index=True)
     create_by = Column(String(100), nullable=False)
     update_by = Column(String(100), nullable=True)
-    create_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    create_time = Column(DateTime, default=now_shanghai, nullable=False)
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -172,8 +180,8 @@ class AgentConfig(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     create_by = Column(String(100), nullable=False, default='system')
     update_by = Column(String(100), nullable=True)
-    create_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    create_time = Column(DateTime, default=now_shanghai, nullable=False)
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -289,8 +297,8 @@ class AIModelConfig(Base):
     config_data = Column(Text, nullable=True)
     create_by = Column(String(100), nullable=False)
     update_by = Column(String(100), nullable=True)
-    create_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    create_time = Column(DateTime, default=now_shanghai, nullable=False)
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -334,8 +342,8 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
     avatar_url = Column(String(500), nullable=True)
     preferences = Column(JSONType, nullable=True)
-    create_time = Column(DateTime, default=datetime.utcnow, nullable=False)
-    update_time = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    create_time = Column(DateTime, default=now_shanghai, nullable=False)
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -373,8 +381,8 @@ class UserThread(Base):
     is_archived = Column(Boolean, default=False, nullable=False)
     message_count = Column(Integer, default=0, nullable=False)
     last_message_time = Column(DateTime, nullable=True)
-    create_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    update_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    create_at = Column(DateTime, default=now_shanghai, nullable=False)
+    update_at = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
     __table_args__ = (
         UniqueConstraint('user_name', 'thread_id', name='uk_user_thread'),
