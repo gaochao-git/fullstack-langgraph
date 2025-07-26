@@ -29,7 +29,7 @@ AGENT_API_BASE_URL = os.getenv('AGENT_API_BASE_URL', 'http://192.168.1.10:8000')
 @app.task(bind=True, max_retries=0, soft_time_limit=300, time_limit=360)
 def call_agent_task(self, agent_id, message, user_name="system", conversation_id=None):
     """
-    调用智能体的异步任务
+    调用智能体的异步任务,参数从celery_periodic_task_configs表里获取的
     
     Args:
         agent_id: 智能体ID
