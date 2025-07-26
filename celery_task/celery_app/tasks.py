@@ -104,4 +104,17 @@ def update_task_status(task_id, status):
     finally:
         session.close()
 
-# 重复的智能体任务执行器已删除，使用 agent_tasks.py 中的版本 
+# 兼容旧任务的执行器
+@app.task(bind=True, max_retries=3)
+def execute_agent_task(self, agent_id, message, user="system", **kwargs):
+    """
+    兼容旧版本的智能体任务执行器
+    直接调用 call_agent_task 的逻辑
+    """
+    from celery_app.agent_tasks import call_agent_task
+    
+    logger.info(f"兼容模式：执行智能体任务 - Agent: {agent_id}")
+    
+    # 直接调用 call_agent_task 函数，不使用 apply_async
+    conversation_id = kwargs.get('conversation_id')
+    return call_agent_task(agent_id, message, user, conversation_id) 

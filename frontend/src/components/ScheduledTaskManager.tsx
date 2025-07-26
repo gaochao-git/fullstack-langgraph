@@ -98,7 +98,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         agent_id: agentId,
         agent_url: values.agent_url,
         message: values.task_message || '执行定时任务',
-        user: 'system',
+        user: 'zhangsan123',
         task_timeout: values.task_timeout || 300,
         max_retries: 3
       };
@@ -115,8 +115,8 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         task_crontab_day_of_month: values.schedule_type === 'crontab' ? values.task_crontab_day_of_month : null,
         task_crontab_month_of_year: values.schedule_type === 'crontab' ? values.task_crontab_month_of_year : null,
         task_enabled: true,
-        create_by: 'system',
-        update_by: 'system'
+        create_by: 'zhangsan123',
+        update_by: 'zhangsan123'
       };
       
       const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks`, {
@@ -184,7 +184,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         agent_id: agentId,
         agent_url: values.agent_url,
         message: values.task_message || '执行定时任务',
-        user: 'system',
+        user: 'zhangsan123',
         task_timeout: values.task_timeout || 300,
         max_retries: 3
       };
@@ -199,7 +199,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         task_crontab_day_of_week: values.schedule_type === 'crontab' ? values.task_crontab_day_of_week : null,
         task_crontab_day_of_month: values.schedule_type === 'crontab' ? values.task_crontab_day_of_month : null,
         task_crontab_month_of_year: values.schedule_type === 'crontab' ? values.task_crontab_month_of_year : null,
-        update_by: 'system'
+        update_by: 'zhangsan123'
       };
       
       const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks/${editingTask.id}`, {
