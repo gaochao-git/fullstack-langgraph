@@ -76,7 +76,7 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
                     "selected_model": "qwen2.5-72b-instruct"  # 默认模型
                 }
             },
-            "stream_mode": ["values"],  # 不使用流式，直接获取结果
+            "stream_mode": ["messages", "values", "updates"],  # 包含消息历史模式
             "assistant_id": agent_id  # 直接使用agent_id
         }
         
