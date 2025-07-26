@@ -371,15 +371,8 @@ def execute_agent_periodic_task(self, task_config_id):
         
         logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
         
-        # 调用智能体任务
-        result = call_agent_task.apply_async(
-            args=[agent_id, message, user_name],
-            kwargs={'conversation_id': conversation_id}
-        )
-        
-        # 等待任务完成
-        timeout = extra_config.get('task_timeout', 300)
-        agent_result = result.get(timeout=timeout)
+        # 直接调用智能体任务（避免在任务内调用.get()）
+        agent_result = call_agent_task(self, agent_id, message, user_name, conversation_id)
         
         if agent_result and agent_result.get('status') == 'SUCCESS':
             success_result = {
