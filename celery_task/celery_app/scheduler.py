@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from celery.beat import Scheduler
+from celery.beat import Scheduler, ScheduleEntry
 from celery import current_app
 from celery.schedules import crontab, schedule
 from celery_app.models import get_session, PeriodicTask
@@ -49,14 +49,29 @@ class DatabaseScheduler(Scheduler):
                             month_of_year=task.task_crontab_month_of_year or '*'
                         )
                     
+                    # 官方方案：让Celery自己处理时区转换
+                    last_run_at = task.task_last_run_time
+                    
+                    # 创建ScheduleEntry对象
+                    entry = ScheduleEntry(
+                        name=task.task_name,
+                        task=task.task_path,
+                        schedule=schedule_obj,
+                        args=args,
+                        kwargs=kwargs,
+                        options={'expires': 60.0},
+                        last_run_at=last_run_at,
+                        total_run_count=task.task_run_count
+                    )
+                    
+                    print(f"📋 加载任务: {task.task_name}")
+                    print(f"   上次运行: {task.task_last_run_time}")
+                    print(f"   运行次数: {task.task_run_count}")
+                    print(f"   间隔: {task.task_interval}秒")
+                    print(f"   当前时间(UTC): {datetime.now()}")
+                    
                     # 添加到调度中
-                    self._schedule[task.task_name] = {
-                        'task': task.task_path,
-                        'schedule': schedule_obj,
-                        'args': args,
-                        'kwargs': kwargs,
-                        'options': {'expires': 60.0}
-                    }
+                    self._schedule[task.task_name] = entry
                 
                 self._last_timestamp = datetime.now()
                 break  # 成功则退出重试循环
@@ -71,8 +86,36 @@ class DatabaseScheduler(Scheduler):
             finally:
                 session.close()
     
+    @property
+    def schedule(self):
+        """返回当前的调度配置"""
+        return self._schedule
+    
     def tick(self, *args, **kwargs):
         # 每30秒检查一次数据库更新
         if datetime.now() - self._last_timestamp > timedelta(seconds=30):
+            print("🔄 更新数据库任务配置...")
             self.update_from_database()
+        
+        # 调试：显示tick调用频率
+        if not hasattr(self, '_last_tick_time'):
+            self._last_tick_time = datetime.now()
+        else:
+            tick_interval = datetime.now() - self._last_tick_time
+            print(f"🔄 Beat tick间隔: {tick_interval.total_seconds():.1f}s")
+            self._last_tick_time = datetime.now()
+        
+        # 显示当前任务状态  
+        current_utc = datetime.now()
+        print(f"⏰ Beat tick - 当前时间(UTC): {current_utc}")
+        for task_name, entry in self._schedule.items():
+            is_due, next_delay = entry.is_due()
+            print(f"   📝 {task_name}: due={is_due}, next_in={next_delay:.1f}s")
+            # 调试：显示任务的详细时间信息
+            if hasattr(entry, 'last_run_at') and entry.last_run_at:
+                print(f"       last_run_at: {entry.last_run_at}")
+                print(f"       last_run_at类型: {type(entry.last_run_at)}")
+            else:
+                print(f"       last_run_at: None (首次运行)")
+            
         return super(DatabaseScheduler, self).tick(*args, **kwargs) 

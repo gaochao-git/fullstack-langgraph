@@ -10,8 +10,8 @@ result_backend = 'db+mysql://gaochao:fffjjj@82.156.146.51:3306/celery_tasks'
 accept_content = ['json']
 task_serializer = 'json'
 result_serializer = 'json'
-timezone = 'Asia/Shanghai'
-# 使用新的配置名称 enable_utc 替代 ENABLE_UTC
+timezone = 'UTC'  # 改为UTC避免时区问题
+# 使用新的配置名称 enable_utc 替代 ENABLE_UTC  
 enable_utc = True
 
 # 添加新的配置项，解决启动时连接重试的警告

@@ -7,7 +7,10 @@ app = Celery('celery_app')
 app.config_from_object('celery_app.config')
 
 # 自动发现任务
-app.autodiscover_tasks(['celery_app', 'celery_app.agent_tasks'])
+app.autodiscover_tasks(['celery_app'])
+
+# 确保导入任务模块以注册信号处理器
+from celery_app import tasks, agent_tasks
 
 if __name__ == '__main__':
     app.start() 
