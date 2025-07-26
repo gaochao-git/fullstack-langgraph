@@ -35,6 +35,72 @@ class DatabaseScheduler(Scheduler):
                     args = json.loads(task.task_args) if task.task_args else []
                     kwargs = json.loads(task.task_kwargs) if task.task_kwargs else {}
                     
+                    # 从 task_extra_config 中获取配置
+                    if task.task_extra_config:
+                        try:
+                            extra_config = json.loads(task.task_extra_config)
+                            task_type = extra_config.get('task_type', 'http')
+                            agent_id = extra_config.get('agent_id')
+                            task_timeout = extra_config.get('task_timeout')
+                        except json.JSONDecodeError:
+                            print(f"⚠️ 任务 {task.task_name} 的 task_extra_config JSON 解析失败，跳过该任务")
+                            continue
+                    else:
+                        # 没有额外配置，使用默认值
+                        task_type = 'http'
+                        agent_id = None
+                        task_timeout = None
+                        extra_config = {}
+                    
+                    # 根据任务类型动态设置任务路径和参数
+                    if task_type == 'agent':
+                        # 智能体任务：使用统一的智能体任务执行器
+                        task_path = 'celery_app.tasks.execute_agent_task'
+                        
+                        # 从 extra_config 或传统字段获取参数
+                        message = extra_config.get('message', kwargs.get('message', '定时任务执行'))
+                        user = extra_config.get('user', kwargs.get('user', 'system'))
+                        timeout = extra_config.get('timeout', task_timeout)
+                        # 可扩展其他配置
+                        retries = extra_config.get('max_retries', 3)
+                        priority = extra_config.get('priority', 5)
+                        
+                        # 重新构造参数
+                        args = [agent_id, message, user]
+                        kwargs = {'timeout': timeout} if timeout else {}
+                        
+                        print(f"🤖 智能体任务: {task.task_name} -> Agent: {agent_id}")
+                        
+                    elif task_type == 'http':
+                        # HTTP任务：使用HTTP任务执行器
+                        task_path = 'celery_app.tasks.execute_http_task'
+                        
+                        # 从 extra_config 或传统字段获取参数
+                        url = extra_config.get('url', kwargs.get('url', ''))
+                        method = extra_config.get('method', kwargs.get('method', 'GET'))
+                        headers = extra_config.get('headers', kwargs.get('headers', None))
+                        data = extra_config.get('data', kwargs.get('data', None))
+                        timeout = extra_config.get('timeout', task_timeout)
+                        # 可扩展配置：认证、代理等
+                        auth = extra_config.get('auth', None)
+                        verify_ssl = extra_config.get('verify_ssl', True)
+                        
+                        # 重新构造参数
+                        args = [url, method, headers, data]
+                        kwargs = {'timeout': timeout} if timeout else {}
+                        
+                        print(f"🌐 HTTP任务: {task.task_name} -> URL: {url}")
+                        
+                    else:
+                        # system 或其他类型：使用原始任务路径
+                        task_path = task.task_path
+                        
+                        # 如果有额外配置，合并到 kwargs 中
+                        if extra_config:
+                            kwargs.update(extra_config)
+                            
+                        print(f"⚙️ 系统任务: {task.task_name} -> Path: {task_path}")
+                    
                     # 创建调度
                     if task.task_interval is not None:
                         # 间隔调度
@@ -55,7 +121,7 @@ class DatabaseScheduler(Scheduler):
                     # 创建ScheduleEntry对象
                     entry = ScheduleEntry(
                         name=task.task_name,
-                        task=task.task_path,
+                        task=task_path,
                         schedule=schedule_obj,
                         args=args,
                         kwargs=kwargs,

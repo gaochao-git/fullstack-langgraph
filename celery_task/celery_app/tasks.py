@@ -221,4 +221,186 @@ def update_task_status(task_id, status):
             # update_time 会自动更新
             session.commit()
     finally:
-        session.close() 
+        session.close()
+
+# 智能体任务统一执行器
+@app.task(bind=True, max_retries=3)
+def execute_agent_task(self, agent_id, message, user="system", **kwargs):
+    """
+    执行智能体任务的统一入口
+    支持并行处理多个智能体的定时任务
+    """
+    import requests
+    
+    execution_time = datetime.now()
+    logger.info(f"开始执行智能体任务 - Agent: {agent_id}, Message: {message}")
+    
+    try:
+        # 调用LangGraph API
+        api_url = "http://localhost:8000/api/chat/stream"
+        payload = {
+            "message": message,
+            "assistant_id": agent_id,
+            "user": user,
+            "stream_mode": ["messages"]  # 确保消息历史被记录
+        }
+        
+        # 设置超时时间
+        timeout = kwargs.get('timeout', 300)  # 默认5分钟超时
+        
+        response = requests.post(
+            api_url, 
+            json=payload, 
+            timeout=timeout,
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        if response.status_code == 200:
+            # 处理流式响应
+            result_messages = []
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line.decode('utf-8'))
+                        if 'content' in data:
+                            result_messages.append(data['content'])
+                    except json.JSONDecodeError:
+                        continue
+            
+            final_result = {
+                'agent_id': agent_id,
+                'status': 'SUCCESS',
+                'message': message,
+                'response': '\n'.join(result_messages),
+                'execution_time': execution_time.isoformat(),
+                'user': user
+            }
+            
+            logger.info(f"智能体任务执行成功 - Agent: {agent_id}")
+            
+        else:
+            raise Exception(f"API调用失败: {response.status_code} - {response.text}")
+            
+    except requests.exceptions.Timeout:
+        error_msg = f"智能体任务超时 - Agent: {agent_id}, 超时时间: {timeout}秒"
+        logger.error(error_msg)
+        final_result = {
+            'agent_id': agent_id,
+            'status': 'TIMEOUT',
+            'message': message,
+            'error': error_msg,
+            'execution_time': execution_time.isoformat()
+        }
+        
+    except Exception as exc:
+        error_msg = f"智能体任务执行失败 - Agent: {agent_id}, Error: {str(exc)}"
+        logger.error(error_msg)
+        
+        # 重试逻辑
+        if self.request.retries < self.max_retries:
+            logger.info(f"智能体任务重试 - Agent: {agent_id}, 重试次数: {self.request.retries + 1}")
+            self.retry(exc=exc, countdown=60)  # 1分钟后重试
+            
+        final_result = {
+            'agent_id': agent_id,
+            'status': 'FAILURE',
+            'message': message,
+            'error': error_msg,
+            'execution_time': execution_time.isoformat(),
+            'retries': self.request.retries
+        }
+    
+    # 记录定时任务执行日志
+    session = get_session()
+    try:
+        task_run = PeriodicTaskRun(
+            task_name=f'agent_task_{agent_id}',
+            task_schedule_time=execution_time,
+            task_execute_time=datetime.now(),
+            task_status=final_result['status'],
+            task_result=json.dumps(final_result),
+            create_by='system',
+            update_by='system'
+        )
+        session.add(task_run)
+        session.commit()
+    except Exception as e:
+        logger.error(f"记录智能体任务执行日志错误: {str(e)}")
+        session.rollback()
+    finally:
+        session.close()
+    
+    return final_result
+
+# HTTP任务执行器
+@app.task(bind=True, max_retries=3)
+def execute_http_task(self, url, method="GET", headers=None, data=None, **kwargs):
+    """
+    执行HTTP任务的统一入口
+    """
+    import requests
+    
+    execution_time = datetime.now()
+    logger.info(f"开始执行HTTP任务 - URL: {url}, Method: {method}")
+    
+    try:
+        timeout = kwargs.get('timeout', 30)  # 默认30秒超时
+        
+        if method.upper() == 'GET':
+            response = requests.get(url, headers=headers, timeout=timeout)
+        elif method.upper() == 'POST':
+            response = requests.post(url, headers=headers, json=data, timeout=timeout)
+        elif method.upper() == 'PUT':
+            response = requests.put(url, headers=headers, json=data, timeout=timeout)
+        else:
+            raise Exception(f"不支持的HTTP方法: {method}")
+            
+        result = {
+            'status': 'SUCCESS',
+            'url': url,
+            'method': method,
+            'status_code': response.status_code,
+            'response': response.text[:1000] if response.text else None,  # 限制响应长度
+            'execution_time': execution_time.isoformat()
+        }
+        
+        logger.info(f"HTTP任务执行成功 - URL: {url}, Status: {response.status_code}")
+        
+    except Exception as exc:
+        error_msg = f"HTTP任务执行失败 - URL: {url}, Error: {str(exc)}"
+        logger.error(error_msg)
+        
+        if self.request.retries < self.max_retries:
+            logger.info(f"HTTP任务重试 - URL: {url}, 重试次数: {self.request.retries + 1}")
+            self.retry(exc=exc, countdown=30)  # 30秒后重试
+            
+        result = {
+            'status': 'FAILURE',
+            'url': url,
+            'method': method,
+            'error': error_msg,
+            'execution_time': execution_time.isoformat(),
+            'retries': self.request.retries
+        }
+    
+    # 记录任务执行日志
+    session = get_session()
+    try:
+        task_run = PeriodicTaskRun(
+            task_name=f'http_task_{url.replace("://", "_").replace("/", "_")}',
+            task_schedule_time=execution_time,
+            task_execute_time=datetime.now(),
+            task_status=result['status'],
+            task_result=json.dumps(result),
+            create_by='system',
+            update_by='system'
+        )
+        session.add(task_run)
+        session.commit()
+    except Exception as e:
+        logger.error(f"记录HTTP任务执行日志错误: {str(e)}")
+        session.rollback()
+    finally:
+        session.close()
+    
+    return result 

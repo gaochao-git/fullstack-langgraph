@@ -19,7 +19,8 @@ import {
   Tabs,
   Tree,
   Form,
-  Tooltip
+  Tooltip,
+  Table
 } from 'antd';
 import { 
   RobotOutlined,
@@ -33,7 +34,11 @@ import {
   CloudOutlined,
   GlobalOutlined,
   DeleteOutlined,
-  MessageOutlined
+  MessageOutlined,
+  ClockCircleOutlined,
+  PlayCircleOutlined,
+  PauseCircleOutlined,
+  PlusOutlined
 } from '@ant-design/icons';
 import AgentChatDialog from '../components/AgentChatDialog';
 import type { DataNode } from 'antd/es/tree';
@@ -167,6 +172,15 @@ const AgentManagement: React.FC = () => {
   // 对话相关状态
   const [chatDialogVisible, setChatDialogVisible] = useState(false);
   const [selectedChatAgent, setSelectedChatAgent] = useState<LocalAgent | null>(null);
+  
+  // 定时任务相关状态
+  const [agentScheduledTasks, setAgentScheduledTasks] = useState<any[]>([]);
+  const [scheduledTasksLoading, setScheduledTasksLoading] = useState(false);
+  const [taskCreateModalVisible, setTaskCreateModalVisible] = useState(false);
+  const [taskEditModalVisible, setTaskEditModalVisible] = useState(false);
+  const [editingTask, setEditingTask] = useState<any>(null);
+  const [taskForm] = Form.useForm();
+  const [taskEditForm] = Form.useForm();
   
   const { message, modal } = App.useApp();
 
@@ -556,6 +570,9 @@ const AgentManagement: React.FC = () => {
       console.error('获取智能体详细配置失败:', error);
     }
     
+    // 获取智能体的定时任务
+    await fetchAgentScheduledTasks(agent.id);
+    
     setAgentEditModal(true);
   };
 
@@ -577,6 +594,213 @@ const AgentManagement: React.FC = () => {
     }
     setAgentToDelete(agent);
     setDeleteModalVisible(true);
+  };
+
+  // 获取智能体的定时任务
+  const fetchAgentScheduledTasks = async (agentId: string) => {
+    setScheduledTasksLoading(true);
+    try {
+      console.log('正在获取智能体定时任务:', agentId);
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks?agent_id=${agentId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('获取到的任务数据:', data);
+      
+      const tasks = Array.isArray(data) ? data : [];
+      console.log('设置任务列表:', tasks);
+      setAgentScheduledTasks(tasks);
+    } catch (error) {
+      console.error('获取智能体定时任务失败:', error);
+      message.error('获取定时任务列表失败');
+      setAgentScheduledTasks([]);
+    } finally {
+      setScheduledTasksLoading(false);
+    }
+  };
+
+  // 创建智能体定时任务
+  const handleCreateAgentTask = async (values: any) => {
+    if (!editingAgent) return;
+    
+    try {
+      // 构建新的统一配置格式
+      const extraConfig = {
+        task_type: 'agent',
+        agent_id: editingAgent.id,
+        task_timeout: values.task_timeout || 300,
+        message: values.task_message || '执行定时任务',
+        user: 'system',
+        max_retries: 3
+      };
+      
+      const taskData = {
+        task_name: values.task_name,
+        task_path: 'auto', // 调度器会自动设置
+        task_description: values.task_description,
+        task_extra_config: JSON.stringify(extraConfig),
+        task_interval: values.task_interval,
+        task_crontab_minute: values.task_crontab_minute,
+        task_crontab_hour: values.task_crontab_hour,
+        task_crontab_day_of_week: values.task_crontab_day_of_week,
+        task_crontab_day_of_month: values.task_crontab_day_of_month,
+        task_crontab_month_of_year: values.task_crontab_month_of_year,
+        task_enabled: true,
+        create_by: 'system',
+        update_by: 'system'
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      message.success('创建定时任务成功');
+      setTaskCreateModalVisible(false);
+      taskForm.resetFields();
+      await fetchAgentScheduledTasks(editingAgent.id);
+    } catch (error) {
+      console.error('创建任务失败:', error);
+      message.error('创建任务失败');
+    }
+  };
+
+  // 切换任务状态
+  const handleToggleTask = async (task: any) => {
+    try {
+      const endpoint = task.task_enabled ? 'disable' : 'enable';
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks/${task.id}/${endpoint}`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      message.success(`任务已${task.task_enabled ? '暂停' : '启动'}`);
+      if (editingAgent) {
+        await fetchAgentScheduledTasks(editingAgent.id);
+      }
+    } catch (error) {
+      console.error('切换任务状态失败:', error);
+      message.error('操作失败');
+    }
+  };
+
+  // 编辑任务
+  const handleEditTask = (task: any) => {
+    setEditingTask(task);
+    
+    // 解析task_extra_config获取配置信息
+    let extraConfig = {};
+    try {
+      if (task.task_extra_config) {
+        extraConfig = JSON.parse(task.task_extra_config);
+      }
+    } catch (error) {
+      console.error('解析任务配置失败:', error);
+    }
+    
+    // 设置表单初始值
+    taskEditForm.setFieldsValue({
+      task_name: task.task_name,
+      task_description: task.task_description,
+      task_message: (extraConfig as any).message || '执行定时任务',
+      task_timeout: (extraConfig as any).task_timeout || 300,
+      schedule_type: task.task_interval ? 'interval' : 'crontab',
+      task_interval: task.task_interval,
+      task_crontab_minute: task.task_crontab_minute,
+      task_crontab_hour: task.task_crontab_hour,
+      task_crontab_day_of_week: task.task_crontab_day_of_week,
+      task_crontab_day_of_month: task.task_crontab_day_of_month,
+      task_crontab_month_of_year: task.task_crontab_month_of_year,
+    });
+    
+    setTaskEditModalVisible(true);
+  };
+
+  // 更新任务
+  const handleUpdateTask = async (values: any) => {
+    if (!editingTask || !editingAgent) return;
+    
+    try {
+      // 构建新的统一配置格式
+      const extraConfig = {
+        task_type: 'agent',
+        agent_id: editingAgent.id,
+        task_timeout: values.task_timeout || 300,
+        message: values.task_message || '执行定时任务',
+        user: 'system',
+        max_retries: 3
+      };
+      
+      const taskData = {
+        task_name: values.task_name,
+        task_description: values.task_description,
+        task_extra_config: JSON.stringify(extraConfig),
+        task_interval: values.schedule_type === 'interval' ? values.task_interval : null,
+        task_crontab_minute: values.schedule_type === 'crontab' ? values.task_crontab_minute : null,
+        task_crontab_hour: values.schedule_type === 'crontab' ? values.task_crontab_hour : null,
+        task_crontab_day_of_week: values.schedule_type === 'crontab' ? values.task_crontab_day_of_week : null,
+        task_crontab_day_of_month: values.schedule_type === 'crontab' ? values.task_crontab_day_of_month : null,
+        task_crontab_month_of_year: values.schedule_type === 'crontab' ? values.task_crontab_month_of_year : null,
+        update_by: 'system'
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks/${editingTask.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      message.success('更新任务成功');
+      setTaskEditModalVisible(false);
+      setEditingTask(null);
+      taskEditForm.resetFields();
+      await fetchAgentScheduledTasks(editingAgent.id);
+    } catch (error) {
+      console.error('更新任务失败:', error);
+      message.error('更新任务失败');
+    }
+  };
+
+  // 删除任务
+  const handleDeleteTask = (task: any) => {
+    modal.confirm({
+      title: '确认删除',
+      content: `确定要删除任务 "${task.task_name}" 吗？`,
+      okText: '删除',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks/${task.id}`, {
+            method: 'DELETE',
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          message.success('删除任务成功');
+          if (editingAgent) {
+            await fetchAgentScheduledTasks(editingAgent.id);
+          }
+        } catch (error) {
+          console.error('删除任务失败:', error);
+          message.error('删除任务失败');
+        }
+      },
+    });
   };
 
   // 保存智能体（新建或编辑）
@@ -1294,6 +1518,120 @@ const AgentManagement: React.FC = () => {
                 />
               </Form.Item>
             </TabPane>
+
+            {/* 定时任务配置 */}
+            <TabPane tab={<span><ClockCircleOutlined />定时任务</span>} key="scheduled-tasks">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-medium">智能体定时任务</h4>
+                  <Button 
+                    type="primary" 
+                    size="small"
+                    icon={<PlusOutlined />}
+                    onClick={() => setTaskCreateModalVisible(true)}
+                  >
+                    新建任务
+                  </Button>
+                </div>
+                
+                <Table
+                  dataSource={agentScheduledTasks}
+                  loading={scheduledTasksLoading}
+                  size="small"
+                  pagination={false}
+                  rowKey="id"
+                  scroll={{ x: 800 }}
+                  columns={[
+                    {
+                      title: '任务名称',
+                      dataIndex: 'task_name',
+                      key: 'task_name',
+                      width: 150,
+                      fixed: 'left',
+                    },
+                    {
+                      title: '描述',
+                      dataIndex: 'task_description',
+                      key: 'task_description',
+                      width: 200,
+                      ellipsis: true,
+                    },
+                    {
+                      title: '调度配置',
+                      key: 'schedule',
+                      width: 120,
+                      render: (_, record) => {
+                        if (record.task_interval) {
+                          return `每${record.task_interval}秒`;
+                        }
+                        const cron = [
+                          record.task_crontab_minute || '*',
+                          record.task_crontab_hour || '*',
+                          record.task_crontab_day_of_month || '*',
+                          record.task_crontab_month_of_year || '*',
+                          record.task_crontab_day_of_week || '*'
+                        ].join(' ');
+                        return <code className="text-xs">{cron}</code>;
+                      }
+                    },
+                    {
+                      title: '状态',
+                      dataIndex: 'task_enabled',
+                      key: 'task_enabled',
+                      width: 80,
+                      render: (enabled) => (
+                        <Badge 
+                          status={enabled ? "success" : "default"} 
+                          text={enabled ? "启用" : "暂停"} 
+                        />
+                      )
+                    },
+                    {
+                      title: '最后运行',
+                      dataIndex: 'task_last_run_time',
+                      key: 'task_last_run_time',
+                      width: 140,
+                      render: (time) => time ? new Date(time).toLocaleString() : '-'
+                    },
+                    {
+                      title: '操作',
+                      key: 'actions',
+                      width: 160,
+                      fixed: 'right',
+                      render: (_, record) => (
+                        <Space size="small">
+                          <Tooltip title="暂停/启动">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={record.task_enabled ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                              onClick={() => handleToggleTask(record)}
+                            />
+                          </Tooltip>
+                          <Tooltip title="编辑">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<SettingOutlined />}
+                              onClick={() => handleEditTask(record)}
+                            />
+                          </Tooltip>
+                          <Tooltip title="删除">
+                            <Button
+                              type="text"
+                              size="small"
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => handleDeleteTask(record)}
+                            />
+                          </Tooltip>
+                        </Space>
+                      )
+                    }
+                  ]}
+                />
+              </div>
+            </TabPane>
           </Tabs>
 
           <div className="flex justify-end space-x-2 mt-4 pt-4 border-t">
@@ -1365,6 +1703,276 @@ const AgentManagement: React.FC = () => {
           capabilities: selectedChatAgent.capabilities
         } : null}
       />
+
+      {/* 创建定时任务模态框 */}
+      <Modal
+        title="创建定时任务"
+        open={taskCreateModalVisible}
+        onCancel={() => {
+          setTaskCreateModalVisible(false);
+          taskForm.resetFields();
+        }}
+        width={600}
+        footer={null}
+      >
+        <Form
+          form={taskForm}
+          layout="vertical"
+          onFinish={handleCreateAgentTask}
+        >
+          <Form.Item
+            label="任务名称"
+            name="task_name"
+            rules={[{ required: true, message: '请输入任务名称' }]}
+          >
+            <Input placeholder="输入任务名称" />
+          </Form.Item>
+
+          <Form.Item
+            label="任务描述"
+            name="task_description"
+          >
+            <TextArea rows={2} placeholder="输入任务描述（可选）" />
+          </Form.Item>
+
+          <Form.Item
+            label="执行消息"
+            name="task_message"
+            rules={[{ required: true, message: '请输入执行消息' }]}
+            tooltip="这是智能体在定时任务执行时收到的消息"
+          >
+            <TextArea rows={2} placeholder="输入智能体执行的消息内容" />
+          </Form.Item>
+
+          <Form.Item
+            label="超时时间（秒）"
+            name="task_timeout"
+            initialValue={300}
+          >
+            <Input type="number" min={30} max={3600} placeholder="300" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="调度方式"
+                name="schedule_type"
+                initialValue="interval"
+              >
+                <Select>
+                  <Option value="interval">间隔执行</Option>
+                  <Option value="crontab">Crontab</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="间隔时间（秒）"
+                name="task_interval"
+                dependencies={['schedule_type']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (getFieldValue('schedule_type') === 'interval' && (!value || value < 60)) {
+                        return Promise.reject(new Error('间隔时间不能少于60秒'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <Input type="number" min={60} placeholder="3600" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.schedule_type !== currentValues.schedule_type}>
+            {({ getFieldValue }) => {
+              return getFieldValue('schedule_type') === 'crontab' ? (
+                <Row gutter={8}>
+                  <Col span={4}>
+                    <Form.Item label="分钟" name="task_crontab_minute">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="小时" name="task_crontab_hour">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="日" name="task_crontab_day_of_month">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="月" name="task_crontab_month_of_year">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="周" name="task_crontab_day_of_week">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <div className="text-xs text-gray-500 mt-6">
+                      Crontab格式
+                    </div>
+                  </Col>
+                </Row>
+              ) : null;
+            }}
+          </Form.Item>
+
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button onClick={() => {
+              setTaskCreateModalVisible(false);
+              taskForm.resetFields();
+            }}>
+              取消
+            </Button>
+            <Button type="primary" htmlType="submit">
+              创建任务
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      {/* 编辑定时任务模态框 */}
+      <Modal
+        title="编辑定时任务"
+        open={taskEditModalVisible}
+        onCancel={() => {
+          setTaskEditModalVisible(false);
+          setEditingTask(null);
+          taskEditForm.resetFields();
+        }}
+        width={600}
+        footer={null}
+      >
+        <Form
+          form={taskEditForm}
+          layout="vertical"
+          onFinish={handleUpdateTask}
+        >
+          <Form.Item
+            label="任务名称"
+            name="task_name"
+            rules={[{ required: true, message: '请输入任务名称' }]}
+          >
+            <Input placeholder="输入任务名称" />
+          </Form.Item>
+
+          <Form.Item
+            label="任务描述"
+            name="task_description"
+          >
+            <TextArea rows={2} placeholder="输入任务描述（可选）" />
+          </Form.Item>
+
+          <Form.Item
+            label="执行消息"
+            name="task_message"
+            rules={[{ required: true, message: '请输入执行消息' }]}
+            tooltip="这是智能体在定时任务执行时收到的消息"
+          >
+            <TextArea rows={2} placeholder="输入智能体执行的消息内容" />
+          </Form.Item>
+
+          <Form.Item
+            label="超时时间（秒）"
+            name="task_timeout"
+          >
+            <Input type="number" min={30} max={3600} placeholder="300" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="调度方式"
+                name="schedule_type"
+              >
+                <Select>
+                  <Option value="interval">间隔执行</Option>
+                  <Option value="crontab">Crontab</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="间隔时间（秒）"
+                name="task_interval"
+                dependencies={['schedule_type']}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (getFieldValue('schedule_type') === 'interval' && (!value || value < 60)) {
+                        return Promise.reject(new Error('间隔时间不能少于60秒'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <Input type="number" min={60} placeholder="3600" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.schedule_type !== currentValues.schedule_type}>
+            {({ getFieldValue }) => {
+              return getFieldValue('schedule_type') === 'crontab' ? (
+                <Row gutter={8}>
+                  <Col span={4}>
+                    <Form.Item label="分钟" name="task_crontab_minute">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="小时" name="task_crontab_hour">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="日" name="task_crontab_day_of_month">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="月" name="task_crontab_month_of_year">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <Form.Item label="周" name="task_crontab_day_of_week">
+                      <Input placeholder="*" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={4}>
+                    <div className="text-xs text-gray-500 mt-6">
+                      Crontab格式
+                    </div>
+                  </Col>
+                </Row>
+              ) : null;
+            }}
+          </Form.Item>
+
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button onClick={() => {
+              setTaskEditModalVisible(false);
+              setEditingTask(null);
+              taskEditForm.resetFields();
+            }}>
+              取消
+            </Button>
+            <Button type="primary" htmlType="submit">
+              保存修改
+            </Button>
+          </div>
+        </Form>
+      </Modal>
     </div>
   );
 };

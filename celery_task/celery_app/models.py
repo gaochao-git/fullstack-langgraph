@@ -93,6 +93,7 @@ class PeriodicTask(Base):
     create_by = Column(String(100), nullable=True)
     update_by = Column(String(100), nullable=True)
     task_description = Column(Text, nullable=True)
+    task_extra_config = Column(Text, nullable=True)  # 任务额外配置JSON字符串（包含task_type、agent_id、task_timeout等）
     
     def __repr__(self):
         return f"<PeriodicTask {self.task_name}>"

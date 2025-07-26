@@ -6,7 +6,7 @@ import json
 import sys
 import os
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -39,6 +39,7 @@ class ScheduledTaskCreate(BaseModel):
     task_name: str = Field(..., description="任务名称")
     task_path: str = Field(..., description="任务路径，如 'celery_app.tasks.example_task'")
     task_description: Optional[str] = Field(None, description="任务描述")
+    task_extra_config: Optional[str] = Field(None, description="任务配置JSON字符串（包含task_type、agent_id、task_timeout等）")
     task_interval: Optional[int] = Field(None, description="间隔秒数（用于间隔调度）")
     task_crontab_minute: Optional[str] = Field(None, description="Crontab分钟")
     task_crontab_hour: Optional[str] = Field(None, description="Crontab小时")
@@ -53,6 +54,7 @@ class ScheduledTaskUpdate(BaseModel):
     task_name: Optional[str] = None
     task_path: Optional[str] = None
     task_description: Optional[str] = None
+    task_extra_config: Optional[str] = None
     task_interval: Optional[int] = None
     task_crontab_minute: Optional[str] = None
     task_crontab_hour: Optional[str] = None
@@ -68,6 +70,7 @@ class ScheduledTaskResponse(BaseModel):
     task_name: str
     task_path: str
     task_description: Optional[str]
+    task_extra_config: Optional[str]
     task_interval: Optional[int]
     task_crontab_minute: Optional[str]
     task_crontab_hour: Optional[str]
@@ -115,7 +118,8 @@ def get_db_session():
 async def list_scheduled_tasks(
     skip: int = Query(0, ge=0, description="跳过的记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回的记录数"),
-    enabled_only: bool = Query(False, description="仅显示启用的任务")
+    enabled_only: bool = Query(False, description="仅显示启用的任务"),
+    agent_id: Optional[str] = Query(None, description="按智能体ID过滤")
 ):
     """获取定时任务列表"""
     session = get_db_session()
@@ -123,6 +127,11 @@ async def list_scheduled_tasks(
         query = session.query(PeriodicTask)
         if enabled_only:
             query = query.filter(PeriodicTask.task_enabled == True)
+            
+        # 按智能体ID过滤（需要解析task_extra_config中的agent_id）
+        if agent_id:
+            # 使用MySQL的JSON_EXTRACT函数来查询JSON字段
+            query = query.filter(PeriodicTask.task_extra_config.like(f'%"agent_id": "{agent_id}"%'))
         
         tasks = query.offset(skip).limit(limit).all()
         return [ScheduledTaskResponse(**task.__dict__) for task in tasks]
