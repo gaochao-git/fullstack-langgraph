@@ -384,3 +384,24 @@ async def get_celery_status():
             "status": "error",
             "message": f"无法获取Celery状态: {str(e)}"
         }
+
+@router.post("/refresh-schedule")
+async def refresh_schedule():
+    """手动刷新定时任务调度配置"""
+    if celery_app is None:
+        raise HTTPException(status_code=503, detail="Celery应用不可用")
+    
+    try:
+        # 发送刷新调度的任务
+        result = celery_app.send_task('celery_app.dynamic_scheduler.refresh_periodic_tasks_schedule')
+        
+        # 等待任务完成（最多等待10秒）
+        task_result = result.get(timeout=10)
+        
+        return {
+            "message": "调度配置刷新成功",
+            "task_id": result.id,
+            "result": task_result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"刷新调度配置失败: {str(e)}")

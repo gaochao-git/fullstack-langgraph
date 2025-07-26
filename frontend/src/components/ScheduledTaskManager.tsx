@@ -105,7 +105,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       
       const taskData = {
         task_name: values.task_name,
-        task_path: 'auto', // 调度器会自动设置
+        task_path: 'celery_app.agent_tasks.execute_agent_periodic_task', // 使用通用的智能体任务函数
         task_description: values.task_description,
         task_extra_config: JSON.stringify(extraConfig),
         task_interval: values.schedule_type === 'interval' ? values.task_interval : null,

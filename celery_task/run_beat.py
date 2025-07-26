@@ -1,14 +1,23 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
-调试版本的 Celery Beat 启动脚本
+Celery Beat 启动脚本
+直接运行: python run_beat.py
 """
 import os
 import sys
 import logging
 
+# ==================== 配置区域 ====================
+# 可以根据需要修改以下配置
+
+LOG_LEVEL = 'INFO'                # 日志级别: DEBUG, INFO, WARNING, ERROR
+ENABLE_HEALTH_CHECK = True        # 是否启用启动前健康检查
+
+# ================================================
+
 # 配置日志
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, LOG_LEVEL),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -98,7 +107,7 @@ def start_beat_safe():
         # 启动参数
         argv = [
             'beat',
-            '--loglevel=INFO',
+            f'--loglevel={LOG_LEVEL}',
         ]
         
         logger.info("启动 Celery Beat...")
@@ -114,29 +123,34 @@ def start_beat_safe():
         return False
 
 if __name__ == '__main__':
-    logger.info("🚀 Celery Beat 调试启动器")
+    logger.info("🚀 Celery Beat 启动器 (含动态调度器)")
     logger.info("=" * 50)
     
-    # 运行前置检查
-    checks = [
-        ("模块导入", test_imports),
-        ("数据库连接", test_database), 
-        ("Redis连接", test_redis),
-    ]
-    
-    all_passed = True
-    for check_name, check_func in checks:
-        logger.info(f"检查: {check_name}")
-        if not check_func():
-            all_passed = False
-            logger.error(f"❌ {check_name} 检查失败")
+    if ENABLE_HEALTH_CHECK:
+        # 运行前置检查
+        checks = [
+            ("模块导入", test_imports),
+            ("数据库连接", test_database), 
+            ("Redis连接", test_redis),
+        ]
+        
+        all_passed = True
+        for check_name, check_func in checks:
+            logger.info(f"检查: {check_name}")
+            if not check_func():
+                all_passed = False
+                logger.error(f"❌ {check_name} 检查失败")
+            else:
+                logger.info(f"✅ {check_name} 检查通过")
+            logger.info("-" * 30)
+        
+        if all_passed:
+            logger.info("🎉 所有检查通过，启动 Celery Beat...")
+            start_beat_safe()
         else:
-            logger.info(f"✅ {check_name} 检查通过")
-        logger.info("-" * 30)
-    
-    if all_passed:
-        logger.info("🎉 所有检查通过，启动 Celery Beat...")
-        start_beat_safe()
+            logger.error("❌ 检查失败，请修复问题后重试")
+            logger.info("提示: 可以设置 ENABLE_HEALTH_CHECK = False 跳过检查")
+            sys.exit(1)
     else:
-        logger.error("❌ 检查失败，请修复问题后重试")
-        sys.exit(1)
+        logger.info("跳过健康检查，直接启动 Celery Beat...")
+        start_beat_safe()

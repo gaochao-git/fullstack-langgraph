@@ -8,7 +8,7 @@ import logging
 import requests
 from datetime import datetime
 from celery_app.celery import app
-from celery_app.models import get_session, PeriodicTaskRun
+from celery_app.models import get_session, PeriodicTaskRun, PeriodicTask
 
 # 添加 backend 项目路径到 Python 路径
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
@@ -283,148 +283,165 @@ def periodic_agent_health_check():
         return error_result
 
 
-@app.task
-def periodic_diagnostic_report():
+
+@app.task(bind=True, max_retries=3, soft_time_limit=300, time_limit=360)
+def execute_agent_periodic_task(self, task_config_id):
     """
-    定期生成系统诊断报告
-    调用 diagnostic_agent 智能体
+    通用的智能体定时任务执行函数
+    
+    Args:
+        task_config_id: 定时任务配置ID，从celery_periodic_task_configs表中读取配置
     """
+    task_id = self.request.id
     execution_time = datetime.now()
-    logger.info(f"开始执行系统诊断报告任务: {execution_time.isoformat()}")
+    
+    session = get_session()
     
     try:
-        # 构建诊断消息
-        diagnostic_message = f"""
-请生成 {execution_time.strftime('%Y-%m-%d %H:%M')} 的系统诊断报告，包括以下内容：
-1. 系统整体健康状态
-2. 关键服务运行状态  
-3. 资源使用情况分析
-4. 潜在问题识别
-5. 优化建议
-
-请提供简洁但全面的分析报告。
-        """.strip()
-        
-        # 调用 diagnostic_agent
-        result = call_agent_task.apply_async(
-            args=['diagnostic_agent', diagnostic_message, 'system'],
-            kwargs={'conversation_id': f'diagnostic_report_{execution_time.strftime("%Y%m%d_%H%M")}'}
-        )
-        
-        # 等待任务完成（最多等待60秒）
-        agent_result = result.get(timeout=60)
-        
-        if agent_result and agent_result.get('status') == 'SUCCESS':
-            diagnostic_report = {
-                'report_time': execution_time.isoformat(),
-                'agent_id': 'diagnostic_agent',
-                'message': diagnostic_message,
-                'agent_response': agent_result.get('response', ''),
-                'conversation_id': agent_result.get('conversation_id', ''),
-                'status': 'SUCCESS'
-            }
-            
-            logger.info("系统诊断报告生成成功")
-            record_periodic_task_result('periodic_diagnostic_report', execution_time, 'SUCCESS', diagnostic_report)
-            
-            return diagnostic_report
-        else:
-            error_msg = f"智能体调用失败: {agent_result}"
+        # 从数据库获取任务配置
+        task_config = session.query(PeriodicTask).filter(PeriodicTask.id == task_config_id).first()
+        if not task_config:
+            error_msg = f"找不到任务配置，ID: {task_config_id}"
             logger.error(error_msg)
-            
-            error_result = {
-                'report_time': execution_time.isoformat(),
+            return {
+                'task_id': task_id,
                 'error': error_msg,
-                'status': 'FAILED'
+                'status': 'FAILED',
+                'execution_time': execution_time.isoformat()
             }
-            record_periodic_task_result('periodic_diagnostic_report', execution_time, 'FAILED', error_result)
-            
-            return error_result
-            
-    except Exception as e:
-        error_msg = f"系统诊断报告任务异常: {str(e)}"
-        logger.error(error_msg)
         
-        error_result = {
-            'report_time': execution_time.isoformat(),
-            'error': error_msg,
-            'status': 'FAILED'
-        }
-        record_periodic_task_result('periodic_diagnostic_report', execution_time, 'FAILED', error_result)
+        # 检查任务是否启用
+        if not task_config.task_enabled:
+            logger.info(f"任务已禁用，跳过执行: {task_config.task_name}")
+            return {
+                'task_id': task_id,
+                'task_name': task_config.task_name,
+                'message': '任务已禁用',
+                'status': 'SKIPPED',
+                'execution_time': execution_time.isoformat()
+            }
         
-        return error_result
-
-
-@app.task
-def periodic_research_summary():
-    """
-    定期生成研究总结报告
-    调用 research_agent 智能体
-    """
-    execution_time = datetime.now()
-    logger.info(f"开始执行研究总结任务: {execution_time.isoformat()}")
-    
-    try:
-        # 构建研究消息
-        research_message = f"""
-请为 {execution_time.strftime('%Y-%m-%d')} 生成技术研究总结，包括：
-1. 当前热门技术趋势
-2. 重要技术更新和发布
-3. 行业动态分析
-4. 值得关注的技术方向
-5. 学习和应用建议
-
-请提供结构化的研究总结报告。
-        """.strip()
+        # 解析任务配置
+        try:
+            extra_config = json.loads(task_config.task_extra_config) if task_config.task_extra_config else {}
+        except json.JSONDecodeError as e:
+            error_msg = f"任务配置JSON解析失败: {str(e)}"
+            logger.error(error_msg)
+            record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', {
+                'error': error_msg,
+                'task_config_id': task_config_id
+            })
+            return {
+                'task_id': task_id,
+                'error': error_msg,
+                'status': 'FAILED',
+                'execution_time': execution_time.isoformat()
+            }
         
-        # 调用 research_agent
+        # 验证是否为智能体任务
+        if extra_config.get('task_type') != 'agent':
+            error_msg = f"不是智能体任务类型: {extra_config.get('task_type')}"
+            logger.error(error_msg)
+            return {
+                'task_id': task_id,
+                'error': error_msg,
+                'status': 'FAILED',
+                'execution_time': execution_time.isoformat()
+            }
+        
+        # 获取智能体配置
+        agent_id = extra_config.get('agent_id')
+        if not agent_id:
+            error_msg = "缺少智能体ID配置"
+            logger.error(error_msg)
+            record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', {
+                'error': error_msg,
+                'task_config_id': task_config_id
+            })
+            return {
+                'task_id': task_id,
+                'error': error_msg,
+                'status': 'FAILED',
+                'execution_time': execution_time.isoformat()
+            }
+        
+        message = extra_config.get('message', '执行定时任务')
+        user_name = extra_config.get('user', 'system')
+        conversation_id = extra_config.get('conversation_id')
+        
+        logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
+        
+        # 调用智能体任务
         result = call_agent_task.apply_async(
-            args=['research_agent', research_message, 'system'],
-            kwargs={'conversation_id': f'research_summary_{execution_time.strftime("%Y%m%d")}'}
+            args=[agent_id, message, user_name],
+            kwargs={'conversation_id': conversation_id}
         )
         
         # 等待任务完成
-        agent_result = result.get(timeout=60)
+        timeout = extra_config.get('task_timeout', 300)
+        agent_result = result.get(timeout=timeout)
         
         if agent_result and agent_result.get('status') == 'SUCCESS':
-            research_report = {
-                'summary_time': execution_time.isoformat(),
-                'agent_id': 'research_agent',
-                'message': research_message,
-                'agent_response': agent_result.get('response', ''),
-                'conversation_id': agent_result.get('conversation_id', ''),
-                'status': 'SUCCESS'
+            success_result = {
+                'task_id': task_id,
+                'task_config_id': task_config_id,
+                'task_name': task_config.task_name,
+                'agent_id': agent_id,
+                'agent_result': agent_result,
+                'status': 'SUCCESS',
+                'execution_time': execution_time.isoformat()
             }
             
-            logger.info("研究总结报告生成成功")
-            record_periodic_task_result('periodic_research_summary', execution_time, 'SUCCESS', research_report)
+            # 更新任务最后运行时间和运行次数
+            task_config.task_last_run_time = execution_time
+            task_config.task_run_count = (task_config.task_run_count or 0) + 1
+            session.commit()
             
-            return research_report
+            logger.info(f"智能体定时任务执行成功: {task_config.task_name}")
+            record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'SUCCESS', success_result)
+            
+            return success_result
         else:
-            error_msg = f"智能体调用失败: {agent_result}"
+            error_msg = f"智能体任务执行失败: {agent_result}"
             logger.error(error_msg)
             
             error_result = {
-                'summary_time': execution_time.isoformat(),
+                'task_id': task_id,
+                'task_config_id': task_config_id,
+                'task_name': task_config.task_name,
+                'agent_id': agent_id,
                 'error': error_msg,
-                'status': 'FAILED'
+                'agent_result': agent_result,
+                'status': 'FAILED',
+                'execution_time': execution_time.isoformat()
             }
-            record_periodic_task_result('periodic_research_summary', execution_time, 'FAILED', error_result)
             
+            record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
             return error_result
-            
-    except Exception as e:
-        error_msg = f"研究总结任务异常: {str(e)}"
+    
+    except Exception as exc:
+        error_msg = f"智能体定时任务执行异常: {str(exc)}"
         logger.error(error_msg)
         
         error_result = {
-            'summary_time': execution_time.isoformat(),
+            'task_id': task_id,
+            'task_config_id': task_config_id,
             'error': error_msg,
-            'status': 'FAILED'
+            'status': 'FAILED',
+            'execution_time': execution_time.isoformat()
         }
-        record_periodic_task_result('periodic_research_summary', execution_time, 'FAILED', error_result)
+        
+        record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
+        
+        # 重试机制
+        if self.request.retries < self.max_retries:
+            logger.info(f"任务失败，将在60秒后重试 (第{self.request.retries + 1}次重试)")
+            raise self.retry(countdown=60, exc=exc)
         
         return error_result
+    
+    finally:
+        session.close()
 
 
 def record_agent_task_result(task_id, agent_id, status, result_data):
