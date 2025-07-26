@@ -114,7 +114,6 @@ class DatabaseScheduler(Scheduler):
             # 调试：显示任务的详细时间信息
             if hasattr(entry, 'last_run_at') and entry.last_run_at:
                 print(f"       last_run_at: {entry.last_run_at}")
-                print(f"       last_run_at类型: {type(entry.last_run_at)}")
             else:
                 print(f"       last_run_at: None (首次运行)")
             
