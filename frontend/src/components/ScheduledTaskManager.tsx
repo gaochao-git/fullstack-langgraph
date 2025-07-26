@@ -72,13 +72,14 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   // 创建任务
   const handleCreateTask = async (values: any) => {
     try {
-      // 构建新的统一配置格式
+      // 构建智能体任务配置
       const extraConfig = {
         task_type: 'agent',
         agent_id: agentId,
-        task_timeout: values.task_timeout || 300,
+        agent_url: values.agent_url,
         message: values.task_message || '执行定时任务',
         user: 'system',
+        task_timeout: values.task_timeout || 300,
         max_retries: 3
       };
       
@@ -123,7 +124,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     setEditingTask(task);
     
     // 解析task_extra_config获取配置信息
-    let extraConfig = {};
+    let extraConfig: any = {};
     try {
       if (task.task_extra_config) {
         extraConfig = JSON.parse(task.task_extra_config);
@@ -132,12 +133,13 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       console.error('解析任务配置失败:', error);
     }
     
-    // 设置表单初始值
-    editForm.setFieldsValue({
+    // 设置智能体任务表单初始值
+    const formValues: any = {
       task_name: task.task_name,
       task_description: task.task_description,
-      task_message: (extraConfig as any).message || '执行定时任务',
-      task_timeout: (extraConfig as any).task_timeout || 300,
+      agent_url: extraConfig.agent_url || '',
+      task_message: extraConfig.message || '执行定时任务',
+      task_timeout: extraConfig.task_timeout || 300,
       schedule_type: task.task_interval ? 'interval' : 'crontab',
       task_interval: task.task_interval,
       task_crontab_minute: task.task_crontab_minute,
@@ -145,8 +147,9 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       task_crontab_day_of_week: task.task_crontab_day_of_week,
       task_crontab_day_of_month: task.task_crontab_day_of_month,
       task_crontab_month_of_year: task.task_crontab_month_of_year,
-    });
+    };
     
+    editForm.setFieldsValue(formValues);
     setEditModalVisible(true);
   };
 
@@ -155,13 +158,14 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     if (!editingTask) return;
     
     try {
-      // 构建新的统一配置格式
+      // 构建智能体任务配置
       const extraConfig = {
         task_type: 'agent',
         agent_id: agentId,
-        task_timeout: values.task_timeout || 300,
+        agent_url: values.agent_url,
         message: values.task_message || '执行定时任务',
         user: 'system',
+        task_timeout: values.task_timeout || 300,
         max_retries: 3
       };
       
@@ -263,11 +267,45 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       fixed: 'left' as const,
     },
     {
+      title: '类型',
+      key: 'task_type',
+      width: 80,
+      render: () => (
+        <Badge 
+          status="processing"
+          text="智能体"
+        />
+      )
+    },
+    {
       title: '描述',
       dataIndex: 'task_description',
       key: 'task_description',
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: 'API地址',
+      key: 'agent_url',
       width: 200,
       ellipsis: true,
+      render: (_: any, record: any) => {
+        let url = '-';
+        try {
+          if (record.task_extra_config) {
+            const config = JSON.parse(record.task_extra_config);
+            url = config.agent_url || '-';
+          }
+        } catch (error) {
+          console.error('解析任务配置失败:', error);
+        }
+        
+        return (
+          <span className="text-xs" title={url}>
+            {url === '-' ? url : url.length > 30 ? `${url.substring(0, 30)}...` : url}
+          </span>
+        );
+      }
     },
     {
       title: '调度配置',
@@ -344,119 +382,133 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   ];
 
   // 任务表单组件
-  const TaskForm = ({ form, onFinish, initialValues }: any) => (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={onFinish}
-      initialValues={initialValues}
-    >
-      <Form.Item
-        label="任务名称"
-        name="task_name"
-        rules={[{ required: true, message: '请输入任务名称' }]}
+  const TaskForm = ({ form, onFinish, initialValues }: any) => {
+    return (
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        initialValues={initialValues}
       >
-        <Input placeholder="输入任务名称" />
-      </Form.Item>
+        <Form.Item
+          label="任务名称"
+          name="task_name"
+          rules={[{ required: true, message: '请输入任务名称' }]}
+        >
+          <Input placeholder="输入任务名称" />
+        </Form.Item>
 
-      <Form.Item
-        label="任务描述"
-        name="task_description"
-      >
-        <TextArea rows={2} placeholder="输入任务描述（可选）" />
-      </Form.Item>
+        <Form.Item
+          label="任务描述"
+          name="task_description"
+        >
+          <TextArea rows={2} placeholder="输入任务描述（可选）" />
+        </Form.Item>
 
-      <Form.Item
-        label="执行消息"
-        name="task_message"
-        rules={[{ required: true, message: '请输入执行消息' }]}
-        tooltip="这是智能体在定时任务执行时收到的消息"
-      >
-        <TextArea rows={2} placeholder="输入智能体执行的消息内容" />
-      </Form.Item>
+        <Form.Item
+          label="智能体API地址"
+          name="agent_url"
+          rules={[
+            { required: true, message: '请输入智能体API地址' },
+            { type: 'url', message: '请输入有效的URL' }
+          ]}
+          tooltip="智能体服务的API调用地址"
+        >
+          <Input placeholder="http://localhost:8000/api/chat/stream" />
+        </Form.Item>
 
-      <Form.Item
-        label="超时时间（秒）"
-        name="task_timeout"
-        initialValue={300}
-      >
-        <Input type="number" min={30} max={3600} placeholder="300" />
-      </Form.Item>
+        <Form.Item
+          label="执行消息"
+          name="task_message"
+          rules={[{ required: true, message: '请输入执行消息' }]}
+          tooltip="这是智能体在定时任务执行时收到的消息"
+        >
+          <TextArea rows={2} placeholder="输入智能体执行的消息内容" />
+        </Form.Item>
 
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            label="调度方式"
-            name="schedule_type"
-            initialValue="interval"
-          >
-            <Select>
-              <Option value="interval">间隔执行</Option>
-              <Option value="crontab">Crontab</Option>
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col span={12}>
-          <Form.Item
-            label="间隔时间（秒）"
-            name="task_interval"
-            dependencies={['schedule_type']}
-            rules={[
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (getFieldValue('schedule_type') === 'interval' && (!value || value < 60)) {
-                    return Promise.reject(new Error('间隔时间不能少于60秒'));
-                  }
-                  return Promise.resolve();
-                },
-              }),
-            ]}
-          >
-            <Input type="number" min={60} placeholder="3600" />
-          </Form.Item>
-        </Col>
-      </Row>
+        <Form.Item
+          label="超时时间（秒）"
+          name="task_timeout"
+          initialValue={300}
+        >
+          <Input type="number" min={30} max={3600} placeholder="300" />
+        </Form.Item>
 
-      <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.schedule_type !== currentValues.schedule_type}>
-        {({ getFieldValue }) => {
-          return getFieldValue('schedule_type') === 'crontab' ? (
-            <Row gutter={8}>
-              <Col span={4}>
-                <Form.Item label="分钟" name="task_crontab_minute">
-                  <Input placeholder="*" />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <Form.Item label="小时" name="task_crontab_hour">
-                  <Input placeholder="*" />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <Form.Item label="日" name="task_crontab_day_of_month">
-                  <Input placeholder="*" />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <Form.Item label="月" name="task_crontab_month_of_year">
-                  <Input placeholder="*" />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <Form.Item label="周" name="task_crontab_day_of_week">
-                  <Input placeholder="*" />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <div className="text-xs text-gray-500 mt-6">
-                  Crontab格式
-                </div>
-              </Col>
-            </Row>
-          ) : null;
-        }}
-      </Form.Item>
-    </Form>
-  );
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              label="调度方式"
+              name="schedule_type"
+              initialValue="interval"
+            >
+              <Select>
+                <Option value="interval">间隔执行</Option>
+                <Option value="crontab">Crontab</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label="间隔时间（秒）"
+              name="task_interval"
+              dependencies={['schedule_type']}
+              rules={[
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (getFieldValue('schedule_type') === 'interval' && (!value || value < 60)) {
+                      return Promise.reject(new Error('间隔时间不能少于60秒'));
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <Input type="number" min={60} placeholder="3600" />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.schedule_type !== currentValues.schedule_type}>
+          {({ getFieldValue }) => {
+            return getFieldValue('schedule_type') === 'crontab' ? (
+              <Row gutter={8}>
+                <Col span={4}>
+                  <Form.Item label="分钟" name="task_crontab_minute">
+                    <Input placeholder="*" />
+                  </Form.Item>
+                </Col>
+                <Col span={4}>
+                  <Form.Item label="小时" name="task_crontab_hour">
+                    <Input placeholder="*" />
+                  </Form.Item>
+                </Col>
+                <Col span={4}>
+                  <Form.Item label="日" name="task_crontab_day_of_month">
+                    <Input placeholder="*" />
+                  </Form.Item>
+                </Col>
+                <Col span={4}>
+                  <Form.Item label="月" name="task_crontab_month_of_year">
+                    <Input placeholder="*" />
+                  </Form.Item>
+                </Col>
+                <Col span={4}>
+                  <Form.Item label="周" name="task_crontab_day_of_week">
+                    <Input placeholder="*" />
+                  </Form.Item>
+                </Col>
+                <Col span={4}>
+                  <div className="text-xs text-gray-500 mt-6">
+                    Crontab格式
+                  </div>
+                </Col>
+              </Row>
+            ) : null;
+          }}
+        </Form.Item>
+      </Form>
+    );
+  };
 
   if (!visible) return null;
 
