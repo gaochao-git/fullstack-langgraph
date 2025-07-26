@@ -52,6 +52,9 @@ interface ScheduledTask {
   task_name: string;
   task_path: string;
   task_description?: string;
+  task_type?: 'system' | 'agent' | 'http'; // 任务类型：系统任务/智能体任务/HTTP任务
+  agent_id?: string; // 智能体ID（当task_type为agent时使用）
+  task_timeout?: number; // 任务超时时间（秒），用于HTTP任务和智能体任务
   task_interval?: number;
   task_crontab_minute?: string;
   task_crontab_hour?: string;
@@ -149,8 +152,11 @@ const TasksManagement: React.FC = () => {
   const [scheduledTaskDetailModalVisible, setScheduledTaskDetailModalVisible] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [scheduledTaskStatusFilter, setScheduledTaskStatusFilter] = useState<string>('');
+  const [scheduledTaskTypeFilter, setScheduledTaskTypeFilter] = useState<string>('');
   const [enableAllLoading, setEnableAllLoading] = useState(false);
   const [disableAllLoading, setDisableAllLoading] = useState(false);
+  const [selectedTaskType, setSelectedTaskType] = useState<string>('http');
+  const [agents, setAgents] = useState<any[]>([]);
   
   const [form] = Form.useForm();
 
@@ -191,6 +197,17 @@ const TasksManagement: React.FC = () => {
       setCeleryStatus(data);
     } catch (error) {
       console.error('Failed to fetch celery status:', error);
+    }
+  };
+
+  // 获取智能体列表
+  const fetchAgents = async () => {
+    try {
+      const data = await baseFetchJson('/api/agents/');
+      setAgents(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to fetch agents:', error);
+      setAgents([]);
     }
   };
 
@@ -466,6 +483,7 @@ const TasksManagement: React.FC = () => {
   // 编辑任务
   const handleEditTask = (task: ScheduledTask) => {
     setCurrentTask(task);
+    setSelectedTaskType(task.task_type || 'http'); // 设置当前任务类型
     form.setFieldsValue({
       ...task,
       task_args: task.task_args || '[]',
@@ -478,6 +496,7 @@ const TasksManagement: React.FC = () => {
     fetchScheduledTasks();
     fetchCeleryTasks();
     fetchCeleryStatus();
+    fetchAgents();
     
     // 定期刷新数据
     const interval = setInterval(() => {
@@ -529,6 +548,21 @@ const TasksManagement: React.FC = () => {
           <span>{text || '-'}</span>
         </Tooltip>
       ),
+    },
+    {
+      title: '任务类型',
+      dataIndex: 'task_type',
+      key: 'task_type',
+      width: 100,
+      render: (type: string) => {
+        const typeConfig = {
+          system: { color: 'blue', text: '系统任务' },
+          agent: { color: 'purple', text: '智能体' },
+          http: { color: 'orange', text: 'HTTP任务' },
+        };
+        const config = typeConfig[type as keyof typeof typeConfig] || { color: 'default', text: type || '未知' };
+        return <Tag color={config.color}>{config.text}</Tag>;
+      },
     },
     {
       title: '调度配置',
@@ -849,7 +883,10 @@ const TasksManagement: React.FC = () => {
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  onClick={() => setCreateModalVisible(true)}
+                  onClick={() => {
+                    setCreateModalVisible(true);
+                    setSelectedTaskType('http'); // 设置默认类型
+                  }}
                 >
                   新建定时任务
                 </Button>
@@ -868,6 +905,16 @@ const TasksManagement: React.FC = () => {
                   <Option value="">所有状态</Option>
                   <Option value="enabled">启用</Option>
                   <Option value="disabled">禁用</Option>
+                </Select>
+                <Select 
+                  value={scheduledTaskTypeFilter} 
+                  style={{ width: 120 }} 
+                  onChange={(value) => setScheduledTaskTypeFilter(value)}
+                >
+                  <Option value="">所有类型</Option>
+                  <Option value="system">系统任务</Option>
+                  <Option value="agent">智能体</Option>
+                  <Option value="http">HTTP任务</Option>
                 </Select>
                 <Button
                   type="default"
@@ -902,9 +949,13 @@ const TasksManagement: React.FC = () => {
               columns={scheduledTaskColumns}
               dataSource={Array.isArray(scheduledTasks) ? 
                 scheduledTasks.filter(task => {
-                  if (scheduledTaskStatusFilter === '') return true;
-                  if (scheduledTaskStatusFilter === 'enabled') return task.task_enabled;
-                  if (scheduledTaskStatusFilter === 'disabled') return !task.task_enabled;
+                  // 状态筛选
+                  if (scheduledTaskStatusFilter === 'enabled' && !task.task_enabled) return false;
+                  if (scheduledTaskStatusFilter === 'disabled' && task.task_enabled) return false;
+                  
+                  // 类型筛选
+                  if (scheduledTaskTypeFilter !== '' && task.task_type !== scheduledTaskTypeFilter) return false;
+                  
                   return true;
                 }) : []
               }
@@ -970,6 +1021,7 @@ const TasksManagement: React.FC = () => {
           setCreateModalVisible(false);
           setEditModalVisible(false);
           setCurrentTask(null);
+          setSelectedTaskType('http'); // 重置任务类型
           form.resetFields();
         }}
         onOk={() => form.submit()}
@@ -983,6 +1035,8 @@ const TasksManagement: React.FC = () => {
             task_enabled: true,
             task_args: '[]',
             task_kwargs: '{}',
+            task_type: 'http',
+            task_timeout: 120, // 默认超时时间120秒
           }}
         >
           <Row gutter={16}>
@@ -997,11 +1051,32 @@ const TasksManagement: React.FC = () => {
             </Col>
             <Col span={12}>
               <Form.Item
-                name="task_path"
-                label="任务路径"
-                rules={[{ required: true, message: '请输入任务路径' }]}
+                name="task_type"
+                label="任务类型"
+                rules={[{ required: true, message: '请选择任务类型' }]}
               >
-                <Input placeholder="如: celery_app.tasks.example_task" />
+                <Select 
+                  placeholder="选择任务类型" 
+                  value={selectedTaskType}
+                  onChange={(value) => {
+                    setSelectedTaskType(value);
+                    form.setFieldsValue({ task_type: value });
+                    // 清除相关字段
+                    if (value !== 'agent') {
+                      form.setFieldsValue({ agent_id: undefined, task_message: undefined });
+                    }
+                    if (value === 'agent') {
+                      form.setFieldsValue({ task_path: undefined });
+                    }
+                    if (value === 'system') {
+                      form.setFieldsValue({ task_timeout: undefined });
+                    }
+                  }}
+                >
+                  <Option value="system">系统任务</Option>
+                  <Option value="agent">智能体</Option>
+                  <Option value="http">HTTP任务</Option>
+                </Select>
               </Form.Item>
             </Col>
           </Row>
@@ -1009,6 +1084,106 @@ const TasksManagement: React.FC = () => {
           <Form.Item name="task_description" label="任务描述">
             <TextArea rows={2} placeholder="输入任务描述" />
           </Form.Item>
+
+          {/* 智能体任务特有配置 */}
+          {selectedTaskType === 'agent' && (
+            <>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="agent_id"
+                    label="选择智能体"
+                    rules={selectedTaskType === 'agent' ? 
+                      [{ required: true, message: '请选择智能体' }] : []
+                    }
+                  >
+                    <Select placeholder="选择要调用的智能体">
+                      {agents.map(agent => (
+                        <Option key={agent.id} value={agent.id}>
+                          {agent.display_name || agent.name} ({agent.id})
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item 
+                    name="task_timeout" 
+                    label="超时时间（秒）"
+                    rules={[
+                      { type: 'number', min: 1, max: 3600, message: '超时时间范围：1-3600秒' }
+                    ]}
+                  >
+                    <Input 
+                      type="number" 
+                      placeholder="默认120秒" 
+                      addonAfter="秒"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col span={24}>
+                  <Form.Item 
+                    name="task_message" 
+                    label="发送消息"
+                    rules={selectedTaskType === 'agent' ? 
+                      [{ required: true, message: '请输入要发送给智能体的消息' }] : []
+                    }
+                  >
+                    <TextArea rows={3} placeholder="要发送给智能体的消息内容" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
+
+          {/* HTTP任务配置 */}
+          {selectedTaskType === 'http' && (
+            <>
+              <Row gutter={16}>
+                <Col span={16}>
+                  <Form.Item
+                    name="task_path"
+                    label="任务路径"
+                    rules={[{ required: true, message: '请输入任务路径' }]}
+                  >
+                    <Input placeholder="如: celery_app.tasks.http_request_task" />
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item 
+                    name="task_timeout" 
+                    label="超时时间（秒）"
+                    rules={[
+                      { type: 'number', min: 1, max: 3600, message: '超时时间范围：1-3600秒' }
+                    ]}
+                  >
+                    <Input 
+                      type="number" 
+                      placeholder="默认30秒" 
+                      addonAfter="秒"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
+
+          {/* 系统任务配置 */}
+          {selectedTaskType === 'system' && (
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item
+                  name="task_path"
+                  label="任务路径"
+                  rules={[{ required: true, message: '请输入任务路径' }]}
+                >
+                  <Input placeholder="如: celery_app.tasks.system_check_task" />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
           
           <Row gutter={16}>
             <Col span={8}>
@@ -1083,6 +1258,23 @@ const TasksManagement: React.FC = () => {
             <Descriptions.Item label="任务路径">
               <Text code>{currentTask.task_path}</Text>
             </Descriptions.Item>
+            <Descriptions.Item label="任务类型">
+              {(() => {
+                const typeConfig = {
+                  system: { color: 'blue', text: '系统任务' },
+                  agent: { color: 'purple', text: '智能体' },
+                  http: { color: 'orange', text: 'HTTP任务' },
+                };
+                const config = typeConfig[currentTask.task_type as keyof typeof typeConfig] || { color: 'default', text: currentTask.task_type || '未知' };
+                return <Tag color={config.color}>{config.text}</Tag>;
+              })()}
+            </Descriptions.Item>
+            {currentTask.task_type === 'agent' && currentTask.agent_id && (
+              <Descriptions.Item label="智能体ID">{currentTask.agent_id}</Descriptions.Item>
+            )}
+            {(currentTask.task_type === 'agent' || currentTask.task_type === 'http') && currentTask.task_timeout && (
+              <Descriptions.Item label="超时时间">{currentTask.task_timeout}秒</Descriptions.Item>
+            )}
             <Descriptions.Item label="任务描述">{currentTask.task_description || '-'}</Descriptions.Item>
             <Descriptions.Item label="调度配置">
               {currentTask.task_interval ? (
