@@ -13,6 +13,7 @@ import {
   BookOutlined,
   CustomerServiceOutlined,
   CloseOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import ResearchAgent from "./agents/research_agent/ResearchAgent";
@@ -23,6 +24,7 @@ import AgentManagement from "./pages/AgentManagement";
 import ModelsManagement from "./pages/ModelsManagement";
 import AgentMarketplace from "./pages/AgentMarketplace";
 import GenericAgentChat from "./pages/GenericAgentChat";
+import TasksManagement from "./pages/TasksManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 
@@ -93,6 +95,11 @@ function AppContent() {
           key: '5',
           icon: <ApiOutlined />,
           label: <Link to="/models">模型管理</Link>,
+        },
+        {
+          key: '6',
+          icon: <ClockCircleOutlined />,
+          label: <Link to="/tasks">任务管理</Link>,
         },
       ],
     },
@@ -272,6 +279,7 @@ function AppContent() {
               <Route path="/sop" element={<SOPManagementSimple />} />
               <Route path="/mcp" element={<MCPManagement />} />
               <Route path="/models" element={<ModelsManagement />} />
+              <Route path="/tasks" element={<TasksManagement />} />
               <Route
                 path="*"
                 element={

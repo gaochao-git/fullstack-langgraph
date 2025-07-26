@@ -20,3 +20,19 @@ export const baseFetch = async (url: string, options?: RequestInit): Promise<Res
     ...options,
   });
 };
+
+/**
+ * 封装的fetch函数，直接返回JSON数据
+ * @param url - API端点路径（不包含base URL）
+ * @param options - fetch选项
+ * @returns Promise<any>
+ */
+export const baseFetchJson = async (url: string, options?: RequestInit): Promise<any> => {
+  const response = await baseFetch(url, options);
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  
+  return await response.json();
+};

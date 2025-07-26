@@ -10,6 +10,7 @@ from .endpoints.agents import router as agents_router
 from .endpoints.sop import router as sop_router
 from .endpoints.mcp import router as mcp_router
 from .endpoints.ai_models import router as ai_models_router
+from .endpoints.scheduled_tasks import router as scheduled_tasks_router
 
 # 创建主API路由器
 api_router = APIRouter()
@@ -19,6 +20,7 @@ api_router.include_router(agents_router,prefix="/agents",tags=["agents"])
 api_router.include_router(sop_router,prefix="/sops",tags=["sop"])
 api_router.include_router(mcp_router,prefix="/mcp",tags=["mcp"])
 api_router.include_router(ai_models_router,prefix="/ai-models",tags=["ai-models"])
+api_router.include_router(scheduled_tasks_router,prefix="/scheduled-tasks",tags=["scheduled-tasks"])
 
 
 @api_router.get("/health")
