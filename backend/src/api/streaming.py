@@ -163,12 +163,10 @@ async def handle_postgres_streaming(request_body, thread_id):
     assistant_id = request_body.assistant_id
     logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
     
-    # 检查configurable中的agent_id
-    config = getattr(request_body, 'config', None)
-    configurable = config.get('configurable', {}) if config else {}
-    agent_id = configurable.get('agent_id', assistant_id)
+    # 直接使用assistant_id作为agent_id，不再从config中获取
+    agent_id = assistant_id
     
-    logger.info(f"🔍 实际处理的agent_id: {agent_id}")
+    logger.info(f"🔍 直接使用assistant_id作为agent_id: {agent_id}")
     
     # 从数据库获取智能体配置
     config_service = AgentConfigService()
@@ -208,11 +206,9 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     from src.services.agent_config_service import AgentConfigService
     
-    # 动态检查智能体是否存在
+    # 动态检查智能体是否存在 - 直接使用assistant_id
     assistant_id = request_body.assistant_id
-    config = getattr(request_body, 'config', None)
-    configurable = config.get('configurable', {}) if config else {}
-    agent_id = configurable.get('agent_id', assistant_id)
+    agent_id = assistant_id
     
     # 检查数据库中是否存在该智能体
     config_service = AgentConfigService()
@@ -221,17 +217,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     if not agent_config:
         raise HTTPException(status_code=400, detail=f"智能体不存在: {agent_id}")
     
-    # 验证智能体类型和assistant_id的匹配
-    is_builtin = agent_config.get('is_builtin') == 'yes'
-    
-    if is_builtin:
-        # 内置智能体：assistant_id应该等于agent_id
-        if assistant_id != agent_id:
-            raise HTTPException(status_code=400, detail=f"内置智能体assistant_id应为: {agent_id}, 当前: {assistant_id}")
-    else:
-        # 自定义智能体：assistant_id应该是generic_agent
-        if assistant_id != 'generic_agent':
-            raise HTTPException(status_code=400, detail=f"自定义智能体应使用 generic_agent，当前: {assistant_id}")
+    # 移除验证逻辑，直接根据数据库配置处理智能体
     
     # 创建用户线程关联（如果提供了用户名且关联不存在）
     # 用户名可能在 request_body.user_name 或 request_body.input.user_name 中

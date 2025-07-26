@@ -67,20 +67,12 @@ export default function UnifiedAgentChat({
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
 
-  // 根据数据库中的is_builtin字段选择assistantId
+  // 直接使用agent的ID作为assistantId，不再区分内置和自定义
   const getAssistantId = () => {
     if (!agent) return "diagnostic_agent"; // 默认fallback
     
-    // 检查数据库中的is_builtin字段
-    const isBuiltin = agent.is_builtin === 'yes';
-    
-    if (isBuiltin) {
-      // 内置智能体直接使用其ID
-      return agent.id;
-    } else {
-      // 自定义智能体使用generic_agent
-      return "generic_agent";
-    }
+    // 统一使用agent的ID作为assistantId
+    return agent.id;
   };
 
   // 从URL参数中获取线程ID
@@ -216,12 +208,12 @@ export default function UnifiedAgentChat({
       
       const submitConfig = currentModel ? {
         configurable: {
-          selected_model: currentModel,
-          agent_id: agentId // 为自定义智能体传递agent_id
+          selected_model: currentModel
+          // 移除agent_id，因为已经通过assistantId传递
         }
       } : {
         configurable: {
-          agent_id: agentId
+          // 空配置，agent信息通过assistantId传递
         }
       };
       

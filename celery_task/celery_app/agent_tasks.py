@@ -73,12 +73,11 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
             },
             "config": {
                 "configurable": {
-                    "agent_id": agent_id,
                     "selected_model": "qwen2.5-72b-instruct"  # 默认模型
                 }
             },
             "stream_mode": ["values"],  # 不使用流式，直接获取结果
-            "assistant_id": agent_id
+            "assistant_id": agent_id  # 直接使用agent_id
         }
         
         api_url = f"{AGENT_API_BASE_URL}/threads/{conversation_id}/runs/stream"
