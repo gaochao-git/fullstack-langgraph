@@ -19,7 +19,8 @@ import {
   PlayCircleOutlined,
   PauseCircleOutlined,
   SettingOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  MessageOutlined
 } from '@ant-design/icons';
 
 const { Option } = Select;
@@ -36,6 +37,9 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
+  const [selectedTaskMessages, setSelectedTaskMessages] = useState<any[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -50,16 +54,32 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     setLoading(true);
     try {
       console.log('正在获取智能体定时任务:', agentId);
-      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks?agent_id=${agentId}`);
+      // 获取所有任务，然后在前端过滤
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
       console.log('获取到的任务数据:', data);
       
-      const tasks = Array.isArray(data) ? data : [];
-      console.log('设置任务列表:', tasks);
-      setTasks(tasks);
+      const allTasks = Array.isArray(data) ? data : [];
+      
+      // 在前端过滤属于当前智能体的任务
+      const filteredTasks = allTasks.filter(task => {
+        try {
+          if (task.task_extra_config) {
+            const config = JSON.parse(task.task_extra_config);
+            return config.agent_id === agentId;
+          }
+          return false;
+        } catch (error) {
+          console.error('解析任务配置失败:', error);
+          return false;
+        }
+      });
+      
+      console.log('过滤后的任务列表:', filteredTasks);
+      setTasks(filteredTasks);
     } catch (error) {
       console.error('获取智能体定时任务失败:', error);
       message.error('获取定时任务列表失败');
@@ -223,6 +243,26 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     }
   };
 
+  // 查看任务执行消息
+  const handleViewMessages = async (task: any) => {
+    setMessagesLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/scheduled-tasks/${task.id}/execution-logs`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setSelectedTaskMessages(Array.isArray(data) ? data : []);
+      setMessageModalVisible(true);
+    } catch (error) {
+      console.error('获取任务执行记录失败:', error);
+      message.error('获取执行记录失败');
+      setSelectedTaskMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
   // 删除任务
   const handleDeleteTask = (task: any) => {
     modal.confirm({
@@ -347,7 +387,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     {
       title: '操作',
       key: 'actions',
-      width: 160,
+      width: 200,
       fixed: 'right' as const,
       render: (_: any, record: any) => (
         <Space size="small">
@@ -357,6 +397,14 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
               size="small"
               icon={record.task_enabled ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
               onClick={() => handleToggleTask(record)}
+            />
+          </Tooltip>
+          <Tooltip title="查看消息">
+            <Button
+              type="text"
+              size="small"
+              icon={<MessageOutlined />}
+              onClick={() => handleViewMessages(record)}
             />
           </Tooltip>
           <Tooltip title="编辑">
