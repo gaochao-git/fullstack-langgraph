@@ -58,8 +58,9 @@ def task_postrun_handler(task_id=None, task=None, state=None, retval=None, **kw)
     if task.name.startswith('celery.'):
         return  # 跳过Celery内部任务
     
-    session = get_session()
+    session = None
     try:
+        session = get_session()
         task_record = session.query(Task).filter_by(task_id=task_id).first()
         if task_record:
             task_record.task_status = state
@@ -67,11 +68,20 @@ def task_postrun_handler(task_id=None, task=None, state=None, retval=None, **kw)
             task_record.task_result = json.dumps(retval) if retval is not None else None
             task_record.update_by = 'system'  # 添加更新人
             session.commit()
+            logger.info(f"任务后处理完成: {task_id}")
     except Exception as e:
         logger.error(f"任务后处理错误: {str(e)}")
-        session.rollback()
+        if session:
+            try:
+                session.rollback()
+            except:
+                pass
     finally:
-        session.close()
+        if session:
+            try:
+                session.close()
+            except Exception as e:
+                logger.error(f"关闭数据库会话错误: {str(e)}")
 
 # 任务失败处理
 @task_failure.connect
