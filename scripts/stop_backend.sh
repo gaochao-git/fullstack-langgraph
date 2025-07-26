@@ -22,7 +22,7 @@ if [ -f "$PROJECT_ROOT/backend/pids/backend.pid" ]; then
     fi
 else
     echo "⚠️  PID文件不存在，尝试杀死所有相关进程"
-    pkill -f "gunicorn.*src.api.app:app" || true
-    pkill -f "uvicorn.*src.api.app:app" || true
+    pkill -f "gunicorn.*src.main:app" || true
+    pkill -f "uvicorn.*src.main:app" || true
     echo "✅ 已尝试停止所有相关进程"
 fi

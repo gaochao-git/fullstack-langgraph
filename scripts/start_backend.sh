@@ -70,7 +70,7 @@ mkdir -p logs pids
 # 启动生产模式服务
 echo "🏭 启动gunicorn服务..."
 
-$PYTHON_CMD -m gunicorn src.api.app:app \
+$PYTHON_CMD -m gunicorn src.main:app \
     --bind 0.0.0.0:$PORT \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers $WORKERS \
