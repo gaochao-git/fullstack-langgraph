@@ -30,4 +30,30 @@ DATABASE_CONFIG = {
     'user': 'gaochao',
     'password': 'fffjjj',
     'database': 'celery_tasks',
-} 
+}
+
+# ========== 队列配置 ==========
+# 三个队列，优先级从高到低：system > priority_high > priority_low
+# Worker处理顺序: -Q system,priority_high,priority_low,celery
+
+# 固定路由规则：只有系统任务使用固定路由
+task_routes = {
+    # 系统维护任务 → system队列
+    'celery_app.tasks.*': {'queue': 'system'},
+    'celery_app.dynamic_scheduler.*': {'queue': 'system'},
+    'celery_app.agent_tasks.periodic_agent_health_check': {'queue': 'system'},
+}
+
+# 默认队列：智能体任务的兜底队列
+task_default_queue = 'priority_low'
+task_default_exchange = 'default'
+task_default_exchange_type = 'direct'
+task_default_routing_key = 'default'
+
+# ========== 智能体任务路由逻辑 ==========
+# 1. 调度器读取 task_extra_config 中的 "queue" 字段
+# 2. 有效值: "priority_high", "priority_low"  
+# 3. 无效值或未配置: 使用默认 "priority_low"
+# 4. 示例配置:
+#    {"task_type":"agent", "queue":"priority_high", ...}  → priority_high队列
+#    {"task_type":"agent", ...}                          → priority_low队列 

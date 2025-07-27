@@ -178,7 +178,6 @@ def initialize_scheduler():
         logger.error(f"动态任务调度器初始化失败: {str(e)}")
         return False
 
-# 在模块加载时自动初始化调度器 - 临时禁用以解决worker卡死问题
-# if __name__ != '__main__':
-#     initialize_scheduler()
-print("动态调度器已禁用，避免worker启动时阻塞")
+# 在模块加载时自动初始化调度器
+if __name__ != '__main__':
+    initialize_scheduler()

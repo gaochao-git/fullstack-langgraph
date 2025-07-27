@@ -118,14 +118,36 @@ class DatabaseScheduler(Scheduler):
                     # 官方方案：让Celery自己处理时区转换
                     last_run_at = task.task_last_run_time
                     
-                    # 创建ScheduleEntry对象
+                    # 从task_extra_config中获取队列配置
+                    queue_name = 'priority_low'  # 默认队列
+                    if task.task_extra_config:
+                        try:
+                            extra_config = json.loads(task.task_extra_config)
+                            queue_name = extra_config.get('queue', 'priority_low')
+                            
+                            # 验证队列名称是否有效
+                            valid_queues = ['system', 'priority_high', 'priority_low']
+                            if queue_name not in valid_queues:
+                                print(f"⚠️ 任务 {task.task_name} 配置了无效队列 {queue_name}，使用默认队列 priority_low")
+                                queue_name = 'priority_low'
+                            else:
+                                print(f"✅ 任务 {task.task_name} 将路由到队列: {queue_name}")
+                                
+                        except json.JSONDecodeError:
+                            print(f"⚠️ 任务 {task.task_name} 的task_extra_config解析失败，使用默认队列")
+                    
+                    # 创建ScheduleEntry对象，添加队列配置
                     entry = ScheduleEntry(
                         name=task.task_name,
                         task=task_path,
                         schedule=schedule_obj,
                         args=args,
                         kwargs=kwargs,
-                        options={'expires': 60.0},
+                        options={
+                            'expires': 60.0,
+                            'queue': queue_name,  # 指定队列
+                            # 简化路由配置，使用默认exchange
+                        },
                         last_run_at=last_run_at,
                         total_run_count=task.task_run_count
                     )
