@@ -107,8 +107,11 @@ class DatabaseScheduler(Scheduler):
                             month_of_year=task.task_crontab_month_of_year or '*'
                         )
                     
-                    # 官方方案：让Celery自己处理时区转换
+                    # 时区转换：数据库存储本地时间，Celery使用UTC
                     last_run_at = task.task_last_run_time
+                    if last_run_at:
+                        # 将本地时间转换为UTC时间（减去8小时）
+                        last_run_at = last_run_at - timedelta(hours=8)
                     
                     # 从task_extra_config中获取队列配置
                     queue_name = 'priority_low'  # 默认队列
@@ -196,8 +199,11 @@ class DatabaseScheduler(Scheduler):
                 PeriodicTask.task_enabled == True
             ).order_by(PeriodicTask.update_time.desc()).first()
             
-            if latest_update and latest_update[0] > self._last_timestamp:
-                return True
+            if latest_update:
+                # 将数据库时间转换为UTC进行比较
+                db_time_utc = latest_update[0] - timedelta(hours=8)
+                if db_time_utc > self._last_timestamp:
+                    return True
             
             return False
         except Exception as e:
