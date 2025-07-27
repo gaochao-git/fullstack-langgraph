@@ -12,12 +12,7 @@ app.autodiscover_tasks(['celery_app'])
 # 确保导入任务模块以注册信号处理器
 from celery_app import tasks, agent_tasks
 
-# 导入动态调度器以初始化
-try:
-    from celery_app import dynamic_scheduler
-    print("动态任务调度器已加载")
-except ImportError as e:
-    print(f"警告: 无法加载动态任务调度器: {e}")
+# 动态调度功能由 scheduler.py 中的 DatabaseScheduler 提供
 
 if __name__ == '__main__':
     app.start() 

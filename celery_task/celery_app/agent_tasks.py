@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 AGENT_API_BASE_URL = os.getenv('AGENT_API_BASE_URL', 'http://192.168.1.10:8000')
 
 
-@app.task(bind=True, max_retries=0, soft_time_limit=300, time_limit=360)
-def call_agent_task(self, agent_id, message, user_name="system", conversation_id=None):
+def call_agent_task(agent_id, message, user_name="system", conversation_id=None):
     """
     调用智能体的异步任务,参数从celery_periodic_task_configs表里获取的
     
@@ -37,10 +36,9 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
         user_name: 用户名
         conversation_id: 会话ID（可选）
     """
-    task_id = self.request.id
     execution_time = datetime.now()
     
-    logger.info(f"开始调用智能体任务 {task_id}: agent_id={agent_id}, user={user_name}")
+    logger.info(f"开始调用智能体: agent_id={agent_id}, user={user_name}")
     
     try:
         # 第一步：创建线程
@@ -138,7 +136,6 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
             
             # 构建返回结果
             result = {
-                'task_id': task_id,
                 'agent_id': agent_id,
                 'user_name': user_name,
                 'message': message,
@@ -149,9 +146,6 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
                 'api_response_code': response.status_code
             }
             
-            # 记录任务执行结果
-            record_agent_task_result(task_id, agent_id, 'SUCCESS', result)
-            
             return result
             
         else:
@@ -160,14 +154,12 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
             
             # 记录失败结果
             error_result = {
-                'task_id': task_id,
                 'agent_id': agent_id,
                 'error': error_msg,
                 'status': 'FAILED',
                 'execution_time': execution_time.isoformat(),
                 'api_response_code': response.status_code
             }
-            record_agent_task_result(task_id, agent_id, 'FAILED', error_result)
             
             # 不重试，直接返回失败结果
             return error_result
@@ -178,13 +170,11 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
         
         # 记录失败结果
         error_result = {
-            'task_id': task_id,
             'agent_id': agent_id,
             'error': error_msg,
             'status': 'FAILED',
             'execution_time': execution_time.isoformat()
         }
-        record_agent_task_result(task_id, agent_id, 'FAILED', error_result)
         
         # 不重试，直接返回失败结果
         return error_result
@@ -195,13 +185,11 @@ def call_agent_task(self, agent_id, message, user_name="system", conversation_id
         
         # 记录失败结果
         error_result = {
-            'task_id': task_id,
             'agent_id': agent_id,
             'error': error_msg,
             'status': 'FAILED',
             'execution_time': execution_time.isoformat()
         }
-        record_agent_task_result(task_id, agent_id, 'FAILED', error_result)
         
         # 不重试，直接返回失败结果
         return error_result
@@ -284,7 +272,7 @@ def periodic_agent_health_check():
 
 
 
-@app.task(bind=True, max_retries=3, soft_time_limit=300, time_limit=360)
+@app.task(bind=True, max_retries=0, soft_time_limit=300, time_limit=360)
 def execute_agent_periodic_task(self, task_config_id):
     """
     通用的智能体定时任务执行函数
@@ -371,8 +359,8 @@ def execute_agent_periodic_task(self, task_config_id):
         
         logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
         
-        # 直接调用智能体任务（避免在任务内调用.get()）
-        agent_result = call_agent_task(self, agent_id, message, user_name, conversation_id)
+        # 直接调用智能体函数
+        agent_result = call_agent_task(agent_id, message, user_name, conversation_id)
         
         if agent_result and agent_result.get('status') == 'SUCCESS':
             success_result = {

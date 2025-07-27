@@ -17,7 +17,7 @@ enable_utc = True
 # 添加新的配置项，解决启动时连接重试的警告
 broker_connection_retry_on_startup = True
 
-# 添加自定义调度器配置
+# 使用自定义数据库调度器（官方推荐模式）
 beat_scheduler = 'celery_app.scheduler.DatabaseScheduler'
 
 # 设置 Beat 最大循环间隔为30秒，提高新任务检测速度
@@ -36,6 +36,16 @@ DATABASE_CONFIG = {
 # 三个队列，优先级从高到低：system > priority_high > priority_low
 # Worker处理顺序: -Q system,priority_high,priority_low,celery
 
+from kombu import Queue
+
+# 显式定义队列，确保exchange一致性
+task_queues = (
+    Queue('system', routing_key='system'),
+    Queue('priority_high', routing_key='priority_high'), 
+    Queue('priority_low', routing_key='priority_low'),
+    Queue('celery', routing_key='celery'),  # 默认队列
+)
+
 # 固定路由规则：只有系统任务使用固定路由
 task_routes = {
     # 系统维护任务 → system队列
@@ -50,10 +60,30 @@ task_default_exchange = 'default'
 task_default_exchange_type = 'direct'
 task_default_routing_key = 'default'
 
-# ========== 智能体任务路由逻辑 ==========
-# 1. 调度器读取 task_extra_config 中的 "queue" 字段
-# 2. 有效值: "priority_high", "priority_low"  
-# 3. 无效值或未配置: 使用默认 "priority_low"
-# 4. 示例配置:
-#    {"task_type":"agent", "queue":"priority_high", ...}  → priority_high队列
-#    {"task_type":"agent", ...}                          → priority_low队列 
+# ========== 智能体调度器配置 ==========
+# 新的优雅方案：固定调度任务 + 动态配置读取
+# 每分钟执行一次agent_scheduler_task，动态读取数据库配置并执行
+
+from celery.schedules import crontab
+
+beat_schedule = {
+    # 智能体调度器 - 每分钟执行一次
+    'agent-scheduler': {
+        'task': 'celery_app.agent_scheduler.agent_scheduler_task',
+        'schedule': crontab(minute='*'),  # 每分钟执行
+        'options': {'queue': 'system'},   # 在system队列执行
+    },
+    
+    # 健康检查任务 - 每30分钟执行一次
+    'health-check': {
+        'task': 'celery_app.agent_tasks.periodic_agent_health_check',
+        'schedule': crontab(minute='*/30'),
+        'options': {'queue': 'system'},
+    },
+}
+
+# ========== 配置说明 ==========
+# 1. 数据库中配置智能体任务参数（agent_id, message, interval等）
+# 2. agent_scheduler_task 每分钟检查并执行到期的任务
+# 3. 支持动态添加/修改/删除任务，立即生效
+# 4. 多线程并发执行，性能更好 

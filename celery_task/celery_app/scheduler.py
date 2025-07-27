@@ -55,19 +55,11 @@ class DatabaseScheduler(Scheduler):
                     # 根据任务类型动态设置任务路径和参数
                     if task_type == 'agent':
                         # 智能体任务：使用统一的智能体任务执行器
-                        task_path = 'celery_app.tasks.execute_agent_task'
+                        task_path = 'celery_app.agent_tasks.execute_agent_periodic_task'
                         
-                        # 从 extra_config 或传统字段获取参数
-                        message = extra_config.get('message', kwargs.get('message', '定时任务执行'))
-                        user = extra_config.get('user', kwargs.get('user', 'system'))
-                        timeout = extra_config.get('timeout', task_timeout)
-                        # 可扩展其他配置
-                        retries = extra_config.get('max_retries', 3)
-                        priority = extra_config.get('priority', 5)
-                        
-                        # 重新构造参数
-                        args = [agent_id, message, user]
-                        kwargs = {'timeout': timeout} if timeout else {}
+                        # execute_agent_periodic_task 只需要任务配置ID
+                        args = [task.id]  # 传递任务ID，函数内部读取配置
+                        kwargs = {}
                         
                         print(f"🤖 智能体任务: {task.task_name} -> Agent: {agent_id}")
                         
@@ -180,30 +172,37 @@ class DatabaseScheduler(Scheduler):
         return self._schedule
     
     def tick(self, *args, **kwargs):
-        # 每30秒检查一次数据库更新
-        if datetime.now() - self._last_timestamp > timedelta(seconds=30):
-            print("🔄 更新数据库任务配置...")
-            self.update_from_database()
+        # Celery官方推荐：每个beat周期检查配置变化
+        # 通过检查数据库时间戳来判断是否需要重新加载
+        try:
+            if self._should_reload_schedule():
+                print("🔄 发现配置变化，重新加载任务...")
+                self.update_from_database()
+        except Exception as e:
+            print(f"⚠️ 检查配置更新失败: {str(e)}")
         
-        # 调试：显示tick调用频率
-        if not hasattr(self, '_last_tick_time'):
-            self._last_tick_time = datetime.now()
-        else:
-            tick_interval = datetime.now() - self._last_tick_time
-            print(f"🔄 Beat tick间隔: {tick_interval.total_seconds():.1f}s")
-            self._last_tick_time = datetime.now()
+        return super(DatabaseScheduler, self).tick(*args, **kwargs)
+    
+    def _should_reload_schedule(self):
+        """检查是否需要重新加载调度配置"""
+        # 每30秒检查一次数据库变化
+        if datetime.now() - self._last_timestamp < timedelta(seconds=30):
+            return False
         
-        # 显示当前任务状态  
-        current_utc = datetime.now()
-        print(f"⏰ Beat tick - 当前时间(UTC): {current_utc}")
-        for task_name, entry in self._schedule.items():
-            is_due, next_delay = entry.is_due()
-            print(f"   📝 {task_name}: due={is_due}, next_in={next_delay:.1f}s")
-            # 调试：显示任务的详细时间信息
-            if hasattr(entry, 'last_run_at') and entry.last_run_at:
-                print(f"       last_run_at: {entry.last_run_at}")
-            else:
-                print(f"       last_run_at: None (首次运行)")
+        session = get_session()
+        try:
+            # 检查数据库中任务的最新更新时间
+            latest_update = session.query(PeriodicTask.update_time).filter(
+                PeriodicTask.task_enabled == True
+            ).order_by(PeriodicTask.update_time.desc()).first()
             
-        return super(DatabaseScheduler, self).tick(*args, **kwargs) 
+            if latest_update and latest_update[0] > self._last_timestamp:
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"⚠️ 检查数据库变化失败: {str(e)}")
+            return False
+        finally:
+            session.close() 
         
