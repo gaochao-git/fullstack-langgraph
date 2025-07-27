@@ -10,8 +10,8 @@ from sqlalchemy import select, update, delete, and_, or_
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
-from ..config import get_async_session, get_sync_session
-from ..models import now_shanghai
+from ..db.config import get_async_session, get_sync_session
+from ..db.models import now_shanghai
 
 # 泛型类型变量
 ModelType = TypeVar('ModelType')

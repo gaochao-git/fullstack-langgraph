@@ -106,22 +106,19 @@ def get_agent_service():
 def get_mcp_service():
     """获取MCP服务实例"""
     from ..services import MCPService
-    return MCPService() if MCPService else None
+    return MCPService()
 
 
 def get_user_service():
     """获取用户服务实例"""
     from ..services import UserService
-    return UserService() if UserService else None
+    return UserService()
 
 
 def get_user_thread_service():
     """获取用户线程服务实例"""
-    try:
-        from ..services.user_service import UserThreadService
-        return UserThreadService()
-    except ImportError:
-        return None
+    from ..services import UserThreadService
+    return UserThreadService()
 
 
 # ==================== 工具函数 ====================
