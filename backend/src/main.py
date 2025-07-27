@@ -3,7 +3,6 @@ FastAPI应用入口文件
 """
 
 import pathlib
-import logging
 import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
@@ -18,6 +17,8 @@ load_dotenv()
 
 # 导入核心模块
 from .core.config import settings
+from .core.logging import setup_logging, get_logger
+from .core.middleware import setup_middlewares
 from .api.router import api_router
 
 # 导入智能体相关
@@ -37,31 +38,21 @@ from .api.threads import (
 from .api.streaming import RunCreate, stream_run_standard, init_refs
 
 
-def setup_logging():
-    """配置日志系统"""
-    log_dir = os.getenv("LOG_DIR", "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    
-    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    log_filename = os.path.join(log_dir, f"backend_{datetime.now().strftime('%Y%m%d')}.log")
-    
-    logging.basicConfig(
-        level=getattr(logging, log_level),
-        format=log_format,
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler(log_filename, encoding='utf-8')
-        ]
-    )
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"📝 日志配置完成，级别: {log_level}, 文件: {log_filename}")
-    return logger
 
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
+    
+    # 配置日志系统（优先配置）
+    setup_logging(
+        log_level=settings.LOG_LEVEL,
+        log_dir=settings.LOG_DIR,
+        app_name="error",  # 日志文件名为error.log
+        enable_json=False,  # 默认使用文本格式
+        rotation_type="time"  # 按时间轮转，适合长期运行的应用
+    )
+    
+    logger = get_logger(__name__)
     
     # 创建应用
     app = FastAPI(
@@ -81,8 +72,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    # 配置日志
-    logger = setup_logging()
+    # 设置所有中间件
+    setup_middlewares(app)
     
     # 静态智能体配置
     ASSISTANTS = {
