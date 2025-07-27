@@ -11,14 +11,32 @@
 
 ## 快速启动
 
-### 1. 启动 Worker
+### 方式一：使用 Supervisor (推荐)
 ```bash
-python run_worker.py
+# 一键启动所有服务
+./start_celery.sh
+
+# 或者使用管理脚本
+python supervisor_manager.py start
 ```
 
-### 2. 启动 Beat 调度器
+### 方式二：手动启动
 ```bash
+# 启动 Worker
+python run_worker.py
+
+# 启动 Beat 调度器  
 python run_beat.py
+```
+
+## 服务管理
+
+### Supervisor 常用命令
+```bash
+python supervisor_manager.py status      # 查看状态
+python supervisor_manager.py logs        # 查看日志
+python supervisor_manager.py restart-celery  # 重启服务
+python supervisor_manager.py stop        # 停止所有服务
 ```
 
 ## 运行机制

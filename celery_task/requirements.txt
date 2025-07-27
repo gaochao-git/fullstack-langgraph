@@ -1,6 +1,18 @@
-celery==5.5.3
-redis==5.0.1
+# ==================== Core Dependencies ====================
+celery==5.3.6           # 任务队列框架
+redis==5.0.1            # 消息代理
+kombu==5.5.4            # Celery消息传输库
+
+# ==================== Database ====================
 # 使用 PyMySQL 替代 mysqlclient
-pymysql==1.1.0
-SQLAlchemy==2.0.36
-tabulate==0.9.0 
+pymysql==1.4.6          # MySQL数据库驱动
+SQLAlchemy==2.0.36      # ORM框架
+
+# ==================== HTTP Requests ====================
+requests==2.32.4        # HTTP请求库 (智能体API调用)
+
+# ==================== Process Management ====================
+supervisor==4.2.5       # 进程管理工具
+
+# ==================== Utilities ====================
+tabulate==0.9.0         # 表格格式化显示 
