@@ -13,11 +13,17 @@
 
 ### 方式一：使用 Supervisor (推荐)
 ```bash
-# 一键启动所有服务
-./start_celery.sh
+# 0. 安装依赖 (首次使用)
+pip install -r requirements.txt
 
-# 或者使用管理脚本
-python supervisor_manager.py start
+# 1. 启动 supervisord 守护进程
+supervisord -c supervisord.conf
+
+# 2. 查看进程状态
+supervisorctl -c supervisord.conf status
+
+# 3. 启动所有服务
+supervisorctl -c supervisord.conf start all
 ```
 
 ### 方式二：手动启动
@@ -33,11 +39,34 @@ python run_beat.py
 
 ### Supervisor 常用命令
 ```bash
-python supervisor_manager.py status      # 查看状态
-python supervisor_manager.py logs        # 查看日志
-python supervisor_manager.py restart-celery  # 重启服务
-python supervisor_manager.py stop        # 停止所有服务
+# 启动守护进程
+supervisord -c supervisord.conf
+
+# 查看进程状态
+supervisorctl -c supervisord.conf status
+
+# 启动/停止进程
+supervisorctl -c supervisord.conf start all
+supervisorctl -c supervisord.conf start celery-beat
+supervisorctl -c supervisord.conf start celery-worker
+supervisorctl -c supervisord.conf stop all
+
+# 重启进程
+supervisorctl -c supervisord.conf restart all
+supervisorctl -c supervisord.conf restart celery-beat
+
+# 查看日志
+supervisorctl -c supervisord.conf tail -f celery-beat
+supervisorctl -c supervisord.conf tail -f celery-worker
+
+# 关闭 supervisord
+supervisorctl -c supervisord.conf shutdown
 ```
+
+### 日志文件位置
+- Beat 日志: `/tmp/celery-beat.log`
+- Worker 日志: `/tmp/celery-worker.log`
+- Supervisor 日志: `/tmp/supervisord.log`
 
 ## 运行机制
 
@@ -86,7 +115,7 @@ python supervisor_manager.py stop        # 停止所有服务
 
 ## 环境要求
 
-- Python 3.8+
+- Python 3.12+
 - Redis (消息队列)
 - MySQL (结果存储)
 - Celery 5.3+
