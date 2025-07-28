@@ -3,33 +3,68 @@ SOP工具 - 标准操作程序相关工具
 """
 
 import json
-import os
+from typing import Optional, Dict, Any
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-def load_sop_data():
-    """从知识库加载SOP数据"""
-    sop_data = {}
-    
-    # SOP文件路径
-    sop_files = [
-        "src/knowledge_base/diagnostic_sop/system_sop.json",
-        "src/knowledge_base/diagnostic_sop/mysql_sop.json"
-    ]
-    
-    for file_path in sop_files:
-        try:
-            if os.path.exists(file_path):
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    file_data = json.load(f)
-                    sop_data.update(file_data)
-        except Exception as e:
-            print(f"加载SOP文件 {file_path} 失败: {e}")
-    
-    return sop_data
+# 导入数据库相关模块  
+from ..db.config import get_sync_session
+from ..db.dao.sop_dao import SOPDAO
 
-# 全局SOP数据
-SOP_DATA = load_sop_data()
+
+def get_sop_from_db(sop_id: str) -> Optional[Dict[str, Any]]:
+    """从数据库获取单个SOP"""
+    try:
+        for session in get_sync_session():
+            sop_dao = SOPDAO()
+            sop_template = sop_dao.sync_get_by_sop_id(session, sop_id)
+            return sop_template.to_dict() if sop_template else None
+    except Exception as e:
+        print(f"从数据库获取SOP失败: {e}")
+        return None
+
+
+def search_sops_from_db(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    severity: Optional[str] = None,
+    team_name: Optional[str] = None,
+    limit: int = 20
+) -> Dict[str, Any]:
+    """从数据库搜索SOPs"""
+    try:
+        for session in get_sync_session():
+            from ..models import SOPTemplate
+            
+            # 构建查询
+            query = session.query(SOPTemplate)
+            
+            # 添加过滤条件
+            if category:
+                query = query.filter(SOPTemplate.sop_category == category)
+            
+            if search:
+                query = query.filter(SOPTemplate.sop_title.contains(search))
+            
+            if severity:
+                query = query.filter(SOPTemplate.sop_severity == severity)
+                
+            if team_name:
+                query = query.filter(SOPTemplate.team_name == team_name)
+            
+            # 获取总数
+            total = query.count()
+            
+            # 分页
+            templates = query.limit(limit).offset(0).all()
+            
+            return {
+                "sops": [template.to_dict() for template in templates],
+                "total": total
+            }
+    except Exception as e:
+        print(f"从数据库搜索SOPs失败: {e}")
+        return {"sops": [], "total": 0}
 
 # Tool Schemas
 class GetSOPDetailInput(BaseModel):
@@ -56,17 +91,20 @@ def get_sop_detail(sop_key: str) -> str:
         JSON格式的SOP详细信息
     """
     try:
-        if sop_key in SOP_DATA:
+        sop_data = get_sop_from_db(sop_key)
+        if sop_data:
             return json.dumps({
                 "success": True,
-                "sop": SOP_DATA[sop_key]
+                "sop": sop_data
             }, ensure_ascii=False, indent=2)
         else:
-            available_sops = list(SOP_DATA.keys())
+            # 如果没有找到，搜索相似的SOP
+            search_result = search_sops_from_db(search=sop_key, limit=10)
+            available_sops = [sop.get("sop_id", "") for sop in search_result.get("sops", [])]
             return json.dumps({
                 "success": False,
                 "error": f"SOP '{sop_key}' 未找到",
-                "available_sops": available_sops[:10],  # 只显示前10个
+                "available_sops": available_sops,
                 "sop_key": sop_key
             }, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -87,18 +125,35 @@ def get_sop_content(sop_key: str) -> str:
         JSON格式的SOP内容和状态信息
     """
     try:
-        if sop_key in SOP_DATA:
-            sop_data = SOP_DATA[sop_key]
+        sop_data = get_sop_from_db(sop_key)
+        if sop_data:
+            # 处理JSON字段
+            sop_steps = sop_data.get("sop_steps", [])
+            tools_required = sop_data.get("tools_required", [])
+            
+            # 如果是字符串，尝试解析为JSON
+            if isinstance(sop_steps, str):
+                try:
+                    sop_steps = json.loads(sop_steps)
+                except:
+                    sop_steps = []
+            
+            if isinstance(tools_required, str):
+                try:
+                    tools_required = json.loads(tools_required)
+                except:
+                    tools_required = []
+            
             # 提取SOP内容
             sop_content = {
-                "id": sop_data.get("id", ""),
-                "title": sop_data.get("title", ""),
-                "category": sop_data.get("category", ""),
-                "description": sop_data.get("description", ""),
-                "severity": sop_data.get("severity", ""),
-                "steps": sop_data.get("steps", []),
-                "symptoms": sop_data.get("symptoms", []),
-                "tools_needed": sop_data.get("tools_needed", [])
+                "id": sop_data.get("sop_id", ""),
+                "title": sop_data.get("sop_title", ""),
+                "category": sop_data.get("sop_category", ""),
+                "description": sop_data.get("sop_description", ""),
+                "severity": sop_data.get("sop_severity", ""),
+                "steps": sop_steps,
+                "symptoms": sop_data.get("sop_symptoms", "").split(",") if sop_data.get("sop_symptoms") else [],
+                "tools_needed": tools_required
             }
             
             return json.dumps({
@@ -108,13 +163,15 @@ def get_sop_content(sop_key: str) -> str:
                 "message": f"SOP内容获取成功：{sop_key}"
             }, ensure_ascii=False, indent=2)
         else:
-            available_sops = list(SOP_DATA.keys())
+            # 如果没有找到，搜索相似的SOP
+            search_result = search_sops_from_db(search=sop_key, limit=10)
+            available_sops = [sop.get("sop_id", "") for sop in search_result.get("sops", [])]
             return json.dumps({
                 "success": False,
                 "sop_content": None,
                 "sop_state": "invalid",
                 "error": f"SOP '{sop_key}' 未找到",
-                "available_sops": available_sops[:10],
+                "available_sops": available_sops,
                 "message": f"SOP验证失败：{sop_key}"
             }, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -137,27 +194,24 @@ def list_sops(category: str = "") -> str:
         JSON格式的SOP列表
     """
     try:
-        if category:
-            filtered_sops = {k: v for k, v in SOP_DATA.items() 
-                           if v.get("category", "").lower() == category.lower()}
-        else:
-            filtered_sops = SOP_DATA
+        search_result = search_sops_from_db(category=category, limit=50)
+        sops = search_result.get("sops", [])
         
         sop_list = []
-        for key, sop in filtered_sops.items():
+        for sop in sops:
             sop_list.append({
-                "key": key,
-                "id": sop.get("id", ""),
-                "title": sop.get("title", ""),
-                "category": sop.get("category", ""),
-                "description": sop.get("description", ""),
-                "severity": sop.get("severity", "")
+                "key": sop.get("sop_id", ""),
+                "id": sop.get("sop_id", ""),
+                "title": sop.get("sop_title", ""),
+                "category": sop.get("sop_category", ""),
+                "description": sop.get("sop_description", ""),
+                "severity": sop.get("sop_severity", "")
             })
         
         return json.dumps({
             "success": True,
             "sops": sop_list,
-            "total": len(sop_list)
+            "total": search_result.get("total", len(sop_list))
         }, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
@@ -176,36 +230,25 @@ def search_sops(keyword: str) -> str:
         JSON格式的匹配SOP列表
     """
     try:
-        keyword_lower = keyword.lower()
-        matched_sops = {}
-        
-        for key, sop in SOP_DATA.items():
-            # 在标题、描述、症状中搜索
-            title = sop.get("title", "").lower()
-            description = sop.get("description", "").lower()
-            symptoms = " ".join(sop.get("symptoms", [])).lower()
-            
-            if (keyword_lower in title or 
-                keyword_lower in description or 
-                keyword_lower in symptoms):
-                matched_sops[key] = sop
+        search_result = search_sops_from_db(search=keyword, limit=20)
+        sops = search_result.get("sops", [])
         
         sop_list = []
-        for key, sop in matched_sops.items():
+        for sop in sops:
             sop_list.append({
-                "key": key,
-                "id": sop.get("id", ""),
-                "title": sop.get("title", ""),
-                "category": sop.get("category", ""),
-                "description": sop.get("description", ""),
-                "severity": sop.get("severity", "")
+                "key": sop.get("sop_id", ""),
+                "id": sop.get("sop_id", ""),
+                "title": sop.get("sop_title", ""),
+                "category": sop.get("sop_category", ""),
+                "description": sop.get("sop_description", ""),
+                "severity": sop.get("sop_severity", "")
             })
         
         return json.dumps({
             "success": True,
             "keyword": keyword,
             "sops": sop_list,
-            "total": len(sop_list)
+            "total": search_result.get("total", len(sop_list))
         }, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
