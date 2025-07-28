@@ -42,8 +42,21 @@ const GenericAgentChat: React.FC = () => {
       }
 
       try {
-        const agents = await agentApi.getAgents();
-        const foundAgent = agents.find(a => a.id === agentId);
+        const response = await agentApi.getAgents();
+        let agents = [];
+        
+        // Handle API response structure
+        if (response && response.data && response.data.items) {
+          agents = response.data.items;
+        } else if (Array.isArray(response)) {
+          agents = response;
+        } else {
+          console.error('Unexpected API response format:', response);
+          setError('API响应格式错误');
+          return;
+        }
+        
+        const foundAgent = agents.find(a => a.agent_id === agentId);
         
         if (foundAgent) {
           setAgent(foundAgent);

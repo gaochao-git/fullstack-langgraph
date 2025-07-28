@@ -125,37 +125,48 @@ export default function UnifiedAgentChat({
     },
   });
 
-  // 获取智能体的可用模型列表
+  // 获取智能体的配置信息（包括可用模型列表）
   useEffect(() => {
-    const fetchAgentAvailableModels = async () => {
+    const fetchAgentConfig = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/agents/${agentId}/available-models`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/agents/${agentId}`);
         if (response.ok) {
           const result = await response.json();
-          console.log('智能体可用模型API返回:', result);
+          console.log('智能体配置信息API返回:', result);
           
-          // 处理API返回的数据结构
-          const models: ModelInfo[] = (result.data?.models || []).map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            provider: item.provider,
-            type: item.type
-          }));
-          setAvailableModels(models);
-          console.log('智能体可用模型列表:', models);
-          
-          // 设置默认选中第一个模型
-          if (models.length > 0 && !currentModel) {
-            setCurrentModel(models[0].type);
+          if (result.status === 'ok' && result.data) {
+            const agentConfig = result.data;
+            
+            // 从llm_info中获取可用模型列表
+            const availableModelNames = agentConfig.llm_info?.available_models || [];
+            
+            // 转换为ModelInfo格式
+            const models: ModelInfo[] = availableModelNames.map((modelName: string) => ({
+              id: modelName,
+              name: modelName,
+              provider: 'default', // 可以根据需要调整
+              type: modelName
+            }));
+            
+            setAvailableModels(models);
+            console.log('智能体可用模型列表:', models);
+            
+            // 设置默认选中当前使用的模型，如果没有则选择第一个
+            const currentModelName = agentConfig.llm_info?.model_name;
+            if (currentModelName) {
+              setCurrentModel(currentModelName);
+            } else if (models.length > 0 && !currentModel) {
+              setCurrentModel(models[0].type);
+            }
           }
         }
       } catch (error) {
-        console.error('Failed to fetch agent available models:', error);
+        console.error('Failed to fetch agent config:', error);
       }
     };
 
     if (agentId) {
-      fetchAgentAvailableModels();
+      fetchAgentConfig();
     }
   }, [agentId, currentModel]);
 

@@ -111,7 +111,7 @@ const AgentMarketplace = () => {
       key={agent.id}
       hoverable
       style={{ height: "100%", cursor: "pointer" }}
-      onClick={() => handleAgentClick(agent.id)}
+      onClick={() => handleAgentClick(agent.agent_id)}
     >
       <Card.Meta
         title={
@@ -120,7 +120,7 @@ const AgentMarketplace = () => {
               <Avatar 
                 size={36} 
                 style={{ backgroundColor: "#1677ff" }} 
-                icon={getAgentIcon(agent.id)} 
+                icon={getAgentIcon(agent.agent_id)} 
               />
               <span style={{ fontWeight: 600, fontSize: 18, color: isDark ? '#ffffff' : '#262626' }}>
                 {agent.display_name || agent.name}
