@@ -49,7 +49,13 @@ def get_system_prompt(agent_name: str = "diagnostic_agent") -> str:
         系统提示词字符串
     """
     try:
-        prompt_config = AgentConfigService.get_prompt_config_from_agent(agent_name)
+        from .....shared.db.config import get_sync_db
+        db_gen = get_sync_db()
+        db = next(db_gen)
+        try:
+            prompt_config = AgentConfigService.get_prompt_config_from_agent(agent_name, db)
+        finally:
+            db.close()
         system_prompt = prompt_config.get('system_prompt', '').strip()
         
         # 如果数据库中有有效的系统提示词，使用它

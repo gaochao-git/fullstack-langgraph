@@ -148,8 +148,13 @@ class Configuration(BaseModel):
         agent_id = configurable.get("agent_id", "generic_agent")
         
         # 从数据库加载配置
-        config_service = AgentConfigService()
-        db_config = config_service.get_agent_config(agent_id)
+        from .....shared.db.config import get_sync_db
+        db_gen = get_sync_db()
+        db = next(db_gen)
+        try:
+            db_config = AgentConfigService.get_agent_config(agent_id, db)
+        finally:
+            db.close()
         
         # 合并配置优先级: configurable > 数据库 > 环境变量 > 默认值
         raw_values: Dict[str, Any] = {}

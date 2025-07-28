@@ -10,7 +10,7 @@ import logging
 import aiohttp
 import asyncio
 
-from ....shared.db.config import get_db
+from src.shared.core.dependencies import get_sync_db
 from ....shared.db.models import MCPServer
 from ..schema.mcp import MCPServerCreate, MCPServerUpdate, MCPServerResponse, MCPTestRequest, MCPTestResponse
 
@@ -131,7 +131,7 @@ async def _test_mcp_http_connection(http_url: str, timeout: int = 10) -> List[di
 async def get_mcp_servers(
     team_name: Optional[str] = None,
     is_enabled: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """获取MCP服务器列表"""
     try:
@@ -151,7 +151,7 @@ async def get_mcp_servers(
 
 
 @router.get("/mcp/servers/{server_id}", response_model=MCPServerResponse)
-async def get_mcp_server(server_id: str, db: Session = Depends(get_db)):
+async def get_mcp_server(server_id: str, db: Session = Depends(get_sync_db)):
     """获取单个MCP服务器详情"""
     server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
     if not server:
@@ -160,7 +160,7 @@ async def get_mcp_server(server_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/mcp/servers", response_model=MCPServerResponse)
-async def create_mcp_server(server: MCPServerCreate, db: Session = Depends(get_db)):
+async def create_mcp_server(server: MCPServerCreate, db: Session = Depends(get_sync_db)):
     """创建MCP服务器"""
     # 检查server_id是否已存在
     existing_server = db.query(MCPServer).filter(MCPServer.server_id == server.server_id).first()
@@ -198,7 +198,7 @@ async def create_mcp_server(server: MCPServerCreate, db: Session = Depends(get_d
 async def update_mcp_server(
     server_id: str, 
     server_update: MCPServerUpdate, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """更新MCP服务器"""
     db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
@@ -222,7 +222,7 @@ async def update_mcp_server(
 
 
 @router.delete("/mcp/servers/{server_id}")
-async def delete_mcp_server(server_id: str, db: Session = Depends(get_db)):
+async def delete_mcp_server(server_id: str, db: Session = Depends(get_sync_db)):
     """删除MCP服务器"""
     db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
     if not db_server:
@@ -235,7 +235,7 @@ async def delete_mcp_server(server_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/mcp/servers/{server_id}/test")
-async def test_mcp_server(server_id: str, db: Session = Depends(get_db)):
+async def test_mcp_server(server_id: str, db: Session = Depends(get_sync_db)):
     """测试MCP服务器连接"""
     db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
     if not db_server:
@@ -280,7 +280,7 @@ async def test_mcp_server(server_id: str, db: Session = Depends(get_db)):
 async def update_server_status(
     server_id: str, 
     status: str, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """更新MCP服务器状态"""
     db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
@@ -303,7 +303,7 @@ async def update_server_status(
 async def toggle_server_enable(
     server_id: str, 
     enabled: str, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """启用/禁用MCP服务器"""
     db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()

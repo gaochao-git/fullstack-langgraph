@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from .config import get_async_session, get_sync_session
-from ..core.logging import get_logger
+from src.shared.db.config import get_async_db, get_sync_db
+from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 
@@ -56,7 +56,7 @@ def transactional(rollback_on: Optional[tuple] = None):
             
             # 创建新的事务
             try:
-                async with get_async_session() as session:
+                async with get_async_db() as session:
                     try:
                         # 将session注入到函数参数中
                         if 'session' not in kwargs:
@@ -106,7 +106,7 @@ def sync_transactional(rollback_on: Optional[tuple] = None):
             
             # 创建新的事务
             try:
-                with get_sync_session() as session:
+                with get_sync_db() as session:
                     try:
                         # 将session注入到函数参数中
                         if 'session' not in kwargs:
@@ -147,7 +147,8 @@ class AsyncTransactionContext:
     
     async def __aenter__(self) -> AsyncSession:
         if self._own_session:
-            self.session = await get_async_session().__aenter__()
+            async with get_async_db() as session:
+                self.session = session
         return self.session
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -172,7 +173,7 @@ class SyncTransactionContext:
     
     def __enter__(self) -> Session:
         if self._own_session:
-            self.session = get_sync_session().__enter__()
+            self.session = get_sync_db().__enter__()
         return self.session
     
     def __exit__(self, exc_type, exc_val, exc_tb):

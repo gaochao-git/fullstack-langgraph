@@ -5,7 +5,7 @@ Agent configuration service for dynamic loading from database.
 import asyncio
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from ....shared.db.config import get_db
+from src.shared.core.dependencies import get_sync_db
 from ....shared.db.models import AgentConfig
 
 
@@ -13,19 +13,17 @@ class AgentConfigService:
     """Service to manage agent configurations from database."""
     
     @staticmethod
-    def get_agent_config(agent_name: str) -> Optional[Dict[str, Any]]:
+    def get_agent_config(agent_name: str, db: Session) -> Optional[Dict[str, Any]]:
         """
         Get agent configuration from database.
         
         Args:
             agent_name: Name of the agent to get configuration for
+            db: Database session
             
         Returns:
             Dictionary containing agent configuration or None if not found
         """
-        db_gen = get_db()
-        db: Session = next(db_gen)
-        
         try:
             # Query agent by agent_id (which corresponds to agent name)
             agent = db.query(AgentConfig).filter(AgentConfig.agent_id == agent_name).first()
@@ -54,23 +52,21 @@ class AgentConfigService:
         except Exception as e:
             print(f"Error loading agent config for {agent_name}: {e}")
             return None
-            
-        finally:
-            db.close()
     
     @staticmethod 
-    def get_model_config_from_agent(agent_name: str, selected_model: str = None) -> Dict[str, Any]:
+    def get_model_config_from_agent(agent_name: str, db: Session, selected_model: str = None) -> Dict[str, Any]:
         """
         Extract model configuration from agent settings.
         
         Args:
             agent_name: Name of the agent
+            db: Database session
             selected_model: Optional model to override the default configured model
             
         Returns:
             Dictionary containing model configuration with fallback defaults
         """
-        agent_config = AgentConfigService.get_agent_config(agent_name)
+        agent_config = AgentConfigService.get_agent_config(agent_name, db)
         
         if not agent_config or not agent_config.get('llm_config'):
             # Return default configuration if agent not found or no LLM config
@@ -136,7 +132,7 @@ class AgentConfigService:
         print(f"🔧 模型选择逻辑: selected_model={selected_model}, configured_model={llm_config.get('model_name')}, final_model={model_name}")
         
         # Get model info from database (includes endpoint_url and api_key)
-        model_info = AgentConfigService._get_model_info_from_db(model_name)
+        model_info = AgentConfigService._get_model_info_from_db(model_name, db)
         
         result = {
             'model_name': model_name,
@@ -156,17 +152,18 @@ class AgentConfigService:
         return result
     
     @staticmethod
-    def get_prompt_config_from_agent(agent_name: str) -> Dict[str, str]:
+    def get_prompt_config_from_agent(agent_name: str, db: Session) -> Dict[str, str]:
         """
         Extract prompt configuration from agent settings.
         
         Args:
             agent_name: Name of the agent
+            db: Database session
             
         Returns:
             Dictionary containing prompt configuration
         """
-        agent_config = AgentConfigService.get_agent_config(agent_name)
+        agent_config = AgentConfigService.get_agent_config(agent_name, db)
         
         if not agent_config or not agent_config.get('prompt_config'):
             # Return default system prompt if not configured
@@ -216,19 +213,17 @@ class AgentConfigService:
     
     
     @staticmethod
-    def _get_model_info_from_db(model_name: str) -> Dict[str, str]:
+    def _get_model_info_from_db(model_name: str, db: Session) -> Dict[str, str]:
         """
         Get complete model information from database.
         
         Args:
             model_name: Name of the model
+            db: Database session
             
         Returns:
             Dictionary containing model info (endpoint_url, api_key, etc.)
         """
-        db_gen = get_db()
-        db: Session = next(db_gen)
-        
         try:
             # Import here to avoid circular imports
             from ....shared.db.models import AIModelConfig
@@ -252,22 +247,20 @@ class AgentConfigService:
         except Exception as e:
             print(f"Error getting model info for {model_name}: {e}")
             return {}
-            
-        finally:
-            db.close()
     
     @staticmethod
-    def get_agent_available_models(agent_name: str) -> List[Dict[str, Any]]:
+    def get_agent_available_models(agent_name: str, db: Session) -> List[Dict[str, Any]]:
         """
         Get available models configured for a specific agent.
         
         Args:
             agent_name: Name of the agent
+            db: Database session
             
         Returns:
             List of available models with their details
         """
-        agent_config = AgentConfigService.get_agent_config(agent_name)
+        agent_config = AgentConfigService.get_agent_config(agent_name, db)
         
         if not agent_config or not agent_config.get('llm_config'):
             return []
@@ -293,9 +286,6 @@ class AgentConfigService:
             return []
             
         # Get model details from database for each available model
-        db_gen = get_db()
-        db: Session = next(db_gen)
-        
         try:
             from ....shared.db.models import AIModelConfig
             
@@ -320,21 +310,18 @@ class AgentConfigService:
         except Exception as e:
             print(f"Error getting agent available models for {agent_name}: {e}")
             return []
-            
-        finally:
-            db.close()
     
     @staticmethod
-    def get_available_models_from_db() -> Dict[str, Any]:
+    def get_available_models_from_db(db: Session) -> Dict[str, Any]:
         """
         Get available active models from database.
         
+        Args:
+            db: Database session
+            
         Returns:
             Dictionary mapping model names to their configurations
         """
-        db_gen = get_db()
-        db: Session = next(db_gen)
-        
         try:
             # Import here to avoid circular imports
             from ....shared.db.models import AIModelConfig
@@ -359,6 +346,3 @@ class AgentConfigService:
         except Exception as e:
             print(f"Error loading available models: {e}")
             return {}
-            
-        finally:
-            db.close()

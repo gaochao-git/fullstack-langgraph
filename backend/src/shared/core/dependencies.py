@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from .config import settings
-from ..db.config import get_async_session, get_sync_session
+from src.shared.db.config import get_async_db, get_sync_db
 
 # 设置日志
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ def get_settings():
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """获取异步数据库会话（推荐使用）"""
     try:
-        async with get_async_session() as session:
+        async with get_async_db() as session:
             yield session
     except Exception as e:
         logger.error(f"Async database connection error: {e}")
@@ -36,17 +36,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         )
 
 
-def get_sync_db() -> Generator[Session, None, None]:
-    """获取同步数据库会话（兼容现有代码）"""
-    try:
-        with get_sync_session() as session:
-            yield session
-    except Exception as e:
-        logger.error(f"Sync database connection error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database connection failed"
-        )
+# 直接使用数据库配置中的函数
+# get_sync_db 已经从 src.shared.db.config 导入
 
 
 # 向后兼容的别名

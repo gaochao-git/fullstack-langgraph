@@ -16,8 +16,8 @@ def now_shanghai():
 from sqlalchemy import select, insert, update, delete
 from sqlalchemy.exc import IntegrityError
 
-from ....shared.db.config import get_async_session
-from ....shared.db.models import User, UserThread
+from src.shared.db.config import get_async_db_context
+from src.shared.db.models import User, UserThread
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 async def check_user_thread_exists(user_name: str, thread_id: str) -> bool:
     """检查用户线程关联是否存在"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             result = await session.execute(
                 select(UserThread).where(
                     UserThread.user_name == user_name,
@@ -55,7 +55,7 @@ async def create_user_thread_mapping(
             thread_title = f"对话 {datetime.now().strftime('%m-%d %H:%M')}"
             logger.info(f"🏷️ 使用默认标题: {thread_title}")
         
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             # 检查是否已存在，避免重复插入
             existing = await session.execute(
                 select(UserThread).where(
@@ -99,7 +99,7 @@ async def get_user_threads(
 ) -> List[Dict[str, Any]]:
     """获取用户的所有线程"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             query = select(UserThread).where(UserThread.user_name == user_name)
             
             # 如果指定了archived状态，添加过滤条件
@@ -126,7 +126,7 @@ async def update_thread_title(
 ) -> bool:
     """更新线程标题"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             result = await session.execute(
                 update(UserThread)
                 .where(
@@ -164,7 +164,7 @@ async def archive_thread(
 ) -> bool:
     """归档或取消归档线程"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             result = await session.execute(
                 update(UserThread)
                 .where(
@@ -198,7 +198,7 @@ async def archive_thread(
 async def delete_thread(user_name: str, thread_id: str) -> bool:
     """删除用户线程关联"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             result = await session.execute(
                 delete(UserThread).where(
                     UserThread.user_name == user_name,
@@ -230,7 +230,7 @@ async def update_thread_message_count(
 ) -> bool:
     """更新线程消息数量"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             # 先获取当前记录
             result = await session.execute(
                 select(UserThread).where(
@@ -272,7 +272,7 @@ async def update_thread_message_count(
 async def get_thread_by_id(user_name: str, thread_id: str) -> Optional[Dict[str, Any]]:
     """根据ID获取特定线程"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             result = await session.execute(
                 select(UserThread).where(
                     UserThread.user_name == user_name,
@@ -294,7 +294,7 @@ async def get_thread_by_id(user_name: str, thread_id: str) -> Optional[Dict[str,
 async def create_or_get_user(user_name: str, display_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """创建或获取用户"""
     try:
-        async for session in get_async_session():
+        async with get_async_db_context() as session:
             # 先尝试获取用户
             result = await session.execute(
                 select(User).where(User.user_name == user_name)
@@ -322,7 +322,7 @@ async def create_or_get_user(user_name: str, display_name: Optional[str] = None)
     except IntegrityError:
         # 可能是并发创建导致的重复，重新获取
         try:
-            async for session in get_async_session():
+            async with get_async_db_context() as session:
                 result = await session.execute(
                     select(User).where(User.user_name == user_name)
                 )

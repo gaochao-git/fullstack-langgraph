@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ....shared.db.config import get_db
+from src.shared.core.dependencies import get_sync_db
 from ....shared.db.models import CeleryTaskRecord
 from ..service.scheduled_task_service import ScheduledTaskService
 from ..schema.scheduled_task_schema import (
@@ -29,7 +29,7 @@ async def list_scheduled_tasks(
     limit: int = Query(100, ge=1, le=1000, description="返回的记录数"),
     enabled_only: bool = Query(False, description="仅显示启用的任务"),
     agent_id: Optional[str] = Query(None, description="按智能体ID过滤"),
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """获取定时任务列表"""
     return ScheduledTaskService.get_tasks_list(
@@ -46,7 +46,7 @@ async def get_task_execution_records(
     limit: int = Query(100, ge=1, le=1000, description="返回的记录数"),
     task_name: Optional[str] = Query(None, description="按任务名称过滤"),
     task_status: Optional[str] = Query(None, description="按任务状态过滤"),
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """获取任务执行记录"""
     query = session.query(CeleryTaskRecord)
@@ -68,7 +68,7 @@ async def get_task_execution_records(
 @router.get("/scheduled-tasks/records/{record_id}", response_model=Dict[str, Any])
 async def get_task_execution_record(
     record_id: int,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """获取单条任务执行记录详情"""
     record = session.query(CeleryTaskRecord).filter(CeleryTaskRecord.id == record_id).first()
@@ -79,7 +79,7 @@ async def get_task_execution_record(
 @router.get("/scheduled-tasks/{task_id}", response_model=Dict[str, Any])
 async def get_scheduled_task(
     task_id: int,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """获取单个定时任务详情"""
     task = ScheduledTaskService.get_task_by_id(session, task_id)
@@ -90,7 +90,7 @@ async def get_scheduled_task(
 @router.post("/scheduled-tasks", response_model=Dict[str, Any])
 async def create_scheduled_task(
     task_data: ScheduledTaskCreate,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """创建新的定时任务"""
     # 验证JSON格式
@@ -118,7 +118,7 @@ async def create_scheduled_task(
 async def update_scheduled_task(
     task_id: int,
     task_data: ScheduledTaskUpdate,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """更新定时任务"""
     # 验证JSON格式
@@ -150,7 +150,7 @@ async def update_scheduled_task(
 @router.delete("/scheduled-tasks/{task_id}")
 async def delete_scheduled_task(
     task_id: int,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """删除定时任务"""
     success = ScheduledTaskService.delete_task(session, task_id)
@@ -161,7 +161,7 @@ async def delete_scheduled_task(
 @router.post("/scheduled-tasks/{task_id}/enable")
 async def enable_scheduled_task(
     task_id: int,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """启用定时任务"""
     success = ScheduledTaskService.enable_task(session, task_id)
@@ -172,7 +172,7 @@ async def enable_scheduled_task(
 @router.post("/scheduled-tasks/{task_id}/disable")
 async def disable_scheduled_task(
     task_id: int,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """禁用定时任务"""
     success = ScheduledTaskService.disable_task(session, task_id)
@@ -183,7 +183,7 @@ async def disable_scheduled_task(
 @router.post("/scheduled-tasks/{task_id}/trigger")
 async def trigger_scheduled_task(
     task_id: int,
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """手动触发定时任务"""
     # 这里应该通过消息队列或HTTP API通知任务执行器
@@ -199,7 +199,7 @@ async def get_task_execution_logs(
     task_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_sync_db)
 ):
     """获取任务执行日志"""
     logs = ScheduledTaskService.get_task_execution_logs(

@@ -203,8 +203,13 @@ def get_system_prompt_from_config(agent_id: str, **kwargs) -> str:
     print(f"🔍 通用Agent - 获取系统提示词 for agent_id: {agent_id}")
     
     # 从数据库加载配置
-    config_service = AgentConfigService()
-    config = config_service.get_agent_config(agent_id) or {}
+    from .....shared.db.config import get_sync_db
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
+        config = AgentConfigService.get_agent_config(agent_id, db) or {}
+    finally:
+        db.close()
     
     print(f"🔍 通用Agent - 从数据库获取到的配置: {config}")
     

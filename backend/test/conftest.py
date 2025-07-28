@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.shared.db.config import get_async_session
+from src.shared.db.config import get_async_db
 from src.shared.db.models import Base
 
 
@@ -54,7 +54,7 @@ async def test_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.fixture
 def override_get_db(test_db_session):
-    """覆盖get_async_session依赖"""
+    """覆盖get_async_db依赖"""
     async def _override_get_db():
         yield test_db_session
     

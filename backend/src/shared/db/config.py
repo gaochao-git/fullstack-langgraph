@@ -3,7 +3,7 @@ import asyncio
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 # 使用新的配置系统
 from ..core.config import settings
@@ -88,72 +88,108 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 Base = declarative_base()
 
 
-async def get_async_session():
-    """Get async database session with reconnection handling."""
-    max_retries = 3
-    retry_count = 0
-    
-    while retry_count < max_retries:
-        try:
-            async with AsyncSessionLocal() as session:
-                # 测试连接
-                from sqlalchemy import text
-                await session.execute(text("SELECT 1"))
-                yield session
-                return
-        except Exception as e:
-            retry_count += 1
-            if retry_count >= max_retries:
-                raise e
-            await asyncio.sleep(0.5)  # 等待0.5秒后重试
+# ==================== 异步数据库会话 ====================
 
-
-def get_sync_session():
-    """Get sync database session with reconnection handling."""
-    max_retries = 3
-    retry_count = 0
+async def get_async_db():
+    """
+    获取异步数据库会话 - 用于依赖注入
     
-    while retry_count < max_retries:
-        session = SessionLocal()
+    Usage:
+        async def api_endpoint(db: AsyncSession = Depends(get_async_db)):
+            return await service.method(db, ...)
+    """
+    async with AsyncSessionLocal() as session:
         try:
-            # 测试连接
-            from sqlalchemy import text
-            session.execute(text("SELECT 1"))
             yield session
-            return
-        except Exception as e:
-            session.close()
-            retry_count += 1
-            if retry_count >= max_retries:
-                raise e
-            import time
-            time.sleep(0.5)  # 等待0.5秒后重试
-        finally:
-            session.close()
+        except Exception:
+            await session.rollback()
+            raise
 
 
-def get_db():
-    """Get database session for FastAPI dependency injection with reconnection."""
-    max_retries = 3
-    retry_count = 0
+def get_async_db_context():
+    """
+    获取异步数据库会话上下文管理器 - 用于手动管理
     
-    while retry_count < max_retries:
-        db = SessionLocal()
+    Usage:
+        async with get_async_db_context() as session:
+            result = await session.execute(...)
+    """
+    return AsyncSessionLocal()
+
+
+# ==================== 向后兼容性 ====================
+
+async def get_async_session():
+    """
+    获取异步数据库会话 - 向后兼容
+    @deprecated: 建议使用 get_async_db() 用于依赖注入，或 get_async_db_context() 用于上下文管理
+    """
+    async with AsyncSessionLocal() as session:
         try:
-            # 测试连接
-            from sqlalchemy import text
-            db.execute(text("SELECT 1"))
-            yield db
-            return
-        except Exception as e:
-            db.close()
-            retry_count += 1
-            if retry_count >= max_retries:
-                raise e
-            import time
-            time.sleep(0.5)  # 等待0.5秒后重试
-        finally:
-            db.close()
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+
+
+async def get_async_session_context():
+    """获取异步会话上下文管理器 - 用于手动管理"""
+    return AsyncSessionLocal()
+
+
+# ==================== 同步数据库会话 ====================
+
+def get_sync_db():
+    """获取同步数据库会话 - 统一接口，支持依赖注入和上下文管理"""
+    session = SessionLocal()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+# 统一接口：既可以用于依赖注入，也可以用于上下文管理
+# 1. 依赖注入：db: Session = Depends(get_sync_db)  
+# 2. 上下文管理：with get_sync_db() as db:
+
+
+# ==================== 便捷函数 ====================
+
+async def execute_async(func, *args, **kwargs):
+    """在异步会话中执行函数"""
+    async with AsyncSessionLocal() as session:
+        try:
+            kwargs['db'] = session
+            result = await func(*args, **kwargs)
+            await session.commit()
+            return result
+        except Exception:
+            await session.rollback()
+            raise
+
+
+def execute_sync(func, *args, **kwargs):
+    """在同步会话中执行函数"""
+    session = SessionLocal()
+    try:
+        kwargs['db'] = session
+        result = func(*args, **kwargs)
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+# Legacy compatibility (deprecated, use get_sync_db instead)
+def get_db():
+    """@deprecated: Use get_sync_db() instead"""
+    return get_sync_db()
 
 
 async def init_database():

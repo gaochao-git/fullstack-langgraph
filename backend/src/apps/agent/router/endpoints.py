@@ -7,11 +7,12 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, insert, update
 import json
 import uuid
 
-from ....shared.db.config import get_async_session
+from src.shared.db.config import get_async_db, get_sync_db
 from ....shared.db.models import MCPServer, AgentConfig
 from ...llm.agents.diagnostic_agent.tools_mcp import mcp_integrator
 
@@ -128,143 +129,141 @@ BUILTIN_AGENTS = {
 
 # 用户自定义智能体将从数据库加载
 
-async def get_mcp_servers_info() -> List[MCPServerInfo]:
+async def get_mcp_servers_info(session: AsyncSession) -> List[MCPServerInfo]:
     """获取MCP服务器信息"""
     try:
         # 获取数据库中的MCP服务器配置
-        async for session in get_async_session():
-            result = await session.execute(
-                select(MCPServer).where(MCPServer.is_enabled == 'on')
-            )
-            db_servers = result.scalars().all()
+        result = await session.execute(
+            select(MCPServer).where(MCPServer.is_enabled == 'on')
+        )
+        db_servers = result.scalars().all()
+        
+        # 获取实际的MCP工具信息
+        try:
+            actual_tools = await mcp_integrator.get_mcp_tools()
+            tool_map = {tool.name: tool for tool in actual_tools}
+        except Exception as e:
+            logger.warning(f"获取MCP工具失败: {e}")
+            tool_map = {}
+        
+        servers_info = []
+        for server in db_servers:
+            tools = []
             
-            # 获取实际的MCP工具信息
-            try:
-                actual_tools = await mcp_integrator.get_mcp_tools()
-                tool_map = {tool.name: tool for tool in actual_tools}
-            except Exception as e:
-                logger.warning(f"获取MCP工具失败: {e}")
-                tool_map = {}
+            # 解析服务器工具配置
+            if server.server_tools:
+                import json
+                try:
+                    tools_config = json.loads(server.server_tools) if isinstance(server.server_tools, str) else server.server_tools
+                    for tool_config in tools_config:
+                        tool_name = tool_config.get('name', '')
+                        actual_tool = tool_map.get(tool_name)
+                        
+                        tools.append(MCPTool(
+                            name=tool_name,
+                            description=tool_config.get('description', actual_tool.description if actual_tool else ''),
+                            enabled=tool_config.get('enabled', True),
+                            category=tool_config.get('category', 'general'),
+                            server_id=server.server_id,
+                            server_name=server.server_name
+                        ))
+                except Exception as e:
+                    logger.warning(f"解析服务器 {server.server_name} 工具配置失败: {e}")
             
-            servers_info = []
-            for server in db_servers:
-                tools = []
-                
-                # 解析服务器工具配置
-                if server.server_tools:
-                    import json
-                    try:
-                        tools_config = json.loads(server.server_tools) if isinstance(server.server_tools, str) else server.server_tools
-                        for tool_config in tools_config:
-                            tool_name = tool_config.get('name', '')
-                            actual_tool = tool_map.get(tool_name)
-                            
-                            tools.append(MCPTool(
-                                name=tool_name,
-                                description=tool_config.get('description', actual_tool.description if actual_tool else ''),
-                                enabled=tool_config.get('enabled', True),
-                                category=tool_config.get('category', 'general'),
-                                server_id=server.server_id,
-                                server_name=server.server_name
-                            ))
-                    except Exception as e:
-                        logger.warning(f"解析服务器 {server.server_name} 工具配置失败: {e}")
-                
-                servers_info.append(MCPServerInfo(
-                    id=server.server_id,
-                    name=server.server_name,
-                    status="connected" if server.connection_status == "connected" else "disconnected",
-                    tools=tools
-                ))
-            
-            return servers_info
+            servers_info.append(MCPServerInfo(
+                id=server.server_id,
+                name=server.server_name,
+                status="connected" if server.connection_status == "connected" else "disconnected",
+                tools=tools
+            ))
+        
+        return servers_info
             
     except Exception as e:
         logger.error(f"获取MCP服务器信息失败: {e}")
         return []
 
-async def get_or_create_agent_config(agent_id: str, agent_name: str, is_builtin: bool = False) -> Dict[str, Any]:
+async def get_or_create_agent_config(agent_id: str, agent_name: str, is_builtin: bool = False, session: AsyncSession = None) -> Dict[str, Any]:
     """获取或创建智能体MCP配置"""
     try:
-        async for session in get_async_session():
-            # 查询现有配置
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
-            config = result.scalar_one_or_none()
-            
-            if config:
-                # 返回现有配置
-                tools_config = config.tools_info
-                if isinstance(tools_config, str):
-                    try:
-                        tools_config = json.loads(tools_config)
-                    except:
-                        tools_config = {}
-                elif tools_config is None:
+        # 查询现有配置
+        result = await session.execute(
+            select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+        )
+        config = result.scalar_one_or_none()
+        
+        if config:
+            # 返回现有配置
+            tools_config = config.tools_info
+            if isinstance(tools_config, str):
+                try:
+                    tools_config = json.loads(tools_config)
+                except:
                     tools_config = {}
-                
-                system_tools = tools_config.get('system_tools', [])
-                mcp_tools_config = tools_config.get('mcp_tools', [])
-                
-                # 从mcp_tools_config中提取启用的服务器和工具列表
-                enabled_servers = []
-                all_mcp_tools = []
-                
-                if isinstance(mcp_tools_config, list):
-                    for server in mcp_tools_config:
-                        if isinstance(server, dict) and server.get('tools'):
-                            enabled_servers.append(server.get('server_id', ''))
-                            all_mcp_tools.extend(server.get('tools', []))
-                
-                return {
-                    'enabled_servers': enabled_servers,
-                    'selected_tools': all_mcp_tools,
-                    'system_tools': system_tools
-                }
-            else:
-                # 创建默认配置
-                default_system_tools = []
-                if agent_id == "diagnostic_agent":
-                    default_system_tools = ["get_sop_content", "get_sop_detail", "list_sops", "search_sops", "get_current_time"]
-                elif agent_id in ["research_agent", "security_agent"]:
-                    default_system_tools = ["get_current_time"]
-                
-                # 构建默认配置
-                tools_config = {
-                    'system_tools': default_system_tools,
-                    'mcp_tools': []
-                }
-                
-                llm_config = {
-                    'model_name': 'gpt-4',
-                    'temperature': 0.7,
-                    'max_tokens': 2000
-                }
-                
-                prompt_config = {
-                    'system_prompt': f'你是一个{agent_name}，请根据用户需求提供专业的帮助。'
-                }
-                
-                await session.execute(
-                    insert(AgentConfig).values(
-                        agent_id=agent_id,
-                        agent_name=agent_name,
-                        is_builtin='yes' if is_builtin else 'no',
-                        tools_info=json.dumps(tools_config),
-                        llm_info=json.dumps(llm_config),
-                        prompt_info=json.dumps(prompt_config),
-                        create_by='system'
-                    )
+            elif tools_config is None:
+                tools_config = {}
+            
+            system_tools = tools_config.get('system_tools', [])
+            mcp_tools_config = tools_config.get('mcp_tools', [])
+            
+            # 从mcp_tools_config中提取启用的服务器和工具列表
+            enabled_servers = []
+            all_mcp_tools = []
+            
+            if isinstance(mcp_tools_config, list):
+                for server in mcp_tools_config:
+                    if isinstance(server, dict) and server.get('tools'):
+                        enabled_servers.append(server.get('server_id', ''))
+                        all_mcp_tools.extend(server.get('tools', []))
+            
+            return {
+                'enabled_servers': enabled_servers,
+                'selected_tools': all_mcp_tools,
+                'system_tools': system_tools
+            }
+        else:
+            # 创建默认配置
+            default_system_tools = []
+            if agent_id == "diagnostic_agent":
+                default_system_tools = ["get_sop_content", "get_sop_detail", "list_sops", "search_sops", "get_current_time"]
+            elif agent_id in ["research_agent", "security_agent"]:
+                default_system_tools = ["get_current_time"]
+            
+            # 构建默认配置
+            tools_config = {
+                'system_tools': default_system_tools,
+                'mcp_tools': []
+            }
+            
+            llm_config = {
+                'model_name': 'gpt-4',
+                'temperature': 0.7,
+                'max_tokens': 2000
+            }
+            
+            prompt_config = {
+                'system_prompt': f'你是一个{agent_name}，请根据用户需求提供专业的帮助。'
+            }
+            
+            await session.execute(
+                insert(AgentConfig).values(
+                    agent_id=agent_id,
+                    agent_name=agent_name,
+                    is_builtin='yes' if is_builtin else 'no',
+                    tools_info=json.dumps(tools_config),
+                    llm_info=json.dumps(llm_config),
+                    prompt_info=json.dumps(prompt_config),
+                    create_by='system'
                 )
-                await session.commit()
-                
-                return {
-                    'enabled_servers': [],
-                    'selected_tools': [],
-                    'system_tools': default_system_tools
-                }
-                
+            )
+            await session.commit()
+            
+            return {
+                'enabled_servers': [],
+                'selected_tools': [],
+                'system_tools': default_system_tools
+            }
+            
     except Exception as e:
         logger.error(f"获取或创建智能体 {agent_id} 配置失败: {e}")
         return {
@@ -274,125 +273,124 @@ async def get_or_create_agent_config(agent_id: str, agent_name: str, is_builtin:
         }
 
 @router.get("/agents", response_model=List[Agent])
-async def get_agents():
+async def get_agents(session: AsyncSession = Depends(get_async_db)):
     """获取所有智能体（内置 + 用户自定义）"""
     try:
         agents = []
         
         # 获取用户自定义智能体（从数据库）
-        async for session in get_async_session():
-            result = await session.execute(select(AgentConfig))
-            db_agents = result.scalars().all()
+        result = await session.execute(select(AgentConfig))
+        db_agents = result.scalars().all()
+        
+        # 添加数据库中的智能体
+        for db_agent in db_agents:
+            agent_dict = db_agent.to_dict()
             
-            # 添加数据库中的智能体
-            for db_agent in db_agents:
-                agent_dict = db_agent.to_dict()
-                
-                # 确保配置字段是字典类型，不是字符串
-                tools_info = agent_dict.get('tools_info')
-                if isinstance(tools_info, str):
-                    try:
-                        tools_info = json.loads(tools_info)
-                    except:
-                        tools_info = {}
-                
-                llm_info = agent_dict.get('llm_info')
-                if isinstance(llm_info, str):
-                    try:
-                        llm_info = json.loads(llm_info)
-                    except:
-                        llm_info = {}
-                
-                prompt_info = agent_dict.get('prompt_info')
-                if isinstance(prompt_info, str):
-                    try:
-                        prompt_info = json.loads(prompt_info)
-                    except:
-                        prompt_info = {}
-                
-                # 根据数据库中的 is_builtin 字段判断智能体类型
-                agent_id = agent_dict['agent_id']
-                is_builtin_from_db = agent_dict.get('is_builtin', 'no')  # 现在直接是字符串
-                
-                if is_builtin_from_db == 'yes' and agent_id in BUILTIN_AGENTS:
-                    # 内置智能体：使用代码中的定义覆盖基本信息，数据库中的动态数据保留
-                    builtin_config = BUILTIN_AGENTS[agent_id]
-                    agents.append(Agent(
-                        id=agent_id,
-                        name=builtin_config['name'],
-                        display_name=builtin_config['display_name'],
-                        description=builtin_config['description'],
-                        status=builtin_config['status'],
-                        enabled=agent_dict['enabled'],  # 启用状态从数据库读取
-                        version=builtin_config['version'],
-                        last_used=agent_dict['last_used'],  # 使用统计从数据库读取
-                        total_runs=agent_dict['total_runs'],
-                        success_rate=agent_dict['success_rate'],
-                        avg_response_time=agent_dict['avg_response_time'],
-                        capabilities=builtin_config['capabilities'],
-                        is_builtin=is_builtin_from_db,  # 使用数据库中的实际值
-                        mcp_config=AgentMCPConfig(
-                            enabled_servers=agent_dict['mcp_config']['enabled_servers'],
-                            selected_tools=agent_dict['mcp_config']['selected_tools'],
-                            total_tools=agent_dict['mcp_config']['total_tools']
-                        ),
-                        # 完整配置信息
-                        tools_info=tools_info,
-                        llm_info=llm_info,
-                        prompt_info=prompt_info
-                    ))
-                else:
-                    # 自定义智能体或数据库中标记为非内置的智能体，完全使用数据库数据
-                    agents.append(Agent(
-                        id=agent_dict['agent_id'],
-                        name=agent_dict['name'],
-                        display_name=agent_dict['display_name'],
-                        description=agent_dict['description'],
-                        status=agent_dict['status'],
-                        enabled=agent_dict['enabled'],
-                        version=agent_dict['version'],
-                        last_used=agent_dict['last_used'],
-                        total_runs=agent_dict['total_runs'],
-                        success_rate=agent_dict['success_rate'],
-                        avg_response_time=agent_dict['avg_response_time'],
-                        capabilities=agent_dict['capabilities'],
-                        is_builtin=agent_dict.get('is_builtin', 'no'),  # 自定义智能体
-                        mcp_config=AgentMCPConfig(
-                            enabled_servers=agent_dict['mcp_config']['enabled_servers'],
-                            selected_tools=agent_dict['mcp_config']['selected_tools'],
-                            total_tools=agent_dict['mcp_config']['total_tools']
-                        ),
-                        # 完整配置信息
-                        tools_info=tools_info,
-                        llm_info=llm_info,
-                        prompt_info=prompt_info
-                    ))
+            # 确保配置字段是字典类型，不是字符串
+            tools_info = agent_dict.get('tools_info')
+            if isinstance(tools_info, str):
+                try:
+                    tools_info = json.loads(tools_info)
+                except:
+                    tools_info = {}
             
-            # 如果数据库中没有内置智能体，则创建它们
-            existing_agent_ids = {agent.agent_id for agent in db_agents}
+            llm_info = agent_dict.get('llm_info')
+            if isinstance(llm_info, str):
+                try:
+                    llm_info = json.loads(llm_info)
+                except:
+                    llm_info = {}
             
-            for agent_id, agent_config in BUILTIN_AGENTS.items():
-                if agent_id not in existing_agent_ids:
-                    # 创建内置智能体配置（标记为内置）
-                    await get_or_create_agent_config(agent_id, agent_config['display_name'], is_builtin=True)
-                    
-                    # 构建内置智能体数据
-                    mcp_config = AgentMCPConfig(
-                        enabled_servers=[],
-                        selected_tools=[],
-                        total_tools=0
-                    )
-                    
-                    agents.append(Agent(
-                        **agent_config,
-                        last_used=None,
-                        is_builtin='yes',
-                        mcp_config=mcp_config,
-                        # 内置智能体的默认配置
-                        tools_info=None,
-                        llm_info=None,
-                        prompt_info=None
-                    ))
+            prompt_info = agent_dict.get('prompt_info')
+            if isinstance(prompt_info, str):
+                try:
+                    prompt_info = json.loads(prompt_info)
+                except:
+                    prompt_info = {}
+            
+            # 根据数据库中的 is_builtin 字段判断智能体类型
+            agent_id = agent_dict['agent_id']
+            is_builtin_from_db = agent_dict.get('is_builtin', 'no')  # 现在直接是字符串
+            
+            if is_builtin_from_db == 'yes' and agent_id in BUILTIN_AGENTS:
+                # 内置智能体：使用代码中的定义覆盖基本信息，数据库中的动态数据保留
+                builtin_config = BUILTIN_AGENTS[agent_id]
+                agents.append(Agent(
+                    id=agent_id,
+                    name=builtin_config['name'],
+                    display_name=builtin_config['display_name'],
+                    description=builtin_config['description'],
+                    status=builtin_config['status'],
+                    enabled=agent_dict['enabled'],  # 启用状态从数据库读取
+                    version=builtin_config['version'],
+                    last_used=agent_dict['last_used'],  # 使用统计从数据库读取
+                    total_runs=agent_dict['total_runs'],
+                    success_rate=agent_dict['success_rate'],
+                    avg_response_time=agent_dict['avg_response_time'],
+                    capabilities=builtin_config['capabilities'],
+                    is_builtin=is_builtin_from_db,  # 使用数据库中的实际值
+                    mcp_config=AgentMCPConfig(
+                        enabled_servers=agent_dict['mcp_config']['enabled_servers'],
+                        selected_tools=agent_dict['mcp_config']['selected_tools'],
+                        total_tools=agent_dict['mcp_config']['total_tools']
+                    ),
+                    # 完整配置信息
+                    tools_info=tools_info,
+                    llm_info=llm_info,
+                    prompt_info=prompt_info
+                ))
+            else:
+                # 自定义智能体或数据库中标记为非内置的智能体，完全使用数据库数据
+                agents.append(Agent(
+                    id=agent_dict['agent_id'],
+                    name=agent_dict['name'],
+                    display_name=agent_dict['display_name'],
+                    description=agent_dict['description'],
+                    status=agent_dict['status'],
+                    enabled=agent_dict['enabled'],
+                    version=agent_dict['version'],
+                    last_used=agent_dict['last_used'],
+                    total_runs=agent_dict['total_runs'],
+                    success_rate=agent_dict['success_rate'],
+                    avg_response_time=agent_dict['avg_response_time'],
+                    capabilities=agent_dict['capabilities'],
+                    is_builtin=agent_dict.get('is_builtin', 'no'),  # 自定义智能体
+                    mcp_config=AgentMCPConfig(
+                        enabled_servers=agent_dict['mcp_config']['enabled_servers'],
+                        selected_tools=agent_dict['mcp_config']['selected_tools'],
+                        total_tools=agent_dict['mcp_config']['total_tools']
+                    ),
+                    # 完整配置信息
+                    tools_info=tools_info,
+                    llm_info=llm_info,
+                    prompt_info=prompt_info
+                ))
+        
+        # 如果数据库中没有内置智能体，则创建它们
+        existing_agent_ids = {agent.agent_id for agent in db_agents}
+        
+        for agent_id, agent_config in BUILTIN_AGENTS.items():
+            if agent_id not in existing_agent_ids:
+                # 创建内置智能体配置（标记为内置）
+                await get_or_create_agent_config(agent_id, agent_config['display_name'], is_builtin=True, session=session)
+                
+                # 构建内置智能体数据
+                mcp_config = AgentMCPConfig(
+                    enabled_servers=[],
+                    selected_tools=[],
+                    total_tools=0
+                )
+                
+                agents.append(Agent(
+                    **agent_config,
+                    last_used=None,
+                    is_builtin='yes',
+                    mcp_config=mcp_config,
+                    # 内置智能体的默认配置
+                    tools_info=None,
+                    llm_info=None,
+                    prompt_info=None
+                ))
         
         return agents
         
@@ -401,10 +399,10 @@ async def get_agents():
         raise HTTPException(status_code=500, detail="获取智能体列表失败")
 
 @router.get("/agents/mcp-servers", response_model=List[MCPServerInfo])
-async def get_mcp_servers():
+async def get_mcp_servers(session: AsyncSession = Depends(get_async_db)):
     """获取MCP服务器信息"""
     try:
-        return await get_mcp_servers_info()
+        return await get_mcp_servers_info(session)
     except Exception as e:
         logger.error(f"获取MCP服务器信息失败: {e}")
         raise HTTPException(status_code=500, detail="获取MCP服务器信息失败")
@@ -786,13 +784,13 @@ async def delete_agent(agent_id: str):
 
 
 @router.get("/agents/{agent_id}/available-models")
-async def get_agent_available_models(agent_id: str):
+async def get_agent_available_models(agent_id: str, db: Session = Depends(get_sync_db)):
     """获取指定智能体的可用模型列表"""
     try:
         from ..service.agent_config_service import AgentConfigService
         
         # 获取智能体的可用模型
-        models = AgentConfigService.get_agent_available_models(agent_id)
+        models = AgentConfigService.get_agent_available_models(agent_id, db)
         
         return {
             "code": 200,

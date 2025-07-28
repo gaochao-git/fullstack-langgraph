@@ -11,7 +11,7 @@ import aiohttp
 import asyncio
 from pydantic import BaseModel
 
-from ....shared.db.config import get_db
+from src.shared.core.dependencies import get_sync_db
 from ....shared.db.models import AIModelConfig
 
 logger = logging.getLogger(__name__)
@@ -178,7 +178,7 @@ async def get_ai_models(
     provider: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     team_name: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """获取AI模型列表"""
     try:
@@ -225,7 +225,7 @@ async def get_ai_models(
 @router.post("/ai-models", response_model=Dict[str, Any])
 async def create_ai_model(
     model_data: AIModelCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """创建AI模型配置"""
     try:
@@ -274,7 +274,7 @@ async def create_ai_model(
 async def update_ai_model(
     model_id: str,
     model_data: AIModelUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """更新AI模型配置"""
     try:
@@ -314,7 +314,7 @@ async def update_ai_model(
 @router.delete("/ai-models/{model_id}", response_model=Dict[str, Any])
 async def delete_ai_model(
     model_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """删除AI模型配置"""
     try:
@@ -343,7 +343,7 @@ async def delete_ai_model(
 @router.get("/ai-models/{model_id}", response_model=Dict[str, Any])
 async def get_ai_model(
     model_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_sync_db)
 ):
     """获取单个AI模型配置"""
     try:

@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from ....shared.db.config import get_async_session
-from ..schema.sop import (
+from src.shared.db.config import get_async_db
+from src.apps.sop.schema.sop import (
     SOPTemplateCreate, SOPTemplateUpdate, SOPTemplateResponse,
     SOPQueryParams, SOPListResponse, ApiResponse
 )
-from ..service.sop_service import SOPService
+from src.apps.sop.service.sop_service import SOPService
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ router = APIRouter(tags=["SOP Management"])
 @router.post("/sops", response_model=ApiResponse)
 async def create_sop(
     sop_data: SOPTemplateCreate,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Create a new SOP template."""
     try:
@@ -45,7 +45,7 @@ async def create_sop(
 @router.post("/sops/list", response_model=ApiResponse)
 async def list_sops(
     params: SOPQueryParams,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """List SOPs with filtering and pagination."""
     try:
@@ -71,7 +71,7 @@ async def list_sops(
 @router.get("/sops/{sop_id}", response_model=ApiResponse)
 async def get_sop(
     sop_id: str,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Get a specific SOP by ID."""
     try:
@@ -100,7 +100,7 @@ async def get_sop(
 async def update_sop(
     sop_id: str,
     sop_data: SOPTemplateUpdate,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Update an existing SOP template."""
     try:
@@ -129,7 +129,7 @@ async def update_sop(
 @router.delete("/sops/{sop_id}", response_model=ApiResponse)
 async def delete_sop(
     sop_id: str,
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Delete an SOP template."""
     try:
@@ -157,7 +157,7 @@ async def delete_sop(
 
 @router.get("/sops/meta/categories", response_model=ApiResponse)
 async def get_categories(
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Get all available SOP categories."""
     try:
@@ -176,7 +176,7 @@ async def get_categories(
 
 @router.get("/sops/meta/teams", response_model=ApiResponse)
 async def get_teams(
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Get all available team names."""
     try:

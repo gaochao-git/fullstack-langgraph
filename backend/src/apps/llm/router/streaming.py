@@ -168,8 +168,13 @@ async def handle_postgres_streaming(request_body, thread_id):
     logger.info(f"🔍 直接使用assistant_id作为agent_id: {agent_id}")
     
     # 从数据库获取智能体配置
-    config_service = AgentConfigService()
-    agent_config = config_service.get_agent_config(agent_id)
+    from ....shared.db.config import get_sync_db
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
+        agent_config = AgentConfigService.get_agent_config(agent_id, db)
+    finally:
+        db.close()
     
     if not agent_config:
         raise Exception(f"数据库中未找到智能体配置: {agent_id}")
@@ -210,8 +215,13 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     agent_id = assistant_id
     
     # 检查数据库中是否存在该智能体
-    config_service = AgentConfigService()
-    agent_config = config_service.get_agent_config(agent_id)
+    from ....shared.db.config import get_sync_db
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
+        agent_config = AgentConfigService.get_agent_config(agent_id, db)
+    finally:
+        db.close()
     
     if not agent_config:
         raise HTTPException(status_code=400, detail=f"智能体不存在: {agent_id}")

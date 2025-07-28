@@ -100,7 +100,13 @@ class Configuration(BaseModel):
         print(f"   选择的模型: {selected_model or '使用默认配置'}")
         print(f"   完整配置: {config}")
         
-        db_config = AgentConfigService.get_model_config_from_agent(agent_name, selected_model)
+        from .....shared.db.config import get_sync_db
+        db_gen = get_sync_db()
+        db = next(db_gen)
+        try:
+            db_config = AgentConfigService.get_model_config_from_agent(agent_name, db, selected_model)
+        finally:
+            db.close()
         
         print(f"   数据库配置: 模型={db_config.get('model_name')}, 温度={db_config.get('temperature')}")
         
@@ -133,7 +139,13 @@ class Configuration(BaseModel):
     @classmethod
     def from_agent_config(cls, agent_name: str = "diagnostic_agent", selected_model: str = None) -> "Configuration":
         """Create a Configuration instance directly from agent database configuration."""
-        db_config = AgentConfigService.get_model_config_from_agent(agent_name, selected_model)
+        from .....shared.db.config import get_sync_db
+        db_gen = get_sync_db()
+        db = next(db_gen)
+        try:
+            db_config = AgentConfigService.get_model_config_from_agent(agent_name, db, selected_model)
+        finally:
+            db.close()
         
         # Map database configuration to Configuration fields
         config_values = {

@@ -8,16 +8,16 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 # 导入数据库相关模块  
-from src.shared.db.config import get_sync_session
+from src.shared.db.config import get_sync_db
 from src.apps.sop.dao.sop_dao import SOPDAO
 
 
 def get_sop_from_db(sop_id: str) -> Optional[Dict[str, Any]]:
     """从数据库获取单个SOP"""
     try:
-        for session in get_sync_session():
+        with get_sync_db() as db:
             sop_dao = SOPDAO()
-            sop_template = sop_dao.sync_get_by_sop_id(session, sop_id)
+            sop_template = sop_dao.sync_get_by_sop_id(db, sop_id)
             return sop_template.to_dict() if sop_template else None
     except Exception as e:
         print(f"从数据库获取SOP失败: {e}")
@@ -33,11 +33,11 @@ def search_sops_from_db(
 ) -> Dict[str, Any]:
     """从数据库搜索SOPs"""
     try:
-        for session in get_sync_session():
+        with get_sync_db() as db:
             from src.shared.db.models import SOPTemplate
             
             # 构建查询
-            query = session.query(SOPTemplate)
+            query = db.query(SOPTemplate)
             
             # 添加过滤条件
             if category:

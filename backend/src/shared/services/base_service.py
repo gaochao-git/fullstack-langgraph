@@ -10,7 +10,7 @@ from sqlalchemy import select, update, delete, and_, or_
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
-from ..db.config import get_async_session, get_sync_session
+from src.shared.db.config import get_async_db, get_sync_db
 from ..db.models import now_shanghai
 
 # 泛型类型变量
