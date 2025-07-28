@@ -77,11 +77,18 @@ class AgentApiService {
    */
   async getAgents(): Promise<Agent[]> {
     try {
-      const response = await baseFetch('/api/agents/');
+      const response = await baseFetch('/api/v1/agents');
       if (!response.ok) {
         throw new Error(`获取智能体列表失败: ${response.statusText}`);
       }
-      return await response.json();
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data.items || result.data;
+      } else {
+        throw new Error(result.msg || '获取智能体列表失败');
+      }
     } catch (error) {
       console.error('获取智能体列表失败:', error);
       throw error;
@@ -127,11 +134,18 @@ class AgentApiService {
    */
   async getMCPServers(): Promise<MCPServer[]> {
     try {
-      const response = await baseFetch('/api/agents/mcp-servers');
+      const response = await baseFetch('/api/v1/mcp/servers');
       if (!response.ok) {
         throw new Error(`获取MCP服务器信息失败: ${response.statusText}`);
       }
-      return await response.json();
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data.items || result.data;
+      } else {
+        throw new Error(result.msg || '获取MCP服务器信息失败');
+      }
     } catch (error) {
       console.error('获取MCP服务器信息失败:', error);
       throw error;
@@ -141,9 +155,9 @@ class AgentApiService {
   /**
    * 更新智能体MCP配置
    */
-  async updateAgentMCPConfig(agentId: string, config: UpdateMCPConfigRequest): Promise<void> {
+  async updateAgentMCPConfig(agentId: string, config: UpdateMCPConfigRequest): Promise<Agent> {
     try {
-      const response = await baseFetch(`/api/agents/${agentId}/mcp-config`, {
+      const response = await baseFetch(`/api/v1/agents/${agentId}/mcp-config`, {
         method: 'PUT',
         body: JSON.stringify(config),
       });
@@ -152,7 +166,14 @@ class AgentApiService {
         throw new Error(`更新MCP配置失败: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data;
+      } else {
+        throw new Error(result.msg || '更新MCP配置失败');
+      }
     } catch (error) {
       console.error('更新MCP配置失败:', error);
       throw error;
@@ -162,10 +183,26 @@ class AgentApiService {
   /**
    * 切换智能体启用状态
    */
-  async toggleAgentStatus(agentId: string): Promise<any> {
+  async toggleAgentStatus(agentId: string): Promise<Agent> {
     try {
-      const response = await baseFetch(`/api/agents/${agentId}/toggle`, {
+      // 先获取当前状态
+      const currentResponse = await baseFetch(`/api/v1/agents/${agentId}`);
+      if (!currentResponse.ok) {
+        throw new Error(`获取智能体状态失败: ${currentResponse.statusText}`);
+      }
+      
+      const currentResult = await currentResponse.json();
+      if (currentResult.status !== 'ok') {
+        throw new Error(currentResult.msg || '获取智能体状态失败');
+      }
+      
+      const currentAgent = currentResult.data;
+      const newStatus = currentAgent.status === 'running' ? 'stopped' : 'running';
+      
+      // 更新状态
+      const response = await baseFetch(`/api/v1/agents/${agentId}/status`, {
         method: 'PUT',
+        body: JSON.stringify({ status: newStatus }),
       });
       
       if (!response.ok) {
@@ -174,12 +211,12 @@ class AgentApiService {
       
       const result = await response.json();
       
-      // 检查后端返回的业务状态
-      if (!result.success) {
-        throw new Error(result.message || '切换智能体状态失败');
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data;
+      } else {
+        throw new Error(result.msg || '切换智能体状态失败');
       }
-      
-      return result;
     } catch (error) {
       console.error('切换智能体状态失败:', error);
       throw error;
@@ -191,7 +228,7 @@ class AgentApiService {
    */
   async createAgent(agentData: CreateAgentRequest): Promise<Agent> {
     try {
-      const response = await baseFetch('/api/agents/', {
+      const response = await baseFetch('/api/v1/agents', {
         method: 'POST',
         body: JSON.stringify(agentData),
       });
@@ -200,7 +237,14 @@ class AgentApiService {
         throw new Error(`创建智能体失败: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data;
+      } else {
+        throw new Error(result.msg || '创建智能体失败');
+      }
     } catch (error) {
       console.error('创建智能体失败:', error);
       throw error;
@@ -212,7 +256,7 @@ class AgentApiService {
    */
   async updateAgent(agentId: string, agentData: UpdateAgentRequest): Promise<Agent> {
     try {
-      const response = await baseFetch(`/api/agents/${agentId}`, {
+      const response = await baseFetch(`/api/v1/agents/${agentId}`, {
         method: 'PUT',
         body: JSON.stringify(agentData),
       });
@@ -221,7 +265,14 @@ class AgentApiService {
         throw new Error(`更新智能体失败: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data;
+      } else {
+        throw new Error(result.msg || '更新智能体失败');
+      }
     } catch (error) {
       console.error('更新智能体失败:', error);
       throw error;
@@ -231,9 +282,9 @@ class AgentApiService {
   /**
    * 删除智能体
    */
-  async deleteAgent(agentId: string): Promise<void> {
+  async deleteAgent(agentId: string): Promise<{ deleted_id: string }> {
     try {
-      const response = await baseFetch(`/api/agents/${agentId}`, {
+      const response = await baseFetch(`/api/v1/agents/${agentId}`, {
         method: 'DELETE',
       });
       
@@ -241,7 +292,14 @@ class AgentApiService {
         throw new Error(`删除智能体失败: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data;
+      } else {
+        throw new Error(result.msg || '删除智能体失败');
+      }
     } catch (error) {
       console.error('删除智能体失败:', error);
       throw error;

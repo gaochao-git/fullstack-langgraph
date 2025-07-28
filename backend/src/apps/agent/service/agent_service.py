@@ -1,23 +1,23 @@
 """
-Agent统一服务层
-同时支持静态方法（兼容现有API）和实例方法（新架构）
+Agent服务层 - 纯异步实现
 """
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
-from sqlalchemy import select, func, update, insert
 import json
 import uuid
+from datetime import datetime
 
-from ..dao import AgentDAO
+from ..dao.agent_dao import AgentDAO
 from src.shared.db.models import AgentConfig
-from src.shared.db.transaction import transactional, sync_transactional
+from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 logger = get_logger(__name__)
 
-# 内置智能体配置 - 与现有API保持一致
+# 内置智能体配置
 BUILTIN_AGENTS = {
     "diagnostic_agent": {
         "id": "diagnostic_agent",
@@ -65,75 +65,78 @@ BUILTIN_AGENTS = {
 
 
 class AgentService:
-    """Agent模板服务 - 支持新旧两种调用方式"""
-    
-    _instance = None
-    _dao = None
+    """Agent服务层 - 纯异步实现"""
     
     def __init__(self):
-        if not self._dao:
-            self._dao = AgentDAO()
+        self._dao = AgentDAO()
     
-    @classmethod
-    def get_instance(cls):
-        """获取单例实例"""
-        if not cls._instance:
-            cls._instance = cls()
-        return cls._instance
+    # ==================== 核心业务方法 ====================
     
-    # ==================== 静态方法（兼容现有API） ====================
+    @transactional()
+    async def create_agent(
+        self, 
+        session: AsyncSession,
+        agent_data: Dict[str, Any]
+    ) -> AgentConfig:
+        """创建智能体配置"""
+        # 生成agent_id（如果未提供）
+        if not agent_data.get('agent_id'):
+            agent_data['agent_id'] = f"custom_{uuid.uuid4().hex[:8]}"
+        
+        # 检查是否已存在
+        existing = await self._dao.get_by_agent_id(session, agent_data['agent_id'])
+        if existing:
+            raise BusinessException(
+                f"智能体ID {agent_data['agent_id']} 已存在", 
+                ResponseCode.DUPLICATE_RESOURCE
+            )
+        
+        # 检查是否为保留的内置智能体ID
+        if agent_data['agent_id'] in BUILTIN_AGENTS and agent_data.get('is_builtin') != 'yes':
+            raise BusinessException(
+                f"智能体ID {agent_data['agent_id']} 为系统保留ID", 
+                ResponseCode.INVALID_PARAMETER
+            )
+        
+        # 设置默认值
+        agent_data.setdefault('agent_status', 'stopped')
+        agent_data.setdefault('agent_enabled', 'yes')
+        agent_data.setdefault('is_builtin', 'no')
+        agent_data.setdefault('create_by', 'system')
+        agent_data.setdefault('total_runs', 0)
+        agent_data.setdefault('success_rate', 0.0)
+        agent_data.setdefault('avg_response_time', 0.0)
+        agent_data.setdefault('create_time', datetime.utcnow())
+        agent_data.setdefault('update_time', datetime.utcnow())
+        
+        # 处理capabilities字段映射
+        if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):
+            agent_data['agent_capabilities'] = agent_data.pop('capabilities')
+        
+        logger.info(f"Creating agent: {agent_data['agent_id']}")
+        return await self._dao.create(session, agent_data)
     
-    @staticmethod
-    async def get_all_agents(session: AsyncSession) -> List[Dict[str, Any]]:
-        """获取所有智能体（静态方法，兼容现有API）"""
-        service = AgentService.get_instance()
-        
-        # 获取数据库中的智能体
-        db_agents = await service._dao.get_list(session)
-        db_agents_dict = {}
-        for agent in db_agents:
-            agent_dict = agent.to_dict()
-            db_agents_dict[agent.agent_id] = agent_dict
-        
-        # 合并内置智能体和数据库智能体
-        all_agents = []
-        
-        # 先添加内置智能体
-        for builtin_id, builtin_config in BUILTIN_AGENTS.items():
-            if builtin_id in db_agents_dict:
-                # 如果数据库中有，使用数据库配置，但保留内置标识
-                agent_config = db_agents_dict[builtin_id].copy()
-                agent_config['is_builtin'] = 'yes'
-                all_agents.append(agent_config)
-            else:
-                # 使用默认内置配置
-                builtin_config_copy = builtin_config.copy()
-                builtin_config_copy['mcp_config'] = {
-                    'enabled_servers': [],
-                    'selected_tools': [],
-                    'total_tools': 0
-                }
-                all_agents.append(builtin_config_copy)
-        
-        # 添加用户自定义智能体
-        for agent_id, agent_config in db_agents_dict.items():
-            if agent_id not in BUILTIN_AGENTS:
-                all_agents.append(agent_config)
-        
-        return all_agents
-    
-    @staticmethod
-    async def get_agent_by_id(session: AsyncSession, agent_id: str) -> Optional[Dict[str, Any]]:
-        """根据ID获取智能体（静态方法）"""
-        service = AgentService.get_instance()
-        
+    async def get_agent_by_id(
+        self, 
+        session: AsyncSession, 
+        agent_id: str,
+        include_builtin: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """根据ID获取智能体配置"""
         # 先检查是否是内置智能体
-        if agent_id in BUILTIN_AGENTS:
+        if include_builtin and agent_id in BUILTIN_AGENTS:
             # 尝试从数据库获取配置
-            db_agent = await service._dao.get_by_agent_id(session, agent_id)
+            db_agent = await self._dao.get_by_agent_id(session, agent_id)
             if db_agent:
                 agent_dict = db_agent.to_dict()
                 agent_dict['is_builtin'] = 'yes'
+                # 确保有mcp_config字段
+                if 'mcp_config' not in agent_dict:
+                    agent_dict['mcp_config'] = {
+                        'enabled_servers': [],
+                        'selected_tools': [],
+                        'total_tools': 0
+                    }
                 return agent_dict
             else:
                 # 返回默认内置配置
@@ -146,60 +149,192 @@ class AgentService:
                 return builtin_config
         
         # 从数据库获取用户自定义智能体
-        db_agent = await service._dao.get_by_agent_id(session, agent_id)
-        return db_agent.to_dict() if db_agent else None
+        db_agent = await self._dao.get_by_agent_id(session, agent_id)
+        if db_agent:
+            agent_dict = db_agent.to_dict()
+            # 确保有mcp_config字段
+            if 'mcp_config' not in agent_dict:
+                agent_dict['mcp_config'] = {
+                    'enabled_servers': [],
+                    'selected_tools': [],
+                    'total_tools': 0
+                }
+            return agent_dict
+        
+        return None
     
-    @staticmethod
-    async def create_agent(session: AsyncSession, agent_data: Dict[str, Any]) -> AgentConfig:
-        """创建智能体（静态方法）"""
-        service = AgentService.get_instance()
+    async def list_agents(
+        self, 
+        session: AsyncSession,
+        page: int = 1,
+        size: int = 10,
+        search: Optional[str] = None,
+        status: Optional[str] = None,
+        enabled_only: bool = False,
+        include_builtin: bool = True
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """获取智能体列表"""
+        offset = (page - 1) * size
         
-        # 生成agent_id（如果未提供）
-        if not agent_data.get('agent_id'):
-            agent_data['agent_id'] = f"custom_{uuid.uuid4().hex[:8]}"
+        # 构建过滤条件
+        filters = {}
+        if enabled_only:
+            filters['agent_enabled'] = 'yes'
+            filters['is_active'] = True
+        if status:
+            filters['agent_status'] = status
         
-        # 设置默认值
-        agent_data.setdefault('agent_status', 'stopped')
-        agent_data.setdefault('agent_enabled', 'yes')
-        agent_data.setdefault('is_builtin', 'no')
-        agent_data.setdefault('create_by', 'system')
-        agent_data.setdefault('total_runs', 0)
-        agent_data.setdefault('success_rate', 0.0)
-        agent_data.setdefault('avg_response_time', 0.0)
+        # 获取数据库中的智能体
+        if search:
+            db_agents = await self._dao.search_by_name(
+                session, search, enabled_only, size, offset
+            )
+            total_db = len(db_agents)  # 简化计数，实际应该有专门的计数方法
+        else:
+            db_agents = await self._dao.get_list(
+                session, 
+                filters=filters if filters else None,
+                limit=size, 
+                offset=offset,
+                order_by='create_time'
+            )
+            total_db = await self._dao.count(session, filters=filters if filters else None)
         
-        # 处理capabilities字段
-        if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):
-            agent_data['agent_capabilities'] = agent_data.pop('capabilities')
+        # 转换为字典格式
+        db_agents_dict = {}
+        for agent in db_agents:
+            agent_dict = agent.to_dict()
+            # 确保有mcp_config字段
+            if 'mcp_config' not in agent_dict:
+                agent_dict['mcp_config'] = {
+                    'enabled_servers': [],
+                    'selected_tools': [],
+                    'total_tools': 0
+                }
+            db_agents_dict[agent.agent_id] = agent_dict
         
-        return await service.create_agent_template(session, agent_data)
+        all_agents = []
+        total = total_db
+        
+        # 如果包含内置智能体
+        if include_builtin:
+            # 先添加内置智能体
+            for builtin_id, builtin_config in BUILTIN_AGENTS.items():
+                # 应用过滤条件
+                if enabled_only and builtin_config.get('enabled') != 'yes':
+                    continue
+                if status and builtin_config.get('status') != status:
+                    continue
+                if search and search.lower() not in builtin_config.get('display_name', '').lower():
+                    continue
+                
+                if builtin_id in db_agents_dict:
+                    # 如果数据库中有，使用数据库配置，但保留内置标识
+                    agent_config = db_agents_dict[builtin_id].copy()
+                    agent_config['is_builtin'] = 'yes'
+                    all_agents.append(agent_config)
+                else:
+                    # 使用默认内置配置
+                    builtin_config_copy = builtin_config.copy()
+                    builtin_config_copy['mcp_config'] = {
+                        'enabled_servers': [],
+                        'selected_tools': [],
+                        'total_tools': 0
+                    }
+                    all_agents.append(builtin_config_copy)
+            
+            total += len(BUILTIN_AGENTS)
+        
+        # 添加用户自定义智能体
+        for agent_id, agent_config in db_agents_dict.items():
+            if not include_builtin or agent_id not in BUILTIN_AGENTS:
+                all_agents.append(agent_config)
+        
+        return all_agents, total
     
-    @staticmethod
-    async def update_agent(session: AsyncSession, agent_id: str, agent_data: Dict[str, Any]) -> Optional[AgentConfig]:
-        """更新智能体（静态方法）"""
-        service = AgentService.get_instance()
+    @transactional()
+    async def update_agent(
+        self, 
+        session: AsyncSession,
+        agent_id: str,
+        update_data: Dict[str, Any]
+    ) -> Optional[AgentConfig]:
+        """更新智能体配置"""
+        # 检查是否存在
+        existing = await self._dao.get_by_agent_id(session, agent_id)
+        if not existing:
+            # 如果是内置智能体且不存在，则创建
+            if agent_id in BUILTIN_AGENTS:
+                builtin_config = BUILTIN_AGENTS[agent_id].copy()
+                builtin_config.update(update_data)
+                builtin_config['agent_id'] = agent_id
+                builtin_config['is_builtin'] = 'yes'
+                
+                # 处理字段名映射
+                if 'capabilities' in builtin_config:
+                    builtin_config['agent_capabilities'] = builtin_config.pop('capabilities')
+                if 'name' in builtin_config:
+                    builtin_config['agent_name'] = builtin_config.pop('name')
+                if 'display_name' in builtin_config:
+                    builtin_config['agent_name'] = builtin_config.pop('display_name')
+                
+                return await self._dao.create(session, builtin_config)
+            else:
+                raise BusinessException(
+                    f"智能体 {agent_id} 不存在", 
+                    ResponseCode.NOT_FOUND
+                )
         
-        # 处理capabilities字段
-        if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):
-            agent_data['agent_capabilities'] = agent_data.pop('capabilities')
+        # 移除不可更新的字段
+        update_data.pop('agent_id', None)
+        update_data.pop('create_time', None)
+        update_data.pop('create_by', None)
         
-        return await service.update_agent_template(session, agent_id, agent_data)
+        # 设置更新时间
+        update_data['update_time'] = datetime.utcnow()
+        
+        # 处理capabilities字段映射
+        if 'capabilities' in update_data and isinstance(update_data['capabilities'], list):
+            update_data['agent_capabilities'] = update_data.pop('capabilities')
+        
+        logger.info(f"Updating agent: {agent_id}")
+        return await self._dao.update_by_field(session, 'agent_id', agent_id, update_data)
     
-    @staticmethod
-    async def delete_agent(session: AsyncSession, agent_id: str) -> bool:
-        """删除智能体（静态方法）"""
-        service = AgentService.get_instance()
-        return await service.delete_agent_template(session, agent_id)
+    @transactional()
+    async def delete_agent(
+        self, 
+        session: AsyncSession,
+        agent_id: str
+    ) -> bool:
+        """删除智能体配置"""
+        # 检查是否存在
+        existing = await self._dao.get_by_agent_id(session, agent_id)
+        if not existing:
+            raise BusinessException(
+                f"智能体 {agent_id} 不存在", 
+                ResponseCode.NOT_FOUND
+            )
+        
+        # 检查是否为内置智能体
+        if existing.is_builtin == 'yes':
+            raise BusinessException(
+                f"不能删除内置智能体: {agent_id}", 
+                ResponseCode.FORBIDDEN
+            )
+        
+        logger.info(f"Deleting agent: {agent_id}")
+        result = await self._dao.delete_by_field(session, 'agent_id', agent_id)
+        return result > 0
     
-    @staticmethod
-    async def update_agent_mcp_config(
+    @transactional()
+    async def update_mcp_config(
+        self,
         session: AsyncSession,
         agent_id: str,
         enabled_servers: List[str],
         selected_tools: List[str]
     ) -> Optional[AgentConfig]:
-        """更新智能体MCP配置（静态方法）"""
-        service = AgentService.get_instance()
-        
+        """更新智能体MCP配置"""
         # 构建MCP工具配置
         mcp_tools_config = []
         for server_id in enabled_servers:
@@ -221,173 +356,20 @@ class AgentService:
             'tools_info': tools_info
         }
         
-        return await service.update_agent_template(session, agent_id, update_data)
-    
-    # ==================== 实例方法（新架构） ====================
+        return await self.update_agent(session, agent_id, update_data)
     
     @transactional()
-    async def create_agent_template(
-        self, 
-        session: AsyncSession,
-        agent_data: Dict[str, Any]
-    ) -> AgentConfig:
-        """创建智能体配置（实例方法）"""
-        # 业务验证
-        if not agent_data.get('agent_id'):
-            raise ValueError("Agent ID is required")
-        
-        # 检查是否已存在
-        existing = await self._dao.get_by_agent_id(session, agent_data['agent_id'])
-        if existing:
-            raise ValueError(f"Agent with ID {agent_data['agent_id']} already exists")
-        
-        # 检查是否为保留的内置智能体ID
-        if agent_data['agent_id'] in BUILTIN_AGENTS and agent_data.get('is_builtin') != 'yes':
-            raise ValueError(f"Agent ID {agent_data['agent_id']} is reserved for builtin agents")
-        
-        logger.info(f"Creating agent: {agent_data['agent_id']}")
-        return await self._dao.create(session, agent_data)
-    
-    async def get_agent_by_id(
-        self, 
-        session: AsyncSession, 
-        agent_id: str
-    ) -> Optional[AgentConfig]:
-        """根据ID获取智能体配置（实例方法）"""
-        return await self._dao.get_by_agent_id(session, agent_id)
-    
-    async def get_agent_list(
-        self, 
-        session: AsyncSession,
-        enabled_only: bool = True,
-        status: Optional[str] = None,
-        builtin_only: Optional[bool] = None,
-        page: int = 1,
-        size: int = 10
-    ) -> Dict[str, Any]:
-        """获取智能体列表（实例方法）"""
-        offset = (page - 1) * size
-        
-        # 构建过滤条件
-        filters = {}
-        if enabled_only:
-            filters['agent_enabled'] = 'yes'
-            filters['is_active'] = True
-        if status:
-            filters['agent_status'] = status
-        if builtin_only is not None:
-            filters['is_builtin'] = 'yes' if builtin_only else 'no'
-        
-        # 获取数据和总数
-        agents = await self._dao.get_list(
-            session, 
-            filters=filters if filters else None,
-            limit=size, 
-            offset=offset,
-            order_by='create_time'
-        )
-        
-        total = await self._dao.count(session, filters=filters if filters else None)
-        
-        return {
-            'items': [agent.to_dict() for agent in agents],
-            'total': total,
-            'page': page,
-            'size': size,
-            'pages': (total + size - 1) // size
-        }
-    
-    @transactional()
-    async def update_agent_template(
-        self, 
+    async def update_agent_status(
+        self,
         session: AsyncSession,
         agent_id: str,
-        update_data: Dict[str, Any]
+        status: str
     ) -> Optional[AgentConfig]:
-        """更新智能体配置（实例方法）"""
-        # 检查是否存在
-        existing = await self._dao.get_by_agent_id(session, agent_id)
-        if not existing:
-            # 如果是内置智能体且不存在，则创建
-            if agent_id in BUILTIN_AGENTS:
-                builtin_config = BUILTIN_AGENTS[agent_id].copy()
-                builtin_config.update(update_data)
-                builtin_config['agent_id'] = agent_id
-                builtin_config['is_builtin'] = 'yes'
-                # 处理字段名映射
-                if 'capabilities' in builtin_config:
-                    builtin_config['agent_capabilities'] = builtin_config.pop('capabilities')
-                if 'name' in builtin_config:
-                    builtin_config['agent_name'] = builtin_config.pop('name')
-                if 'display_name' in builtin_config:
-                    builtin_config['agent_name'] = builtin_config.pop('display_name')
-                
-                return await self._dao.create(session, builtin_config)
-            else:
-                raise ValueError(f"Agent with ID {agent_id} not found")
-        
-        # 移除不可更新的字段
-        update_data.pop('agent_id', None)
-        update_data.pop('create_time', None)
-        update_data.pop('create_by', None)
-        
-        logger.info(f"Updating agent: {agent_id}")
-        return await self._dao.update_by_field(session, 'agent_id', agent_id, update_data)
+        """更新智能体状态"""
+        return await self._dao.update_agent_status(session, agent_id, status)
     
     @transactional()
-    async def delete_agent_template(
-        self, 
-        session: AsyncSession,
-        agent_id: str
-    ) -> bool:
-        """删除智能体配置（实例方法）"""
-        # 检查是否存在
-        existing = await self._dao.get_by_agent_id(session, agent_id)
-        if not existing:
-            return False
-        
-        # 检查是否为内置智能体
-        if existing.is_builtin == 'yes':
-            raise ValueError(f"Cannot delete builtin agent: {agent_id}")
-        
-        logger.info(f"Deleting agent: {agent_id}")
-        return await self._dao.delete_by_field(session, 'agent_id', agent_id) > 0
-    
-    async def get_agent_statistics(
-        self, 
-        session: AsyncSession
-    ) -> Dict[str, Any]:
-        """获取智能体统计信息（实例方法）"""
-        total_agents = await self._dao.count(session)
-        enabled_agents = await self._dao.count_enabled_agents(session)
-        builtin_agents = await self._dao.count_builtin_agents(session)
-        
-        return {
-            'total': total_agents + len(BUILTIN_AGENTS),  # 包含内置智能体
-            'enabled': enabled_agents,
-            'builtin': builtin_agents + len(BUILTIN_AGENTS),
-            'custom': total_agents - builtin_agents
-        }
-    
-    # ==================== 向后兼容方法 ====================
-    
-    async def get_by_agent_id(self, session: AsyncSession, agent_id: str) -> Optional[AgentConfig]:
-        """根据智能体ID获取配置（向后兼容）"""
-        return await self.get_agent_by_id(session, agent_id)
-    
-    async def get_enabled_agents(self, session: AsyncSession) -> List[AgentConfig]:
-        """获取所有启用的智能体（向后兼容）"""
-        return await self._dao.get_enabled_agents(session)
-    
-    async def get_builtin_agents(self, session: AsyncSession) -> List[AgentConfig]:
-        """获取所有内置智能体（向后兼容）"""
-        return await self._dao.get_builtin_agents(session)
-    
-    async def get_running_agents(self, session: AsyncSession) -> List[AgentConfig]:
-        """获取正在运行的智能体（向后兼容）"""
-        return await self._dao.get_by_status(session, 'running')
-    
-    async def update_run_statistics(
+    async def update_statistics(
         self,
         session: AsyncSession,
         agent_id: str,
@@ -395,11 +377,72 @@ class AgentService:
         success_rate: float,
         avg_response_time: float
     ) -> Optional[AgentConfig]:
-        """更新运行统计信息（向后兼容）"""
+        """更新运行统计信息"""
         return await self._dao.update_statistics(
             session, agent_id, total_runs, success_rate, avg_response_time
         )
+    
+    async def get_statistics(
+        self, 
+        session: AsyncSession
+    ) -> Dict[str, Any]:
+        """获取智能体统计信息"""
+        db_stats = await self._dao.get_agent_statistics(session)
+        
+        # 包含内置智能体的统计
+        return {
+            'total': db_stats['total'] + len(BUILTIN_AGENTS),
+            'enabled': db_stats['enabled'],
+            'running': db_stats['running'],
+            'builtin': db_stats['builtin'] + len(BUILTIN_AGENTS),
+            'custom': db_stats['custom']
+        }
+    
+    async def search_agents(
+        self,
+        session: AsyncSession,
+        keyword: str,
+        page: int = 1,
+        size: int = 10
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """搜索智能体"""
+        offset = (page - 1) * size
+        
+        # 搜索数据库中的智能体
+        db_agents = await self._dao.search_by_name(session, keyword, True, size, offset)
+        
+        # 搜索内置智能体
+        builtin_matches = []
+        for builtin_id, builtin_config in BUILTIN_AGENTS.items():
+            if (keyword.lower() in builtin_config.get('display_name', '').lower() or
+                keyword.lower() in builtin_config.get('description', '').lower()):
+                builtin_config_copy = builtin_config.copy()
+                builtin_config_copy['mcp_config'] = {
+                    'enabled_servers': [],
+                    'selected_tools': [],
+                    'total_tools': 0
+                }
+                builtin_matches.append(builtin_config_copy)
+        
+        # 合并结果
+        all_matches = []
+        
+        # 转换数据库结果
+        for agent in db_agents:
+            agent_dict = agent.to_dict()
+            if 'mcp_config' not in agent_dict:
+                agent_dict['mcp_config'] = {
+                    'enabled_servers': [],
+                    'selected_tools': [],
+                    'total_tools': 0
+                }
+            all_matches.append(agent_dict)
+        
+        # 添加内置智能体匹配
+        all_matches.extend(builtin_matches)
+        
+        return all_matches, len(all_matches)
 
 
-# 创建全局实例以支持导入使用
+# 创建全局实例
 agent_service = AgentService()

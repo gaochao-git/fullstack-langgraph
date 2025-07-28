@@ -20,7 +20,8 @@ import {
   Tree,
   Form,
   Tooltip,
-  Table
+  Table,
+  message
 } from 'antd';
 import { 
   RobotOutlined,
@@ -127,13 +128,8 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
 const transformMCPServerToLocal = (server: MCPServer): LocalMCPServer => ({
   ...server,
   status: server.status as 'connected' | 'disconnected' | 'error',
-  // tools: server.tools.map(tool => ({
-  //   ...tool,
-  //   serverId: tool.server_id,
-  //   serverName: tool.server_name
-  // }))
-  // 直接用 tools: server.tools
-  tools: server.tools
+  // 确保 tools 始终是数组，避免 undefined 错误
+  tools: server.tools || []
 });
 
 const AgentManagement: React.FC = () => {
@@ -350,7 +346,7 @@ const AgentManagement: React.FC = () => {
     setLoading(true);
     try {
       const [agentsData, mcpServersData] = await Promise.all([
-        agentApi.getAgents(),
+        agentApi.getAllAgents(), // 使用 getAllAgents 返回数组而不是分页数据
         agentApi.getMCPServers(),
         loadAvailableModels()
       ]);
@@ -510,7 +506,7 @@ const AgentManagement: React.FC = () => {
     setIsCreating(false);
     
     // 初始化工具选择状态
-    const mcpToolNames = mcpServers.flatMap(s => s.tools.map(t => t.name));
+    const mcpToolNames = mcpServers.flatMap(s => (s.tools || []).map(t => t.name));
     const systemToolNames = agent.mcpConfig.selectedTools.filter(tool => 
       systemTools.some(st => st.name === tool)
     );
@@ -596,7 +592,7 @@ const AgentManagement: React.FC = () => {
           .map(server => ({
             server_id: server.id,
             server_name: server.name,
-            tools: server.tools
+            tools: (server.tools || [])
               .filter(tool => editMCPTools.includes(tool.name))
               .map(tool => tool.name)
           }))
@@ -1032,7 +1028,7 @@ const AgentManagement: React.FC = () => {
                               .filter(s => s.status === 'connected')
                               .forEach(server => {
                                 allConnectedMCPKeys.push(`server-${server.id}`);
-                                server.tools.forEach(tool => {
+                                (server.tools || []).forEach(tool => {
                                   allConnectedMCPKeys.push(`tool-${tool.name}`);
                                   allMCPToolNames.push(tool.name);
                                 });
@@ -1087,7 +1083,7 @@ const AgentManagement: React.FC = () => {
                           可用服务器: {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length}
                         </span>
                         <span className="text-sm text-gray-600">
-                          总工具数: {systemTools.length + mcpServers.reduce((sum, s) => sum + s.tools.length, 0)}
+                          总工具数: {systemTools.length + mcpServers.reduce((sum, s) => sum + (s.tools?.length || 0), 0)}
                         </span>
                       </Space>
                     </Col>
