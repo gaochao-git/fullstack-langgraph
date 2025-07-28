@@ -137,11 +137,15 @@ const MCPManagement: React.FC = () => {
   const fetchServers = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mcp/servers`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers`);
       if (response.ok) {
-        const data = await response.json();
-        const transformedServers = data.map(transformServerFromAPI);
-        setServers(transformedServers);
+        const result = await response.json();
+        if (result.status === 'ok' && result.data && result.data.items) {
+          const transformedServers = result.data.items.map(transformServerFromAPI);
+          setServers(transformedServers);
+        } else {
+          message.error(result.msg || '获取服务器列表失败');
+        }
       } else {
         message.error('获取服务器列表失败');
       }
@@ -156,7 +160,7 @@ const MCPManagement: React.FC = () => {
   const createServer = async (serverData: Partial<MCPServer>) => {
     try {
       const apiData = transformServerToAPI(serverData);
-      const response = await fetch(`${API_BASE_URL}/api/mcp/servers`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(apiData)
@@ -181,7 +185,7 @@ const MCPManagement: React.FC = () => {
   const updateServer = async (serverId: string, serverData: Partial<MCPServer>) => {
     try {
       const apiData = { ...transformServerToAPI(serverData), update_by: 'frontend_user' };
-      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(apiData)
@@ -205,7 +209,7 @@ const MCPManagement: React.FC = () => {
 
   const deleteServer = async (serverId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}`, {
         method: 'DELETE'
       });
       
@@ -227,7 +231,7 @@ const MCPManagement: React.FC = () => {
 
   const testServerConnection = async (serverId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}/test`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}/test`, {
         method: 'POST'
       });
       
@@ -304,7 +308,7 @@ const MCPManagement: React.FC = () => {
     
     const newEnabled = !server.enabled;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mcp/servers/${serverId}/enable`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}/enable`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: newEnabled ? 'on' : 'off' })
@@ -444,7 +448,7 @@ const MCPManagement: React.FC = () => {
       
       // 对于表单中的测试，我们创建一个临时服务器来测试
       // 这里先简化处理，只检查URL格式
-      const resp = await fetch(`${API_BASE_URL}/api/mcp/test_server`, {
+      const resp = await fetch(`${API_BASE_URL}/api/v1/mcp/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)

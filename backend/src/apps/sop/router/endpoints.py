@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["SOP Management"])
 
 
-@router.post("/sops", response_model=UnifiedResponse)
+@router.post("/v1/sops", response_model=UnifiedResponse)
 async def create_sop_template(
     sop_data: SOPTemplateCreate,
     db: AsyncSession = Depends(get_async_db)
@@ -33,7 +33,7 @@ async def create_sop_template(
     )
 
 
-@router.get("/sops/{sop_id}", response_model=UnifiedResponse)
+@router.get("/v1/sops/{sop_id}", response_model=UnifiedResponse)
 async def get_sop_template(
     sop_id: str,
     db: AsyncSession = Depends(get_async_db)
@@ -49,7 +49,7 @@ async def get_sop_template(
     )
 
 
-@router.get("/sops", response_model=UnifiedResponse)
+@router.get("/v1/sops", response_model=UnifiedResponse)
 async def list_sop_templates(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(10, ge=1, le=100, description="每页数量"),
@@ -82,7 +82,7 @@ async def list_sop_templates(
     )
 
 
-@router.put("/sops/{sop_id}", response_model=UnifiedResponse)
+@router.put("/v1/sops/{sop_id}", response_model=UnifiedResponse)
 async def update_sop_template(
     sop_id: str,
     sop_data: SOPTemplateUpdate,
@@ -99,7 +99,7 @@ async def update_sop_template(
     )
 
 
-@router.delete("/sops/{sop_id}", response_model=UnifiedResponse)
+@router.delete("/v1/sops/{sop_id}", response_model=UnifiedResponse)
 async def delete_sop_template(
     sop_id: str,
     db: AsyncSession = Depends(get_async_db)
@@ -115,7 +115,7 @@ async def delete_sop_template(
     )
 
 
-@router.get("/sops/meta/categories", response_model=UnifiedResponse)
+@router.get("/v1/sops/meta/categories", response_model=UnifiedResponse)
 async def get_sop_categories(
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -127,7 +127,7 @@ async def get_sop_categories(
     )
 
 
-@router.get("/sops/meta/teams", response_model=UnifiedResponse)
+@router.get("/v1/sops/meta/teams", response_model=UnifiedResponse)
 async def get_sop_teams(
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -139,7 +139,7 @@ async def get_sop_teams(
     )
 
 
-@router.get("/sops/meta/statistics", response_model=UnifiedResponse)
+@router.get("/v1/sops/meta/statistics", response_model=UnifiedResponse)
 async def get_sop_statistics(
     db: AsyncSession = Depends(get_async_db)
 ):

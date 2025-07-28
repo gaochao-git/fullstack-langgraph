@@ -1,44 +1,40 @@
-"""MCP Server management routes."""
-from datetime import datetime
+"""MCP Server管理路由 - 使用统一响应格式"""
+
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
-import json
-import uuid
-import logging
-import aiohttp
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
+import aiohttp
+import logging
 
-from src.shared.core.dependencies import get_sync_db
-from ....shared.db.models import MCPServer
-from ..schema.mcp import MCPServerCreate, MCPServerUpdate, MCPServerResponse, MCPTestRequest, MCPTestResponse
+from src.shared.db.config import get_async_db
+from src.apps.mcp.schema.mcp import (
+    MCPServerCreate, MCPServerUpdate, MCPQueryParams,
+    MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate
+)
+from src.apps.mcp.service.mcp_service import mcp_service
+from src.shared.schemas.response import (
+    UnifiedResponse, success_response, paginated_response, ResponseCode
+)
+from src.shared.core.exceptions import BusinessException
+from src.shared.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter()
+logger = get_logger(__name__)
+router = APIRouter(tags=["MCP Server Management"])
 
 
 async def _test_mcp_connection(server_uri: str, timeout: int = 10) -> List[dict]:
     """测试MCP服务器连接并发现工具"""
     try:
         # 处理MCP服务器URI格式
-        # 支持的格式:
-        # - http://localhost:3001/sse
-        # - https://localhost:3001/stdio  
-        # - http://localhost:3001 (自动添加/sse/)
-        
         if server_uri.startswith('http://') or server_uri.startswith('https://'):
-            # 检查是否已经有传输方式后缀
             if server_uri.endswith('/sse') or server_uri.endswith('/stdio'):
                 http_url = server_uri + '/'
             elif server_uri.endswith('/sse/') or server_uri.endswith('/stdio/'):
                 http_url = server_uri
             else:
-                # 默认添加/sse/后缀
                 http_url = server_uri.rstrip('/') + '/sse/'
         else:
-            # 兼容旧格式，假设是简单的host:port格式
             http_url = f"http://{server_uri}/sse/"
         
         logger.info(f"测试MCP连接: {server_uri} -> {http_url}")
@@ -47,15 +43,11 @@ async def _test_mcp_connection(server_uri: str, timeout: int = 10) -> List[dict]
         try:
             from fastmcp import Client
             
-            # 创建客户端并连接
             async with Client(http_url) as client:
-                # 获取工具列表
                 tools_info = await client.list_tools()
                 
-                # 转换工具信息格式
                 tools = []
                 if tools_info:
-                    # 尝试不同的访问方式
                     if hasattr(tools_info, 'tools'):
                         tool_list = tools_info.tools
                     elif isinstance(tools_info, list):
@@ -71,7 +63,6 @@ async def _test_mcp_connection(server_uri: str, timeout: int = 10) -> List[dict]
                             "name": getattr(tool, 'name', str(tool)),
                             "description": getattr(tool, 'description', f"Tool: {getattr(tool, 'name', str(tool))}"),
                         }
-                        # 添加参数信息（如果有的话）
                         if hasattr(tool, 'inputSchema'):
                             tool_dict["inputSchema"] = tool.inputSchema
                         tools.append(tool_dict)
@@ -80,7 +71,6 @@ async def _test_mcp_connection(server_uri: str, timeout: int = 10) -> List[dict]
                 return tools
             
         except ImportError:
-            # 如果没有fastmcp，使用HTTP请求方式
             logger.warning("fastmcp不可用，使用HTTP方式测试连接")
             return await _test_mcp_http_connection(http_url, timeout)
             
@@ -93,18 +83,16 @@ async def _test_mcp_http_connection(http_url: str, timeout: int = 10) -> List[di
     """使用HTTP方式测试MCP连接（降级方案）"""
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-            # 尝试健康检查
             test_urls = [
                 http_url + "health", 
                 http_url + "tools/list",
-                http_url.rstrip('/'),  # 根路径
+                http_url.rstrip('/'),
             ]
             
             for url in test_urls:
                 try:
                     async with session.get(url) as response:
                         if response.status == 200:
-                            # 如果是工具列表URL，尝试解析
                             if "tools" in url:
                                 data = await response.json()
                                 if isinstance(data, list):
@@ -112,11 +100,8 @@ async def _test_mcp_http_connection(http_url: str, timeout: int = 10) -> List[di
                                             "description": tool.get("description", "MCP Tool")} 
                                            for tool in data]
                             
-                            # 连接成功，返回默认工具信息
                             logger.info(f"HTTP连接成功: {url}")
-                            return [
-                                {"name": "mcp_tool", "description": "MCP Server Tool"}
-                            ]
+                            return [{"name": "mcp_tool", "description": "MCP Server Tool"}]
                 except Exception as e:
                     logger.debug(f"尝试URL {url} 失败: {e}")
                     continue
@@ -127,217 +112,225 @@ async def _test_mcp_http_connection(http_url: str, timeout: int = 10) -> List[di
         raise Exception(f"HTTP连接测试失败: {str(e)}")
 
 
-@router.get("/mcp/servers")
-async def get_mcp_servers(
-    team_name: Optional[str] = None,
-    is_enabled: Optional[str] = None,
-    db: Session = Depends(get_sync_db)
+@router.post("/v1/mcp/servers", response_model=UnifiedResponse)
+async def create_mcp_server(
+    server_data: MCPServerCreate,
+    db: AsyncSession = Depends(get_async_db)
 ):
-    """获取MCP服务器列表"""
-    try:
-        query = db.query(MCPServer)
-        
-        if team_name:
-            query = query.filter(MCPServer.team_name == team_name)
-        
-        if is_enabled:
-            query = query.filter(MCPServer.is_enabled == is_enabled)
-        
-        servers = query.order_by(MCPServer.create_time.desc()).all()
-        return [server.to_dict() for server in servers]
-    except Exception as e:
-        logger.error(f"获取MCP服务器列表失败: {e}")
-        return []
-
-
-@router.get("/mcp/servers/{server_id}", response_model=MCPServerResponse)
-async def get_mcp_server(server_id: str, db: Session = Depends(get_sync_db)):
-    """获取单个MCP服务器详情"""
-    server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
-    if not server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
-    return server.to_dict()
-
-
-@router.post("/mcp/servers", response_model=MCPServerResponse)
-async def create_mcp_server(server: MCPServerCreate, db: Session = Depends(get_sync_db)):
     """创建MCP服务器"""
-    # 检查server_id是否已存在
-    existing_server = db.query(MCPServer).filter(MCPServer.server_id == server.server_id).first()
-    if existing_server:
-        raise HTTPException(status_code=400, detail="Server ID already exists")
+    server = await mcp_service.create_server(db, server_data)
+    return success_response(
+        data=server.to_dict(),
+        msg="MCP服务器创建成功",
+        code=ResponseCode.CREATED
+    )
+
+
+@router.get("/v1/mcp/servers/{server_id}", response_model=UnifiedResponse)
+async def get_mcp_server(
+    server_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取指定MCP服务器"""
+    server = await mcp_service.get_server_by_id(db, server_id)
+    if not server:
+        raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
-    # 创建新服务器
-    db_server = MCPServer(
-        server_id=server.server_id,
-        server_name=server.server_name,
-        server_uri=server.server_uri,
-        server_description=server.server_description,
-        is_enabled=server.is_enabled,
-        connection_status=server.connection_status,
-        auth_type=server.auth_type,
-        auth_token=server.auth_token,
-        api_key_header=server.api_key_header,
-        read_timeout_seconds=server.read_timeout_seconds,
-        server_tools=json.dumps(server.server_tools) if server.server_tools else None,
-        server_config=json.dumps(server.server_config) if server.server_config else None,
-        team_name=server.team_name,
-        create_by=server.create_by,
-        create_time=datetime.utcnow(),
-        update_time=datetime.utcnow()
+    return success_response(
+        data=server.to_dict(),
+        msg="获取MCP服务器成功"
+    )
+
+
+@router.get("/v1/mcp/servers", response_model=UnifiedResponse)
+async def list_mcp_servers(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
+    is_enabled: Optional[str] = Query(None, description="启用状态过滤"),
+    connection_status: Optional[str] = Query(None, description="连接状态过滤"),
+    team_name: Optional[str] = Query(None, max_length=100, description="团队过滤"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """查询MCP服务器列表"""
+    params = MCPQueryParams(
+        search=search,
+        is_enabled=is_enabled,
+        connection_status=connection_status,
+        team_name=team_name,
+        limit=size,
+        offset=(page - 1) * size
     )
     
-    db.add(db_server)
-    db.commit()
-    db.refresh(db_server)
+    servers, total = await mcp_service.list_servers(db, params)
+    server_data = [server.to_dict() for server in servers]
     
-    return db_server.to_dict()
+    return paginated_response(
+        items=server_data,
+        total=total,
+        page=page,
+        size=size,
+        msg="查询MCP服务器列表成功"
+    )
 
 
-@router.put("/mcp/servers/{server_id}", response_model=MCPServerResponse)
+@router.put("/v1/mcp/servers/{server_id}", response_model=UnifiedResponse)
 async def update_mcp_server(
-    server_id: str, 
-    server_update: MCPServerUpdate, 
-    db: Session = Depends(get_sync_db)
+    server_id: str,
+    server_data: MCPServerUpdate,
+    db: AsyncSession = Depends(get_async_db)
 ):
     """更新MCP服务器"""
-    db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
-    if not db_server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+    updated_server = await mcp_service.update_server(db, server_id, server_data)
+    if not updated_server:
+        raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
-    # 更新字段
-    update_data = server_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        if field in ['server_tools', 'server_config'] and value is not None:
-            setattr(db_server, field, json.dumps(value))
-        else:
-            setattr(db_server, field, value)
-    
-    db_server.update_time = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(db_server)
-    
-    return db_server.to_dict()
+    return success_response(
+        data=updated_server.to_dict(),
+        msg="MCP服务器更新成功"
+    )
 
 
-@router.delete("/mcp/servers/{server_id}")
-async def delete_mcp_server(server_id: str, db: Session = Depends(get_sync_db)):
+@router.delete("/v1/mcp/servers/{server_id}", response_model=UnifiedResponse)
+async def delete_mcp_server(
+    server_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
     """删除MCP服务器"""
-    db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
-    if not db_server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+    success = await mcp_service.delete_server(db, server_id)
+    if not success:
+        raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
-    db.delete(db_server)
-    db.commit()
-    
-    return {"message": "MCP server deleted successfully"}
+    return success_response(
+        data={"deleted_id": server_id},
+        msg="MCP服务器删除成功"
+    )
 
 
-@router.post("/mcp/servers/{server_id}/test")
-async def test_mcp_server(server_id: str, db: Session = Depends(get_sync_db)):
+@router.post("/v1/mcp/servers/{server_id}/test", response_model=UnifiedResponse)
+async def test_mcp_server(
+    server_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
     """测试MCP服务器连接"""
-    db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
-    if not db_server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+    server = await mcp_service.get_server_by_id(db, server_id)
+    if not server:
+        raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
     try:
-        # 实际的MCP服务器连接测试，使用服务器配置的超时时间
-        timeout = db_server.read_timeout_seconds if db_server.read_timeout_seconds else 5
-        tools = await _test_mcp_connection(db_server.server_uri, timeout)
+        timeout = server.read_timeout_seconds if server.read_timeout_seconds else 5
+        tools = await _test_mcp_connection(server.server_uri, timeout)
         
-        # 更新连接状态为成功
-        db_server.connection_status = "connected"
-        db_server.update_time = datetime.utcnow()
-        
-        # 更新发现的工具
+        # 更新连接状态和工具列表
+        await mcp_service.update_connection_status(db, server_id, "connected")
         if tools:
-            db_server.server_tools = json.dumps(tools)
+            await mcp_service.update_server_tools(db, server_id, [tool["name"] for tool in tools])
         
-        db.commit()
-        
-        return {
-            "healthy": True,
-            "tools": tools,
-            "error": None
-        }
+        return success_response(
+            data={
+                "healthy": True,
+                "tools": tools,
+                "error": None
+            },
+            msg="MCP服务器连接测试成功"
+        )
     except Exception as e:
-        logger.error(f"MCP服务器连接测试失败 {db_server.server_uri}: {e}")
-        
         # 更新连接状态为错误
-        db_server.connection_status = "error"
-        db_server.update_time = datetime.utcnow()
-        db.commit()
+        await mcp_service.update_connection_status(db, server_id, "error")
         
-        return {
-            "healthy": False,
-            "tools": [],
-            "error": str(e)
-        }
+        return success_response(
+            data={
+                "healthy": False,
+                "tools": [],
+                "error": str(e)
+            },
+            msg="MCP服务器连接测试失败"
+        )
 
 
-@router.patch("/mcp/servers/{server_id}/status")
+@router.patch("/v1/mcp/servers/{server_id}/status", response_model=UnifiedResponse)
 async def update_server_status(
-    server_id: str, 
-    status: str, 
-    db: Session = Depends(get_sync_db)
+    server_id: str,
+    status_data: MCPStatusUpdate,
+    db: AsyncSession = Depends(get_async_db)
 ):
     """更新MCP服务器状态"""
-    db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
-    if not db_server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+    updated_server = await mcp_service.update_connection_status(db, server_id, status_data.status)
+    if not updated_server:
+        raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
-    if status not in ['connected', 'disconnected', 'error']:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    
-    db_server.connection_status = status
-    db_server.update_time = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(db_server)
-    
-    return {"message": f"Server status updated to {status}"}
+    return success_response(
+        data=updated_server.to_dict(),
+        msg=f"服务器状态已更新为 {status_data.status}"
+    )
 
 
-@router.patch("/mcp/servers/{server_id}/enable")
+@router.patch("/v1/mcp/servers/{server_id}/enable", response_model=UnifiedResponse)
 async def toggle_server_enable(
-    server_id: str, 
-    enabled: str, 
-    db: Session = Depends(get_sync_db)
+    server_id: str,
+    enable_data: MCPEnableUpdate,
+    db: AsyncSession = Depends(get_async_db)
 ):
     """启用/禁用MCP服务器"""
-    db_server = db.query(MCPServer).filter(MCPServer.server_id == server_id).first()
-    if not db_server:
-        raise HTTPException(status_code=404, detail="MCP server not found")
+    update_data = MCPServerUpdate(is_enabled=enable_data.enabled)
+    updated_server = await mcp_service.update_server(db, server_id, update_data)
+    if not updated_server:
+        raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
-    if enabled not in ['on', 'off']:
-        raise HTTPException(status_code=400, detail="Invalid enabled value, must be 'on' or 'off'")
-    
-    db_server.is_enabled = enabled
-    db_server.update_time = datetime.utcnow()
-    
-    db.commit()
-    db.refresh(db_server)
-    
-    return {"message": f"Server {'enabled' if enabled == 'on' else 'disabled'} successfully"}
+    action = "启用" if enable_data.enabled == "on" else "禁用"
+    return success_response(
+        data=updated_server.to_dict(),
+        msg=f"服务器已{action}成功"
+    )
 
 
-@router.post("/mcp/test_server", response_model=MCPTestResponse)
-async def test_server_connection(test_request: MCPTestRequest):
+@router.get("/v1/mcp/servers/meta/teams", response_model=UnifiedResponse)
+async def get_mcp_teams(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取所有MCP团队"""
+    teams = await mcp_service.get_teams(db)
+    return success_response(
+        data=teams,
+        msg="获取MCP团队成功"
+    )
+
+
+@router.get("/v1/mcp/servers/meta/statistics", response_model=UnifiedResponse)
+async def get_mcp_statistics(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取MCP统计信息"""
+    statistics = await mcp_service.get_status_statistics(db)
+    return success_response(
+        data=statistics,
+        msg="获取MCP统计信息成功"
+    )
+
+
+@router.post("/v1/mcp/test", response_model=UnifiedResponse)
+async def test_server_connection(
+    test_request: MCPTestRequest
+):
     """通用MCP服务器连接测试接口"""
     try:
-        # 实际的MCP服务器连接测试，使用默认超时时间10秒
-        tools = await _test_mcp_connection(test_request.url, 10)
+        tools = await _test_mcp_connection(test_request.server_uri, test_request.timeout)
         
-        return {
-            "healthy": True,
-            "tools": tools,
-            "error": None
-        }
+        return success_response(
+            data={
+                "healthy": True,
+                "tools": tools,
+                "error": None
+            },
+            msg="MCP连接测试成功"
+        )
     except Exception as e:
-        logger.error(f"MCP连接测试失败 {test_request.url}: {e}")
-        return {
-            "healthy": False,
-            "tools": [],
-            "error": str(e)
-        }
+        logger.error(f"MCP连接测试失败 {test_request.server_uri}: {e}")
+        return success_response(
+            data={
+                "healthy": False,
+                "tools": [],
+                "error": str(e)
+            },
+            msg="MCP连接测试失败"
+        )
