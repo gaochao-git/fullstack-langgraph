@@ -3,10 +3,12 @@ Agent configuration service for dynamic loading from database.
 """
 
 import asyncio
+import json
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from src.shared.core.dependencies import get_sync_db
-from ....shared.db.models import AgentConfig
+from src.apps.agent.models import AgentConfig
+from src.apps.ai_model.models import AIModelConfig
 
 
 class AgentConfigService:
@@ -83,7 +85,6 @@ class AgentConfigService:
         # Handle case where llm_config might be a JSON string
         if isinstance(llm_config, str):
             try:
-                import json
                 llm_config = json.loads(llm_config)
             except (json.JSONDecodeError, ValueError):
                 llm_config = {}
@@ -178,7 +179,6 @@ class AgentConfigService:
         # Handle case where prompt_config might be a JSON string
         if isinstance(prompt_config, str):
             try:
-                import json
                 # Try to parse as JSON first
                 parsed_config = json.loads(prompt_config)
                 if isinstance(parsed_config, dict):
@@ -225,9 +225,6 @@ class AgentConfigService:
             Dictionary containing model info (endpoint_url, api_key, etc.)
         """
         try:
-            # Import here to avoid circular imports
-            from ....shared.db.models import AIModelConfig
-            
             # Query model by model_type (which matches model_name)
             model = db.query(AIModelConfig).filter(
                 AIModelConfig.model_type == model_name,
@@ -271,7 +268,6 @@ class AgentConfigService:
         # 如果是字符串，尝试解析JSON
         if isinstance(llm_config, str):
             try:
-                import json
                 llm_config = json.loads(llm_config)
             except (json.JSONDecodeError, ValueError):
                 return []
@@ -287,8 +283,6 @@ class AgentConfigService:
             
         # Get model details from database for each available model
         try:
-            from ....shared.db.models import AIModelConfig
-            
             models = []
             for model_type in available_model_types:
                 model = db.query(AIModelConfig).filter(
@@ -323,9 +317,6 @@ class AgentConfigService:
             Dictionary mapping model names to their configurations
         """
         try:
-            # Import here to avoid circular imports
-            from ....shared.db.models import AIModelConfig
-            
             # Query active models
             models = db.query(AIModelConfig).filter(
                 AIModelConfig.model_status == 'active'

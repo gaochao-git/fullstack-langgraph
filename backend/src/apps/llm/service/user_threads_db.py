@@ -17,7 +17,7 @@ from sqlalchemy import select, insert, update, delete
 from sqlalchemy.exc import IntegrityError
 
 from src.shared.db.config import get_async_db_context
-from src.shared.db.models import User, UserThread
+from src.apps.user.models import User, UserThread
 
 logger = logging.getLogger(__name__)
 

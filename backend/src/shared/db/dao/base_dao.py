@@ -10,7 +10,7 @@ from sqlalchemy import select, update, delete, and_, func
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime
 
-from ..models import now_shanghai
+from src.shared.db.models import now_shanghai
 
 # 泛型类型变量
 ModelType = TypeVar('ModelType')

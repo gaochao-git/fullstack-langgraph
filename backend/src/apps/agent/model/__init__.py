@@ -2,6 +2,6 @@
 Agent models
 """
 
-from ....shared.db.models import AgentConfig
+from src.apps.agent.models import AgentConfig
 
 __all__ = ['AgentConfig']

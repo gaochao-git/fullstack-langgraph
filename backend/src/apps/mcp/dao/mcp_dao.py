@@ -1,11 +1,12 @@
 """MCP Server数据访问对象 - 纯异步实现"""
 
+import json
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct
 
 from src.shared.db.dao.base_dao import BaseDAO
-from src.shared.db.models import MCPServer
+from src.apps.mcp.models import MCPServer
 
 
 class MCPDAO(BaseDAO[MCPServer]):
@@ -99,6 +100,5 @@ class MCPDAO(BaseDAO[MCPServer]):
         tools: List[str]
     ) -> Optional[MCPServer]:
         """更新服务器工具列表"""
-        import json
         update_data = {'server_tools': json.dumps(tools)}
         return await self.update_by_field(session, 'server_id', server_id, update_data)

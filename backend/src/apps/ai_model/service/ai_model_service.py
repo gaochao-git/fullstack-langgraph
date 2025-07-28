@@ -9,8 +9,8 @@ import aiohttp
 import logging
 from datetime import datetime
 
-from ..dao.ai_model_dao import AIModelDAO
-from src.shared.db.models import AIModelConfig
+from src.apps.ai_model.dao.ai_model_dao import AIModelDAO
+from src.apps.ai_model.models import AIModelConfig
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger
 

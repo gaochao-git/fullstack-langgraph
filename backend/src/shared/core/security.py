@@ -4,6 +4,7 @@
 """
 
 import jwt
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Union
 from passlib.context import CryptContext
@@ -88,7 +89,6 @@ class SecurityService:
 
 def create_api_key() -> str:
     """创建API密钥"""
-    import secrets
     return secrets.token_urlsafe(32)
 
 

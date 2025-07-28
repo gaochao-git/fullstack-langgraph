@@ -34,7 +34,7 @@ def search_sops_from_db(
     """从数据库搜索SOPs"""
     try:
         with get_sync_db() as db:
-            from src.shared.db.models import SOPTemplate
+            from src.apps.sop.models import SOPTemplate
             
             # 构建查询
             query = db.query(SOPTemplate)

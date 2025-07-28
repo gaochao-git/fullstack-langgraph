@@ -8,7 +8,7 @@ from sqlalchemy import select, and_, func, update as sql_update
 from datetime import datetime
 
 from src.shared.db.dao.base_dao import BaseDAO
-from src.shared.db.models import AgentConfig
+from src.apps.agent.models import AgentConfig
 
 
 class AgentDAO(BaseDAO[AgentConfig]):

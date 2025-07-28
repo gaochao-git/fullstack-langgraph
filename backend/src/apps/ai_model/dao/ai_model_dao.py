@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct
 
 from src.shared.db.dao.base_dao import BaseDAO
-from src.shared.db.models import AIModelConfig
+from src.apps.ai_model.models import AIModelConfig
 
 
 class AIModelDAO(BaseDAO[AIModelConfig]):

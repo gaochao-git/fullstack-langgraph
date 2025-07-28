@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct
 
 from src.shared.db.dao.base_dao import BaseDAO
-from src.shared.db.models import PeriodicTask, TaskResult, CeleryTaskRecord
+from src.apps.scheduled_task.models import PeriodicTask, TaskResult, CeleryTaskRecord
 
 
 class ScheduledTaskDAO(BaseDAO[PeriodicTask]):

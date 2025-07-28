@@ -1,12 +1,12 @@
 """Database configuration and setup."""
 import asyncio
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
 # 使用新的配置系统
-from ..core.config import settings
+from src.shared.core.config import settings
 
 # 数据库配置从统一配置获取
 DATABASE_TYPE = settings.DATABASE_TYPE
@@ -201,7 +201,6 @@ async def init_database():
 async def test_database_connection():
     """Test database connection."""
     try:
-        from sqlalchemy import text
         async with async_engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
         print(f"✅ Database connection successful ({DATABASE_TYPE})")

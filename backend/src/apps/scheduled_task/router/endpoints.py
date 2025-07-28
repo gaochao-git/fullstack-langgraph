@@ -6,12 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
 from src.shared.db.config import get_async_db
-from ..schema import (
+from src.apps.scheduled_task.schema import (
     ScheduledTaskCreate, ScheduledTaskUpdate, ScheduledTaskQueryParams,
     TaskExecutionLogResponse, CeleryTaskRecordQueryParams, TaskStatusUpdate,
     TaskTriggerResponse
 )
-from ..service import scheduled_task_service
+from src.apps.scheduled_task.service import scheduled_task_service
 from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
 )

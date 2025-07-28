@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct
 
 from src.shared.db.dao.base_dao import BaseDAO
-from src.shared.db.models import SOPTemplate
+from src.apps.sop.models import SOPTemplate
 
 
 class SOPDAO(BaseDAO[SOPTemplate]):

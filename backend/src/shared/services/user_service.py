@@ -8,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
-from ..db.dao import UserDAO, UserThreadDAO
-from ..db.models import User, UserThread
-from ..db.transaction import transactional, sync_transactional
-from ..core.logging import get_logger
+from src.shared.db.dao import UserDAO, UserThreadDAO
+from src.apps.user.models import User, UserThread
+from src.shared.db.transaction import transactional, sync_transactional
+from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 

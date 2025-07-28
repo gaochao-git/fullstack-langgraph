@@ -6,8 +6,8 @@ import pytest
 from unittest.mock import Mock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..service.agent_service import AgentService
-from ..service.agent_config_service import AgentConfigService
+from src.apps.agent.service.agent_service import AgentService
+from src.apps.agent.service.agent_config_service import AgentConfigService
 
 
 class TestAgentService:

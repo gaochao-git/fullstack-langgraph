@@ -3,11 +3,11 @@
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dao.sop_dao import SOPDAO
-from src.shared.db.models import SOPTemplate
+from src.apps.sop.dao.sop_dao import SOPDAO
+from src.apps.sop.models import SOPTemplate
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger
-from ..schema.sop import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
+from src.apps.sop.schema.sop import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
 
 logger = get_logger(__name__)
 

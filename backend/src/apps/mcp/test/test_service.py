@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..service.mcp_service import MCPService
+from src.apps.mcp.service.mcp_service import MCPService
 
 
 class TestMCPService:

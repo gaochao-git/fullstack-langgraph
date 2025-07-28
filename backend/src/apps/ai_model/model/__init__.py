@@ -2,6 +2,6 @@
 AI Model models
 """
 
-from ....shared.db.models import AIModelConfig
+from src.apps.ai_model.models import AIModelConfig
 
 __all__ = ['AIModelConfig']

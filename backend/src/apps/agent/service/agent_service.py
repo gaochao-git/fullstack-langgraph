@@ -8,8 +8,8 @@ import json
 import uuid
 from datetime import datetime
 
-from ..dao.agent_dao import AgentDAO
-from src.shared.db.models import AgentConfig
+from src.apps.agent.dao.agent_dao import AgentDAO
+from src.apps.agent.models import AgentConfig
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException

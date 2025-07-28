@@ -5,9 +5,10 @@ User数据访问对象
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from sqlalchemy import select, or_, and_
 
 from .base_dao import BaseDAO
-from ..models import User, UserThread
+from src.apps.user.models import User, UserThread
 
 
 class UserDAO(BaseDAO[User]):
@@ -56,8 +57,6 @@ class UserDAO(BaseDAO[User]):
         offset: Optional[int] = None
     ) -> List[User]:
         """根据名称关键词搜索用户"""
-        from sqlalchemy import select, or_, and_
-        
         query = select(self.model).where(
             or_(
                 self.model.user_name.contains(name_keyword),
