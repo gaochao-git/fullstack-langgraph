@@ -5,14 +5,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.db.config import get_async_db
-from src.apps.sop.schema.sop import (
-    SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
-)
+from src.apps.sop.schema.sop import (SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams)
 from src.apps.sop.service.sop_service import sop_service
 from src.shared.core.logging import get_logger
-from src.shared.schemas.response import (
-    UnifiedResponse, success_response, paginated_response, ResponseCode
-)
+from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException
 
 logger = get_logger(__name__)
