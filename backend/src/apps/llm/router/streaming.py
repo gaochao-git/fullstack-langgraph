@@ -37,7 +37,7 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
     import asyncio
     import logging
-    from .user_threads_db import check_user_thread_exists, create_user_thread_mapping
+    from ..service.user_threads_db import check_user_thread_exists, create_user_thread_mapping
     logger = logging.getLogger(__name__)
     logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
     exists = await check_user_thread_exists(user_name, thread_id)
