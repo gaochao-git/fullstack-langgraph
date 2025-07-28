@@ -6,8 +6,8 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from .base_dao import BaseDAO
-from ..models import MCPServer
+from src.shared.db.dao.base_dao import BaseDAO
+from src.shared.db.models import MCPServer
 
 
 class MCPDAO(BaseDAO[MCPServer]):

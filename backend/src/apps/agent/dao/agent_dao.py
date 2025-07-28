@@ -6,8 +6,8 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from .base_dao import BaseDAO
-from ..models import AgentConfig
+from src.shared.db.dao.base_dao import BaseDAO
+from src.shared.db.models import AgentConfig
 
 
 class AgentDAO(BaseDAO[AgentConfig]):

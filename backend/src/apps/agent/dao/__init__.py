@@ -2,6 +2,6 @@
 Agent DAO
 """
 
-from ....shared.db.dao import AgentDAO
+from .agent_dao import AgentDAO
 
 __all__ = ['AgentDAO']

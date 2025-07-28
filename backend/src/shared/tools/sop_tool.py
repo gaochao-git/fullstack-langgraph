@@ -8,8 +8,8 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 # 导入数据库相关模块  
-from ..db.config import get_sync_session
-from ..db.dao.sop_dao import SOPDAO
+from src.shared.db.config import get_sync_session
+from src.apps.sop.dao.sop_dao import SOPDAO
 
 
 def get_sop_from_db(sop_id: str) -> Optional[Dict[str, Any]]:
@@ -34,7 +34,7 @@ def search_sops_from_db(
     """从数据库搜索SOPs"""
     try:
         for session in get_sync_session():
-            from ..models import SOPTemplate
+            from src.shared.db.models import SOPTemplate
             
             # 构建查询
             query = session.query(SOPTemplate)

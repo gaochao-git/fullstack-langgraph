@@ -2,6 +2,6 @@
 SOP DAO
 """
 
-from ....shared.db.dao import SOPDAO
+from .sop_dao import SOPDAO
 
 __all__ = ['SOPDAO']

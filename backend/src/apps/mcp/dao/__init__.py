@@ -2,6 +2,6 @@
 MCP DAO
 """
 
-from ....shared.db.dao import MCPDAO
+from .mcp_dao import MCPDAO
 
 __all__ = ['MCPDAO']

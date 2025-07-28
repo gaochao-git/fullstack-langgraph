@@ -8,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
-from ....shared.db.dao import SOPDAO
-from ....shared.db.models import SOPTemplate
-from ....shared.db.transaction import transactional, sync_transactional
-from ....shared.core.logging import get_logger
+from ..dao import SOPDAO
+from src.shared.db.models import SOPTemplate
+from src.shared.db.transaction import transactional, sync_transactional
+from src.shared.core.logging import get_logger
 from ..schema.sop import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
 
 logger = get_logger(__name__)
