@@ -96,6 +96,29 @@ class AgentApiService {
   }
 
   /**
+   * 获取所有智能体（简化接口，兼容现有代码）
+   */
+  async getAllAgents(): Promise<Agent[]> {
+    try {
+      const response = await baseFetch('/api/v1/agents?size=100');
+      if (!response.ok) {
+        throw new Error(`获取智能体列表失败: ${response.statusText}`);
+      }
+      const result = await response.json();
+      
+      // 处理统一响应格式
+      if (result.status === 'ok') {
+        return result.data.items || result.data;
+      } else {
+        throw new Error(result.msg || '获取智能体列表失败');
+      }
+    } catch (error) {
+      console.error('获取智能体列表失败:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 刷新后端智能体配置（无需重启服务）
    */
   async refreshAssistants(): Promise<any> {
