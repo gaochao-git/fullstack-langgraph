@@ -334,7 +334,7 @@ class AgentApiService {
    */
   async getAgentAvailableModels(agentId: string): Promise<any[]> {
     try {
-      const response = await baseFetch(`/api/agents/${agentId}/available-models`);
+      const response = await baseFetch(`/api/v1/agents/${agentId}/available-models`);
       if (!response.ok) {
         throw new Error(`获取可用模型失败: ${response.statusText}`);
       }

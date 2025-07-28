@@ -87,7 +87,7 @@ const AgentChatDialog: React.FC<AgentChatDialogProps> = ({
 
     try {
       // 调用后端API发送消息
-      const data = await baseFetchJson(`/api/agents/${agent.id}/chat`, {
+      const data = await baseFetchJson(`/api/v1/agents/${agent.id}/chat`, {
         method: 'POST',
         body: JSON.stringify({
           message: userMessage.content,

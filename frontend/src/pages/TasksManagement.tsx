@@ -195,7 +195,7 @@ const TasksManagement: React.FC = () => {
   // 获取智能体列表
   const fetchAgents = async () => {
     try {
-      const data = await baseFetchJson('/api/agents/');
+      const data = await baseFetchJson('/api/v1/agents/');
       setAgents(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch agents:', error);

@@ -129,7 +129,7 @@ export default function UnifiedAgentChat({
   useEffect(() => {
     const fetchAgentAvailableModels = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/agents/${agentId}/available-models`);
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/agents/${agentId}/available-models`);
         if (response.ok) {
           const result = await response.json();
           console.log('智能体可用模型API返回:', result);

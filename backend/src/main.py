@@ -19,7 +19,7 @@ load_dotenv()
 from .shared.core.config import settings
 from .shared.core.logging import setup_logging, get_logger
 from .shared.core.middleware import setup_middlewares
-from .api_router import api_router
+from .router import api_router
 
 # 导入LLM相关模块
 from .apps.llm.service.utils import test_postgres_connection

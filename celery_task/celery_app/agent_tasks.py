@@ -205,7 +205,7 @@ def periodic_agent_health_check():
     
     try:
         # 获取所有智能体列表
-        api_url = f"{AGENT_API_BASE_URL}/api/agents/"
+        api_url = f"{AGENT_API_BASE_URL}/api/v1/agents/"
         response = requests.get(api_url, timeout=10)
         
         if response.status_code == 200:
