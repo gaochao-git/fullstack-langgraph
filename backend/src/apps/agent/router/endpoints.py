@@ -13,7 +13,7 @@ import uuid
 
 from ....shared.db.config import get_async_session
 from ....shared.db.models import MCPServer, AgentConfig
-from src.agents.diagnostic_agent.tools_mcp import mcp_integrator
+from ...llm.agents.diagnostic_agent.tools_mcp import mcp_integrator
 
 logger = logging.getLogger(__name__)
 

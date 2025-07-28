@@ -16,8 +16,8 @@ def now_shanghai():
 from sqlalchemy import select, insert, update, delete
 from sqlalchemy.exc import IntegrityError
 
-from ..shared.db.config import get_async_session
-from ..shared.db.models import User, UserThread
+from ....shared.db.config import get_async_session
+from ....shared.db.models import User, UserThread
 
 logger = logging.getLogger(__name__)
 

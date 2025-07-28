@@ -7,7 +7,7 @@ import asyncio
 import logging
 from typing import List
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from src.shared.tools import sop_tool, general_tool
+from .....shared.tools import sop_tool, general_tool
 
 logger = logging.getLogger(__name__)
 

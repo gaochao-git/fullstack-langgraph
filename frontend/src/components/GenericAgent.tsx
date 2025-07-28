@@ -130,7 +130,7 @@ const GenericAgent: React.FC<GenericAgentProps> = ({
 
   // 使用LangGraph SDK的流式处理
   const { stream, isStreaming } = useStream({
-    apiUrl: import.meta.env.VITE_API_BASE_URL,
+    apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/llm`,
     assistantId: agentId,
     config: {
       configurable: agentConfig

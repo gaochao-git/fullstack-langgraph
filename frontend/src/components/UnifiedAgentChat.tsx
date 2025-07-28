@@ -90,7 +90,7 @@ export default function UnifiedAgentChat({
   const thread = useStream<{
     messages: Message[];
   }>({
-    apiUrl: import.meta.env.VITE_API_BASE_URL,
+    apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/llm`,
     assistantId: getAssistantId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),
@@ -253,7 +253,7 @@ export default function UnifiedAgentChat({
     setLoadingHistory(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/users/zhangsan123/threads?limit=20&offset=0`
+        `${import.meta.env.VITE_API_BASE_URL}/api/llm/users/zhangsan123/threads?limit=20&offset=0`
       );
 
       if (response.ok) {

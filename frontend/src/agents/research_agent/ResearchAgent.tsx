@@ -25,7 +25,7 @@ export default function ResearchAgent() {
     message?: string;
     [key: string]: any;
   }>({
-    apiUrl: import.meta.env.VITE_API_BASE_URL,
+    apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/llm`,
     assistantId: "research_agent",
     messagesKey: "messages",
     onUpdateEvent: (event: any) => {

@@ -9,13 +9,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from .utils import (
+from ..service.utils import (
     prepare_graph_config, 
     serialize_value,
     CHECK_POINT_URI,
     recover_thread_from_postgres
 )
-from .user_threads_db import (
+from ..service.user_threads_db import (
     check_user_thread_exists,
     create_user_thread_mapping,
     init_user_threads_db
@@ -24,12 +24,11 @@ from .user_threads_db import (
 logger = logging.getLogger(__name__)
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和相关操作
-
-ASSISTANTS = None
+# 智能体配置完全基于数据库，无需静态全局变量
 
 def init_refs(ASSISTANTS_param):
-    global ASSISTANTS
-    ASSISTANTS = ASSISTANTS_param
+    """保留函数签名以兼容现有调用，但实际不做任何操作"""
+    pass
 
 async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
@@ -158,7 +157,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from ..apps.agent.service.agent_config_service import AgentConfigService
+    from ...agent.service.agent_config_service import AgentConfigService
     
     assistant_id = request_body.assistant_id
     logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
@@ -186,16 +185,16 @@ async def handle_postgres_streaming(request_body, thread_id):
         if is_builtin:
             # 内置智能体使用专用图
             if agent_id == 'diagnostic_agent':
-                from src.agents.diagnostic_agent.graph import builder
+                from ..agents.diagnostic_agent.graph import builder
                 graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
             elif agent_id == 'research_agent':
-                from src.agents.research_agent.graph import builder
+                from ..agents.research_agent.graph import builder
                 graph = builder.compile(checkpointer=checkpointer, name="research-agent")
             else:
                 raise Exception(f"不支持的内置智能体: {agent_id}")
         else:
             # 自定义智能体使用generic_agent图
-            from src.agents.generic_agent.graph import builder
+            from ..agents.generic_agent.graph import builder
             graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
         
         # 在同一个async with内执行完整的流式处理
@@ -204,7 +203,7 @@ async def handle_postgres_streaming(request_body, thread_id):
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
-    from ..apps.agent.service.agent_config_service import AgentConfigService
+    from ...agent.service.agent_config_service import AgentConfigService
     
     # 动态检查智能体是否存在 - 直接使用assistant_id
     assistant_id = request_body.assistant_id
@@ -243,9 +242,12 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             async for item in handle_postgres_streaming(request_body, thread_id):
                 yield item
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             logger.error(f"Error in streaming: {e}")
+            logger.error(f"Full traceback: {error_details}")
             yield f"event: error\n"
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e), 'traceback': error_details}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
         generate(),

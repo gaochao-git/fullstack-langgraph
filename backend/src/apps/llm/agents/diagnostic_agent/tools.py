@@ -8,7 +8,7 @@ import json
 import logging
 
 # 导入工具模块
-from src.tools import ssh_tool, sop_tool, mysql_tool, elasticsearch_tool, zabbix_tool, general_tool
+from .....tools import ssh_tool, sop_tool, mysql_tool, elasticsearch_tool, zabbix_tool, general_tool
 
 logger = logging.getLogger(__name__)
 
