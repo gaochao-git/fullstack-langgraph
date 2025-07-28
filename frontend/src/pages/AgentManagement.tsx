@@ -332,7 +332,7 @@ const AgentManagement: React.FC = () => {
   // 加载可用模型
   const loadAvailableModels = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/ai-models`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/ai-models`);
       const data = await response.json();
       if (data.code === 200) {
         const activeModels = data.data.items.filter((model: any) => model.status === 'active');

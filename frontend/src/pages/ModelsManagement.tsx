@@ -89,7 +89,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 // API调用函数
 const fetchModels = async (): Promise<ModelConfig[]> => {
-  const response = await fetch(`${API_BASE_URL}/api/ai-models`);
+  const response = await fetch(`${API_BASE_URL}/api/v1/ai-models`);
   const data = await response.json();
   if (data.code === 200) {
     return data.data.items.map((item: any) => ({
@@ -109,7 +109,7 @@ const fetchModels = async (): Promise<ModelConfig[]> => {
 };
 
 const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig> => {
-  const response = await fetch(`${API_BASE_URL}/api/ai-models`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/ai-models`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -141,7 +141,7 @@ const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig
 };
 
 const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Promise<ModelConfig> => {
-  const response = await fetch(`${API_BASE_URL}/api/ai-models/${modelId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/ai-models/${modelId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -174,7 +174,7 @@ const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Pr
 };
 
 const deleteModel = async (modelId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/api/ai-models/${modelId}`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/ai-models/${modelId}`, {
     method: 'DELETE'
   });
   const data = await response.json();
@@ -192,7 +192,7 @@ const testModelConnection = async (modelData: any): Promise<any> => {
     apiKeyLength: modelData.apiKey?.length || 0
   });
   
-  const response = await fetch(`${API_BASE_URL}/api/ai-models/test-connection`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/ai-models/test-connection`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -209,7 +209,7 @@ const testModelConnection = async (modelData: any): Promise<any> => {
 // 发现Ollama模型
 const discoverOllamaModels = async (endpoint: string): Promise<string[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai-models/discover-ollama`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/ai-models/discover-ollama`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
