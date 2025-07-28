@@ -55,7 +55,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     try {
       console.log('正在获取智能体定时任务:', agentId);
       // 获取所有任务，然后在前端过滤
-      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -119,7 +119,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         update_by: 'zhangsan123'
       };
       
-      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskData),
@@ -202,7 +202,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         update_by: 'zhangsan123'
       };
       
-      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/${editingTask.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks/${editingTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(taskData),
@@ -227,7 +227,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const handleToggleTask = async (task: any) => {
     try {
       const endpoint = task.task_enabled ? 'disable' : 'enable';
-      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/${task.id}/${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks/${task.id}/${endpoint}`, {
         method: 'POST',
       });
       
@@ -247,7 +247,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const handleViewMessages = async (task: any) => {
     setMessagesLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/${task.id}/logs`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks/${task.id}/logs`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -272,7 +272,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       okType: 'danger',
       onOk: async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/scheduled-tasks/${task.id}`, {
+          const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks/${task.id}`, {
             method: 'DELETE',
           });
           

@@ -1,199 +1,193 @@
-"""
-定时任务数据访问对象
-负责数据库操作的具体实现
-"""
+"""定时任务数据访问对象 - 纯异步实现"""
 
-from typing import List, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from typing import List, Optional, Dict, Any
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, distinct
 
-from ....shared.db.models import PeriodicTask, TaskResult
-from ....shared.core.logging import get_logger
-
-logger = get_logger(__name__)
+from src.shared.db.dao.base_dao import BaseDAO
+from src.shared.db.models import PeriodicTask, TaskResult, CeleryTaskRecord
 
 
-class ScheduledTaskDAO:
-    """定时任务DAO类"""
+class ScheduledTaskDAO(BaseDAO[PeriodicTask]):
+    """定时任务数据访问对象 - 纯异步实现"""
     
-    @staticmethod
-    def get_all_tasks(
-        session: Session,
-        skip: int = 0,
-        limit: int = 100,
-        enabled_only: bool = False
+    def __init__(self):
+        super().__init__(PeriodicTask)
+    
+    async def get_by_task_name(self, session: AsyncSession, task_name: str) -> Optional[PeriodicTask]:
+        """根据任务名称查询定时任务"""
+        return await self.get_by_field(session, 'name', task_name)
+    
+    async def search_by_name(
+        self, 
+        session: AsyncSession, 
+        name_keyword: str,
+        enabled_only: bool = False,
+        agent_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
     ) -> List[PeriodicTask]:
-        """
-        获取所有任务
+        """根据名称关键词搜索定时任务"""
+        query = select(self.model).where(
+            self.model.name.contains(name_keyword)
+        )
         
-        Args:
-            session: 数据库会话
-            skip: 跳过的记录数
-            limit: 返回的记录数
-            enabled_only: 仅返回启用的任务
-            
-        Returns:
-            任务列表
-        """
-        try:
-            query = session.query(PeriodicTask)
-            
-            if enabled_only:
-                query = query.filter(PeriodicTask.enabled == True)
-            
-            return query.offset(skip).limit(limit).all()
-            
-        except Exception as e:
-            logger.error(f"查询任务列表失败: {e}")
-            return []
-    
-    @staticmethod
-    def get_task_by_id(session: Session, task_id: int) -> Optional[PeriodicTask]:
-        """
-        根据ID获取任务
+        if enabled_only:
+            query = query.where(self.model.enabled == True)
         
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            
-        Returns:
-            任务对象，如果不存在返回None
-        """
-        try:
-            return session.query(PeriodicTask).filter(PeriodicTask.id == task_id).first()
-        except Exception as e:
-            logger.error(f"查询任务失败: {e}")
-            return None
-    
-    @staticmethod
-    def get_task_by_name(session: Session, task_name: str) -> Optional[PeriodicTask]:
-        """
-        根据名称获取任务
+        if agent_id:
+            # 假设有agent_id字段，实际根据数据库模型调整
+            query = query.where(self.model.task_kwargs.contains(f'"agent_id":"{agent_id}"'))
         
-        Args:
-            session: 数据库会话
-            task_name: 任务名称
-            
-        Returns:
-            任务对象，如果不存在返回None
-        """
-        try:
-            return session.query(PeriodicTask).filter(PeriodicTask.name == task_name).first()
-        except Exception as e:
-            logger.error(f"查询任务失败: {e}")
-            return None
-    
-    @staticmethod
-    def create_task(session: Session, task: PeriodicTask) -> bool:
-        """
-        创建任务
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
         
-        Args:
-            session: 数据库会话
-            task: 任务对象
-            
-        Returns:
-            是否创建成功
-        """
-        try:
-            session.add(task)
-            session.commit()
-            session.refresh(task)
-            logger.info(f"创建任务成功: {task.name}")
-            return True
-        except Exception as e:
-            session.rollback()
-            logger.error(f"创建任务失败: {e}")
-            return False
+        result = await session.execute(query)
+        return result.scalars().all()
     
-    @staticmethod
-    def update_task(session: Session, task: PeriodicTask) -> bool:
-        """
-        更新任务
+    async def get_enabled_tasks(self, session: AsyncSession) -> List[PeriodicTask]:
+        """获取启用的定时任务"""
+        filters = {'enabled': True}
+        return await self.get_list(session, filters=filters, order_by='date_changed')
+    
+    async def get_tasks_by_type(
+        self, 
+        session: AsyncSession, 
+        task_type: str
+    ) -> List[PeriodicTask]:
+        """根据任务类型获取定时任务"""
+        query = select(self.model).where(
+            self.model.task.contains(task_type)
+        )
+        result = await session.execute(query)
+        return result.scalars().all()
+    
+    async def get_task_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取任务状态统计"""
+        result = await session.execute(
+            select(
+                self.model.enabled,
+                func.count(self.model.id).label('count')
+            )
+            .group_by(self.model.enabled)
+            .order_by(func.count(self.model.id).desc())
+        )
         
-        Args:
-            session: 数据库会话
-            task: 任务对象
-            
-        Returns:
-            是否更新成功
-        """
-        try:
-            session.commit()
-            logger.info(f"更新任务成功: {task.name}")
-            return True
-        except Exception as e:
-            session.rollback()
-            logger.error(f"更新任务失败: {e}")
-            return False
+        return [
+            {'enabled': row.enabled, 'count': row.count}
+            for row in result.fetchall()
+        ]
     
-    @staticmethod
-    def delete_task(session: Session, task: PeriodicTask) -> bool:
-        """
-        删除任务
-        
-        Args:
-            session: 数据库会话
-            task: 任务对象
-            
-        Returns:
-            是否删除成功
-        """
-        try:
-            session.delete(task)
-            session.commit()
-            logger.info(f"删除任务成功: {task.name}")
-            return True
-        except Exception as e:
-            session.rollback()
-            logger.error(f"删除任务失败: {e}")
-            return False
+    async def update_task_status(
+        self, 
+        session: AsyncSession, 
+        task_id: int, 
+        enabled: bool
+    ) -> Optional[PeriodicTask]:
+        """更新任务启用状态"""
+        update_data = {'enabled': enabled}
+        return await self.update_by_field(session, 'id', task_id, update_data)
+
+
+class TaskResultDAO(BaseDAO[TaskResult]):
+    """任务执行结果数据访问对象"""
     
-    @staticmethod
-    def get_task_results(
-        session: Session,
+    def __init__(self):
+        super().__init__(TaskResult)
+    
+    async def get_by_task_name(
+        self, 
+        session: AsyncSession, 
         task_name: str,
-        skip: int = 0,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> List[TaskResult]:
+        """根据任务名称获取执行结果"""
+        query = select(self.model).where(
+            self.model.task_name == task_name
+        ).order_by(self.model.date_created.desc())
+        
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        
+        result = await session.execute(query)
+        return result.scalars().all()
+    
+    async def get_by_task_id_str(self, session: AsyncSession, task_id: str) -> Optional[TaskResult]:
+        """根据任务ID字符串查询执行结果"""
+        return await self.get_by_field(session, 'task_id', task_id)
+    
+    async def get_recent_results(
+        self, 
+        session: AsyncSession, 
         limit: int = 50
     ) -> List[TaskResult]:
-        """
-        获取任务执行结果
+        """获取最近的执行结果"""
+        query = select(self.model).order_by(
+            self.model.date_created.desc()
+        ).limit(limit)
         
-        Args:
-            session: 数据库会话
-            task_name: 任务名称
-            skip: 跳过的记录数
-            limit: 返回的记录数
-            
-        Returns:
-            执行结果列表
-        """
-        try:
-            return session.query(TaskResult).filter(
-                TaskResult.task_name == task_name
-            ).order_by(desc(TaskResult.date_created)).offset(skip).limit(limit).all()
-        except Exception as e:
-            logger.error(f"查询任务执行结果失败: {e}")
-            return []
+        result = await session.execute(query)
+        return result.scalars().all()
+
+
+class CeleryTaskRecordDAO(BaseDAO[CeleryTaskRecord]):
+    """Celery任务记录数据访问对象"""
     
-    @staticmethod
-    def get_task_result_by_id(session: Session, result_id: str) -> Optional[TaskResult]:
-        """
-        根据ID获取任务执行结果
+    def __init__(self):
+        super().__init__(CeleryTaskRecord)
+    
+    async def search_by_name(
+        self, 
+        session: AsyncSession, 
+        task_name: str,
+        status: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> List[CeleryTaskRecord]:
+        """根据任务名称搜索记录"""
+        query = select(self.model).where(
+            self.model.task_name.contains(task_name)
+        )
         
-        Args:
-            session: 数据库会话
-            result_id: 结果ID
-            
-        Returns:
-            执行结果对象，如果不存在返回None
-        """
-        try:
-            return session.query(TaskResult).filter(TaskResult.task_id == result_id).first()
-        except Exception as e:
-            logger.error(f"查询任务执行结果失败: {e}")
-            return None
-
-
-# 实例化DAO对象，保持向后兼容
-scheduled_task_dao = ScheduledTaskDAO()
+        if status:
+            query = query.where(self.model.task_status == status)
+        
+        query = query.order_by(self.model.create_time.desc())
+        
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        
+        result = await session.execute(query)
+        return result.scalars().all()
+    
+    async def get_by_status(
+        self, 
+        session: AsyncSession, 
+        status: str
+    ) -> List[CeleryTaskRecord]:
+        """根据状态获取任务记录"""
+        filters = {'task_status': status}
+        return await self.get_list(session, filters=filters, order_by='create_time')
+    
+    async def get_status_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取任务状态统计"""
+        result = await session.execute(
+            select(
+                self.model.task_status,
+                func.count(self.model.id).label('count')
+            )
+            .group_by(self.model.task_status)
+            .order_by(func.count(self.model.id).desc())
+        )
+        
+        return [
+            {'status': row.task_status, 'count': row.count}
+            for row in result.fetchall()
+        ]

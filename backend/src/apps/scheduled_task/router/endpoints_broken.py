@@ -22,49 +22,17 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["Scheduled Task Management"])
 
 
-# 具体路径路由 - 必须放在参数化路径之前
-
-@router.get("/v1/scheduled-tasks/records", response_model=UnifiedResponse)
-async def get_task_execution_records(
-    page: int = Query(1, ge=1, description="页码"),
-    size: int = Query(10, ge=1, le=100, description="每页数量"),
-    task_name: Optional[str] = Query(None, max_length=200, description="任务名称过滤"),
-    task_status: Optional[str] = Query(None, max_length=50, description="任务状态过滤"),
+@router.post("/v1/scheduled-tasks", response_model=UnifiedResponse)
+async def create_scheduled_task(
+    task_data: ScheduledTaskCreate,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取任务执行记录"""
-    records, total = await scheduled_task_service.list_task_records(
-        db,
-        page=page,
-        size=size,
-        task_name=task_name,
-        task_status=task_status
-    )
-    record_data = [record.to_dict() for record in records]
-    
-    return paginated_response(
-        items=record_data,
-        total=total,
-        page=page,
-        size=size,
-        msg="查询任务执行记录成功"
-    )
-
-
-@router.get("/v1/scheduled-tasks/meta/statistics", response_model=UnifiedResponse)
-async def get_scheduled_task_statistics(
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取定时任务统计信息"""
-    task_stats = await scheduled_task_service.get_task_statistics(db)
-    record_stats = await scheduled_task_service.get_record_statistics(db)
-    
+    """创建定时任务"""
+    task = await scheduled_task_service.create_task(db, task_data.dict())
     return success_response(
-        data={
-            "task_statistics": task_stats,
-            "record_statistics": record_stats
-        },
-        msg="获取统计信息成功"
+        data=task.to_dict(),
+        msg="定时任务创建成功",
+        code=ResponseCode.CREATED
     )
 
 
@@ -97,60 +65,36 @@ async def list_scheduled_tasks(
     )
 
 
-@router.post("/v1/scheduled-tasks", response_model=UnifiedResponse)
-async def create_scheduled_task(
-    task_data: ScheduledTaskCreate,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """创建定时任务"""
-    task = await scheduled_task_service.create_task(db, task_data.dict())
-    return success_response(
-        data=task.to_dict(),
-        msg="定时任务创建成功",
-        code=ResponseCode.CREATED
-    )
-
-
-# 参数化路径路由 - 必须放在具体路径之后
-
-@router.get("/v1/scheduled-tasks/records/{record_id}", response_model=UnifiedResponse)
-async def get_task_execution_record(
-    record_id: int,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取单条任务执行记录详情"""
-    record = await scheduled_task_service.get_task_record_by_id(db, record_id)
-    if not record:
-        raise BusinessException(f"执行记录 {record_id} 不存在", ResponseCode.NOT_FOUND)
-    
-    return success_response(
-        data=record.to_dict(),
-        msg="获取执行记录成功"
-    )
-
-
-@router.get("/v1/scheduled-tasks/{task_id}/logs", response_model=UnifiedResponse)
-async def get_task_execution_logs(
+@router.put("/v1/scheduled-tasks/{task_id}", response_model=UnifiedResponse)
+async def update_scheduled_task(
     task_id: int,
-    skip: int = Query(0, ge=0, description="跳过的记录数"),
-    limit: int = Query(50, ge=1, le=1000, description="返回的记录数"),
+    task_data: ScheduledTaskUpdate,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取任务执行日志"""
-    logs = await scheduled_task_service.get_task_execution_logs(
-        db,
-        task_id=task_id,
-        skip=skip,
-        limit=limit
-    )
-    
-    if not logs and await scheduled_task_service.get_task_by_id(db, task_id) is None:
+    """更新定时任务"""
+    updated_task = await scheduled_task_service.update_task(db, task_id, task_data.dict(exclude_unset=True))
+    if not updated_task:
         raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
     
-    log_data = [log.to_dict() for log in logs]
     return success_response(
-        data=log_data,
-        msg="获取任务执行日志成功"
+        data=updated_task.to_dict(),
+        msg="定时任务更新成功"
+    )
+
+
+@router.delete("/v1/scheduled-tasks/{task_id}", response_model=UnifiedResponse)
+async def delete_scheduled_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """删除定时任务"""
+    success = await scheduled_task_service.delete_task(db, task_id)
+    if not success:
+        raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
+    
+    return success_response(
+        data={"deleted_id": task_id},
+        msg="定时任务删除成功"
     )
 
 
@@ -208,50 +152,86 @@ async def trigger_scheduled_task(
     )
 
 
-@router.get("/v1/scheduled-tasks/{task_id}", response_model=UnifiedResponse)
-async def get_scheduled_task(
+@router.get("/v1/scheduled-tasks/{task_id}/logs", response_model=UnifiedResponse)
+async def get_task_execution_logs(
     task_id: int,
+    skip: int = Query(0, ge=0, description="跳过的记录数"),
+    limit: int = Query(50, ge=1, le=1000, description="返回的记录数"),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取指定定时任务"""
-    task = await scheduled_task_service.get_task_by_id(db, task_id)
-    if not task:
+    """获取任务执行日志"""
+    logs = await scheduled_task_service.get_task_execution_logs(
+        db,
+        task_id=task_id,
+        skip=skip,
+        limit=limit
+    )
+    
+    if not logs and await scheduled_task_service.get_task_by_id(db, task_id) is None:
         raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
     
+    log_data = [log.to_dict() for log in logs]
     return success_response(
-        data=task.to_dict(),
-        msg="获取定时任务成功"
+        data=log_data,
+        msg="获取任务执行日志成功"
     )
 
 
-@router.put("/v1/scheduled-tasks/{task_id}", response_model=UnifiedResponse)
-async def update_scheduled_task(
-    task_id: int,
-    task_data: ScheduledTaskUpdate,
+@router.get("/v1/scheduled-tasks/records", response_model=UnifiedResponse)
+async def get_task_execution_records(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    task_name: Optional[str] = Query(None, max_length=200, description="任务名称过滤"),
+    task_status: Optional[str] = Query(None, max_length=50, description="任务状态过滤"),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """更新定时任务"""
-    updated_task = await scheduled_task_service.update_task(db, task_id, task_data.dict(exclude_unset=True))
-    if not updated_task:
-        raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
+    """获取任务执行记录"""
+    records, total = await scheduled_task_service.list_task_records(
+        db,
+        page=page,
+        size=size,
+        task_name=task_name,
+        task_status=task_status
+    )
+    record_data = [record.to_dict() for record in records]
     
-    return success_response(
-        data=updated_task.to_dict(),
-        msg="定时任务更新成功"
+    return paginated_response(
+        items=record_data,
+        total=total,
+        page=page,
+        size=size,
+        msg="查询任务执行记录成功"
     )
 
 
-@router.delete("/v1/scheduled-tasks/{task_id}", response_model=UnifiedResponse)
-async def delete_scheduled_task(
-    task_id: int,
+@router.get("/v1/scheduled-tasks/records/{record_id}", response_model=UnifiedResponse)
+async def get_task_execution_record(
+    record_id: int,
     db: AsyncSession = Depends(get_async_db)
 ):
-    """删除定时任务"""
-    success = await scheduled_task_service.delete_task(db, task_id)
-    if not success:
-        raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
+    """获取单条任务执行记录详情"""
+    record = await scheduled_task_service.get_task_record_by_id(db, record_id)
+    if not record:
+        raise BusinessException(f"执行记录 {record_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data={"deleted_id": task_id},
-        msg="定时任务删除成功"
+        data=record.to_dict(),
+        msg="获取执行记录成功"
+    )
+
+
+@router.get("/v1/scheduled-tasks/meta/statistics", response_model=UnifiedResponse)
+async def get_scheduled_task_statistics(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取定时任务统计信息"""
+    task_stats = await scheduled_task_service.get_task_statistics(db)
+    record_stats = await scheduled_task_service.get_record_statistics(db)
+    
+    return success_response(
+        data={
+            "task_statistics": task_stats,
+            "record_statistics": record_stats
+        },
+        msg="获取统计信息成功"
     )

@@ -1,323 +1,331 @@
-"""
-定时任务服务层
-处理定时任务相关的业务逻辑
-"""
+"""定时任务服务层 - 简化的纯异步实现"""
 
+from typing import List, Optional, Dict, Any, Tuple
+from sqlalchemy.ext.asyncio import AsyncSession
 import json
 from datetime import datetime
-from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
 
-from ....shared.db.models import PeriodicTask, TaskResult
-from ....shared.core.logging import get_logger
-from ..dao.scheduled_task_dao import ScheduledTaskDAO
+from ..dao.scheduled_task_dao import ScheduledTaskDAO, TaskResultDAO, CeleryTaskRecordDAO
+from src.shared.db.models import PeriodicTask, TaskResult, CeleryTaskRecord
+from src.shared.db.transaction import transactional
+from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class ScheduledTaskService:
-    """定时任务服务类"""
+    """定时任务服务 - 清晰的单一职责实现"""
     
-    @staticmethod
-    def get_tasks_list(
-        session: Session,
-        skip: int = 0, 
-        limit: int = 100,
+    def __init__(self):
+        self._dao = ScheduledTaskDAO()
+        self._result_dao = TaskResultDAO()
+        self._record_dao = CeleryTaskRecordDAO()
+    
+    @transactional()
+    async def create_task(
+        self, 
+        session: AsyncSession, 
+        task_data: Dict[str, Any]
+    ) -> PeriodicTask:
+        """创建定时任务"""
+        # 业务验证
+        existing = await self._dao.get_by_task_name(session, task_data['task_name'])
+        if existing:
+            raise ValueError(f"Task with name {task_data['task_name']} already exists")
+        
+        # 验证JSON字段
+        self._validate_json_fields(task_data)
+        
+        # 验证调度配置
+        self._validate_schedule_config(task_data)
+        
+        # 转换数据
+        data = self._prepare_task_data(task_data)
+        
+        logger.info(f"Creating scheduled task: {task_data['task_name']}")
+        return await self._dao.create(session, data)
+    
+    async def get_task_by_id(
+        self, 
+        session: AsyncSession, 
+        task_id: int
+    ) -> Optional[PeriodicTask]:
+        """根据ID获取定时任务"""
+        return await self._dao.get_by_id(session, task_id)
+    
+    async def get_task_by_name(
+        self, 
+        session: AsyncSession, 
+        task_name: str
+    ) -> Optional[PeriodicTask]:
+        """根据名称获取定时任务"""
+        return await self._dao.get_by_task_name(session, task_name)
+    
+    async def list_tasks(
+        self, 
+        session: AsyncSession, 
+        page: int = 1,
+        size: int = 10,
         enabled_only: bool = False,
-        agent_id: Optional[str] = None
+        agent_id: Optional[str] = None,
+        search: Optional[str] = None
+    ) -> Tuple[List[PeriodicTask], int]:
+        """列出定时任务"""
+        # 构建过滤条件
+        filters = {}
+        if enabled_only:
+            filters['enabled'] = True
+        
+        # 搜索功能
+        if search:
+            tasks = await self._dao.search_by_name(
+                session,
+                search,
+                enabled_only=enabled_only,
+                agent_id=agent_id,
+                limit=size,
+                offset=(page - 1) * size
+            )
+            # 获取搜索总数
+            all_results = await self._dao.search_by_name(
+                session, 
+                search,
+                enabled_only=enabled_only,
+                agent_id=agent_id
+            )
+            total = len(all_results)
+        else:
+            # 普通查询
+            tasks = await self._dao.get_list(
+                session,
+                filters=filters if filters else None,
+                limit=size,
+                offset=(page - 1) * size,
+                order_by='date_changed'
+            )
+            total = await self._dao.count(session, filters=filters if filters else None)
+        
+        return tasks, total
+    
+    @transactional()
+    async def update_task(
+        self, 
+        session: AsyncSession, 
+        task_id: int, 
+        task_data: Dict[str, Any]
+    ) -> Optional[PeriodicTask]:
+        """更新定时任务"""
+        # 检查是否存在
+        existing = await self._dao.get_by_id(session, task_id)
+        if not existing:
+            raise ValueError(f"Task with ID {task_id} not found")
+        
+        # 验证JSON字段
+        self._validate_json_fields(task_data)
+        
+        # 转换数据
+        data = task_data.copy()
+        
+        # 移除不可更新字段
+        data.pop('id', None)
+        data.pop('date_created', None)
+        
+        logger.info(f"Updating scheduled task: {task_id}")
+        return await self._dao.update_by_field(session, 'id', task_id, data)
+    
+    @transactional()
+    async def delete_task(
+        self, 
+        session: AsyncSession, 
+        task_id: int
+    ) -> bool:
+        """删除定时任务"""
+        existing = await self._dao.get_by_id(session, task_id)
+        if not existing:
+            return False
+        
+        logger.info(f"Deleting scheduled task: {task_id}")
+        return await self._dao.delete_by_field(session, 'id', task_id) > 0
+    
+    @transactional()
+    async def enable_task(
+        self,
+        session: AsyncSession,
+        task_id: int
+    ) -> bool:
+        """启用定时任务"""
+        updated_task = await self._dao.update_task_status(session, task_id, True)
+        return updated_task is not None
+    
+    @transactional()
+    async def disable_task(
+        self,
+        session: AsyncSession,
+        task_id: int
+    ) -> bool:
+        """禁用定时任务"""
+        updated_task = await self._dao.update_task_status(session, task_id, False)
+        return updated_task is not None
+    
+    async def get_enabled_tasks(self, session: AsyncSession) -> List[PeriodicTask]:
+        """获取启用的任务（兼容性方法）"""
+        return await self._dao.get_enabled_tasks(session)
+    
+    async def get_task_statistics(
+        self, 
+        session: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """
-        获取定时任务列表
-        
-        Args:
-            session: 数据库会话
-            skip: 跳过的记录数
-            limit: 返回的记录数
-            enabled_only: 仅显示启用的任务
-            agent_id: 按智能体ID过滤
-            
-        Returns:
-            任务列表
-        """
-        tasks = ScheduledTaskDAO.get_all_tasks(
-            session=session,
-            skip=skip,
-            limit=limit,
-            enabled_only=enabled_only
-        )
-        return [task.to_dict() for task in tasks]
+        """获取任务统计"""
+        return await self._dao.get_task_statistics(session)
     
-    @staticmethod
-    def get_task_by_id(session: Session, task_id: int) -> Optional[Dict[str, Any]]:
-        """
-        根据ID获取单个任务
-        
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            
-        Returns:
-            任务信息字典，如果不存在返回None
-        """
-        task = ScheduledTaskDAO.get_task_by_id(session, task_id)
-        if task:
-            return task.to_dict()
-        return None
-    
-    @staticmethod
-    def get_task_execution_logs(
-        session: Session, 
+    # TaskResult相关方法
+    async def get_task_execution_logs(
+        self,
+        session: AsyncSession,
         task_id: int,
         skip: int = 0,
         limit: int = 50
-    ) -> List[Dict[str, Any]]:
-        """
-        获取任务执行日志
-        
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            skip: 跳过的记录数
-            limit: 返回的记录数
-            
-        Returns:
-            执行日志列表
-        """
-        # 首先验证任务是否存在
-        task = ScheduledTaskDAO.get_task_by_id(session, task_id)
+    ) -> List[TaskResult]:
+        """获取任务执行日志"""
+        # 先获取任务信息
+        task = await self._dao.get_by_id(session, task_id)
         if not task:
             return []
         
-        # 查询该任务的执行结果
-        results = ScheduledTaskDAO.get_task_results(
-            session=session,
-            task_name=task.name,
-            skip=skip,
-            limit=limit
+        # 根据任务名称获取执行结果
+        return await self._result_dao.get_by_task_name(
+            session, 
+            task.name,
+            limit=limit,
+            offset=skip
         )
-        
-        # 转换为响应格式
-        logs = []
-        for result in results:
-            log_data = result.to_dict()
-            logs.append({
-                "id": log_data["id"],
-                "task_name": log_data["task_name"],
-                "task_schedule_time": log_data["task_schedule_time"],
-                "task_execute_time": log_data["task_execute_time"], 
-                "task_status": log_data["task_status"],
-                "task_result": log_data["task_result"],
-                "create_time": log_data["create_time"]
-            })
-        
-        return logs
     
-    @staticmethod
-    def create_task(session: Session, task_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        创建新的定时任务
-        
-        Args:
-            session: 数据库会话
-            task_data: 任务数据
-            
-        Returns:
-            创建结果
-        """
-        try:
-            # 创建新任务实例
-            new_task = PeriodicTask(
-                name=task_data["task_name"],
-                task=task_data["task_path"],
-                description=task_data.get("task_description", ""),
-                args=task_data.get("task_args", "[]"),
-                kwargs=task_data.get("task_kwargs", "{}"),
-                enabled=task_data.get("task_enabled", True),
-                create_by=task_data.get("create_by", "system"),
-                update_by=task_data.get("update_by", "system")
+    async def get_task_result_by_id(
+        self,
+        session: AsyncSession,
+        result_id: str
+    ) -> Optional[TaskResult]:
+        """根据ID获取任务执行结果"""
+        return await self._result_dao.get_by_task_id_str(session, result_id)
+    
+    async def get_recent_task_results(
+        self,
+        session: AsyncSession,
+        limit: int = 50
+    ) -> List[TaskResult]:
+        """获取最近的任务执行结果"""
+        return await self._result_dao.get_recent_results(session, limit)
+    
+    # CeleryTaskRecord相关方法
+    async def list_task_records(
+        self,
+        session: AsyncSession,
+        page: int = 1,
+        size: int = 10,
+        task_name: Optional[str] = None,
+        task_status: Optional[str] = None
+    ) -> Tuple[List[CeleryTaskRecord], int]:
+        """列出任务执行记录"""
+        if task_name:
+            records = await self._record_dao.search_by_name(
+                session,
+                task_name,
+                status=task_status,
+                limit=size,
+                offset=(page - 1) * size
             )
+            # 获取搜索总数
+            all_results = await self._record_dao.search_by_name(
+                session, 
+                task_name,
+                status=task_status
+            )
+            total = len(all_results)
+        else:
+            # 构建过滤条件
+            filters = {}
+            if task_status:
+                filters['task_status'] = task_status
             
-            session.add(new_task)
-            session.commit()
-            session.refresh(new_task)
-            
-            logger.info(f"创建任务成功: {task_data['task_name']}")
-            
-            return {
-                "id": new_task.id,
-                "message": "任务创建成功",
-                "task_name": new_task.name,
-                "status": "created"
-            }
-            
-        except Exception as e:
-            session.rollback()
-            logger.error(f"创建任务失败: {e}")
-            return None
-    
-    @staticmethod
-    def update_task(session: Session, task_id: int, task_data: Dict[str, Any]) -> bool:
-        """
-        更新定时任务
+            records = await self._record_dao.get_list(
+                session,
+                filters=filters if filters else None,
+                limit=size,
+                offset=(page - 1) * size,
+                order_by='create_time'
+            )
+            total = await self._record_dao.count(session, filters=filters if filters else None)
         
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            task_data: 更新数据
-            
-        Returns:
-            是否更新成功
-        """
-        try:
-            task = session.query(PeriodicTask).filter(PeriodicTask.id == task_id).first()
-            if not task:
-                return False
-            
-            # 更新字段
-            for key, value in task_data.items():
-                if hasattr(task, key) and value is not None:
-                    setattr(task, key, value)
-            
-            task.update_by = task_data.get("update_by", "system")
-            
-            session.commit()
-            logger.info(f"更新任务成功: {task.name}")
-            return True
-            
-        except Exception as e:
-            session.rollback()
-            logger.error(f"更新任务失败: {e}")
-            return False
+        return records, total
     
-    @staticmethod
-    def delete_task(session: Session, task_id: int) -> bool:
-        """
-        删除定时任务
-        
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            
-        Returns:
-            是否删除成功
-        """
-        try:
-            task = session.query(PeriodicTask).filter(PeriodicTask.id == task_id).first()
-            if not task:
-                return False
-            
-            session.delete(task)
-            session.commit()
-            logger.info(f"删除任务成功: {task.name}")
-            return True
-            
-        except Exception as e:
-            session.rollback()
-            logger.error(f"删除任务失败: {e}")
-            return False
+    async def get_task_record_by_id(
+        self,
+        session: AsyncSession,
+        record_id: int
+    ) -> Optional[CeleryTaskRecord]:
+        """根据ID获取任务执行记录"""
+        return await self._record_dao.get_by_id(session, record_id)
     
-    @staticmethod
-    def enable_task(session: Session, task_id: int) -> bool:
-        """
-        启用定时任务
-        
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            
-        Returns:
-            是否启用成功
-        """
-        try:
-            task = session.query(PeriodicTask).filter(PeriodicTask.id == task_id).first()
-            if not task:
-                return False
-            
-            task.enabled = True
-            session.commit()
-            logger.info(f"启用任务成功: {task.name}")
-            return True
-            
-        except Exception as e:
-            session.rollback()
-            logger.error(f"启用任务失败: {e}")
-            return False
+    async def get_record_statistics(
+        self,
+        session: AsyncSession
+    ) -> List[Dict[str, Any]]:
+        """获取任务记录状态统计"""
+        return await self._record_dao.get_status_statistics(session)
     
-    @staticmethod
-    def disable_task(session: Session, task_id: int) -> bool:
-        """
-        禁用定时任务
+    # 私有方法
+    def _validate_json_fields(self, task_data: Dict[str, Any]) -> None:
+        """验证JSON字段"""
+        json_fields = ['task_args', 'task_kwargs', 'task_extra_config']
         
-        Args:
-            session: 数据库会话
-            task_id: 任务ID
-            
-        Returns:
-            是否禁用成功
-        """
-        try:
-            task = session.query(PeriodicTask).filter(PeriodicTask.id == task_id).first()
-            if not task:
-                return False
-            
-            task.enabled = False
-            session.commit()
-            logger.info(f"禁用任务成功: {task.name}")
-            return True
-            
-        except Exception as e:
-            session.rollback()
-            logger.error(f"禁用任务失败: {e}")
-            return False
+        for field in json_fields:
+            if field in task_data and task_data[field] is not None:
+                try:
+                    if isinstance(task_data[field], str):
+                        json.loads(task_data[field])
+                except json.JSONDecodeError:
+                    raise ValueError(f"{field} must be valid JSON format")
     
-    @staticmethod
-    def validate_json_field(field_name: str, value: Optional[str]) -> bool:
-        """
-        验证JSON字段格式
-        
-        Args:
-            field_name: 字段名
-            value: 字段值
-            
-        Returns:
-            是否为有效JSON
-        """
-        if value:
-            try:
-                json.loads(value)
-                return True
-            except json.JSONDecodeError:
-                logger.warning(f"{field_name}格式无效: {value}")
-                return False
-        return True
-    
-    @staticmethod
-    def validate_schedule_config(task_data: Dict[str, Any]) -> bool:
-        """
-        验证调度配置
-        
-        Args:
-            task_data: 任务数据
-            
-        Returns:
-            配置是否有效
-        """
-        has_interval = task_data.get("task_interval") is not None
+    def _validate_schedule_config(self, task_data: Dict[str, Any]) -> None:
+        """验证调度配置"""
+        has_interval = task_data.get('task_interval') is not None
         has_crontab = any([
-            task_data.get("task_crontab_minute"),
-            task_data.get("task_crontab_hour"),
-            task_data.get("task_crontab_day_of_week"),
-            task_data.get("task_crontab_day_of_month"),
-            task_data.get("task_crontab_month_of_year")
+            task_data.get('task_crontab_minute'),
+            task_data.get('task_crontab_hour'),
+            task_data.get('task_crontab_day_of_week'),
+            task_data.get('task_crontab_day_of_month'),
+            task_data.get('task_crontab_month_of_year')
         ])
         
         if not has_interval and not has_crontab:
-            logger.warning("缺少调度配置")
-            return False
+            raise ValueError("Must provide either interval schedule (task_interval) or crontab schedule configuration")
+    
+    def _prepare_task_data(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+        """准备任务数据"""
+        data = task_data.copy()
         
-        return True
+        # 设置默认值
+        data.setdefault('enabled', True)
+        data.setdefault('date_created', datetime.utcnow())
+        data.setdefault('date_changed', datetime.utcnow())
+        
+        # 映射字段名
+        field_mapping = {
+            'task_name': 'name',
+            'task_path': 'task',
+            'task_description': 'description',
+            'task_enabled': 'enabled',
+            'task_args': 'args',
+            'task_kwargs': 'kwargs',
+            'task_extra_config': 'extra'
+        }
+        
+        for old_key, new_key in field_mapping.items():
+            if old_key in data:
+                data[new_key] = data.pop(old_key)
+        
+        return data
 
 
-# 实例化服务对象，保持向后兼容
+# 全局实例
 scheduled_task_service = ScheduledTaskService()

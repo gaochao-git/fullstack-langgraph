@@ -155,8 +155,13 @@ const TasksManagement: React.FC = () => {
   const fetchScheduledTasks = async () => {
     setScheduledTasksLoading(true);
     try {
-      const data = await baseFetchJson('/api/scheduled-tasks');
-      setScheduledTasks(Array.isArray(data) ? data : []);
+      const response = await baseFetchJson('/api/v1/scheduled-tasks');
+      if (response.status === 'ok' && response.data && response.data.items) {
+        setScheduledTasks(response.data.items);
+      } else {
+        message.error(response.msg || '获取定时任务列表失败');
+        setScheduledTasks([]);
+      }
     } catch (error) {
       message.error('获取定时任务列表失败');
       console.error('Failed to fetch scheduled tasks:', error);
@@ -170,8 +175,13 @@ const TasksManagement: React.FC = () => {
   const fetchCeleryTasks = async () => {
     setCeleryTasksLoading(true);
     try {
-      const data = await baseFetchJson('/api/scheduled-tasks/records');
-      setCeleryTasks(Array.isArray(data) ? data : []);
+      const response = await baseFetchJson('/api/v1/scheduled-tasks/records');
+      if (response.status === 'ok' && response.data && response.data.items) {
+        setCeleryTasks(response.data.items);
+      } else {
+        message.error(response.msg || '获取执行记录列表失败');
+        setCeleryTasks([]);
+      }
     } catch (error) {
       message.error('获取执行记录列表失败');
       console.error('Failed to fetch celery tasks:', error);
@@ -197,7 +207,7 @@ const TasksManagement: React.FC = () => {
   const fetchTaskLogs = async (taskId: number) => {
     setTaskLogsLoading(true);
     try {
-      const response = await baseFetch(`/api/scheduled-tasks/${taskId}/logs`);
+      const response = await baseFetch(`/api/v1/scheduled-tasks/${taskId}/logs`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -217,7 +227,7 @@ const TasksManagement: React.FC = () => {
   // 创建定时任务
   const handleCreateTask = async (values: any) => {
     try {
-      const response = await baseFetch('/api/scheduled-tasks', {
+      const response = await baseFetch('/api/v1/scheduled-tasks', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -241,7 +251,7 @@ const TasksManagement: React.FC = () => {
     if (!currentTask) return;
     
     try {
-      await baseFetch(`/api/scheduled-tasks/${currentTask.id}`, {
+      await baseFetch(`/api/v1/scheduled-tasks/${currentTask.id}`, {
         method: 'PUT',
         body: JSON.stringify(values),
       });
@@ -259,7 +269,7 @@ const TasksManagement: React.FC = () => {
   const handleToggleTask = async (task: ScheduledTask) => {
     const action = task.task_enabled ? 'disable' : 'enable';
     try {
-      await baseFetch(`/api/scheduled-tasks/${task.id}/${action}`, {
+      await baseFetch(`/api/v1/scheduled-tasks/${task.id}/${action}`, {
         method: 'POST',
       });
       message.success(`${task.task_enabled ? '禁用' : '启用'}任务成功`);
@@ -309,7 +319,7 @@ const TasksManagement: React.FC = () => {
         try {
           for (const task of disabledTasks) {
             try {
-              await baseFetch(`/api/scheduled-tasks/${task.id}/enable`, {
+              await baseFetch(`/api/v1/scheduled-tasks/${task.id}/enable`, {
                 method: 'POST',
               });
               successCount++;
@@ -377,7 +387,7 @@ const TasksManagement: React.FC = () => {
         try {
           for (const task of enabledTasks) {
             try {
-              await baseFetch(`/api/scheduled-tasks/${task.id}/disable`, {
+              await baseFetch(`/api/v1/scheduled-tasks/${task.id}/disable`, {
                 method: 'POST',
               });
               successCount++;
@@ -409,7 +419,7 @@ const TasksManagement: React.FC = () => {
   // 立即执行任务
   const handleRunTask = async (task: ScheduledTask) => {
     try {
-      const response = await baseFetch(`/api/scheduled-tasks/${task.id}/trigger`, {
+      const response = await baseFetch(`/api/v1/scheduled-tasks/${task.id}/trigger`, {
         method: 'POST',
       });
       message.success(`任务已发送执行，任务ID: ${response.task_id}`);
@@ -430,7 +440,7 @@ const TasksManagement: React.FC = () => {
       content: `确定要删除任务 "${task.task_name}" 吗？`,
       onOk: async () => {
         try {
-          await baseFetch(`/api/scheduled-tasks/${task.id}`, {
+          await baseFetch(`/api/v1/scheduled-tasks/${task.id}`, {
             method: 'DELETE',
           });
           message.success('删除任务成功');
