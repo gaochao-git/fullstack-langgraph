@@ -47,7 +47,7 @@ pytz==2025.2
 colorlog==6.9.0
 
 # HTTP客户端
-httpx==0.28.1
+httpx==0.28.1  # 也用于FastAPI测试客户端
 requests==2.32.4
 aiohttp==3.12.13
 
@@ -58,8 +58,14 @@ orjson==3.11.0
 black==25.1.0
 flake8==7.3.0
 mypy==1.16.1
-pytest==8.4.1
 ipython==9.3.0
+
+# 测试工具
+pytest==8.4.1
+pytest-cov==4.0.0
+pytest-asyncio==0.23.2
+pytest-mock==3.12.0
+coverage==7.4.0
 
 # 额外AI provider (注释掉避免numpy依赖)
 # langchain-google-genai==2.1.6

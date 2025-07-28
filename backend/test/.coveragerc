@@ -1,0 +1,45 @@
+[run]
+# 指定要测量覆盖率的源码目录
+source = src
+
+# 启用分支覆盖率（默认启用）
+branch = True
+
+# 忽略的文件模式
+omit = 
+    */test/*
+    */tests/*
+    */__pycache__/*
+    */venv/*
+    */migrations/*
+    */_bak
+    */conftest.py
+    src/main.py
+
+[report]
+# 排除指定行（如pragma: no cover）
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+# 显示缺失的行号
+show_missing = True
+
+# 报告精度
+precision = 2
+
+# 失败阈值
+fail_under = 80
+
+[html]
+# HTML报告输出目录
+directory = htmlcov
+
+[xml]
+# XML报告输出文件
+output = coverage.xml

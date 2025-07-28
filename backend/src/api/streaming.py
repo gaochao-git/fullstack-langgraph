@@ -158,7 +158,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from src.services.agent_config_service import AgentConfigService
+    from ..apps.agent.service.agent_config_service import AgentConfigService
     
     assistant_id = request_body.assistant_id
     logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
@@ -204,7 +204,7 @@ async def handle_postgres_streaming(request_body, thread_id):
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
-    from src.services.agent_config_service import AgentConfigService
+    from ..apps.agent.service.agent_config_service import AgentConfigService
     
     # 动态检查智能体是否存在 - 直接使用assistant_id
     assistant_id = request_body.assistant_id

@@ -6,7 +6,7 @@
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
-from src.services.agent_config_service import AgentConfigService
+from src.apps.agent.service.agent_config_service import AgentConfigService
 
 
 def get_current_date() -> str:

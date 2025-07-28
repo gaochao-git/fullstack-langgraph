@@ -16,9 +16,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 导入核心模块
-from .core.config import settings
-from .core.logging import setup_logging, get_logger
-from .core.middleware import setup_middlewares
+from .shared.core.config import settings
+from .shared.core.logging import setup_logging, get_logger
+from .shared.core.middleware import setup_middlewares
 from .api.router import api_router
 
 # 导入智能体相关
@@ -115,7 +115,7 @@ def create_app() -> FastAPI:
         
         # 初始化SOP数据库
         try:
-            from .db.config import init_database, test_database_connection
+            from .shared.db.config import init_database, test_database_connection
             db_connected = await test_database_connection()
             if db_connected:
                 await init_database()

@@ -7,13 +7,13 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import HTTPAuthorizationCredentials
 
-from core.dependencies import (
+from ..shared.core.dependencies import (
     get_settings, 
     get_database, 
     get_current_user,
     get_pagination_params
 )
-from core.security import security, SecurityService
+from ..shared.core.security import security, SecurityService
 
 
 def get_api_settings():

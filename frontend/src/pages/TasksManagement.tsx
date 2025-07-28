@@ -32,7 +32,6 @@ import {
   ReloadOutlined,
   EyeOutlined,
   HistoryOutlined,
-  SettingOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
@@ -95,13 +94,6 @@ interface TaskExecutionLog {
   create_time: string;
 }
 
-interface CeleryStatus {
-  status: string;
-  worker_count: number;
-  active_task_count: number;
-  workers: string[];
-  message?: string;
-}
 
 // 解码Unicode字符串的辅助函数
 const decodeUnicodeString = (str: string): string => {
@@ -146,7 +138,6 @@ const TasksManagement: React.FC = () => {
   // 任务执行记录相关状态
   const [celeryTasks, setCeleryTasks] = useState<CeleryTask[]>([]);
   const [celeryTasksLoading, setCeleryTasksLoading] = useState(false);
-  const [celeryStatus, setCeleryStatus] = useState<CeleryStatus | null>(null);
   const [taskDetailModalVisible, setTaskDetailModalVisible] = useState(false);
   const [currentCeleryTask, setCurrentCeleryTask] = useState<CeleryTask | null>(null);
   const [scheduledTaskDetailModalVisible, setScheduledTaskDetailModalVisible] = useState(false);
@@ -164,7 +155,7 @@ const TasksManagement: React.FC = () => {
   const fetchScheduledTasks = async () => {
     setScheduledTasksLoading(true);
     try {
-      const data = await baseFetchJson('/api/scheduled-tasks/scheduled-tasks');
+      const data = await baseFetchJson('/api/scheduled-tasks');
       setScheduledTasks(Array.isArray(data) ? data : []);
     } catch (error) {
       message.error('获取定时任务列表失败');
@@ -179,7 +170,7 @@ const TasksManagement: React.FC = () => {
   const fetchCeleryTasks = async () => {
     setCeleryTasksLoading(true);
     try {
-      const data = await baseFetchJson('/api/scheduled-tasks/celery-tasks');
+      const data = await baseFetchJson('/api/scheduled-tasks/records');
       setCeleryTasks(Array.isArray(data) ? data : []);
     } catch (error) {
       message.error('获取执行记录列表失败');
@@ -190,15 +181,6 @@ const TasksManagement: React.FC = () => {
     }
   };
 
-  // 获取Celery状态
-  const fetchCeleryStatus = async () => {
-    try {
-      const data = await baseFetchJson('/api/scheduled-tasks/celery-status');
-      setCeleryStatus(data);
-    } catch (error) {
-      console.error('Failed to fetch celery status:', error);
-    }
-  };
 
   // 获取智能体列表
   const fetchAgents = async () => {
@@ -215,7 +197,7 @@ const TasksManagement: React.FC = () => {
   const fetchTaskLogs = async (taskId: number) => {
     setTaskLogsLoading(true);
     try {
-      const response = await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${taskId}/execution-logs`);
+      const response = await baseFetch(`/api/scheduled-tasks/${taskId}/logs`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -235,7 +217,7 @@ const TasksManagement: React.FC = () => {
   // 创建定时任务
   const handleCreateTask = async (values: any) => {
     try {
-      const response = await baseFetch('/api/scheduled-tasks/scheduled-tasks', {
+      const response = await baseFetch('/api/scheduled-tasks', {
         method: 'POST',
         body: JSON.stringify(values),
       });
@@ -259,7 +241,7 @@ const TasksManagement: React.FC = () => {
     if (!currentTask) return;
     
     try {
-      await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${currentTask.id}`, {
+      await baseFetch(`/api/scheduled-tasks/${currentTask.id}`, {
         method: 'PUT',
         body: JSON.stringify(values),
       });
@@ -277,7 +259,7 @@ const TasksManagement: React.FC = () => {
   const handleToggleTask = async (task: ScheduledTask) => {
     const action = task.task_enabled ? 'disable' : 'enable';
     try {
-      await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${task.id}/${action}`, {
+      await baseFetch(`/api/scheduled-tasks/${task.id}/${action}`, {
         method: 'POST',
       });
       message.success(`${task.task_enabled ? '禁用' : '启用'}任务成功`);
@@ -327,7 +309,7 @@ const TasksManagement: React.FC = () => {
         try {
           for (const task of disabledTasks) {
             try {
-              await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${task.id}/enable`, {
+              await baseFetch(`/api/scheduled-tasks/${task.id}/enable`, {
                 method: 'POST',
               });
               successCount++;
@@ -395,7 +377,7 @@ const TasksManagement: React.FC = () => {
         try {
           for (const task of enabledTasks) {
             try {
-              await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${task.id}/disable`, {
+              await baseFetch(`/api/scheduled-tasks/${task.id}/disable`, {
                 method: 'POST',
               });
               successCount++;
@@ -427,7 +409,7 @@ const TasksManagement: React.FC = () => {
   // 立即执行任务
   const handleRunTask = async (task: ScheduledTask) => {
     try {
-      const response = await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${task.id}/run-now`, {
+      const response = await baseFetch(`/api/scheduled-tasks/${task.id}/trigger`, {
         method: 'POST',
       });
       message.success(`任务已发送执行，任务ID: ${response.task_id}`);
@@ -448,7 +430,7 @@ const TasksManagement: React.FC = () => {
       content: `确定要删除任务 "${task.task_name}" 吗？`,
       onOk: async () => {
         try {
-          await baseFetch(`/api/scheduled-tasks/scheduled-tasks/${task.id}`, {
+          await baseFetch(`/api/scheduled-tasks/${task.id}`, {
             method: 'DELETE',
           });
           message.success('删除任务成功');
@@ -495,7 +477,6 @@ const TasksManagement: React.FC = () => {
   useEffect(() => {
     fetchScheduledTasks();
     fetchCeleryTasks();
-    fetchCeleryStatus();
     fetchAgents();
     
     // 定期刷新数据
@@ -504,7 +485,6 @@ const TasksManagement: React.FC = () => {
         fetchScheduledTasks();
       } else if (activeTab === 'celery') {
         fetchCeleryTasks();
-        fetchCeleryStatus();
       }
     }, 10000); // 每10秒刷新
 
@@ -814,53 +794,35 @@ const TasksManagement: React.FC = () => {
       <Title level={2}>任务管理</Title>
       
       
-      {/* Celery状态概览 */}
+      {/* 任务概览 */}
       <Row gutter={16} className="mb-4">
-        <Col span={6}>
+        <Col span={8}>
           <Card size="small">
             <Statistic
-              title="Celery状态"
-              value={celeryStatus?.status || 'unknown'}
-              valueStyle={{ 
-                color: celeryStatus?.status === 'running' ? '#3f8600' : '#cf1322',
-                fontSize: '16px'
-              }}
-              prefix={
-                celeryStatus?.status === 'running' ? 
-                <CheckCircleOutlined /> : 
-                <ExclamationCircleOutlined />
-              }
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="工作进程"
-              value={celeryStatus?.worker_count || 0}
+              title="定时任务总数"
+              value={Array.isArray(scheduledTasks) ? scheduledTasks.length : 0}
               valueStyle={{ color: '#1890ff', fontSize: '16px' }}
-              prefix={<SettingOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="活跃任务"
-              value={celeryStatus?.active_task_count || 0}
-              valueStyle={{ color: '#722ed1', fontSize: '16px' }}
-              prefix={<LoadingOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={6}>
-          <Card size="small">
-            <Statistic
-              title="定时任务"
-              value={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => t.task_enabled).length : 0}
-              suffix={`/ ${Array.isArray(scheduledTasks) ? scheduledTasks.length : 0}`}
-              valueStyle={{ color: '#52c41a', fontSize: '16px' }}
               prefix={<ClockCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small">
+            <Statistic
+              title="启用任务"
+              value={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => t.task_enabled).length : 0}
+              valueStyle={{ color: '#52c41a', fontSize: '16px' }}
+              prefix={<CheckCircleOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card size="small">
+            <Statistic
+              title="禁用任务"
+              value={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => !t.task_enabled).length : 0}
+              valueStyle={{ color: '#ff4d4f', fontSize: '16px' }}
+              prefix={<ExclamationCircleOutlined />}
             />
           </Card>
         </Col>

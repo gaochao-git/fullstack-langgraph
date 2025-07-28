@@ -3,7 +3,7 @@
 专门管理智能运维助手的提示词
 """
 
-from ...services.agent_config_service import AgentConfigService
+from ...apps.agent.service.agent_config_service import AgentConfigService
 
 # 默认智能运维助手的系统提示词 - 作为后备方案
 DEFAULT_SYSTEM_PROMPT = """你是一个专业的智能运维助手，具备以下核心能力：

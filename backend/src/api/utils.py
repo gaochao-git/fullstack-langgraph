@@ -12,7 +12,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 logger = logging.getLogger(__name__)
 
 # 全局连接字符串配置 - 从环境变量读取
-from ..core.config import get_checkpoint_uri
+from ..shared.core.config import get_checkpoint_uri
 CHECK_POINT_URI = get_checkpoint_uri()
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
