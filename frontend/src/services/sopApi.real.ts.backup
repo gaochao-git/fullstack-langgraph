@@ -70,23 +70,10 @@ export class SOPApi {
       const url = `/api/v1/sops${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
       const response = await baseFetchJson(url);
       
-      // 处理分页响应格式
-      const result = handleUnifiedResponse(response);
-      
-      // 转换为前端期望的格式
-      return {
-        success: true,
-        data: {
-          data: result.items,
-          total: result.pagination.total
-        }
-      };
+      return handleUnifiedResponse(response);
     } catch (error) {
       console.error('Failed to fetch SOPs:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取SOP数据失败'
-      };
+      throw error;
     }
   }
 
@@ -94,17 +81,10 @@ export class SOPApi {
   static async getSOPById(sopId: string) {
     try {
       const response = await baseFetchJson(`/api/v1/sops/${sopId}`);
-      const result = handleUnifiedResponse<SOPTemplate>(response);
-      return {
-        success: true,
-        data: result
-      };
+      return handleUnifiedResponse<SOPTemplate>(response);
     } catch (error) {
       console.error(`Failed to fetch SOP ${sopId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'SOP不存在'
-      };
+      throw error;
     }
   }
 
@@ -115,17 +95,10 @@ export class SOPApi {
         method: 'POST',
         body: JSON.stringify(sopData),
       });
-      const result = handleUnifiedResponse<SOPTemplate>(response);
-      return {
-        success: true,
-        data: result
-      };
+      return handleUnifiedResponse<SOPTemplate>(response);
     } catch (error) {
       console.error('Failed to create SOP:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '创建SOP失败'
-      };
+      throw error;
     }
   }
 
@@ -136,17 +109,10 @@ export class SOPApi {
         method: 'PUT',
         body: JSON.stringify(sopData),
       });
-      const result = handleUnifiedResponse<SOPTemplate>(response);
-      return {
-        success: true,
-        data: result
-      };
+      return handleUnifiedResponse<SOPTemplate>(response);
     } catch (error) {
       console.error(`Failed to update SOP ${sopId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '更新SOP失败'
-      };
+      throw error;
     }
   }
 
@@ -156,17 +122,10 @@ export class SOPApi {
       const response = await baseFetchJson(`/api/v1/sops/${sopId}`, {
         method: 'DELETE',
       });
-      handleUnifiedResponse(response);
-      return {
-        success: true,
-        data: true
-      };
+      return handleUnifiedResponse(response);
     } catch (error) {
       console.error(`Failed to delete SOP ${sopId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '删除SOP失败'
-      };
+      throw error;
     }
   }
 
@@ -174,17 +133,10 @@ export class SOPApi {
   static async getCategories() {
     try {
       const response = await baseFetchJson('/api/v1/sops/meta/categories');
-      const result = handleUnifiedResponse<string[]>(response);
-      return {
-        success: true,
-        data: result
-      };
+      return handleUnifiedResponse<string[]>(response);
     } catch (error) {
       console.error('Failed to fetch categories:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取分类列表失败'
-      };
+      throw error;
     }
   }
 
@@ -192,17 +144,10 @@ export class SOPApi {
   static async getTeams() {
     try {
       const response = await baseFetchJson('/api/v1/sops/meta/teams');
-      const result = handleUnifiedResponse<string[]>(response);
-      return {
-        success: true,
-        data: result
-      };
+      return handleUnifiedResponse<string[]>(response);
     } catch (error) {
       console.error('Failed to fetch teams:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取团队列表失败'
-      };
+      throw error;
     }
   }
 }

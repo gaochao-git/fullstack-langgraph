@@ -16,13 +16,13 @@ from .apps.llm import router as llm_router
 # 创建主API路由器
 api_router = APIRouter()
 
-# 注册各个子路由
-api_router.include_router(agents_router,tags=["agents"])
-api_router.include_router(sop_router,tags=["sop"])
-api_router.include_router(mcp_router,tags=["mcp"])
-api_router.include_router(ai_models_router,tags=["ai-models"])
-api_router.include_router(scheduled_tasks_router,tags=["scheduled-tasks"])
-api_router.include_router(llm_router, tags=["llm"])
+# 注册各个子路由 - 添加v1版本前缀
+api_router.include_router(agents_router, prefix="/v1", tags=["agents"])
+api_router.include_router(sop_router, prefix="/v1", tags=["sop"])
+api_router.include_router(mcp_router, prefix="/v1", tags=["mcp"])
+api_router.include_router(ai_models_router, prefix="/v1", tags=["ai-models"])
+api_router.include_router(scheduled_tasks_router, prefix="/v1", tags=["scheduled-tasks"])
+api_router.include_router(llm_router, prefix="/v1", tags=["llm"])
 
 
 @api_router.get("/health")
