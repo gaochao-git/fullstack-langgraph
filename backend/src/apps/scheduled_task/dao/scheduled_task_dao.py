@@ -28,21 +28,11 @@ class ScheduledTaskDAO(BaseDAO[PeriodicTask]):
         offset: Optional[int] = None
     ) -> List[PeriodicTask]:
         """根据名称关键词搜索定时任务"""
-        query = select(self.model).where(
-            self.model.name.contains(name_keyword)
-        )
-        
-        if enabled_only:
-            query = query.where(self.model.enabled == True)
-        
-        if agent_id:
-            # 假设有agent_id字段，实际根据数据库模型调整
-            query = query.where(self.model.task_kwargs.contains(f'"agent_id":"{agent_id}"'))
-        
-        if offset:
-            query = query.offset(offset)
-        if limit:
-            query = query.limit(limit)
+        query = select(self.model).where(self.model.name.contains(name_keyword))
+        if enabled_only: query = query.where(self.model.enabled == True)
+        if agent_id: query = query.where(self.model.task_kwargs.contains(f'"agent_id":"{agent_id}"'))
+        if offset: query = query.offset(offset)
+        if limit: query = query.limit(limit)
         
         result = await session.execute(query)
         return result.scalars().all()
