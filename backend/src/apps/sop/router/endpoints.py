@@ -66,8 +66,8 @@ async def list_sop_templates(
         offset=(page - 1) * size
     )
     
-    templates, total = await sop_service.list_sops(db, params)
-    template_data = [template.to_dict() for template in templates]
+    # 使用优化后的批量转换方法
+    template_data, total = await sop_service.list_sops_dict(db, params)
     
     return paginated_response(
         items=template_data,
@@ -115,8 +115,8 @@ async def delete_sop_template(
 async def get_sop_categories(
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取所有SOP分类"""
-    categories = await sop_service.get_categories(db)
+    """获取所有SOP分类 - 统一对象格式"""
+    categories = await sop_service.get_category_options(db)
     return success_response(
         data=categories,
         msg="获取SOP分类成功"
@@ -127,11 +127,23 @@ async def get_sop_categories(
 async def get_sop_teams(
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取所有SOP团队"""
-    teams = await sop_service.get_teams(db)
+    """获取所有SOP团队 - 统一对象格式"""
+    teams = await sop_service.get_team_options(db)
     return success_response(
         data=teams,
         msg="获取SOP团队成功"
+    )
+
+
+@router.get("/v1/sops/meta/severity", response_model=UnifiedResponse)
+async def get_sop_severity_options(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取SOP严重程度选项 - 统一对象格式"""
+    severity_options = await sop_service.get_severity_options(db)
+    return success_response(
+        data=severity_options,
+        msg="获取SOP严重程度选项成功"
     )
 
 

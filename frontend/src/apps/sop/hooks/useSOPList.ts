@@ -4,7 +4,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
-import { SOPTemplate, SOPListParams, SOPApi } from '../apps/sop';
+import { SOPTemplate, SOPListParams } from '../types/sop';
+import { SOPApi } from '../services/sopApi';
 
 interface UseSOPListReturn {
   // 数据状态

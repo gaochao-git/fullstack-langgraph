@@ -4,11 +4,11 @@ SOP Template Model
 
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from src.shared.db.config import Base
-from src.shared.db.models import JSONType, now_shanghai
+from src.shared.db.models import JSONType, now_shanghai, BaseModel
 import json
 
 
-class SOPTemplate(Base):
+class SOPTemplate(BaseModel):
     """SOP Template model matching sop_prompt_templates table."""
     __tablename__ = "sop_prompt_templates"
 
@@ -27,21 +27,10 @@ class SOPTemplate(Base):
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
-    def to_dict(self):
-        """Convert model to dictionary."""
-        return {
-            'id': self.id,
-            'sop_id': self.sop_id,
-            'sop_title': self.sop_title,
-            'sop_category': self.sop_category,
-            'sop_description': self.sop_description,
-            'sop_severity': self.sop_severity,
-            'sop_steps': json.dumps(self.sop_steps) if isinstance(self.sop_steps, (dict, list)) else self.sop_steps,
-            'tools_required': json.dumps(self.tools_required) if isinstance(self.tools_required, (dict, list)) else self.tools_required,
-            'sop_recommendations': self.sop_recommendations,
-            'team_name': self.team_name,
-            'create_by': self.create_by,
-            'update_by': self.update_by,
-            'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else None,
-            'update_time': self.update_time.strftime('%Y-%m-%d %H:%M:%S') if self.update_time else None,
-        }
+    def _process_sop_steps(self, value):
+        """自定义处理sop_steps字段 - 解析为Python对象"""
+        return self._parse_json_field(value, default=[])
+    
+    def _process_tools_required(self, value):
+        """自定义处理tools_required字段 - 解析为Python对象"""
+        return self._parse_json_field(value, default=[])

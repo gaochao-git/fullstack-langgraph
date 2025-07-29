@@ -42,8 +42,9 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         result = await session.execute(query)
         return result.scalars().all()
     
+    # ========== 旧格式方法 - 向后兼容 ==========
     async def get_all_categories(self, session: AsyncSession) -> List[str]:
-        """获取所有分类"""
+        """获取所有分类 - 字符串数组格式（向后兼容）"""
         result = await session.execute(
             select(distinct(self.model.sop_category))
             .where(self.model.sop_category.isnot(None))
@@ -52,7 +53,7 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         return [category for category in result.scalars().all() if category]
     
     async def get_all_teams(self, session: AsyncSession) -> List[str]:
-        """获取所有团队"""
+        """获取所有团队 - 字符串数组格式（向后兼容）"""
         result = await session.execute(
             select(distinct(self.model.team_name))
             .where(self.model.team_name.isnot(None))
@@ -60,19 +61,46 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         )
         return [team for team in result.scalars().all() if team]
     
-    async def get_category_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
-        """获取分类统计"""
+    # ========== 简单方法 - 直接转为[{}]格式 ==========
+    async def get_category_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取分类选项 - 简单直接"""
         result = await session.execute(
             select(
-                self.model.sop_category,
-                func.count(self.model.id).label('count')
+                self.model.sop_category.label('value'),
+                func.count().label('count')
             )
             .where(self.model.sop_category.isnot(None))
             .group_by(self.model.sop_category)
-            .order_by(func.count(self.model.id).desc())
+            .order_by(self.model.sop_category)
         )
-        
-        return [
-            {'category': row.sop_category, 'count': row.count}
-            for row in result.fetchall()
-        ]
+        return self.to_dict_list(result)
+    
+    async def get_team_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取团队选项 - 简单直接"""
+        result = await session.execute(
+            select(
+                self.model.team_name.label('value'),
+                func.count().label('count')
+            )
+            .where(self.model.team_name.isnot(None))
+            .group_by(self.model.team_name)
+            .order_by(self.model.team_name)
+        )
+        return self.to_dict_list(result)
+    
+    async def get_severity_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取严重程度选项 - 简单直接"""
+        result = await session.execute(
+            select(
+                self.model.sop_severity.label('value'),
+                func.count().label('count')
+            )
+            .where(self.model.sop_severity.isnot(None))
+            .group_by(self.model.sop_severity)
+            .order_by(func.count().desc())  # 按使用频率排序
+        )
+        return self.to_dict_list(result)
+    
+    async def get_category_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取分类统计 - 简单直接"""
+        return await self.get_category_options(session)

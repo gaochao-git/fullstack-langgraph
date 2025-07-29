@@ -29,7 +29,7 @@ import SOPDetailModalSimple from '../components/SOPDetailModalSimple';
 const { Search } = Input;
 const { Option } = Select;
 
-const SOPManagementSimple: React.FC = () => {
+const SOPList: React.FC = () => {
   const [sops, setSOPs] = useState<SOPTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -356,4 +356,4 @@ const SOPManagementSimple: React.FC = () => {
   );
 };
 
-export default SOPManagementSimple;
+export default SOPList;

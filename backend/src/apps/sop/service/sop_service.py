@@ -134,20 +134,49 @@ class SOPService:
         logger.info(f"Deleting SOP template: {sop_id}")
         return await self._dao.delete_by_field(session, 'sop_id', sop_id) > 0
     
+    # ========== 旧格式方法 - 向后兼容 ==========
     async def get_categories(self, session: AsyncSession) -> List[str]:
-        """获取所有分类"""
+        """获取所有分类 - 字符串数组格式（向后兼容）"""
         return await self._dao.get_all_categories(session)
     
-    async def get_teams(self, session: AsyncSession) -> List[str]:
-        """获取所有团队"""
+    async def get_teams(self, session: AsyncSession) -> List[str]:  
+        """获取所有团队 - 字符串数组格式（向后兼容）"""
         return await self._dao.get_all_teams(session)
     
     async def get_category_statistics(
         self, 
         session: AsyncSession
     ) -> List[Dict[str, Any]]:
-        """获取分类统计"""
+        """获取分类统计 - 原有格式（向后兼容）"""
         return await self._dao.get_category_statistics(session)
+    
+    # ========== 新格式方法 - 统一标准格式 ==========
+    async def get_category_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取分类选项 - 统一对象格式"""
+        return await self._dao.get_category_options(session)
+    
+    async def get_team_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取团队选项 - 统一对象格式"""
+        return await self._dao.get_team_options(session)
+    
+    async def get_severity_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+        """获取严重程度选项 - 统一对象格式"""
+        return await self._dao.get_severity_options(session)
+    
+    # ========== 优化列表查询 - 使用BaseModel批量转换 ==========
+    async def list_sops_dict(
+        self, 
+        session: AsyncSession, 
+        params: SOPQueryParams
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """列出SOP模板 - 返回字典格式"""
+        templates, total = await self.list_sops(session, params)
+        
+        # 使用BaseModel的批量转换方法
+        from src.shared.db.models import BaseModel
+        template_data = BaseModel.bulk_to_dict(templates)
+        
+        return template_data, total
 
 
 # 全局实例

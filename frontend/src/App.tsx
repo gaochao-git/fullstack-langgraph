@@ -17,7 +17,7 @@ import {
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import { ResearchAgent, DiagnosticAgent } from "./apps/llm";
-import { SOPManagementSimple } from "./apps/sop";
+import { SOPList } from "./apps/sop";
 import { MCPManagement } from "./apps/mcp";
 import { AgentManagement, AgentMarketplace, GenericAgentChat } from "./apps/agent";
 import { ModelsManagement } from "./apps/ai_model";
@@ -273,7 +273,7 @@ function AppContent() {
               <Route path="/agents/diagnostic_agent" element={<DiagnosticAgent />} />
               <Route path="/agents/:agentId" element={<GenericAgentChat />} />
               <Route path="/agents" element={<AgentManagement />} />
-              <Route path="/sop" element={<SOPManagementSimple />} />
+              <Route path="/sop" element={<SOPList />} />
               <Route path="/mcp" element={<MCPManagement />} />
               <Route path="/models" element={<ModelsManagement />} />
               <Route path="/tasks" element={<TasksManagement />} />
