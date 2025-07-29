@@ -262,7 +262,7 @@ export default function ChatEngine({
     setLoadingHistory(true);
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/llm/users/zhangsan123/threads?limit=20&offset=0`
+        `${import.meta.env.VITE_API_BASE_URL}/api/chat/users/zhangsan123/threads?limit=20&offset=0`
       );
 
       if (response.ok) {

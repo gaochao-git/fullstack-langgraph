@@ -37,7 +37,7 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
     import asyncio
     import logging
-    from ..service.user_threads_db import check_user_thread_exists, create_user_thread_mapping
+    from ..llm_service.user_threads_db import check_user_thread_exists, create_user_thread_mapping
     logger = logging.getLogger(__name__)
     logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
     exists = await check_user_thread_exists(user_name, thread_id)
@@ -157,7 +157,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from ...agent.service.agent_config_service import AgentConfigService
+    from .agent_config_service import AgentConfigService
     
     assistant_id = request_body.assistant_id
     logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
@@ -168,7 +168,7 @@ async def handle_postgres_streaming(request_body, thread_id):
     logger.info(f"🔍 直接使用assistant_id作为agent_id: {agent_id}")
     
     # 从数据库获取智能体配置
-    from ....shared.db.config import get_sync_db
+    from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
     db = next(db_gen)
     try:
@@ -205,14 +205,14 @@ async def handle_postgres_streaming(request_body, thread_id):
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
-    from ...agent.service.agent_config_service import AgentConfigService
+    from .agent_config_service import AgentConfigService
     
     # 动态检查智能体是否存在 - 直接使用assistant_id
     assistant_id = request_body.assistant_id
     agent_id = assistant_id
     
     # 检查数据库中是否存在该智能体
-    from ....shared.db.config import get_sync_db
+    from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
     db = next(db_gen)
     try:

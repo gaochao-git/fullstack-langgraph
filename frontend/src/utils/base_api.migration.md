@@ -104,7 +104,7 @@ const reader = response.body.getReader();
 
 **新代码：**
 ```typescript
-await omind_fetch_stream('/api/llm/threads/123/runs/stream', {
+await omind_fetch_stream('/api/chat/threads/123/runs/stream', {
   body: requestBody,
   onData: (data: string) => {
     // 处理每个数据块

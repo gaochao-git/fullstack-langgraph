@@ -69,7 +69,7 @@ export async function streamChat(threadId: string, messages: any[]) {
   };
 
   try {
-    await omind_fetch_stream(`/api/llm/threads/${threadId}/runs/stream`, {
+    await omind_fetch_stream(`/api/chat/threads/${threadId}/runs/stream`, {
       method: 'POST',
       body: requestBody,
       onData: (data: string) => {
@@ -124,7 +124,7 @@ export function useStreamChat() {
     };
 
     try {
-      await omind_fetch_stream(`/api/llm/threads/${threadId}/runs/stream`, {
+      await omind_fetch_stream(`/api/chat/threads/${threadId}/runs/stream`, {
         body: requestBody,
         onData: (data: string) => {
           try {
