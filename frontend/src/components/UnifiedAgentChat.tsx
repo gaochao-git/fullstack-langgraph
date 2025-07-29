@@ -67,12 +67,12 @@ export default function UnifiedAgentChat({
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
 
-  // 直接使用agent的ID作为assistantId，不再区分内置和自定义
+  // 获取assistantId，兼容不同的agent对象结构
   const getAssistantId = () => {
     if (!agent) return "diagnostic_agent"; // 默认fallback
     
-    // 统一使用agent的ID作为assistantId
-    return agent.id;
+    // 优先使用agent_id（来自API的agent对象），如果没有则使用id（硬编码的agent对象）
+    return agent.agent_id || agent.id;
   };
 
   // 从URL参数中获取线程ID
