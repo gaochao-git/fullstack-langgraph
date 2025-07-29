@@ -23,7 +23,7 @@ from .shared.core.middleware import setup_middlewares
 from .router import api_router
 
 # 导入LLM相关模块
-from .apps.agent.llm_service.utils import test_postgres_connection
+from .apps.agent.utils import test_postgres_connection
 
 
 
@@ -76,7 +76,7 @@ def create_app() -> FastAPI:
         logger.info("📊 智能体配置完全基于数据库，动态加载")
         
         # 初始化用户线程数据库
-        from .apps.agent.llm_service.user_threads_db import init_user_threads_db
+        from .apps.agent.service.user_threads_db import init_user_threads_db
         await init_user_threads_db()
         
         # 初始化SOP数据库

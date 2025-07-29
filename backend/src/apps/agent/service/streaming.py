@@ -9,13 +9,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from ..llm_service.utils import (
+from ..utils import (
     prepare_graph_config, 
     serialize_value,
     CHECK_POINT_URI,
     recover_thread_from_postgres
 )
-from ..llm_service.user_threads_db import (
+from .user_threads_db import (
     check_user_thread_exists,
     create_user_thread_mapping,
     init_user_threads_db
@@ -37,7 +37,7 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
     import asyncio
     import logging
-    from ..llm_service.user_threads_db import check_user_thread_exists, create_user_thread_mapping
+    from .user_threads_db import check_user_thread_exists, create_user_thread_mapping
     logger = logging.getLogger(__name__)
     logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
     exists = await check_user_thread_exists(user_name, thread_id)

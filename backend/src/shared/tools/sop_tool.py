@@ -9,15 +9,14 @@ from pydantic import BaseModel, Field
 
 # 导入数据库相关模块  
 from src.shared.db.config import get_sync_db_context
-from src.apps.sop.dao import SOPDAO
+from src.apps.sop.models import SOPTemplate
 
 
 def get_sop_from_db(sop_id: str) -> Optional[Dict[str, Any]]:
     """从数据库获取单个SOP"""
     try:
         with get_sync_db_context() as db:
-            sop_dao = SOPDAO()
-            sop_template = sop_dao.sync_get_by_sop_id(db, sop_id)
+            sop_template = db.query(SOPTemplate).filter(SOPTemplate.sop_id == sop_id).first()
             return sop_template.to_dict() if sop_template else None
     except Exception as e:
         print(f"从数据库获取SOP失败: {e}")

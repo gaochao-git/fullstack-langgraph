@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from ..llm_service.utils import recover_thread_from_postgres
+from ..utils import recover_thread_from_postgres
 
 logger = logging.getLogger(__name__)
 

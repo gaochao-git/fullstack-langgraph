@@ -228,6 +228,6 @@ async def stream_run_standard_endpoint(thread_id: str, request_body: RunCreate):
 @router.get("/chat/users/{user_name}/threads")
 async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int = 0):
     """获取用户的所有线程"""
-    from .llm_service.user_threads_db import get_user_threads
+    from .service.user_threads_db import get_user_threads
     threads = await get_user_threads(user_name, limit, offset)
     return {"user_name": user_name, "threads": threads, "total": len(threads)}
