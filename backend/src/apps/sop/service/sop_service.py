@@ -151,16 +151,16 @@ class SOPService:
         return await self._dao.get_category_statistics(db)
     
     # ========== 新格式方法 - 统一标准格式 ==========
-    async def get_category_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取分类选项 - 统一对象格式"""
+    async def get_category_options(self, db: AsyncSession):
+        """获取分类选项 - 返回原始查询结果"""
         return await self._dao.get_category_options(db)
     
-    async def get_team_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取团队选项 - 统一对象格式"""
+    async def get_team_options(self, db: AsyncSession):
+        """获取团队选项 - 返回原始查询结果"""
         return await self._dao.get_team_options(db)
     
-    async def get_severity_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取严重程度选项 - 统一对象格式"""
+    async def get_severity_options(self, db: AsyncSession):
+        """获取严重程度选项 - 返回原始查询结果"""
         return await self._dao.get_severity_options(db)
     
     # ========== 优化列表查询 - 使用BaseModel批量转换 ==========

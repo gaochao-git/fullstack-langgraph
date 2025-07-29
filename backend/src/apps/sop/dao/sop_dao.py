@@ -42,9 +42,9 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         result = await db.execute(query)
         return result.scalars().all()
     
-    # ========== 统一格式方法 - 直接转为[{}]格式 ==========
-    async def get_category_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取分类选项 - 简单直接"""
+    # ========== 选项和统计方法 - 返回原始查询结果让Router层处理 ==========
+    async def get_category_options(self, db: AsyncSession):
+        """获取分类选项 - 返回原始查询结果"""
         result = await db.execute(
             select(
                 self.model.sop_category.label('value'),
@@ -54,10 +54,10 @@ class SOPDAO(BaseDAO[SOPTemplate]):
             .group_by(self.model.sop_category)
             .order_by(self.model.sop_category)
         )
-        return self.to_dict_list(result)
+        return result
     
-    async def get_team_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取团队选项 - 简单直接"""
+    async def get_team_options(self, db: AsyncSession):
+        """获取团队选项 - 返回原始查询结果"""
         result = await db.execute(
             select(
                 self.model.team_name.label('value'),
@@ -67,10 +67,10 @@ class SOPDAO(BaseDAO[SOPTemplate]):
             .group_by(self.model.team_name)
             .order_by(self.model.team_name)
         )
-        return self.to_dict_list(result)
+        return result
     
-    async def get_severity_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取严重程度选项 - 简单直接"""
+    async def get_severity_options(self, db: AsyncSession):
+        """获取严重程度选项 - 返回原始查询结果"""
         result = await db.execute(
             select(
                 self.model.sop_severity.label('value'),
@@ -80,8 +80,4 @@ class SOPDAO(BaseDAO[SOPTemplate]):
             .group_by(self.model.sop_severity)
             .order_by(func.count().desc())  # 按使用频率排序
         )
-        return self.to_dict_list(result)
-    
-    async def get_category_statistics(self, db: AsyncSession) -> List[Dict[str, Any]]:
-        """获取分类统计 - 简单直接"""
-        return await self.get_category_options(db)
+        return result

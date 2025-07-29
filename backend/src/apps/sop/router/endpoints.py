@@ -23,7 +23,7 @@ async def create_sop_template(
     """创建SOP模板"""
     sop_template = await sop_service.create_sop(db, sop_data)
     return success_response(
-        data=sop_template.to_dict(),
+        data=sop_template,
         msg="SOP模板创建成功",
         code=ResponseCode.CREATED
     )
@@ -40,7 +40,7 @@ async def get_sop_template(
         raise BusinessException(f"SOP模板 {sop_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=sop_template.to_dict(),
+        data=sop_template,
         msg="获取SOP模板成功"
     )
 
@@ -90,7 +90,7 @@ async def update_sop_template(
         raise BusinessException(f"SOP模板 {sop_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_template.to_dict(),
+        data=updated_template,
         msg="SOP模板更新成功"
     )
 

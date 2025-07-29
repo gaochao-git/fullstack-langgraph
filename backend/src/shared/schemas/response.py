@@ -1,6 +1,6 @@
 """全局统一响应格式"""
 
-from typing import Optional, Any, Generic, TypeVar
+from typing import Optional, Any, Generic, TypeVar, Union, List, Dict
 from pydantic import BaseModel
 from enum import Enum
 
@@ -36,10 +36,10 @@ class ResponseCode(int, Enum):
 
 
 class UnifiedResponse(BaseModel, Generic[T]):
-    """统一响应格式"""
+    """统一响应格式 - data 只能是字典或字典列表"""
     status: ResponseStatus
     msg: str
-    data: Optional[T] = None
+    data: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None
     code: int
     
     class Config:
@@ -57,7 +57,14 @@ def success_response(
     msg: str = "操作成功",
     code: int = ResponseCode.SUCCESS
 ) -> UnifiedResponse:
-    """成功响应"""
+    """成功响应 - 自动序列化模型对象和查询结果"""
+    # 自动序列化模型对象
+    if data is not None and hasattr(data, 'to_dict'):
+        data = data.to_dict()
+    # 处理SQLAlchemy查询结果
+    if data is not None and hasattr(data, 'mappings'):
+        data = [dict(row) for row in data.mappings()]
+    
     return UnifiedResponse(
         status=ResponseStatus.OK,
         msg=msg,
@@ -68,14 +75,13 @@ def success_response(
 
 def error_response(
     msg: str = "操作失败",
-    code: int = ResponseCode.INTERNAL_ERROR,
-    data: Optional[Any] = None
+    code: int = ResponseCode.INTERNAL_ERROR
 ) -> UnifiedResponse:
-    """错误响应"""
+    """错误响应 - data 固定为 None"""
     return UnifiedResponse(
         status=ResponseStatus.ERROR,
         msg=msg,
-        data=data,
+        data=None,  # 错误响应不返回业务数据
         code=code
     )
 
@@ -87,7 +93,11 @@ def paginated_response(
     size: int,
     msg: str = "查询成功"
 ) -> UnifiedResponse[PaginatedData]:
-    """分页响应"""
+    """分页响应 - 自动序列化模型对象列表"""
+    # 自动序列化模型对象列表
+    if items and hasattr(items[0], 'to_dict'):
+        items = [item.to_dict() for item in items]
+    
     pagination_data = PaginatedData(
         items=items,
         pagination={
