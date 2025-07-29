@@ -35,16 +35,10 @@ class AgentService:
     ) -> AgentConfig:
         """创建智能体配置"""
         # 生成agent_id（如果未提供）
-        if not agent_data.get('agent_id'):
-            agent_data['agent_id'] = f"custom_{uuid.uuid4().hex[:8]}"
-        
+        if not agent_data.get('agent_id'): agent_data['agent_id'] = f"custom_{uuid.uuid4().hex[:8]}"
         # 检查是否已存在
         existing = await self._dao.get_by_agent_id(session, agent_data['agent_id'])
-        if existing:
-            raise BusinessException(
-                f"智能体ID {agent_data['agent_id']} 已存在", 
-                ResponseCode.DUPLICATE_RESOURCE
-            )
+        if existing: raise BusinessException(f"智能体ID {agent_data['agent_id']} 已存在", ResponseCode.DUPLICATE_RESOURCE)
         
         
         # 设置默认值
