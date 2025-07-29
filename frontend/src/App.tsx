@@ -16,15 +16,12 @@ import {
   ClockCircleOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
-import ResearchAgent from "./agents/research_agent/ResearchAgent";
-import DiagnosticAgent from "./agents/diagnostic_agent/DiagnosticAgent";
-import SOPManagementSimple from "./pages/SOPManagementSimple";
-import MCPManagement from "./pages/MCPManagement";
-import AgentManagement from "./pages/AgentManagement";
-import ModelsManagement from "./pages/ModelsManagement";
-import AgentMarketplace from "./pages/AgentMarketplace";
-import GenericAgentChat from "./pages/GenericAgentChat";
-import TasksManagement from "./pages/TasksManagement";
+import { ResearchAgent, DiagnosticAgent } from "./apps/llm";
+import { SOPManagementSimple } from "./apps/sop";
+import { MCPManagement } from "./apps/mcp";
+import { AgentManagement, AgentMarketplace, GenericAgentChat } from "./apps/agent";
+import { ModelsManagement } from "./apps/ai_model";
+import { TasksManagement } from "./apps/scheduled_task";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 

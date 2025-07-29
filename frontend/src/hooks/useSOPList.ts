@@ -4,9 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { message } from 'antd';
-import { SOPTemplate, SOPListParams } from '../types/sop';
-import { PaginatedData } from '../types/api';
-import { SOPApi, SOPErrorHandler } from '../services/sopApi.new';
+import { SOPTemplate, SOPListParams, SOPApi } from '../apps/sop';
 
 interface UseSOPListReturn {
   // 数据状态
@@ -47,14 +45,18 @@ export const useSOPList = (initialParams: SOPListParams = {}): UseSOPListReturn 
     setLoading(true);
     
     try {
-      const result: PaginatedData<SOPTemplate> = await SOPApi.getSOPs(queryParams);
+      const result = await SOPApi.getSOPs(queryParams);
       
-      setSOPs(result.items);
-      setTotal(result.pagination.total);
-      setCurrentParams(queryParams);
+      if (result.success && result.data) {
+        setSOPs(result.data.data);
+        setTotal(result.data.total);
+        setCurrentParams(queryParams);
+      } else {
+        throw new Error(result.error || '获取SOP列表失败');
+      }
     } catch (error) {
       console.error('获取SOP列表失败:', error);
-      message.error(SOPErrorHandler.handleError(error));
+      message.error(error instanceof Error ? error.message : '获取SOP列表失败');
       setSOPs([]);
       setTotal(0);
     } finally {
@@ -108,7 +110,7 @@ export const useSOPList = (initialParams: SOPListParams = {}): UseSOPListReturn 
       await fetchSOPs({ ...currentParams, page: newPage });
     } catch (error) {
       console.error('删除SOP失败:', error);
-      message.error(SOPErrorHandler.handleError(error));
+      message.error(error instanceof Error ? error.message : '删除SOP失败');
     }
   }, [sops.length, currentParams, fetchSOPs]);
 
