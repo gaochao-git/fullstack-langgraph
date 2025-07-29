@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test MCP API Fix</title>
+</head>
+<body>
+    <h1>Test MCP API</h1>
+    <button onclick="testMCPServers()">Test getMCPServers</button>
+    <div id="result"></div>
+
+    <script>
+        async function testMCPServers() {
+            try {
+                const response = await fetch('http://172.20.10.2:8000/api/v1/mcp/servers');
+                const data = await response.json();
+                document.getElementById('result').innerHTML = 
+                    '<h3>Success!</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    '<h3>Error:</h3><pre>' + error.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>

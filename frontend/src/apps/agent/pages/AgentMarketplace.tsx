@@ -8,11 +8,12 @@ import { useTheme } from "../../../contexts/ThemeContext";
 const { Title, Text, Paragraph } = Typography;
 interface Agent {
   id: string;
+  agent_id: string;
   name: string;
   display_name: string;
   description: string;
   status: string;
-  enabled: boolean;
+  enabled: string; // 'yes' | 'no'
   tools_info: {
     system_tools: string[];
     mcp_tools: any[];
@@ -29,7 +30,7 @@ interface Agent {
     total_tools: number;
     selected_tools: string[];
   };
-  is_builtin: boolean;
+  is_builtin: string; // 'yes' | 'no'
 }
 
 const AgentMarketplace = () => {
@@ -42,11 +43,11 @@ const AgentMarketplace = () => {
   const loadAgents = async () => {
     try {
       setLoading(true);
-      const response = await agentApi.getAgents();
-      // 只显示启用状态的智能体，兼容 "yes"/"no" 和 true/false
-      const activeAgents = response.filter((agent: Agent) => 
-        agent.enabled === true || agent.enabled === 'yes'
-      );
+      const response = await agentApi.getAgents({ include_builtin: true });
+      console.log('API Response:', response);
+      console.log('Items:', response.items);
+      // 显示所有智能体，不再过滤启用状态
+      const activeAgents = response.items;
       setAgents(activeAgents);
     } catch (error) {
       console.error('加载智能体失败:', error);
@@ -83,7 +84,7 @@ const AgentMarketplace = () => {
     const tags = [];
     
     // 根据智能体类型添加标签
-    switch (agent.id) {
+    switch (agent.agent_id) {
       case 'research_agent':
         tags.push('研究', '搜索', '分析');
         break;
