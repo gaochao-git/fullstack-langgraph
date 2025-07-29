@@ -394,12 +394,13 @@ class AgentApiService {
    */
   async getMCPServers(): Promise<MCPServer[]> {
     try {
-      const response = await omind_get('/api/v1/mcp/servers');
+      const response = await omind_get('/api/v1/mcp/servers?size=100');
       if (!response.ok) {
         throw new Error(`获取MCP服务器信息失败: ${response.statusText}`);
       }
       const result = await response.json();
-      return handleUnifiedResponse<MCPServer[]>(result);
+      const paginatedResult = handleUnifiedResponse<{items: MCPServer[], total: number}>(result);
+      return paginatedResult.items;
     } catch (error) {
       console.error('获取MCP服务器信息失败:', error);
       throw error;

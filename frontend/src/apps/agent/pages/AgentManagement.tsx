@@ -119,9 +119,9 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
   // 将 enabled 转换为 boolean，兼容 "yes"/"no" 和 true/false
   enabled: agent.enabled === true || agent.enabled === 'yes',
   mcpConfig: {
-    enabledServers: agent.mcp_config.enabled_servers,
-    selectedTools: agent.mcp_config.selected_tools,
-    totalTools: agent.mcp_config.total_tools
+    enabledServers: agent.mcp_config?.enabled_servers || [],
+    selectedTools: agent.mcp_config?.selected_tools || [],
+    totalTools: agent.mcp_config?.total_tools || 0
   }
 });
 
@@ -129,7 +129,7 @@ const transformMCPServerToLocal = (server: MCPServer): LocalMCPServer => ({
   ...server,
   status: server.status as 'connected' | 'disconnected' | 'error',
   // 确保 tools 始终是数组，避免 undefined 错误
-  tools: server.tools || []
+  tools: Array.isArray(server.tools) ? server.tools : []
 });
 
 const AgentManagement: React.FC = () => {
@@ -345,14 +345,40 @@ const AgentManagement: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [agentsData, mcpServersData] = await Promise.all([
-        agentApi.getAllAgents(), // 使用 getAllAgents 返回数组而不是分页数据
-        agentApi.getMCPServers(),
-        loadAvailableModels()
-      ]);
+      // 分别加载数据，避免一个失败影响全部
+      let agentsData = [];
+      let mcpServersData = [];
       
-      setAgents(agentsData.map(transformAgentToLocal));
-      setMcpServers(mcpServersData.map(transformMCPServerToLocal));
+      try {
+        agentsData = await agentApi.getAllAgents();
+        console.log('Agents data loaded:', agentsData);
+        setAgents(agentsData.map(transformAgentToLocal));
+      } catch (error) {
+        console.error('加载智能体数据失败:', error);
+        message.error('加载智能体数据失败');
+      }
+      
+      try {
+        mcpServersData = await agentApi.getMCPServers();
+        console.log('MCP servers data loaded:', mcpServersData);
+        console.log('Is array?', Array.isArray(mcpServersData));
+        
+        if (Array.isArray(mcpServersData)) {
+          setMcpServers(mcpServersData.map(transformMCPServerToLocal));
+        } else {
+          console.warn('MCP服务器数据不是数组格式:', mcpServersData);
+          setMcpServers([]);
+        }
+      } catch (error) {
+        console.error('加载MCP服务器数据失败:', error);
+        // MCP服务器加载失败不影响整体功能，只显示警告
+        console.warn('MCP服务器数据加载失败，将使用空数据');
+        setMcpServers([]);
+      }
+      
+      // 加载可用模型
+      await loadAvailableModels();
+      
     } catch (error) {
       console.error('加载数据失败:', error);
       message.error('加载数据失败，请重试');
