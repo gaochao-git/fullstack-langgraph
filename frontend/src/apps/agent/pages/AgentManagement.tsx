@@ -442,11 +442,11 @@ const AgentManagement: React.FC = () => {
     .filter(agent => {
       const matchSearch = !searchText || 
         agent.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
-        agent.description.toLowerCase().includes(searchText.toLowerCase());
+        agent.agent_description.toLowerCase().includes(searchText.toLowerCase());
       // 状态筛选用 agent.enabled
       let matchStatus = true;
-      if (statusFilter === 'enabled') matchStatus = agent.enabled === true || agent.enabled === 'yes';
-      if (statusFilter === 'disabled') matchStatus = agent.enabled === false || agent.enabled === 'no';
+      if (statusFilter === 'enabled') matchStatus = agent.enabled === 'yes';
+      if (statusFilter === 'disabled') matchStatus = agent.enabled === 'no';
       return matchSearch && matchStatus;
     })
     // 内置智能体排前面
@@ -559,7 +559,7 @@ const AgentManagement: React.FC = () => {
           editForm.setFieldsValue({
             agent_id: agent.id,
             agent_name: agent.displayName,
-            description: agent.description,
+            agent_description: agent.agent_description,
             capabilities: agent.capabilities,
             // LLM配置 - 从智能体配置中获取，否则使用默认值
             available_models: (fullAgent as any).llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
@@ -636,7 +636,7 @@ const AgentManagement: React.FC = () => {
         // 新建智能体
         const newAgentData: CreateAgentRequest = {
           agent_name: values.agent_name,
-          description: values.description || '',
+          agent_description: values.agent_description || '',
           capabilities: values.capabilities || [],
           tools_info: toolsConfig,
           llm_info: llmConfig,
@@ -650,7 +650,7 @@ const AgentManagement: React.FC = () => {
         // 编辑智能体
         const updateData: UpdateAgentRequest = {
           agent_name: values.agent_name,
-          description: values.description,
+          agent_description: values.agent_description,
           capabilities: values.capabilities,
           tools_info: toolsConfig,
           llm_info: llmConfig,
@@ -854,7 +854,7 @@ const AgentManagement: React.FC = () => {
               <Descriptions.Item label="标识符">{selectedAgent.name}</Descriptions.Item>
               <Descriptions.Item label="版本">{selectedAgent.version}</Descriptions.Item>
               <Descriptions.Item label="描述" span={2}>
-                {selectedAgent.description}
+                {selectedAgent.agent_description}
               </Descriptions.Item>
             </Descriptions>
             
@@ -947,7 +947,7 @@ const AgentManagement: React.FC = () => {
           initialValues={editingAgent ? {
             agent_id: editingAgent.agent_id,
             agent_name: editingAgent.displayName,
-            description: editingAgent.description,
+            agent_description: editingAgent.agnet_description,
             capabilities: editingAgent.capabilities,
             // LLM配置默认值
             available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
@@ -988,7 +988,7 @@ const AgentManagement: React.FC = () => {
               </Form.Item>
               <Form.Item
                 label="描述"
-                name="description"
+                name="agent_description"
               >
                 <TextArea 
                   rows={3}

@@ -99,7 +99,7 @@ class AgentConfig(Base):
             'name': self.agent_id,  # 前端兼容
             'agent_name': self.agent_name,
             'display_name': self.agent_name,  # 前端兼容
-            'description': self.agent_description or '',
+            'agent_description': self.agent_description or '',
             'capabilities': capabilities,
             'version': self.agent_version,
             'status': self.agent_status,

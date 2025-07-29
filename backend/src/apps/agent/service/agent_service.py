@@ -10,10 +10,10 @@ from datetime import datetime
 
 from src.apps.agent.dao import AgentDAO
 from src.apps.agent.models import AgentConfig
-from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
+from src.shared.db.models import now_shanghai
 
 logger = get_logger(__name__)
 
@@ -27,7 +27,6 @@ class AgentService:
     
     # ==================== 核心业务方法 ====================
     
-    @transactional()
     async def create_agent(
         self, 
         session: AsyncSession,
@@ -49,15 +48,17 @@ class AgentService:
         agent_data.setdefault('total_runs', 0)
         agent_data.setdefault('success_rate', 0.0)
         agent_data.setdefault('avg_response_time', 0.0)
-        agent_data.setdefault('create_time', datetime.utcnow())
-        agent_data.setdefault('update_time', datetime.utcnow())
-        
+        agent_data.setdefault('create_time', now_shanghai())
+        agent_data.setdefault('update_time', now_shanghai()) 
         # 处理capabilities字段映射
-        if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):
-            agent_data['agent_capabilities'] = agent_data.pop('capabilities')
+        if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):agent_data['agent_capabilities'] = agent_data.pop('capabilities')
         
         logger.info(f"Creating agent: {agent_data['agent_id']}")
-        return await self._dao.create(session, agent_data)
+        instance = self.model(**entity_data)
+        session.add(instance)
+        await session.flush()  # 获取ID但不提交事务
+        await session.refresh(instance)
+        return instance
     
     async def get_agent_by_id(
         self, 
@@ -133,7 +134,6 @@ class AgentService:
         
         return all_agents, total
     
-    @transactional()
     async def update_agent(
         self, 
         session: AsyncSession,
@@ -142,25 +142,20 @@ class AgentService:
     ) -> Optional[AgentConfig]:
         """更新智能体配置"""
         # 检查是否存在
-        existing = await self._dao.get_by_agent_id(session, agent_id)
-        if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-        
-        # 移除不可更新的字段
-        update_data.pop('agent_id', None)
-        update_data.pop('create_time', None)
-        update_data.pop('create_by', None)
-        
-        # 设置更新时间
-        update_data['update_time'] = datetime.utcnow()
-        
-        # 处理capabilities字段映射
-        if 'capabilities' in update_data and isinstance(update_data['capabilities'], list):
-            update_data['agent_capabilities'] = update_data.pop('capabilities')
-        
-        logger.info(f"Updating agent: {agent_id}")
-        return await self._dao.update_by_field(session, 'agent_id', agent_id, update_data)
+        async with session.begin():
+            existing = await self._dao.get_by_agent_id(session, agent_id)
+            if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            # 移除不可更新的字段
+            update_data = {k: v for k, v in update_data.items() if k not in ['agent_id', 'create_time', 'create_by']}
+            # 设置更新时间
+            update_data['update_time'] = datetime.utcnow()
+            # 处理capabilities字段映射
+            if 'capabilities' in update_data and isinstance(update_data['capabilities'], list): update_data['agent_capabilities'] = update_data.pop('capabilities')
+            logger.info(f"Updating agent: {agent_id}")
+            result = await db.execute(update(self.model).where(self.model.agent_id == agent_id).values(**update_data))
+            result = await db.execute(select(self.model).where(self.model.agent_id == field_value))
+            return result.scalar_one_or_none()
     
-    @transactional()
     async def delete_agent(
         self, 
         session: AsyncSession,
@@ -186,7 +181,6 @@ class AgentService:
         result = await self._dao.delete_by_field(session, 'agent_id', agent_id)
         return result > 0
     
-    @transactional()
     async def update_mcp_config(
         self,
         session: AsyncSession,
@@ -218,7 +212,6 @@ class AgentService:
         
         return await self.update_agent(session, agent_id, update_data)
     
-    @transactional()
     async def update_agent_status(
         self,
         session: AsyncSession,
@@ -228,7 +221,6 @@ class AgentService:
         """更新智能体状态"""
         return await self._dao.update_agent_status(session, agent_id, status)
     
-    @transactional()
     async def update_statistics(
         self,
         session: AsyncSession,
