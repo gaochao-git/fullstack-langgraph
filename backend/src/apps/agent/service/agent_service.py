@@ -17,51 +17,6 @@ from src.shared.schemas.response import ResponseCode
 
 logger = get_logger(__name__)
 
-# 内置智能体配置
-BUILTIN_AGENTS = {
-    "diagnostic_agent": {
-        "id": "diagnostic_agent",
-        "name": "diagnostic_agent",
-        "display_name": "故障诊断智能体",
-        "description": "专业的系统故障诊断和问题分析智能体，能够快速定位和解决各类技术问题",
-        "status": "running",
-        "enabled": 'yes',
-        "version": "2.1.0",
-        "total_runs": 1247,
-        "success_rate": 94.5,
-        "avg_response_time": 2.3,
-        "capabilities": ["数据库诊断", "系统监控", "日志分析", "性能优化"],
-        "is_builtin": 'yes'
-    },
-    "research_agent": {
-        "id": "research_agent",
-        "name": "research_agent", 
-        "display_name": "研究分析智能体",
-        "description": "强大的信息研究和数据分析智能体，擅长网络搜索、数据整理和深度分析",
-        "status": "running",
-        "enabled": 'yes',
-        "version": "1.8.2",
-        "total_runs": 892,
-        "success_rate": 96.2,
-        "avg_response_time": 3.1,
-        "capabilities": ["网络搜索", "数据分析", "信息整理", "报告生成"],
-        "is_builtin": 'yes'
-    },
-    "security_agent": {
-        "id": "security_agent",
-        "name": "security_agent",
-        "display_name": "安全防护智能体", 
-        "description": "专注于网络安全和系统防护的智能体，能够检测威胁和提供安全建议",
-        "status": "stopped",
-        "enabled": 'no',
-        "version": "1.5.1",
-        "total_runs": 456,
-        "success_rate": 91.8,
-        "avg_response_time": 1.9,
-        "capabilities": ["威胁检测", "漏洞扫描", "安全评估", "防护建议"],
-        "is_builtin": 'yes'
-    }
-}
 
 
 class AgentService:
@@ -91,12 +46,6 @@ class AgentService:
                 ResponseCode.DUPLICATE_RESOURCE
             )
         
-        # 检查是否为保留的内置智能体ID
-        if agent_data['agent_id'] in BUILTIN_AGENTS and agent_data.get('is_builtin') != 'yes':
-            raise BusinessException(
-                f"智能体ID {agent_data['agent_id']} 为系统保留ID", 
-                ResponseCode.INVALID_PARAMETER
-            )
         
         # 设置默认值
         agent_data.setdefault('agent_status', 'stopped')
@@ -123,32 +72,7 @@ class AgentService:
         include_builtin: bool = True
     ) -> Optional[Dict[str, Any]]:
         """根据ID获取智能体配置"""
-        # 先检查是否是内置智能体
-        if include_builtin and agent_id in BUILTIN_AGENTS:
-            # 尝试从数据库获取配置
-            db_agent = await self._dao.get_by_agent_id(session, agent_id)
-            if db_agent:
-                agent_dict = db_agent.to_dict()
-                agent_dict['is_builtin'] = 'yes'
-                # 确保有mcp_config字段
-                if 'mcp_config' not in agent_dict:
-                    agent_dict['mcp_config'] = {
-                        'enabled_servers': [],
-                        'selected_tools': [],
-                        'total_tools': 0
-                    }
-                return agent_dict
-            else:
-                # 返回默认内置配置
-                builtin_config = BUILTIN_AGENTS[agent_id].copy()
-                builtin_config['mcp_config'] = {
-                    'enabled_servers': [],
-                    'selected_tools': [],
-                    'total_tools': 0
-                }
-                return builtin_config
-        
-        # 从数据库获取用户自定义智能体
+        # 从数据库获取智能体配置
         db_agent = await self._dao.get_by_agent_id(session, agent_id)
         if db_agent:
             agent_dict = db_agent.to_dict()
@@ -189,7 +113,7 @@ class AgentService:
             db_agents = await self._dao.search_by_name(
                 session, search, enabled_only, size, offset
             )
-            total_db = len(db_agents)  # 简化计数，实际应该有专门的计数方法
+            total = len(db_agents)  # 简化计数，实际应该有专门的计数方法
         else:
             db_agents = await self._dao.get_list(
                 session, 
@@ -198,10 +122,10 @@ class AgentService:
                 offset=offset,
                 order_by='create_time'
             )
-            total_db = await self._dao.count(session, filters=filters if filters else None)
+            total = await self._dao.count(session, filters=filters if filters else None)
         
         # 转换为字典格式
-        db_agents_dict = {}
+        all_agents = []
         for agent in db_agents:
             agent_dict = agent.to_dict()
             # 确保有mcp_config字段
@@ -211,44 +135,7 @@ class AgentService:
                     'selected_tools': [],
                     'total_tools': 0
                 }
-            db_agents_dict[agent.agent_id] = agent_dict
-        
-        all_agents = []
-        total = total_db
-        
-        # 如果包含内置智能体
-        if include_builtin:
-            # 先添加内置智能体
-            for builtin_id, builtin_config in BUILTIN_AGENTS.items():
-                # 应用过滤条件
-                if enabled_only and builtin_config.get('enabled') != 'yes':
-                    continue
-                if status and builtin_config.get('status') != status:
-                    continue
-                if search and search.lower() not in builtin_config.get('display_name', '').lower():
-                    continue
-                
-                if builtin_id in db_agents_dict:
-                    # 如果数据库中有，使用数据库配置，但保留内置标识
-                    agent_config = db_agents_dict[builtin_id].copy()
-                    agent_config['is_builtin'] = 'yes'
-                    all_agents.append(agent_config)
-                else:
-                    # 使用默认内置配置
-                    builtin_config_copy = builtin_config.copy()
-                    builtin_config_copy['mcp_config'] = {
-                        'enabled_servers': [],
-                        'selected_tools': [],
-                        'total_tools': 0
-                    }
-                    all_agents.append(builtin_config_copy)
-            
-            total += len(BUILTIN_AGENTS)
-        
-        # 添加用户自定义智能体
-        for agent_id, agent_config in db_agents_dict.items():
-            if not include_builtin or agent_id not in BUILTIN_AGENTS:
-                all_agents.append(agent_config)
+            all_agents.append(agent_dict)
         
         return all_agents, total
     
@@ -263,27 +150,10 @@ class AgentService:
         # 检查是否存在
         existing = await self._dao.get_by_agent_id(session, agent_id)
         if not existing:
-            # 如果是内置智能体且不存在，则创建
-            if agent_id in BUILTIN_AGENTS:
-                builtin_config = BUILTIN_AGENTS[agent_id].copy()
-                builtin_config.update(update_data)
-                builtin_config['agent_id'] = agent_id
-                builtin_config['is_builtin'] = 'yes'
-                
-                # 处理字段名映射
-                if 'capabilities' in builtin_config:
-                    builtin_config['agent_capabilities'] = builtin_config.pop('capabilities')
-                if 'name' in builtin_config:
-                    builtin_config['agent_name'] = builtin_config.pop('name')
-                if 'display_name' in builtin_config:
-                    builtin_config['agent_name'] = builtin_config.pop('display_name')
-                
-                return await self._dao.create(session, builtin_config)
-            else:
-                raise BusinessException(
-                    f"智能体 {agent_id} 不存在", 
-                    ResponseCode.NOT_FOUND
-                )
+            raise BusinessException(
+                f"智能体 {agent_id} 不存在", 
+                ResponseCode.NOT_FOUND
+            )
         
         # 移除不可更新的字段
         update_data.pop('agent_id', None)
@@ -395,17 +265,14 @@ class AgentService:
             stats_dict = dict(stats_row)
             # 添加业务逻辑计算
             stats_dict['custom'] = stats_dict['total'] - stats_dict['builtin']
-            # 包含内置智能体的统计
-            stats_dict['total'] += len(BUILTIN_AGENTS)
-            stats_dict['builtin'] += len(BUILTIN_AGENTS)
             return stats_dict
         
         # 如果没有数据，返回默认统计
         return {
-            'total': len(BUILTIN_AGENTS),
+            'total': 0,
             'enabled': 0,
             'running': 0,
-            'builtin': len(BUILTIN_AGENTS),
+            'builtin': 0,
             'custom': 0
         }
     
@@ -422,23 +289,8 @@ class AgentService:
         # 搜索数据库中的智能体
         db_agents = await self._dao.search_by_name(session, keyword, True, size, offset)
         
-        # 搜索内置智能体
-        builtin_matches = []
-        for builtin_id, builtin_config in BUILTIN_AGENTS.items():
-            if (keyword.lower() in builtin_config.get('display_name', '').lower() or
-                keyword.lower() in builtin_config.get('description', '').lower()):
-                builtin_config_copy = builtin_config.copy()
-                builtin_config_copy['mcp_config'] = {
-                    'enabled_servers': [],
-                    'selected_tools': [],
-                    'total_tools': 0
-                }
-                builtin_matches.append(builtin_config_copy)
-        
-        # 合并结果
-        all_matches = []
-        
         # 转换数据库结果
+        all_matches = []
         for agent in db_agents:
             agent_dict = agent.to_dict()
             if 'mcp_config' not in agent_dict:
@@ -448,9 +300,6 @@ class AgentService:
                     'total_tools': 0
                 }
             all_matches.append(agent_dict)
-        
-        # 添加内置智能体匹配
-        all_matches.extend(builtin_matches)
         
         return all_matches, len(all_matches)
 
