@@ -68,8 +68,6 @@ const AgentMarketplace = () => {
   // 获取智能体图标
   const getAgentIcon = (agentId: string) => {
     switch (agentId) {
-      case 'research_agent':
-        return <RobotOutlined />;
       case 'diagnostic_agent':
         return <SettingOutlined />;
       case 'security_agent':
@@ -85,9 +83,6 @@ const AgentMarketplace = () => {
     
     // 根据智能体类型添加标签
     switch (agent.agent_id) {
-      case 'research_agent':
-        tags.push('研究', '搜索', '分析');
-        break;
       case 'diagnostic_agent':
         tags.push('监控', '诊断', '性能分析');
         break;

@@ -9,13 +9,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from ..service.utils import (
+from ..llm_service.utils import (
     prepare_graph_config, 
     serialize_value,
     CHECK_POINT_URI,
     recover_thread_from_postgres
 )
-from ..service.user_threads_db import (
+from ..llm_service.user_threads_db import (
     check_user_thread_exists,
     create_user_thread_mapping,
     init_user_threads_db
@@ -190,16 +190,13 @@ async def handle_postgres_streaming(request_body, thread_id):
         if is_builtin:
             # 内置智能体使用专用图
             if agent_id == 'diagnostic_agent':
-                from ..agents.diagnostic_agent.graph import builder
+                from ..llm_agents.diagnostic_agent.graph import builder
                 graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
-            elif agent_id == 'research_agent':
-                from ..agents.research_agent.graph import builder
-                graph = builder.compile(checkpointer=checkpointer, name="research-agent")
             else:
                 raise Exception(f"不支持的内置智能体: {agent_id}")
         else:
             # 自定义智能体使用generic_agent图
-            from ..agents.generic_agent.graph import builder
+            from ..llm_agents.generic_agent.graph import builder
             graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
         
         # 在同一个async with内执行完整的流式处理

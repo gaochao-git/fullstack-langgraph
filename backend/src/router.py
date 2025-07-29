@@ -11,7 +11,7 @@ from .apps.agent import router as agents_router
 from .apps.mcp import router as mcp_router
 from .apps.ai_model import router as ai_models_router
 from .apps.scheduled_task import router as scheduled_tasks_router
-from .apps.llm import router as llm_router
+from .apps.agent.llm_router.endpoints import router as llm_router
 
 # 创建主API路由器
 api_router = APIRouter()
