@@ -4,7 +4,7 @@ Agent数据访问对象 - 纯异步实现
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, update as sql_update
+from sqlalchemy import select, and_, func, update as sql_update, case
 from datetime import datetime
 
 from src.shared.db.dao.base_dao import BaseDAO
@@ -202,39 +202,31 @@ class AgentDAO(BaseDAO[AgentConfig]):
     
     async def get_agent_statistics(self, session: AsyncSession) -> Dict[str, Any]:
         """获取智能体统计信息"""
-        # 总数
-        total_query = select(func.count(self.model.id))
-        total_result = await session.execute(total_query)
-        total = total_result.scalar() or 0
-        
-        # 启用数量
-        enabled_query = select(func.count(self.model.id)).where(
-            and_(
-                self.model.agent_enabled == 'yes',
-                self.model.is_active == True
+        # 使用一个复杂查询获取所有统计信息
+        result = await session.execute(
+            select(
+                func.count(self.model.id).label('total'),
+                func.sum(
+                    case(
+                        (and_(self.model.agent_enabled == 'yes', self.model.is_active == True), 1),
+                        else_=0
+                    )
+                ).label('enabled'),
+                func.sum(
+                    case(
+                        (self.model.agent_status == 'running', 1),
+                        else_=0
+                    )
+                ).label('running'),
+                func.sum(
+                    case(
+                        (self.model.is_builtin == 'yes', 1),
+                        else_=0
+                    )
+                ).label('builtin')
             )
         )
-        enabled_result = await session.execute(enabled_query)
-        enabled = enabled_result.scalar() or 0
         
-        # 运行中数量
-        running_query = select(func.count(self.model.id)).where(
-            self.model.agent_status == 'running'
-        )
-        running_result = await session.execute(running_query)
-        running = running_result.scalar() or 0
-        
-        # 内置智能体数量
-        builtin_query = select(func.count(self.model.id)).where(
-            self.model.is_builtin == 'yes'
-        )
-        builtin_result = await session.execute(builtin_query)
-        builtin = builtin_result.scalar() or 0
-        
-        return {
-            'total': total,
-            'enabled': enabled,
-            'running': running,
-            'builtin': builtin,
-            'custom': total - builtin
-        }
+        stats = self.to_dict_list(result)[0]  # 获取第一行结果
+        stats['custom'] = stats['total'] - stats['builtin']  # 计算自定义数量
+        return stats

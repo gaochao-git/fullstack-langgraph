@@ -68,33 +68,25 @@ class AIModelDAO(BaseDAO[AIModelConfig]):
         """获取状态统计"""
         result = await session.execute(
             select(
-                self.model.model_status,
+                self.model.model_status.label('status'),
                 func.count(self.model.id).label('count')
             )
             .group_by(self.model.model_status)
             .order_by(func.count(self.model.id).desc())
         )
-        
-        return [
-            {'status': row.model_status, 'count': row.count}
-            for row in result.fetchall()
-        ]
+        return self.to_dict_list(result)
     
     async def get_provider_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
         """获取提供商统计"""
         result = await session.execute(
             select(
-                self.model.model_provider,
+                self.model.model_provider.label('provider'),
                 func.count(self.model.id).label('count')
             )
             .group_by(self.model.model_provider)
             .order_by(func.count(self.model.id).desc())
         )
-        
-        return [
-            {'provider': row.model_provider, 'count': row.count}
-            for row in result.fetchall()
-        ]
+        return self.to_dict_list(result)
     
     async def get_active_models(self, session: AsyncSession) -> List[AIModelConfig]:
         """获取激活的模型"""

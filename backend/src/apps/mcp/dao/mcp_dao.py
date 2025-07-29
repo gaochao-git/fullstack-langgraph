@@ -60,18 +60,14 @@ class MCPDAO(BaseDAO[MCPServer]):
         """获取状态统计"""
         result = await session.execute(
             select(
-                self.model.connection_status,
+                self.model.connection_status.label('status'),
                 func.count(self.model.id).label('count')
             )
             .where(self.model.is_enabled == 'on')
             .group_by(self.model.connection_status)
             .order_by(func.count(self.model.id).desc())
         )
-        
-        return [
-            {'status': row.connection_status, 'count': row.count}
-            for row in result.fetchall()
-        ]
+        return self.to_dict_list(result)
     
     async def get_enabled_servers(self, session: AsyncSession) -> List[MCPServer]:
         """获取启用的服务器"""
