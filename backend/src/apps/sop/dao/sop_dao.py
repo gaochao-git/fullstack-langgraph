@@ -42,26 +42,7 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         result = await db.execute(query)
         return result.scalars().all()
     
-    # ========== 旧格式方法 - 向后兼容 ==========
-    async def get_all_categories(self, db: AsyncSession) -> List[str]:
-        """获取所有分类 - 字符串数组格式（向后兼容）"""
-        result = await db.execute(
-            select(distinct(self.model.sop_category))
-            .where(self.model.sop_category.isnot(None))
-            .order_by(self.model.sop_category)
-        )
-        return [category for category in result.scalars().all() if category]
-    
-    async def get_all_teams(self, db: AsyncSession) -> List[str]:
-        """获取所有团队 - 字符串数组格式（向后兼容）"""
-        result = await db.execute(
-            select(distinct(self.model.team_name))
-            .where(self.model.team_name.isnot(None))
-            .order_by(self.model.team_name)
-        )
-        return [team for team in result.scalars().all() if team]
-    
-    # ========== 简单方法 - 直接转为[{}]格式 ==========
+    # ========== 统一格式方法 - 直接转为[{}]格式 ==========
     async def get_category_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取分类选项 - 简单直接"""
         result = await db.execute(
