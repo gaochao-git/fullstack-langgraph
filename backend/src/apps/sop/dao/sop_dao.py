@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, func, distinct
 
 from src.shared.db.dao.base_dao import BaseDAO
@@ -17,6 +18,10 @@ class SOPDAO(BaseDAO[SOPTemplate]):
     async def get_by_sop_id(self, db: AsyncSession, sop_id: str) -> Optional[SOPTemplate]:
         """根据SOP ID查询模板"""
         return await self.get_by_field(db, 'sop_id', sop_id)
+    
+    def sync_get_by_sop_id(self, db: Session, sop_id: str) -> Optional[SOPTemplate]:
+        """同步根据SOP ID查询模板 - 兼容LangGraph工具"""
+        return db.query(self.model).filter(self.model.sop_id == sop_id).first()
     
     async def search_by_title(
         self, 
@@ -41,6 +46,29 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         
         result = await db.execute(query)
         return result.scalars().all()
+    
+    def sync_search_by_title(
+        self, 
+        db: Session, 
+        title_keyword: str,
+        team_name: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None
+    ) -> List[SOPTemplate]:
+        """同步根据标题关键词搜索SOP模板 - 兼容LangGraph工具"""
+        query = db.query(self.model).filter(
+            self.model.sop_title.contains(title_keyword)
+        )
+        
+        if team_name:
+            query = query.filter(self.model.team_name == team_name)
+        
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        
+        return query.all()
     
     # ========== 选项和统计方法 - 返回原始查询结果让Router层处理 ==========
     async def get_category_options(self, db: AsyncSession):

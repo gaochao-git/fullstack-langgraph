@@ -8,14 +8,14 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 # 导入数据库相关模块  
-from src.shared.db.config import get_sync_db
+from src.shared.db.config import get_sync_db_context
 from src.apps.sop.dao import SOPDAO
 
 
 def get_sop_from_db(sop_id: str) -> Optional[Dict[str, Any]]:
     """从数据库获取单个SOP"""
     try:
-        with get_sync_db() as db:
+        with get_sync_db_context() as db:
             sop_dao = SOPDAO()
             sop_template = sop_dao.sync_get_by_sop_id(db, sop_id)
             return sop_template.to_dict() if sop_template else None
@@ -33,7 +33,7 @@ def search_sops_from_db(
 ) -> Dict[str, Any]:
     """从数据库搜索SOPs"""
     try:
-        with get_sync_db() as db:
+        with get_sync_db_context() as db:
             from src.apps.sop.models import SOPTemplate
             
             # 构建查询
