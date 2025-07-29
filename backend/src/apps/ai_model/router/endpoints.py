@@ -29,7 +29,7 @@ async def create_ai_model(
     """创建AI模型"""
     model = await ai_model_service.create_model(db, model_data.dict())
     return success_response(
-        data=model.to_dict(),
+        data=model,
         msg="AI模型创建成功",
         code=ResponseCode.CREATED
     )
@@ -46,7 +46,7 @@ async def get_ai_model(
         raise BusinessException(f"AI模型 {model_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=model.to_dict(),
+        data=model,
         msg="获取AI模型成功"
     )
 
@@ -70,10 +70,8 @@ async def list_ai_models(
         status=status,
         search=search
     )
-    model_data = [model.to_dict() for model in models]
-    
     return paginated_response(
-        items=model_data,
+        items=models,
         total=total,
         page=page,
         size=size,
@@ -93,7 +91,7 @@ async def update_ai_model(
         raise BusinessException(f"AI模型 {model_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_model.to_dict(),
+        data=updated_model,
         msg="AI模型更新成功"
     )
 
@@ -185,7 +183,7 @@ async def update_model_status(
         raise BusinessException(f"AI模型 {model_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_model.to_dict(),
+        data=updated_model,
         msg=f"模型状态已更新为 {status_data.status}"
     )
 

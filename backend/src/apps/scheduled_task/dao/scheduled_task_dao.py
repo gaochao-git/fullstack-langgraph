@@ -52,8 +52,8 @@ class ScheduledTaskDAO(BaseDAO[PeriodicTask]):
         result = await session.execute(query)
         return result.scalars().all()
     
-    async def get_task_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
-        """获取任务状态统计"""
+    async def get_task_statistics(self, session: AsyncSession):
+        """获取任务状态统计 - 返回原始查询结果"""
         result = await session.execute(
             select(
                 self.model.enabled.label('enabled'),
@@ -62,7 +62,7 @@ class ScheduledTaskDAO(BaseDAO[PeriodicTask]):
             .group_by(self.model.enabled)
             .order_by(func.count(self.model.id).desc())
         )
-        return self.to_dict_list(result)
+        return result
     
     async def update_task_status(
         self, 
@@ -170,4 +170,4 @@ class CeleryTaskRecordDAO(BaseDAO[CeleryTaskRecord]):
             .group_by(self.model.task_status)
             .order_by(func.count(self.model.id).desc())
         )
-        return self.to_dict_list(result)
+        return result

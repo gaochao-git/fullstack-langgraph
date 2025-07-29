@@ -64,8 +64,8 @@ class AIModelDAO(BaseDAO[AIModelConfig]):
         )
         return [model_type for model_type in result.scalars().all() if model_type]
     
-    async def get_status_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
-        """获取状态统计"""
+    async def get_status_statistics(self, session: AsyncSession):
+        """获取状态统计 - 返回原始查询结果"""
         result = await session.execute(
             select(
                 self.model.model_status.label('status'),
@@ -74,10 +74,10 @@ class AIModelDAO(BaseDAO[AIModelConfig]):
             .group_by(self.model.model_status)
             .order_by(func.count(self.model.id).desc())
         )
-        return self.to_dict_list(result)
+        return result
     
-    async def get_provider_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
-        """获取提供商统计"""
+    async def get_provider_statistics(self, session: AsyncSession):
+        """获取提供商统计 - 返回原始查询结果"""
         result = await session.execute(
             select(
                 self.model.model_provider.label('provider'),
@@ -86,7 +86,7 @@ class AIModelDAO(BaseDAO[AIModelConfig]):
             .group_by(self.model.model_provider)
             .order_by(func.count(self.model.id).desc())
         )
-        return self.to_dict_list(result)
+        return result
     
     async def get_active_models(self, session: AsyncSession) -> List[AIModelConfig]:
         """获取激活的模型"""

@@ -385,17 +385,28 @@ class AgentService:
     async def get_statistics(
         self, 
         session: AsyncSession
-    ) -> Dict[str, Any]:
-        """获取智能体统计信息"""
-        db_stats = await self._dao.get_agent_statistics(session)
+    ):
+        """获取智能体统计信息 - 返回原始查询结果让响应层处理"""
+        result = await self._dao.get_agent_statistics(session)
         
-        # 包含内置智能体的统计
+        # 从原始结果中获取第一行数据
+        stats_row = result.first()
+        if stats_row:
+            stats_dict = dict(stats_row)
+            # 添加业务逻辑计算
+            stats_dict['custom'] = stats_dict['total'] - stats_dict['builtin']
+            # 包含内置智能体的统计
+            stats_dict['total'] += len(BUILTIN_AGENTS)
+            stats_dict['builtin'] += len(BUILTIN_AGENTS)
+            return stats_dict
+        
+        # 如果没有数据，返回默认统计
         return {
-            'total': db_stats['total'] + len(BUILTIN_AGENTS),
-            'enabled': db_stats['enabled'],
-            'running': db_stats['running'],
-            'builtin': db_stats['builtin'] + len(BUILTIN_AGENTS),
-            'custom': db_stats['custom']
+            'total': len(BUILTIN_AGENTS),
+            'enabled': 0,
+            'running': 0,
+            'builtin': len(BUILTIN_AGENTS),
+            'custom': 0
         }
     
     async def search_agents(

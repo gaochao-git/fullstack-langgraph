@@ -120,7 +120,7 @@ async def create_mcp_server(
     """创建MCP服务器"""
     server = await mcp_service.create_server(db, server_data)
     return success_response(
-        data=server.to_dict(),
+        data=server,
         msg="MCP服务器创建成功",
         code=ResponseCode.CREATED
     )
@@ -137,7 +137,7 @@ async def get_mcp_server(
         raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=server.to_dict(),
+        data=server,
         msg="获取MCP服务器成功"
     )
 
@@ -163,10 +163,9 @@ async def list_mcp_servers(
     )
     
     servers, total = await mcp_service.list_servers(db, params)
-    server_data = [server.to_dict() for server in servers]
     
     return paginated_response(
-        items=server_data,
+        items=servers,
         total=total,
         page=page,
         size=size,
@@ -186,7 +185,7 @@ async def update_mcp_server(
         raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_server.to_dict(),
+        data=updated_server,
         msg="MCP服务器更新成功"
     )
 
@@ -260,7 +259,7 @@ async def update_server_status(
         raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_server.to_dict(),
+        data=updated_server,
         msg=f"服务器状态已更新为 {status_data.status}"
     )
 
@@ -279,7 +278,7 @@ async def toggle_server_enable(
     
     action = "启用" if enable_data.enabled == "on" else "禁用"
     return success_response(
-        data=updated_server.to_dict(),
+        data=updated_server,
         msg=f"服务器已{action}成功"
     )
 

@@ -200,9 +200,8 @@ class AgentDAO(BaseDAO[AgentConfig]):
         result = await session.execute(query)
         return result.scalar() or 0
     
-    async def get_agent_statistics(self, session: AsyncSession) -> Dict[str, Any]:
-        """获取智能体统计信息"""
-        # 使用一个复杂查询获取所有统计信息
+    async def get_agent_statistics(self, session: AsyncSession):
+        """获取智能体统计信息 - 返回原始查询结果"""
         result = await session.execute(
             select(
                 func.count(self.model.id).label('total'),
@@ -226,7 +225,4 @@ class AgentDAO(BaseDAO[AgentConfig]):
                 ).label('builtin')
             )
         )
-        
-        stats = self.to_dict_list(result)[0]  # 获取第一行结果
-        stats['custom'] = stats['total'] - stats['builtin']  # 计算自定义数量
-        return stats
+        return result

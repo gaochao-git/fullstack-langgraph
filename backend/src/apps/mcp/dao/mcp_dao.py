@@ -56,8 +56,8 @@ class MCPDAO(BaseDAO[MCPServer]):
         )
         return [team for team in result.scalars().all() if team]
     
-    async def get_status_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
-        """获取状态统计"""
+    async def get_status_statistics(self, session: AsyncSession):
+        """获取状态统计 - 返回原始查询结果"""
         result = await session.execute(
             select(
                 self.model.connection_status.label('status'),
@@ -67,7 +67,7 @@ class MCPDAO(BaseDAO[MCPServer]):
             .group_by(self.model.connection_status)
             .order_by(func.count(self.model.id).desc())
         )
-        return self.to_dict_list(result)
+        return result
     
     async def get_enabled_servers(self, session: AsyncSession) -> List[MCPServer]:
         """获取启用的服务器"""

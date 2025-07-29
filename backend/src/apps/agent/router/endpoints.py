@@ -30,7 +30,7 @@ async def create_agent(
     agent = await agent_service.create_agent(db, agent_dict)
     
     return success_response(
-        data=agent.to_dict(),
+        data=agent,
         msg="智能体创建成功",
         code=ResponseCode.CREATED
     )
@@ -93,7 +93,7 @@ async def update_agent(
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_agent.to_dict(),
+        data=updated_agent,
         msg="智能体更新成功"
     )
 
@@ -128,7 +128,7 @@ async def update_mcp_config(
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_agent.to_dict(),
+        data=updated_agent,
         msg="MCP配置更新成功"
     )
 
@@ -147,7 +147,7 @@ async def update_agent_status(
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_agent.to_dict(),
+        data=updated_agent,
         msg="智能体状态更新成功"
     )
 
@@ -167,7 +167,7 @@ async def update_agent_statistics(
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_agent.to_dict(),
+        data=updated_agent,
         msg="智能体统计信息更新成功"
     )
 

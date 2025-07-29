@@ -40,10 +40,8 @@ async def get_task_execution_records(
         task_name=task_name,
         task_status=task_status
     )
-    record_data = [record.to_dict() for record in records]
-    
     return paginated_response(
-        items=record_data,
+        items=records,
         total=total,
         page=page,
         size=size,
@@ -86,10 +84,8 @@ async def list_scheduled_tasks(
         agent_id=agent_id,
         search=search
     )
-    task_data = [task.to_dict() for task in tasks]
-    
     return paginated_response(
-        items=task_data,
+        items=tasks,
         total=total,
         page=page,
         size=size,
@@ -105,7 +101,7 @@ async def create_scheduled_task(
     """创建定时任务"""
     task = await scheduled_task_service.create_task(db, task_data.dict())
     return success_response(
-        data=task.to_dict(),
+        data=task,
         msg="定时任务创建成功",
         code=ResponseCode.CREATED
     )
@@ -124,7 +120,7 @@ async def get_task_execution_record(
         raise BusinessException(f"执行记录 {record_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=record.to_dict(),
+        data=record,
         msg="获取执行记录成功"
     )
 
@@ -147,9 +143,8 @@ async def get_task_execution_logs(
     if not logs and await scheduled_task_service.get_task_by_id(db, task_id) is None:
         raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
     
-    log_data = [log.to_dict() for log in logs]
     return success_response(
-        data=log_data,
+        data=logs,
         msg="获取任务执行日志成功"
     )
 
@@ -219,7 +214,7 @@ async def get_scheduled_task(
         raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=task.to_dict(),
+        data=task,
         msg="获取定时任务成功"
     )
 
@@ -236,7 +231,7 @@ async def update_scheduled_task(
         raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
-        data=updated_task.to_dict(),
+        data=updated_task,
         msg="定时任务更新成功"
     )
 
