@@ -48,9 +48,7 @@ class ScheduledTaskDAO(BaseDAO[PeriodicTask]):
         task_type: str
     ) -> List[PeriodicTask]:
         """根据任务类型获取定时任务"""
-        query = select(self.model).where(
-            self.model.task.contains(task_type)
-        )
+        query = select(self.model).where(self.model.task.contains(task_type))
         result = await session.execute(query)
         return result.scalars().all()
     
