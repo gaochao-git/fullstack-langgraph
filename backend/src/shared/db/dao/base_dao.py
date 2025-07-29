@@ -265,7 +265,7 @@ class BaseDAO(Generic[ModelType]):
     
     def to_dict_list(self, result) -> List[Dict[str, Any]]:
         """
-        官方建议：把查询结果转为 [{}] 格式
+        简单：把查询结果转为 [{}] 格式
         
         Args:
             result: SQLAlchemy查询结果
@@ -273,25 +273,5 @@ class BaseDAO(Generic[ModelType]):
         Returns:
             [{"字段名": "值", ...}]
         """
-        # SQLAlchemy 2.0 官方推荐方法
-        if hasattr(result, 'mappings'):
-            # Result对象，使用官方推荐的mappings()方法
-            return [dict(row) for row in result.mappings()]
-        elif hasattr(result, '__iter__'):
-            # 列表形式的结果，逐个转换
-            return [
-                row._asdict() if hasattr(row, '_asdict') else 
-                dict(row._mapping) if hasattr(row, '_mapping') else
-                row.to_dict() if hasattr(row, 'to_dict') else dict(row)
-                for row in result
-            ]
-        else:
-            # 单个Row对象
-            if hasattr(result, '_asdict'):
-                return [result._asdict()]
-            elif hasattr(result, '_mapping'):
-                return [dict(result._mapping)]
-            elif hasattr(result, 'to_dict'):
-                return [result.to_dict()]
-            else:
-                return [dict(result)]
+        # SQLAlchemy 2.0 官方推荐：直接用 mappings()
+        return [dict(row) for row in result.mappings()]
