@@ -125,11 +125,13 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => ({
   }
 });
 
-const transformMCPServerToLocal = (server: MCPServer): LocalMCPServer => ({
+const transformMCPServerToLocal = (server: any): LocalMCPServer => ({
   ...server,
-  status: server.status as 'connected' | 'disconnected' | 'error',
-  // 确保 tools 始终是数组，避免 undefined 错误
-  tools: Array.isArray(server.tools) ? server.tools : []
+  id: server.server_id,
+  name: server.server_name,
+  status: server.connection_status === 'connected' ? 'connected' : 'disconnected',
+  // 后端返回的是 server_tools，需要映射到 tools
+  tools: Array.isArray(server.server_tools) ? server.server_tools : []
 });
 
 const AgentManagement: React.FC = () => {
