@@ -657,10 +657,10 @@ const AgentManagement: React.FC = () => {
           prompt_info: promptConfig
         };
 
-        const updatedAgent = await agentApi.updateAgent(editingAgent.id, updateData);
+        const updatedAgent = await agentApi.updateAgent(editingAgent.agent_id, updateData);
         setAgents(prevAgents =>
           prevAgents.map(agent => 
-            agent.id === editingAgent.id ? transformAgentToLocal(updatedAgent) : agent
+            agent.agent_id === editingAgent.agent_id ? transformAgentToLocal(updatedAgent) : agent
           )
         );
         message.success('智能体更新成功');
@@ -945,7 +945,7 @@ const AgentManagement: React.FC = () => {
           layout="vertical"
           onFinish={handleSaveAgent}
           initialValues={editingAgent ? {
-            agent_id: editingAgent.id,
+            agent_id: editingAgent.agent_id,
             agent_name: editingAgent.displayName,
             description: editingAgent.description,
             capabilities: editingAgent.capabilities,
@@ -1304,7 +1304,7 @@ const AgentManagement: React.FC = () => {
             {/* 定时任务配置 */}
             <TabPane tab={<span><ClockCircleOutlined />定时任务</span>} key="scheduled-tasks">
               <ScheduledTaskManager 
-                agentId={editingAgent?.id || ''}
+                agentId={editingAgent?.agent_id || ''}
               />
             </TabPane>
           </Tabs>
