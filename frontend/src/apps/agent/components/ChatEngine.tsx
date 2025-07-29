@@ -2,7 +2,7 @@ import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { DiagnosticChatView, type ProcessedEvent } from "../../llm";
+import { ChatMessages, type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
@@ -40,20 +40,20 @@ interface WelcomeComponentProps {
   onSubmit: (message: string) => void;
 }
 
-// 统一对话组件属性
-interface UnifiedAgentChatProps {
+// 聊天引擎组件属性
+interface ChatEngineProps {
   agentId: string;
   agent: Agent | null;
   WelcomeComponent?: React.ComponentType<WelcomeComponentProps>;
   onNewSession: () => void;
 }
 
-export default function UnifiedAgentChat({ 
+export default function ChatEngine({ 
   agentId, 
   agent, 
   WelcomeComponent,
   onNewSession 
-}: UnifiedAgentChatProps) {
+}: ChatEngineProps) {
   const { isDark } = useTheme();
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
   const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
@@ -328,8 +328,8 @@ export default function UnifiedAgentChat({
             </div>
           </div>
         ) : (
-          // 显示标准对话视图，如果有自定义欢迎组件则传递给DiagnosticChatView
-          <DiagnosticChatView
+          // 显示标准对话视图，如果有自定义欢迎组件则传递给ChatMessages
+          <ChatMessages
             messages={thread.messages}
             isLoading={thread.isLoading}
             onSubmit={handleSubmit}

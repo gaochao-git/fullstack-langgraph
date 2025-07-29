@@ -198,7 +198,7 @@ interface FaultWelcomeProps {
   onStartDiagnosis?: (message: string) => void; // 新增：直接发送诊断消息
 }
 
-export function FaultWelcomeSimple({ onDiagnose, onContinueChat, onEndDiagnosis, onStartDiagnosis }: FaultWelcomeProps) {
+export function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, onStartDiagnosis }: FaultWelcomeProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");

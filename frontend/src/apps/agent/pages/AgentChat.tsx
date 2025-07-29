@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Spin, Alert } from 'antd';
 import { Button } from '@/components/ui/button';
-import UnifiedAgentChat from '../components/UnifiedAgentChat';
-import GenericAgentWelcome from '../../../components/GenericAgentWelcome';
+import ChatEngine from '../components/ChatEngine';
+import GenericAgentWelcome from '../components/GenericAgentWelcome';
 import { agentApi } from '../services/agentApi';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { cn } from '@/lib/utils';
@@ -17,7 +17,7 @@ interface Agent {
   is_builtin: string;
 }
 
-const GenericAgentChat: React.FC = () => {
+const AgentChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [sessionKey, setSessionKey] = useState<number>(0);
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -46,8 +46,8 @@ const GenericAgentChat: React.FC = () => {
         let agents = [];
         
         // Handle API response structure
-        if (response && response.data && response.data.items) {
-          agents = response.data.items;
+        if (response && response.items && Array.isArray(response.items)) {
+          agents = response.items;
         } else if (Array.isArray(response)) {
           agents = response;
         } else {
@@ -100,6 +100,10 @@ const GenericAgentChat: React.FC = () => {
     );
   }
 
+  // 判断是否为诊断智能体，如果是则不传递WelcomeComponent，使用默认的DiagnosticAgentWelcome
+  const isDiagnosticAgent = agentId === 'diagnostic_agent';
+  const welcomeComponent = isDiagnosticAgent ? undefined : GenericAgentWelcome;
+
   return (
     <div className={cn(
       "flex h-screen font-sans antialiased overflow-x-hidden transition-colors duration-200",
@@ -108,11 +112,11 @@ const GenericAgentChat: React.FC = () => {
         : "bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900"
     )}>
       <main className="h-full w-full overflow-x-hidden">
-        <UnifiedAgentChat
+        <ChatEngine
           key={sessionKey}
           agentId={agentId!}
           agent={agent}
-          WelcomeComponent={GenericAgentWelcome}
+          WelcomeComponent={welcomeComponent}
           onNewSession={handleNewSession}
         />
       </main>
@@ -120,4 +124,4 @@ const GenericAgentChat: React.FC = () => {
   );
 };
 
-export default GenericAgentChat;
+export default AgentChat;

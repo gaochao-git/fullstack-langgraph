@@ -7,7 +7,7 @@ import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
-import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
+import { DiagnosticAgentWelcome } from "./DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -673,7 +673,7 @@ const SingleToolApproval: React.FC<SingleToolApprovalProps> = ({ interrupt, onIn
 };
 
 // 诊断聊天视图 props
-interface DiagnosticChatViewProps {
+interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
   onSubmit: (inputValue: string) => void;
@@ -707,7 +707,7 @@ interface WelcomeComponentProps {
 }
 
 // 诊断聊天视图组件 Props 扩展
-interface DiagnosticChatViewProps {
+interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
   onSubmit: (input: string) => void;
@@ -726,7 +726,7 @@ interface DiagnosticChatViewProps {
 }
 
 // 诊断聊天视图组件
-export function DiagnosticChatView({
+export function ChatMessages({
   messages,
   isLoading,
   onSubmit,
@@ -742,7 +742,7 @@ export function DiagnosticChatView({
   onModelChange,
   WelcomeComponent,
   agent,
-}: DiagnosticChatViewProps) {
+}: ChatMessagesProps) {
   const { isDark } = useTheme();
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
@@ -916,7 +916,7 @@ export function DiagnosticChatView({
                   onSubmit={onSubmit}
                 />
               ) : (
-                <FaultWelcomeSimple 
+                <DiagnosticAgentWelcome 
                   onDiagnose={() => {}} 
                   onContinueChat={() => {}}
                   onStartDiagnosis={handleStartDiagnosis}

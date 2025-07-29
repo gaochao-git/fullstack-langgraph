@@ -35,10 +35,8 @@ import {
   CloudOutlined,
   GlobalOutlined,
   DeleteOutlined,
-  MessageOutlined,
   ClockCircleOutlined
 } from '@ant-design/icons';
-import AgentChatDialog from '../components/AgentChatDialog';
 import { ScheduledTaskManager } from '../../scheduled_task';
 import type { DataNode } from 'antd/es/tree';
 import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
@@ -165,9 +163,6 @@ const AgentManagement: React.FC = () => {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<LocalAgent | null>(null);
   
-  // 对话相关状态
-  const [chatDialogVisible, setChatDialogVisible] = useState(false);
-  const [selectedChatAgent, setSelectedChatAgent] = useState<LocalAgent | null>(null);
   
   
   const { message, modal } = App.useApp();
@@ -587,15 +582,6 @@ const AgentManagement: React.FC = () => {
     setAgentEditModal(true);
   };
 
-  // 开始对话
-  const handleStartChat = (agent: LocalAgent) => {
-    if (!agent.enabled) {
-      message.warning('请先启用该智能体');
-      return;
-    }
-    setSelectedChatAgent(agent);
-    setChatDialogVisible(true);
-  };
 
   // 删除智能体
   const handleDeleteAgent = (agent: LocalAgent) => {
@@ -753,15 +739,6 @@ const AgentManagement: React.FC = () => {
               <Card
                 className="h-full"
                 actions={[
-                  <Button 
-                    key="chat"
-                    type="text" 
-                    icon={<MessageOutlined />}
-                    onClick={() => handleStartChat(agent)}
-                    disabled={!agent.enabled}
-                  >
-                    对话
-                  </Button>,
                   <Button 
                     key="detail"
                     type="text" 
@@ -1386,21 +1363,6 @@ const AgentManagement: React.FC = () => {
         )}
       </Modal>
 
-      {/* 智能体对话模态框 */}
-      <AgentChatDialog
-        open={chatDialogVisible}
-        onClose={() => {
-          setChatDialogVisible(false);
-          setSelectedChatAgent(null);
-        }}
-        agent={selectedChatAgent ? {
-          id: selectedChatAgent.id,
-          name: selectedChatAgent.name,
-          display_name: selectedChatAgent.displayName,
-          description: selectedChatAgent.description,
-          capabilities: selectedChatAgent.capabilities
-        } : null}
-      />
 
     </div>
   );
