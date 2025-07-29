@@ -251,7 +251,10 @@ const TasksManagement: React.FC = () => {
     if (!currentTask) return;
     
     try {
-      await omind_put(`/api/v1/scheduled-tasks/${currentTask.id}`, values);
+      await baseFetch(`/api/v1/scheduled-tasks/${currentTask.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(values),
+      });
       message.success('更新定时任务成功');
       setEditModalVisible(false);
       form.resetFields();
@@ -266,7 +269,9 @@ const TasksManagement: React.FC = () => {
   const handleToggleTask = async (task: ScheduledTask) => {
     const action = task.task_enabled ? 'disable' : 'enable';
     try {
-      await omind_post(`/api/v1/scheduled-tasks/${task.id}/${action}`);
+      await baseFetch(`/api/v1/scheduled-tasks/${task.id}/${action}`, {
+        method: 'POST',
+      });
       message.success(`${task.task_enabled ? '禁用' : '启用'}任务成功`);
       fetchScheduledTasks();
     } catch (error) {
@@ -314,7 +319,9 @@ const TasksManagement: React.FC = () => {
         try {
           for (const task of disabledTasks) {
             try {
-              await omind_post(`/api/v1/scheduled-tasks/${task.id}/enable`);
+              await baseFetch(`/api/v1/scheduled-tasks/${task.id}/enable`, {
+                method: 'POST',
+              });
               successCount++;
             } catch (error) {
               failCount++;
@@ -380,7 +387,9 @@ const TasksManagement: React.FC = () => {
         try {
           for (const task of enabledTasks) {
             try {
-              await omind_post(`/api/v1/scheduled-tasks/${task.id}/disable`);
+              await baseFetch(`/api/v1/scheduled-tasks/${task.id}/disable`, {
+                method: 'POST',
+              });
               successCount++;
             } catch (error) {
               failCount++;
@@ -410,7 +419,9 @@ const TasksManagement: React.FC = () => {
   // 立即执行任务
   const handleRunTask = async (task: ScheduledTask) => {
     try {
-      const response = await omind_post(`/api/v1/scheduled-tasks/${task.id}/trigger`);
+      const response = await baseFetch(`/api/v1/scheduled-tasks/${task.id}/trigger`, {
+        method: 'POST',
+      });
       message.success(`任务已发送执行，任务ID: ${response.task_id}`);
       // 刷新执行记录列表
       if (activeTab === 'celery') {
@@ -429,7 +440,9 @@ const TasksManagement: React.FC = () => {
       content: `确定要删除任务 "${task.task_name}" 吗？`,
       onOk: async () => {
         try {
-          await omind_del(`/api/v1/scheduled-tasks/${task.id}`);
+          await baseFetch(`/api/v1/scheduled-tasks/${task.id}`, {
+            method: 'DELETE',
+          });
           message.success('删除任务成功');
           fetchScheduledTasks();
         } catch (error) {

@@ -7,7 +7,7 @@ import {
   SOPTemplateRequest,
   SOPListParams
 } from '../types/sop';
-import { baseFetchJson } from '../utils/baseFetch';
+import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
 // 工具函数
 export class SOPUtils {
@@ -68,10 +68,11 @@ export class SOPApi {
       if (params.team_name) queryParams.append('team_name', params.team_name);
 
       const url = `/api/v1/sops${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await baseFetchJson(url);
+      const response = await omind_get(url);
+      const responseData = await response.json();
       
       // 处理分页响应格式
-      const result = handleUnifiedResponse(response);
+      const result = handleUnifiedResponse(responseData);
       
       // 转换为前端期望的格式
       return {
@@ -93,8 +94,9 @@ export class SOPApi {
   // 获取单个SOP
   static async getSOPById(sopId: string) {
     try {
-      const response = await baseFetchJson(`/api/v1/sops/${sopId}`);
-      const result = handleUnifiedResponse<SOPTemplate>(response);
+      const response = await omind_get(`/api/v1/sops/${sopId}`);
+      const responseData = await response.json();
+      const result = handleUnifiedResponse<SOPTemplate>(responseData);
       return {
         success: true,
         data: result
@@ -111,11 +113,9 @@ export class SOPApi {
   // 创建SOP
   static async createSOP(sopData: SOPTemplateRequest) {
     try {
-      const response = await baseFetchJson('/api/v1/sops', {
-        method: 'POST',
-        body: JSON.stringify(sopData),
-      });
-      const result = handleUnifiedResponse<SOPTemplate>(response);
+      const response = await omind_post('/api/v1/sops', sopData);
+      const responseData = await response.json();
+      const result = handleUnifiedResponse<SOPTemplate>(responseData);
       return {
         success: true,
         data: result
@@ -132,11 +132,9 @@ export class SOPApi {
   // 更新SOP
   static async updateSOP(sopId: string, sopData: Partial<SOPTemplateRequest>) {
     try {
-      const response = await baseFetchJson(`/api/v1/sops/${sopId}`, {
-        method: 'PUT',
-        body: JSON.stringify(sopData),
-      });
-      const result = handleUnifiedResponse<SOPTemplate>(response);
+      const response = await omind_put(`/api/v1/sops/${sopId}`, sopData);
+      const responseData = await response.json();
+      const result = handleUnifiedResponse<SOPTemplate>(responseData);
       return {
         success: true,
         data: result
@@ -153,10 +151,9 @@ export class SOPApi {
   // 删除SOP
   static async deleteSOP(sopId: string) {
     try {
-      const response = await baseFetchJson(`/api/v1/sops/${sopId}`, {
-        method: 'DELETE',
-      });
-      handleUnifiedResponse(response);
+      const response = await omind_del(`/api/v1/sops/${sopId}`);
+      const responseData = await response.json();
+      handleUnifiedResponse(responseData);
       return {
         success: true,
         data: true
@@ -173,8 +170,9 @@ export class SOPApi {
   // 获取分类列表
   static async getCategories() {
     try {
-      const response = await baseFetchJson('/api/v1/sops/meta/categories');
-      const result = handleUnifiedResponse<string[]>(response);
+      const response = await omind_get('/api/v1/sops/meta/categories');
+      const responseData = await response.json();
+      const result = handleUnifiedResponse<string[]>(responseData);
       return {
         success: true,
         data: result
@@ -191,8 +189,9 @@ export class SOPApi {
   // 获取团队列表
   static async getTeams() {
     try {
-      const response = await baseFetchJson('/api/v1/sops/meta/teams');
-      const result = handleUnifiedResponse<string[]>(response);
+      const response = await omind_get('/api/v1/sops/meta/teams');
+      const responseData = await response.json();
+      const result = handleUnifiedResponse<string[]>(responseData);
       return {
         success: true,
         data: result

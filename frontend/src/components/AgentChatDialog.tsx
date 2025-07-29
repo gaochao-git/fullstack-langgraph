@@ -18,7 +18,7 @@ import {
   UserOutlined,
   LoadingOutlined
 } from "@ant-design/icons";
-import { baseFetch, baseFetchJson } from '../utils/baseFetch';
+import { omind_post } from '../utils/base_api';
 
 const { TextArea } = Input;
 const { Text, Title } = Typography;
@@ -87,13 +87,11 @@ const AgentChatDialog: React.FC<AgentChatDialogProps> = ({
 
     try {
       // 调用后端API发送消息
-      const data = await baseFetchJson(`/api/v1/agents/${agent.agent_id}/chat`, {
-        method: 'POST',
-        body: JSON.stringify({
-          message: userMessage.content,
-          conversation_id: `chat_${agent.id}_${Date.now()}`
-        }),
+      const response = await omind_post(`/api/v1/agents/${agent.agent_id}/chat`, {
+        message: userMessage.content,
+        conversation_id: `chat_${agent.id}_${Date.now()}`
       });
+      const data = await response.json();
       
       const assistantMessage: Message = {
         role: 'assistant',

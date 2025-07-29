@@ -7,7 +7,7 @@ import {
   SOPStep,
   SOPSeverity
 } from '../types/sop';
-import { baseFetch } from '../utils/baseFetch';
+import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
 // Mock数据 - 将来替换为真实API调用
 const mockSOPTemplates: SOPTemplate[] = [

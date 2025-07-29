@@ -2,7 +2,7 @@
  * 智能体管理API服务
  */
 
-import { baseFetch } from '../utils/baseFetch';
+import { omind_fetch, omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
 // 类型定义
 export interface MCPTool {
@@ -77,10 +77,7 @@ class AgentApiService {
    */
   async getAgents(): Promise<Agent[]> {
     try {
-      const response = await baseFetch('/api/v1/agents');
-      if (!response.ok) {
-        throw new Error(`获取智能体列表失败: ${response.statusText}`);
-      }
+      const response = await omind_get('/api/v1/agents');
       const result = await response.json();
       
       // 处理统一响应格式
@@ -100,10 +97,7 @@ class AgentApiService {
    */
   async getAllAgents(): Promise<Agent[]> {
     try {
-      const response = await baseFetch('/api/v1/agents?size=100');
-      if (!response.ok) {
-        throw new Error(`获取智能体列表失败: ${response.statusText}`);
-      }
+      const response = await omind_get('/api/v1/agents?size=100');
       const result = await response.json();
       
       // 处理统一响应格式
@@ -123,9 +117,7 @@ class AgentApiService {
    */
   async refreshAssistants(): Promise<any> {
     try {
-      const response = await baseFetch('/api/admin/refresh-assistants', {
-        method: 'POST',
-      });
+      const response = await omind_post('/api/admin/refresh-assistants');
       if (!response.ok) {
         throw new Error(`刷新智能体配置失败: ${response.statusText}`);
       }
@@ -141,7 +133,7 @@ class AgentApiService {
    */
   async getAssistantsStatus(): Promise<any> {
     try {
-      const response = await baseFetch('/api/admin/assistants-status');
+      const response = await omind_get('/api/admin/assistants-status');
       if (!response.ok) {
         throw new Error(`获取智能体状态失败: ${response.statusText}`);
       }
@@ -157,7 +149,7 @@ class AgentApiService {
    */
   async getMCPServers(): Promise<MCPServer[]> {
     try {
-      const response = await baseFetch('/api/v1/mcp/servers');
+      const response = await omind_get('/api/v1/mcp/servers');
       if (!response.ok) {
         throw new Error(`获取MCP服务器信息失败: ${response.statusText}`);
       }
@@ -180,10 +172,7 @@ class AgentApiService {
    */
   async updateAgentMCPConfig(agentId: string, config: UpdateMCPConfigRequest): Promise<Agent> {
     try {
-      const response = await baseFetch(`/api/v1/agents/${agentId}/mcp-config`, {
-        method: 'PUT',
-        body: JSON.stringify(config),
-      });
+      const response = await omind_put(`/api/v1/agents/${agentId}/mcp-config`, config);
       
       if (!response.ok) {
         throw new Error(`更新MCP配置失败: ${response.statusText}`);
@@ -209,7 +198,7 @@ class AgentApiService {
   async toggleAgentStatus(agentId: string): Promise<Agent> {
     try {
       // 先获取当前状态
-      const currentResponse = await baseFetch(`/api/v1/agents/${agentId}`);
+      const currentResponse = await omind_get(`/api/v1/agents/${agentId}`);
       if (!currentResponse.ok) {
         throw new Error(`获取智能体状态失败: ${currentResponse.statusText}`);
       }
@@ -223,10 +212,7 @@ class AgentApiService {
       const newStatus = currentAgent.status === 'running' ? 'stopped' : 'running';
       
       // 更新状态
-      const response = await baseFetch(`/api/v1/agents/${agentId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: newStatus }),
-      });
+      const response = await omind_put(`/api/v1/agents/${agentId}/status`, { status: newStatus });
       
       if (!response.ok) {
         throw new Error(`切换智能体状态失败: ${response.statusText}`);
@@ -251,15 +237,7 @@ class AgentApiService {
    */
   async createAgent(agentData: CreateAgentRequest): Promise<Agent> {
     try {
-      const response = await baseFetch('/api/v1/agents', {
-        method: 'POST',
-        body: JSON.stringify(agentData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`创建智能体失败: ${response.statusText}`);
-      }
-      
+      const response = await omind_post('/api/v1/agents', agentData);
       const result = await response.json();
       
       // 处理统一响应格式
@@ -279,10 +257,7 @@ class AgentApiService {
    */
   async updateAgent(agentId: string, agentData: UpdateAgentRequest): Promise<Agent> {
     try {
-      const response = await baseFetch(`/api/v1/agents/${agentId}`, {
-        method: 'PUT',
-        body: JSON.stringify(agentData),
-      });
+      const response = await omind_put(`/api/v1/agents/${agentId}`, agentData);
       
       if (!response.ok) {
         throw new Error(`更新智能体失败: ${response.statusText}`);
@@ -307,9 +282,7 @@ class AgentApiService {
    */
   async deleteAgent(agentId: string): Promise<{ deleted_id: string }> {
     try {
-      const response = await baseFetch(`/api/v1/agents/${agentId}`, {
-        method: 'DELETE',
-      });
+      const response = await omind_del(`/api/v1/agents/${agentId}`);
       
       if (!response.ok) {
         throw new Error(`删除智能体失败: ${response.statusText}`);
@@ -334,7 +307,7 @@ class AgentApiService {
    */
   async getAgentAvailableModels(agentId: string): Promise<any[]> {
     try {
-      const response = await baseFetch(`/api/v1/agents/${agentId}/available-models`);
+      const response = await omind_get(`/api/v1/agents/${agentId}/available-models`);
       if (!response.ok) {
         throw new Error(`获取可用模型失败: ${response.statusText}`);
       }

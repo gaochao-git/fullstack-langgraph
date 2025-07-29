@@ -2,7 +2,7 @@
  * 定时任务 API服务 - 真实API调用，适配统一响应格式
  */
 
-import { baseFetchJson } from '../utils/baseFetch';
+import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
 // 定时任务类型定义
 export interface ScheduledTask {
@@ -119,7 +119,8 @@ export class ScheduledTaskApi {
       if (params.agent_id) queryParams.append('agent_id', params.agent_id);
 
       const url = `/api/v1/scheduled-tasks${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await baseFetchJson(url);
+      const httpResponse = await omind_get(url);
+      const response = await httpResponse.json();
       
       // 处理分页响应格式
       const result = handleUnifiedResponse(response);
@@ -144,7 +145,8 @@ export class ScheduledTaskApi {
   // 获取单个定时任务
   static async getScheduledTaskById(taskId: number) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}`);
+      const httpResponse = await omind_get(`/api/v1/scheduled-tasks/${taskId}`);
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse<ScheduledTask>(response);
       return {
         success: true,
@@ -162,10 +164,8 @@ export class ScheduledTaskApi {
   // 创建定时任务
   static async createScheduledTask(taskData: ScheduledTaskCreateRequest) {
     try {
-      const response = await baseFetchJson('/api/v1/scheduled-tasks', {
-        method: 'POST',
-        body: JSON.stringify(taskData),
-      });
+      const httpResponse = await omind_post('/api/v1/scheduled-tasks', taskData);
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse<ScheduledTask>(response);
       return {
         success: true,
@@ -183,10 +183,8 @@ export class ScheduledTaskApi {
   // 更新定时任务
   static async updateScheduledTask(taskId: number, taskData: ScheduledTaskUpdateRequest) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}`, {
-        method: 'PUT',
-        body: JSON.stringify(taskData),
-      });
+      const httpResponse = await omind_put(`/api/v1/scheduled-tasks/${taskId}`, taskData);
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse<ScheduledTask>(response);
       return {
         success: true,
@@ -204,9 +202,8 @@ export class ScheduledTaskApi {
   // 删除定时任务
   static async deleteScheduledTask(taskId: number) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}`, {
-        method: 'DELETE',
-      });
+      const httpResponse = await omind_del(`/api/v1/scheduled-tasks/${taskId}`);
+      const response = await httpResponse.json();
       handleUnifiedResponse(response);
       return {
         success: true,
@@ -224,9 +221,8 @@ export class ScheduledTaskApi {
   // 启用定时任务
   static async enableScheduledTask(taskId: number) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}/enable`, {
-        method: 'POST',
-      });
+      const httpResponse = await omind_post(`/api/v1/scheduled-tasks/${taskId}/enable`);
+      const response = await httpResponse.json();
       handleUnifiedResponse(response);
       return {
         success: true,
@@ -244,9 +240,8 @@ export class ScheduledTaskApi {
   // 禁用定时任务
   static async disableScheduledTask(taskId: number) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}/disable`, {
-        method: 'POST',
-      });
+      const httpResponse = await omind_post(`/api/v1/scheduled-tasks/${taskId}/disable`);
+      const response = await httpResponse.json();
       handleUnifiedResponse(response);
       return {
         success: true,
@@ -264,9 +259,8 @@ export class ScheduledTaskApi {
   // 手动触发定时任务
   static async triggerScheduledTask(taskId: number) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}/trigger`, {
-        method: 'POST',
-      });
+      const httpResponse = await omind_post(`/api/v1/scheduled-tasks/${taskId}/trigger`);
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse(response);
       return {
         success: true,
@@ -288,7 +282,8 @@ export class ScheduledTaskApi {
       queryParams.append('skip', skip.toString());
       queryParams.append('limit', limit.toString());
 
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/${taskId}/logs?${queryParams.toString()}`);
+      const httpResponse = await omind_get(`/api/v1/scheduled-tasks/${taskId}/logs?${queryParams.toString()}`);
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse<TaskExecutionLog[]>(response);
       return {
         success: true,
@@ -314,7 +309,8 @@ export class ScheduledTaskApi {
       if (params.task_status) queryParams.append('task_status', params.task_status);
 
       const url = `/api/v1/scheduled-tasks/records${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await baseFetchJson(url);
+      const httpResponse = await omind_get(url);
+      const response = await httpResponse.json();
       
       // 处理分页响应格式
       const result = handleUnifiedResponse(response);
@@ -339,7 +335,8 @@ export class ScheduledTaskApi {
   // 获取单个任务记录详情
   static async getCeleryTaskRecordById(recordId: number) {
     try {
-      const response = await baseFetchJson(`/api/v1/scheduled-tasks/records/${recordId}`);
+      const httpResponse = await omind_get(`/api/v1/scheduled-tasks/records/${recordId}`);
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse<CeleryTaskRecord>(response);
       return {
         success: true,
@@ -357,7 +354,8 @@ export class ScheduledTaskApi {
   // 获取统计信息
   static async getStatistics() {
     try {
-      const response = await baseFetchJson('/api/v1/scheduled-tasks/meta/statistics');
+      const httpResponse = await omind_get('/api/v1/scheduled-tasks/meta/statistics');
+      const response = await httpResponse.json();
       const result = handleUnifiedResponse<{
         task_statistics: Array<{enabled: boolean, count: number}>;
         record_statistics: Array<{status: string, count: number}>;
