@@ -1340,8 +1340,8 @@ const AgentManagement: React.FC = () => {
         onOk={async () => {
           if (!agentToDelete) return;
           try {
-            await agentApi.deleteAgent(agentToDelete.id);
-            setAgents(prevAgents => prevAgents.filter(a => a.id !== agentToDelete.id));
+            await agentApi.deleteAgent(agentToDelete.agent_id);
+            setAgents(prevAgents => prevAgents.filter(a => a.agent_id !== agentToDelete.agent_id));
             message.success('智能体已删除');
           } catch (error) {
             message.error('删除智能体失败，请重试');
