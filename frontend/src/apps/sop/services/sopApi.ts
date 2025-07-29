@@ -12,9 +12,17 @@ import { omind_get, omind_post, omind_put, omind_del } from '../../../utils/base
 // 工具函数
 export class SOPUtils {
   // 解析步骤JSON字符串
-  static parseSteps(stepsJson: string) {
+  static parseSteps(stepsJson: string | any) {
     try {
-      return JSON.parse(stepsJson);
+      // 如果已经是对象，直接返回
+      if (typeof stepsJson === 'object' && stepsJson !== null) {
+        return Array.isArray(stepsJson) ? stepsJson : [];
+      }
+      // 如果是字符串，尝试解析
+      if (typeof stepsJson === 'string') {
+        return JSON.parse(stepsJson);
+      }
+      return [];
     } catch (error) {
       console.error('Failed to parse SOP steps:', error);
       return [];
@@ -27,9 +35,22 @@ export class SOPUtils {
   }
 
   // 解析工具JSON字符串
-  static parseTools(toolsJson: string): string[] {
+  static parseTools(toolsJson: string | any): string[] {
     try {
-      return JSON.parse(toolsJson);
+      // 如果已经是数组，直接返回
+      if (Array.isArray(toolsJson)) {
+        return toolsJson;
+      }
+      // 如果是其他对象，返回空数组
+      if (typeof toolsJson === 'object' && toolsJson !== null) {
+        return [];
+      }
+      // 如果是字符串，尝试解析
+      if (typeof toolsJson === 'string') {
+        const parsed = JSON.parse(toolsJson);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
     } catch (error) {
       console.error('Failed to parse tools:', error);
       return [];

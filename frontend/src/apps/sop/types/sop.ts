@@ -22,8 +22,8 @@ export interface SOPTemplate {
   sop_category: string;
   sop_description?: string;
   sop_severity: SOPSeverity;
-  sop_steps: string; // JSON字符串，解析后为SOPStep[]
-  tools_required?: string; // JSON字符串，解析后为string[]
+  sop_steps: SOPStep[] | string; // 可能是对象数组或JSON字符串
+  tools_required?: string[] | string; // 可能是字符串数组或JSON字符串
   sop_recommendations?: string;
   team_name: string;
   create_by: string;
