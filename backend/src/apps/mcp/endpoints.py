@@ -8,7 +8,7 @@ import aiohttp
 import logging
 
 from src.shared.db.config import get_async_db
-from src.apps.mcp.schema.mcp import (
+from src.apps.mcp.schema import (
     MCPServerCreate, MCPServerUpdate, MCPQueryParams,
     MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate
 )

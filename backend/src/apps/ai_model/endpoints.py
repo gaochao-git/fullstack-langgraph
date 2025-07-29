@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.db.config import get_async_db
-from src.apps.ai_model.schema.ai_model import (
+from src.apps.ai_model.schema import (
     AIModelCreate, AIModelUpdate, AIModelQueryParams,
     AIModelTestRequest, AIModelTestResponse, AIModelStatusUpdate,
     OllamaDiscoverRequest, OllamaDiscoverResponse

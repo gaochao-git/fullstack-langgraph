@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from src.shared.db.config import get_async_db
-from src.apps.agent.schema.agent import (
+from src.apps.agent.schema import (
     AgentCreate, AgentUpdate, AgentQueryParams, MCPConfigUpdate,
     AgentStatusUpdate, AgentStatisticsUpdate, AgentResponse, AgentStatistics
 )

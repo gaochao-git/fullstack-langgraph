@@ -7,7 +7,7 @@ from sqlalchemy import select, update, delete, and_, func, case, distinct
 from src.apps.sop.models import SOPTemplate
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
-from src.apps.sop.schema.sop import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
+from src.apps.sop.schema import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
 
 logger = get_logger(__name__)
 

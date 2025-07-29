@@ -7,7 +7,7 @@ from sqlalchemy import select, update, delete, and_, func, case, distinct
 from src.apps.mcp.models import MCPServer
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
-from src.apps.mcp.schema.mcp import MCPServerCreate, MCPServerUpdate, MCPQueryParams
+from src.apps.mcp.schema import MCPServerCreate, MCPServerUpdate, MCPQueryParams
 
 logger = get_logger(__name__)
 

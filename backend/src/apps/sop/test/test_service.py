@@ -7,7 +7,7 @@ from unittest.mock import Mock, AsyncMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.sop.service.sop_service import SOPService
-from src.apps.sop.schema.sop import SOPTemplateCreate, SOPTemplateUpdate
+from src.apps.sop.schema import SOPTemplateCreate, SOPTemplateUpdate
 from .fixtures import *  # 导入SOP模块的fixtures
 
 
