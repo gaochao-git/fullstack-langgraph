@@ -6,8 +6,8 @@
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
-from ....agent.service.agent_config_service import AgentConfigService
-
+from src.apps.agent.service.agent_config_service import AgentConfigService
+from src.shared.db.config import get_sync_db
 
 def get_current_date() -> str:
     """获取当前日期，用于提示词中的时间信息"""
@@ -203,7 +203,6 @@ def get_system_prompt_from_config(agent_id: str, **kwargs) -> str:
     print(f"🔍 通用Agent - 获取系统提示词 for agent_id: {agent_id}")
     
     # 从数据库加载配置
-    from .....shared.db.config import get_sync_db
     db_gen = get_sync_db()
     db = next(db_gen)
     try:

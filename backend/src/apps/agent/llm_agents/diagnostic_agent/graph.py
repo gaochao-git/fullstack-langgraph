@@ -43,6 +43,7 @@ def create_main_graph(enable_tool_approval: bool = False):
         
         # 获取智能体名称并获取对应的系统提示词
         system_prompt = get_system_prompt(agent_name)
+        print(9999999,system_prompt)
         
         agent = create_react_agent(model=llm, tools=tools, prompt=system_prompt)
         return await agent.ainvoke(state, config)

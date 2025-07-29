@@ -3,7 +3,8 @@
 专门管理智能运维助手的提示词
 """
 
-from ....agent.service.agent_config_service import AgentConfigService
+from src.apps.agent.service.agent_config_service import AgentConfigService
+from src.shared.db.config import get_sync_db
 
 # 默认智能运维助手的系统提示词 - 作为后备方案
 DEFAULT_SYSTEM_PROMPT = """你是一个专业的智能运维助手，具备以下核心能力：
@@ -49,7 +50,6 @@ def get_system_prompt(agent_name: str = "diagnostic_agent") -> str:
         系统提示词字符串
     """
     try:
-        from .....shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:

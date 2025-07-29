@@ -90,7 +90,7 @@ export default function ChatEngine({
   const thread = useStream<{
     messages: Message[];
   }>({
-    apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/llm`,
+    apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/chat`,
     assistantId: getAssistantId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),
