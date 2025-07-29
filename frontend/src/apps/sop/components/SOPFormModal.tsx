@@ -133,7 +133,7 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
         if (values.team_name !== editData.team_name) updateData.team_name = values.team_name;
         if (JSON.stringify(steps) !== editData.sop_steps) updateData.steps = steps;
         
-        const currentTools = editData.tools_required ? JSON.parse(editData.tools_required) : [];
+        const currentTools = editData.tools_required ? SOPUtils.parseTools(editData.tools_required) : [];
         const newTools = values.tools_required || [];
         if (JSON.stringify(currentTools) !== JSON.stringify(newTools)) {
           updateData.tools_required = newTools;

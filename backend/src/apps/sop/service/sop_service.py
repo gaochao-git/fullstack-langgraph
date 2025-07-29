@@ -2,10 +2,10 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, delete, and_, func, case, distinct
 
-from src.apps.sop.dao import SOPDAO
 from src.apps.sop.models import SOPTemplate
-from src.shared.db.transaction import transactional
+from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
 from src.apps.sop.schema.sop import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
 
@@ -15,31 +15,37 @@ logger = get_logger(__name__)
 class SOPService:
     """SOP服务 - 清晰的单一职责实现"""
     
-    def __init__(self):
-        self._dao = SOPDAO()
-    
-    @transactional()
     async def create_sop(
         self, 
         db: AsyncSession, 
         sop_data: SOPTemplateCreate
     ) -> SOPTemplate:
         """创建SOP模板"""
-        # 业务验证
-        existing = await self._dao.get_by_sop_id(db, sop_data.sop_id)
-        if existing:
-            raise ValueError(f"SOP template with ID {sop_data.sop_id} already exists")
-        
-        # 转换数据
-        data = sop_data.dict()
-        if 'steps' in data:
-            data['sop_steps'] = data.pop('steps')
-        
-        # 设置默认值
-        data.setdefault('create_by', 'system')
-        
-        logger.info(f"Creating SOP template: {sop_data.sop_id}")
-        return await self._dao.create(db, data)
+        async with db.begin():
+            # 业务验证
+            result = await db.execute(
+                select(SOPTemplate).where(SOPTemplate.sop_id == sop_data.sop_id)
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                raise ValueError(f"SOP template with ID {sop_data.sop_id} already exists")
+            
+            # 转换数据
+            data = sop_data.dict()
+            if 'steps' in data:
+                data['sop_steps'] = data.pop('steps')
+            
+            # 设置默认值
+            data.setdefault('create_by', 'system')
+            data.setdefault('create_time', now_shanghai())
+            data.setdefault('update_time', now_shanghai())
+            
+            logger.info(f"Creating SOP template: {sop_data.sop_id}")
+            instance = SOPTemplate(**data)
+            db.add(instance)
+            await db.flush()
+            await db.refresh(instance)
+            return instance
     
     async def get_sop_by_id(
         self, 
@@ -47,7 +53,10 @@ class SOPService:
         sop_id: str
     ) -> Optional[SOPTemplate]:
         """根据ID获取SOP模板"""
-        return await self._dao.get_by_sop_id(db, sop_id)
+        result = await db.execute(
+            select(SOPTemplate).where(SOPTemplate.sop_id == sop_id)
+        )
+        return result.scalar_one_or_none()
     
     async def list_sops(
         self, 
@@ -55,45 +64,54 @@ class SOPService:
         params: SOPQueryParams
     ) -> Tuple[List[SOPTemplate], int]:
         """列出SOP模板"""
-        # 构建过滤条件
-        filters = {}
-        if params.category:
-            filters['sop_category'] = params.category
-        if params.severity:
-            filters['sop_severity'] = params.severity
-        if params.team_name:
-            filters['team_name'] = params.team_name
-        
         # 搜索功能
         if params.search:
-            templates = await self._dao.search_by_title(
-                db,
-                params.search,
-                team_name=params.team_name,
-                limit=params.limit,
-                offset=params.offset
+            query = select(SOPTemplate).where(
+                SOPTemplate.sop_title.contains(params.search)
             )
+            if params.team_name:
+                query = query.where(SOPTemplate.team_name == params.team_name)
+            
+            query = query.offset(params.offset).limit(params.limit)
+            result = await db.execute(query)
+            templates = list(result.scalars().all())
+            
             # 获取搜索总数
-            all_results = await self._dao.search_by_title(
-                db, 
-                params.search, 
-                team_name=params.team_name
+            count_query = select(func.count(SOPTemplate.id)).where(
+                SOPTemplate.sop_title.contains(params.search)
             )
-            total = len(all_results)
+            if params.team_name:
+                count_query = count_query.where(SOPTemplate.team_name == params.team_name)
+            count_result = await db.execute(count_query)
+            total = count_result.scalar()
         else:
             # 普通查询
-            templates = await self._dao.get_list(
-                db,
-                filters=filters if filters else None,
-                limit=params.limit,
-                offset=params.offset,
-                order_by='create_time'
-            )
-            total = await self._dao.count(db, filters=filters if filters else None)
+            query = select(SOPTemplate)
+            conditions = []
+            if params.category:
+                conditions.append(SOPTemplate.sop_category == params.category)
+            if params.severity:
+                conditions.append(SOPTemplate.sop_severity == params.severity)
+            if params.team_name:
+                conditions.append(SOPTemplate.team_name == params.team_name)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.order_by(SOPTemplate.create_time.desc())
+            query = query.offset(params.offset).limit(params.limit)
+            result = await db.execute(query)
+            templates = list(result.scalars().all())
+            
+            # 计算总数
+            count_query = select(func.count(SOPTemplate.id))
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await db.execute(count_query)
+            total = count_result.scalar()
         
         return templates, total
     
-    @transactional()
     async def update_sop(
         self, 
         db: AsyncSession, 
@@ -101,67 +119,127 @@ class SOPService:
         sop_data: SOPTemplateUpdate
     ) -> Optional[SOPTemplate]:
         """更新SOP模板"""
-        # 检查是否存在
-        existing = await self._dao.get_by_sop_id(db, sop_id)
-        if not existing:
-            raise ValueError(f"SOP template with ID {sop_id} not found")
-        
-        # 转换数据
-        data = sop_data.dict(exclude_unset=True)
-        if 'steps' in data:
-            data['sop_steps'] = data.pop('steps')
-        
-        # 移除不可更新字段
-        data.pop('sop_id', None)
-        data.pop('create_time', None)
-        data.pop('create_by', None)
-        data['update_by'] = 'system'
-        
-        logger.info(f"Updating SOP template: {sop_id}")
-        return await self._dao.update_by_field(db, 'sop_id', sop_id, data)
+        async with db.begin():
+            # 检查是否存在
+            result = await db.execute(
+                select(SOPTemplate).where(SOPTemplate.sop_id == sop_id)
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                raise ValueError(f"SOP template with ID {sop_id} not found")
+            
+            # 转换数据
+            data = sop_data.dict(exclude_unset=True)
+            if 'steps' in data:
+                data['sop_steps'] = data.pop('steps')
+            
+            # 移除不可更新字段
+            data.pop('sop_id', None)
+            data.pop('create_time', None)
+            data.pop('create_by', None)
+            data['update_by'] = 'system'
+            data['update_time'] = now_shanghai()
+            
+            logger.info(f"Updating SOP template: {sop_id}")
+            await db.execute(
+                update(SOPTemplate).where(SOPTemplate.sop_id == sop_id).values(**data)
+            )
+            
+            # 返回更新后的数据
+            result = await db.execute(
+                select(SOPTemplate).where(SOPTemplate.sop_id == sop_id)
+            )
+            return result.scalar_one_or_none()
     
-    @transactional()
     async def delete_sop(
         self, 
         db: AsyncSession, 
         sop_id: str
     ) -> bool:
         """删除SOP模板"""
-        existing = await self._dao.get_by_sop_id(db, sop_id)
-        if not existing:
-            return False
-        
-        logger.info(f"Deleting SOP template: {sop_id}")
-        return await self._dao.delete_by_field(db, 'sop_id', sop_id) > 0
+        async with db.begin():
+            # 检查是否存在
+            result = await db.execute(
+                select(SOPTemplate).where(SOPTemplate.sop_id == sop_id)
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                return False
+            
+            logger.info(f"Deleting SOP template: {sop_id}")
+            result = await db.execute(
+                delete(SOPTemplate).where(SOPTemplate.sop_id == sop_id)
+            )
+            return result.rowcount > 0
     
     # ========== 旧格式方法 - 向后兼容 ==========
     async def get_categories(self, db: AsyncSession) -> List[str]:
         """获取所有分类 - 字符串数组格式（向后兼容）"""
-        return await self._dao.get_all_categories(db)
+        result = await db.execute(
+            select(distinct(SOPTemplate.sop_category)).where(
+                SOPTemplate.sop_category.isnot(None)
+            )
+        )
+        return [row[0] for row in result.fetchall()]
     
     async def get_teams(self, db: AsyncSession) -> List[str]:  
         """获取所有团队 - 字符串数组格式（向后兼容）"""
-        return await self._dao.get_all_teams(db)
+        result = await db.execute(
+            select(distinct(SOPTemplate.team_name)).where(
+                SOPTemplate.team_name.isnot(None)
+            )
+        )
+        return [row[0] for row in result.fetchall()]
     
     async def get_category_statistics(
         self, 
         db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取分类统计 - 原有格式（向后兼容）"""
-        return await self._dao.get_category_statistics(db)
+        result = await db.execute(
+            select(
+                SOPTemplate.sop_category.label('category'),
+                func.count(SOPTemplate.id).label('count')
+            ).group_by(SOPTemplate.sop_category)
+        )
+        return [{'category': row.category, 'count': row.count} for row in result.fetchall()]
     
     # ========== 新格式方法 - 统一标准格式 ==========
     async def get_category_options(self, db: AsyncSession):
         """获取分类选项 - 返回原始查询结果"""
-        return await self._dao.get_category_options(db)
+        return await db.execute(
+            select(
+                SOPTemplate.sop_category.label('value'),
+                SOPTemplate.sop_category.label('label'),
+                func.count(SOPTemplate.id).label('count')
+            )
+            .where(SOPTemplate.sop_category.isnot(None))
+            .group_by(SOPTemplate.sop_category)
+        )
     
     async def get_team_options(self, db: AsyncSession):
         """获取团队选项 - 返回原始查询结果"""
-        return await self._dao.get_team_options(db)
+        return await db.execute(
+            select(
+                SOPTemplate.team_name.label('value'),
+                SOPTemplate.team_name.label('label'),
+                func.count(SOPTemplate.id).label('count')
+            )
+            .where(SOPTemplate.team_name.isnot(None))
+            .group_by(SOPTemplate.team_name)
+        )
     
     async def get_severity_options(self, db: AsyncSession):
         """获取严重程度选项 - 返回原始查询结果"""
-        return await self._dao.get_severity_options(db)
+        return await db.execute(
+            select(
+                SOPTemplate.sop_severity.label('value'),
+                SOPTemplate.sop_severity.label('label'),
+                func.count(SOPTemplate.id).label('count')
+            )
+            .where(SOPTemplate.sop_severity.isnot(None))
+            .group_by(SOPTemplate.sop_severity)
+        )
     
     # ========== 优化列表查询 - 使用BaseModel批量转换 ==========
     async def list_sops_dict(

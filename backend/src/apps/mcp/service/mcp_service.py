@@ -2,10 +2,10 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, delete, and_, func, case, distinct
 
-from src.apps.mcp.dao import MCPDAO
 from src.apps.mcp.models import MCPServer
-from src.shared.db.transaction import transactional
+from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
 from src.apps.mcp.schema.mcp import MCPServerCreate, MCPServerUpdate, MCPQueryParams
 
@@ -15,32 +15,38 @@ logger = get_logger(__name__)
 class MCPService:
     """MCP服务 - 清晰的单一职责实现"""
     
-    def __init__(self):
-        self._dao = MCPDAO()
-    
-    @transactional()
     async def create_server(
         self, 
         session: AsyncSession, 
         server_data: MCPServerCreate
     ) -> MCPServer:
         """创建MCP服务器"""
-        # 业务验证
-        existing = await self._dao.get_by_server_id(session, server_data.server_id)
-        if existing:
-            raise ValueError(f"MCP server with ID {server_data.server_id} already exists")
-        
-        # 转换数据
-        data = server_data.dict()
-        
-        # 设置默认值
-        data.setdefault('is_enabled', 'on')
-        data.setdefault('connection_status', 'disconnected')
-        data.setdefault('team_name', 'default')
-        data.setdefault('create_by', 'system')
-        
-        logger.info(f"Creating MCP server: {server_data.server_id}")
-        return await self._dao.create(session, data)
+        async with session.begin():
+            # 业务验证
+            result = await session.execute(
+                select(MCPServer).where(MCPServer.server_id == server_data.server_id)
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                raise ValueError(f"MCP server with ID {server_data.server_id} already exists")
+            
+            # 转换数据
+            data = server_data.dict()
+            
+            # 设置默认值
+            data.setdefault('is_enabled', 'on')
+            data.setdefault('connection_status', 'disconnected')
+            data.setdefault('team_name', 'default')
+            data.setdefault('create_by', 'system')
+            data.setdefault('create_time', now_shanghai())
+            data.setdefault('update_time', now_shanghai())
+            
+            logger.info(f"Creating MCP server: {server_data.server_id}")
+            instance = MCPServer(**data)
+            session.add(instance)
+            await session.flush()
+            await session.refresh(instance)
+            return instance
     
     async def get_server_by_id(
         self, 
@@ -48,7 +54,10 @@ class MCPService:
         server_id: str
     ) -> Optional[MCPServer]:
         """根据ID获取MCP服务器"""
-        return await self._dao.get_by_server_id(session, server_id)
+        result = await session.execute(
+            select(MCPServer).where(MCPServer.server_id == server_id)
+        )
+        return result.scalar_one_or_none()
     
     async def list_servers(
         self, 
@@ -56,47 +65,62 @@ class MCPService:
         params: MCPQueryParams
     ) -> Tuple[List[MCPServer], int]:
         """列出MCP服务器"""
-        # 构建过滤条件
-        filters = {}
-        if params.is_enabled:
-            filters['is_enabled'] = params.is_enabled
-        if params.connection_status:
-            filters['connection_status'] = params.connection_status
-        if params.team_name:
-            filters['team_name'] = params.team_name
-        
         # 搜索功能
         if params.search:
-            servers = await self._dao.search_by_name(
-                session,
-                params.search,
-                enabled_only=params.is_enabled == 'on' if params.is_enabled else True,
-                team_name=params.team_name,
-                limit=params.limit,
-                offset=params.offset
+            query = select(MCPServer).where(
+                MCPServer.server_name.contains(params.search)
             )
+            conditions = []
+            if params.is_enabled:
+                conditions.append(MCPServer.is_enabled == params.is_enabled)
+            if params.connection_status:
+                conditions.append(MCPServer.connection_status == params.connection_status)
+            if params.team_name:
+                conditions.append(MCPServer.team_name == params.team_name)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.offset(params.offset).limit(params.limit)
+            result = await session.execute(query)
+            servers = list(result.scalars().all())
+            
             # 获取搜索总数
-            all_results = await self._dao.search_by_name(
-                session, 
-                params.search,
-                enabled_only=params.is_enabled == 'on' if params.is_enabled else True,
-                team_name=params.team_name
+            count_query = select(func.count(MCPServer.id)).where(
+                MCPServer.server_name.contains(params.search)
             )
-            total = len(all_results)
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await session.execute(count_query)
+            total = count_result.scalar()
         else:
             # 普通查询
-            servers = await self._dao.get_list(
-                session,
-                filters=filters if filters else None,
-                limit=params.limit,
-                offset=params.offset,
-                order_by='create_time'
-            )
-            total = await self._dao.count(session, filters=filters if filters else None)
+            query = select(MCPServer)
+            conditions = []
+            if params.is_enabled:
+                conditions.append(MCPServer.is_enabled == params.is_enabled)
+            if params.connection_status:
+                conditions.append(MCPServer.connection_status == params.connection_status)
+            if params.team_name:
+                conditions.append(MCPServer.team_name == params.team_name)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.order_by(MCPServer.create_time.desc())
+            query = query.offset(params.offset).limit(params.limit)
+            result = await session.execute(query)
+            servers = list(result.scalars().all())
+            
+            # 计算总数
+            count_query = select(func.count(MCPServer.id))
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await session.execute(count_query)
+            total = count_result.scalar()
         
         return servers, total
     
-    @transactional()
     async def update_server(
         self, 
         session: AsyncSession, 
@@ -104,57 +128,93 @@ class MCPService:
         server_data: MCPServerUpdate
     ) -> Optional[MCPServer]:
         """更新MCP服务器"""
-        # 检查是否存在
-        existing = await self._dao.get_by_server_id(session, server_id)
-        if not existing:
-            raise ValueError(f"MCP server with ID {server_id} not found")
-        
-        # 转换数据
-        data = server_data.dict(exclude_unset=True)
-        
-        # 移除不可更新字段
-        data.pop('server_id', None)
-        data.pop('create_time', None)
-        data.pop('create_by', None)
-        data['update_by'] = 'system'
-        
-        logger.info(f"Updating MCP server: {server_id}")
-        return await self._dao.update_by_field(session, 'server_id', server_id, data)
+        async with session.begin():
+            # 检查是否存在
+            result = await session.execute(
+                select(MCPServer).where(MCPServer.server_id == server_id)
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                raise ValueError(f"MCP server with ID {server_id} not found")
+            
+            # 转换数据
+            data = server_data.dict(exclude_unset=True)
+            
+            # 移除不可更新字段
+            data.pop('server_id', None)
+            data.pop('create_time', None)
+            data.pop('create_by', None)
+            data['update_by'] = 'system'
+            data['update_time'] = now_shanghai()
+            
+            logger.info(f"Updating MCP server: {server_id}")
+            await session.execute(
+                update(MCPServer).where(MCPServer.server_id == server_id).values(**data)
+            )
+            
+            # 返回更新后的数据
+            result = await session.execute(
+                select(MCPServer).where(MCPServer.server_id == server_id)
+            )
+            return result.scalar_one_or_none()
     
-    @transactional()
     async def delete_server(
         self, 
         session: AsyncSession, 
         server_id: str
     ) -> bool:
         """删除MCP服务器"""
-        existing = await self._dao.get_by_server_id(session, server_id)
-        if not existing:
-            return False
-        
-        logger.info(f"Deleting MCP server: {server_id}")
-        return await self._dao.delete_by_field(session, 'server_id', server_id) > 0
+        async with session.begin():
+            # 检查是否存在
+            result = await session.execute(
+                select(MCPServer).where(MCPServer.server_id == server_id)
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                return False
+            
+            logger.info(f"Deleting MCP server: {server_id}")
+            result = await session.execute(
+                delete(MCPServer).where(MCPServer.server_id == server_id)
+            )
+            return result.rowcount > 0
     
     async def get_teams(self, session: AsyncSession) -> List[str]:
         """获取所有团队"""
-        return await self._dao.get_all_teams(session)
+        result = await session.execute(
+            select(distinct(MCPServer.team_name)).where(
+                MCPServer.team_name.isnot(None)
+            )
+        )
+        return [row[0] for row in result.fetchall()]
     
     async def get_status_statistics(
         self, 
         session: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取状态统计"""
-        return await self._dao.get_status_statistics(session)
+        result = await session.execute(
+            select(
+                MCPServer.connection_status.label('status'),
+                func.count(MCPServer.id).label('count')
+            ).group_by(MCPServer.connection_status)
+        )
+        return [{'status': row.status, 'count': row.count} for row in result.fetchall()]
     
     async def get_enabled_servers(self, session: AsyncSession) -> List[MCPServer]:
         """获取启用的服务器（兼容性方法）"""
-        return await self._dao.get_enabled_servers(session)
+        result = await session.execute(
+            select(MCPServer).where(MCPServer.is_enabled == 'on')
+        )
+        return list(result.scalars().all())
     
     async def get_connected_servers(self, session: AsyncSession) -> List[MCPServer]:
         """获取已连接的服务器（兼容性方法）"""
-        return await self._dao.get_connected_servers(session)
+        result = await session.execute(
+            select(MCPServer).where(MCPServer.connection_status == 'connected')
+        )
+        return list(result.scalars().all())
     
-    @transactional()
     async def update_connection_status(
         self,
         session: AsyncSession,
@@ -162,9 +222,20 @@ class MCPService:
         status: str
     ) -> Optional[MCPServer]:
         """更新连接状态"""
-        return await self._dao.update_connection_status(session, server_id, status)
+        async with session.begin():
+            update_data = {
+                'connection_status': status,
+                'update_time': now_shanghai()
+            }
+            await session.execute(
+                update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
+            )
+            
+            result = await session.execute(
+                select(MCPServer).where(MCPServer.server_id == server_id)
+            )
+            return result.scalar_one_or_none()
     
-    @transactional()
     async def update_server_tools(
         self,
         session: AsyncSession,
@@ -172,7 +243,21 @@ class MCPService:
         tools: List[str]
     ) -> Optional[MCPServer]:
         """更新服务器工具列表"""
-        return await self._dao.update_server_tools(session, server_id, tools)
+        async with session.begin():
+            # 转换工具列表为JSON字符串或直接使用列表（根据数据库字段类型）
+            import json
+            update_data = {
+                'available_tools': json.dumps(tools) if tools else None,
+                'update_time': now_shanghai()
+            }
+            await session.execute(
+                update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
+            )
+            
+            result = await session.execute(
+                select(MCPServer).where(MCPServer.server_id == server_id)
+            )
+            return result.scalar_one_or_none()
 
 
 # 全局实例

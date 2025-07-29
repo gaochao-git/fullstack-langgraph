@@ -2,12 +2,12 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update, delete, and_, func, case, distinct
 import json
 from datetime import datetime
 
-from src.apps.scheduled_task.dao import ScheduledTaskDAO, TaskResultDAO, CeleryTaskRecordDAO
 from src.apps.scheduled_task.models import PeriodicTask, TaskResult, CeleryTaskRecord
-from src.shared.db.transaction import transactional
+from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,34 +16,38 @@ logger = get_logger(__name__)
 class ScheduledTaskService:
     """定时任务服务 - 清晰的单一职责实现"""
     
-    def __init__(self):
-        self._dao = ScheduledTaskDAO()
-        self._result_dao = TaskResultDAO()
-        self._record_dao = CeleryTaskRecordDAO()
-    
-    @transactional()
     async def create_task(
         self, 
         session: AsyncSession, 
         task_data: Dict[str, Any]
     ) -> PeriodicTask:
         """创建定时任务"""
-        # 业务验证
-        existing = await self._dao.get_by_task_name(session, task_data['task_name'])
-        if existing:
-            raise ValueError(f"Task with name {task_data['task_name']} already exists")
-        
-        # 验证JSON字段
-        self._validate_json_fields(task_data)
-        
-        # 验证调度配置
-        self._validate_schedule_config(task_data)
-        
-        # 转换数据
-        data = self._prepare_task_data(task_data)
-        
-        logger.info(f"Creating scheduled task: {task_data['task_name']}")
-        return await self._dao.create(session, data)
+        async with session.begin():
+            # 业务验证
+            result = await session.execute(
+                select(PeriodicTask).where(PeriodicTask.task_name == task_data['task_name'])
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                raise ValueError(f"Task with name {task_data['task_name']} already exists")
+            
+            # 验证JSON字段
+            self._validate_json_fields(task_data)
+            
+            # 验证调度配置
+            self._validate_schedule_config(task_data)
+            
+            # 转换数据
+            data = self._prepare_task_data(task_data)
+            data.setdefault('date_created', now_shanghai())
+            data.setdefault('date_changed', now_shanghai())
+            
+            logger.info(f"Creating scheduled task: {task_data['task_name']}")
+            instance = PeriodicTask(**data)
+            session.add(instance)
+            await session.flush()
+            await session.refresh(instance)
+            return instance
     
     async def get_task_by_id(
         self, 
@@ -51,7 +55,10 @@ class ScheduledTaskService:
         task_id: int
     ) -> Optional[PeriodicTask]:
         """根据ID获取定时任务"""
-        return await self._dao.get_by_id(session, task_id)
+        result = await session.execute(
+            select(PeriodicTask).where(PeriodicTask.id == task_id)
+        )
+        return result.scalar_one_or_none()
     
     async def get_task_by_name(
         self, 
@@ -59,7 +66,10 @@ class ScheduledTaskService:
         task_name: str
     ) -> Optional[PeriodicTask]:
         """根据名称获取定时任务"""
-        return await self._dao.get_by_task_name(session, task_name)
+        result = await session.execute(
+            select(PeriodicTask).where(PeriodicTask.task_name == task_name)
+        )
+        return result.scalar_one_or_none()
     
     async def list_tasks(
         self, 
@@ -71,43 +81,57 @@ class ScheduledTaskService:
         search: Optional[str] = None
     ) -> Tuple[List[PeriodicTask], int]:
         """列出定时任务"""
-        # 构建过滤条件
-        filters = {}
-        if enabled_only:
-            filters['enabled'] = True
+        offset = (page - 1) * size
         
         # 搜索功能
         if search:
-            tasks = await self._dao.search_by_name(
-                session,
-                search,
-                enabled_only=enabled_only,
-                agent_id=agent_id,
-                limit=size,
-                offset=(page - 1) * size
+            query = select(PeriodicTask).where(
+                PeriodicTask.task_name.contains(search)
             )
+            conditions = []
+            if enabled_only:
+                conditions.append(PeriodicTask.task_enabled == True)
+            # Note: agent_id filtering would need to be implemented based on your schema
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.offset(offset).limit(size)
+            result = await session.execute(query)
+            tasks = list(result.scalars().all())
+            
             # 获取搜索总数
-            all_results = await self._dao.search_by_name(
-                session, 
-                search,
-                enabled_only=enabled_only,
-                agent_id=agent_id
+            count_query = select(func.count(PeriodicTask.id)).where(
+                PeriodicTask.task_name.contains(search)
             )
-            total = len(all_results)
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await session.execute(count_query)
+            total = count_result.scalar()
         else:
             # 普通查询
-            tasks = await self._dao.get_list(
-                session,
-                filters=filters if filters else None,
-                limit=size,
-                offset=(page - 1) * size,
-                order_by='date_changed'
-            )
-            total = await self._dao.count(session, filters=filters if filters else None)
+            query = select(PeriodicTask)
+            conditions = []
+            if enabled_only:
+                conditions.append(PeriodicTask.task_enabled == True)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.order_by(PeriodicTask.update_time.desc())
+            query = query.offset(offset).limit(size)
+            result = await session.execute(query)
+            tasks = list(result.scalars().all())
+            
+            # 计算总数
+            count_query = select(func.count(PeriodicTask.id))
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await session.execute(count_query)
+            total = count_result.scalar()
         
         return tasks, total
     
-    @transactional()
     async def update_task(
         self, 
         session: AsyncSession, 
@@ -115,68 +139,111 @@ class ScheduledTaskService:
         task_data: Dict[str, Any]
     ) -> Optional[PeriodicTask]:
         """更新定时任务"""
-        # 检查是否存在
-        existing = await self._dao.get_by_id(session, task_id)
-        if not existing:
-            raise ValueError(f"Task with ID {task_id} not found")
-        
-        # 验证JSON字段
-        self._validate_json_fields(task_data)
-        
-        # 转换数据
-        data = task_data.copy()
-        
-        # 移除不可更新字段
-        data.pop('id', None)
-        data.pop('date_created', None)
-        
-        logger.info(f"Updating scheduled task: {task_id}")
-        return await self._dao.update_by_field(session, 'id', task_id, data)
+        async with session.begin():
+            # 检查是否存在
+            result = await session.execute(
+                select(PeriodicTask).where(PeriodicTask.id == task_id)
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                raise ValueError(f"Task with ID {task_id} not found")
+            
+            # 验证JSON字段
+            self._validate_json_fields(task_data)
+            
+            # 转换数据
+            data = task_data.copy()
+            
+            # 移除不可更新字段
+            data.pop('id', None)
+            data.pop('date_created', None)
+            data['update_time'] = now_shanghai()
+            
+            logger.info(f"Updating scheduled task: {task_id}")
+            await session.execute(
+                update(PeriodicTask).where(PeriodicTask.id == task_id).values(**data)
+            )
+            
+            # 返回更新后的数据
+            result = await session.execute(
+                select(PeriodicTask).where(PeriodicTask.id == task_id)
+            )
+            return result.scalar_one_or_none()
     
-    @transactional()
     async def delete_task(
         self, 
         session: AsyncSession, 
         task_id: int
     ) -> bool:
         """删除定时任务"""
-        existing = await self._dao.get_by_id(session, task_id)
-        if not existing:
-            return False
-        
-        logger.info(f"Deleting scheduled task: {task_id}")
-        return await self._dao.delete_by_field(session, 'id', task_id) > 0
+        async with session.begin():
+            # 检查是否存在
+            result = await session.execute(
+                select(PeriodicTask).where(PeriodicTask.id == task_id)
+            )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                return False
+            
+            logger.info(f"Deleting scheduled task: {task_id}")
+            result = await session.execute(
+                delete(PeriodicTask).where(PeriodicTask.id == task_id)
+            )
+            return result.rowcount > 0
     
-    @transactional()
     async def enable_task(
         self,
         session: AsyncSession,
         task_id: int
     ) -> bool:
         """启用定时任务"""
-        updated_task = await self._dao.update_task_status(session, task_id, True)
-        return updated_task is not None
+        async with session.begin():
+            result = await session.execute(
+                update(PeriodicTask)
+                .where(PeriodicTask.id == task_id)
+                .values(task_enabled=True, update_time=now_shanghai())
+            )
+            return result.rowcount > 0
     
-    @transactional()
     async def disable_task(
         self,
         session: AsyncSession,
         task_id: int
     ) -> bool:
         """禁用定时任务"""
-        updated_task = await self._dao.update_task_status(session, task_id, False)
-        return updated_task is not None
+        async with session.begin():
+            result = await session.execute(
+                update(PeriodicTask)
+                .where(PeriodicTask.id == task_id)
+                .values(task_enabled=False, update_time=now_shanghai())
+            )
+            return result.rowcount > 0
     
     async def get_enabled_tasks(self, session: AsyncSession) -> List[PeriodicTask]:
         """获取启用的任务（兼容性方法）"""
-        return await self._dao.get_enabled_tasks(session)
+        result = await session.execute(
+            select(PeriodicTask).where(PeriodicTask.task_enabled == True)
+        )
+        return list(result.scalars().all())
     
     async def get_task_statistics(
         self, 
         session: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取任务统计"""
-        return await self._dao.get_task_statistics(session)
+        result = await session.execute(
+            select(
+                func.count(PeriodicTask.id).label('total'),
+                func.sum(
+                    case(
+                        (PeriodicTask.task_enabled == True, 1),
+                        else_=0
+                    )
+                ).label('enabled')
+            )
+        )
+        row = result.first()
+        return [{'total': row.total or 0, 'enabled': row.enabled or 0}]
     
     # TaskResult相关方法
     async def get_task_execution_logs(
@@ -188,25 +255,33 @@ class ScheduledTaskService:
     ) -> List[TaskResult]:
         """获取任务执行日志"""
         # 先获取任务信息
-        task = await self._dao.get_by_id(session, task_id)
+        task_result = await session.execute(
+            select(PeriodicTask).where(PeriodicTask.id == task_id)
+        )
+        task = task_result.scalar_one_or_none()
         if not task:
             return []
         
         # 根据任务名称获取执行结果
-        return await self._result_dao.get_by_task_name(
-            session, 
-            task.name,
-            limit=limit,
-            offset=skip
+        result = await session.execute(
+            select(TaskResult)
+            .where(TaskResult.task_name == task.task_name)
+            .offset(skip)
+            .limit(limit)
+            .order_by(TaskResult.task_execute_time.desc())
         )
+        return list(result.scalars().all())
     
     async def get_task_result_by_id(
         self,
         session: AsyncSession,
-        result_id: str
+        result_id: int
     ) -> Optional[TaskResult]:
         """根据ID获取任务执行结果"""
-        return await self._result_dao.get_by_task_id_str(session, result_id)
+        result = await session.execute(
+            select(TaskResult).where(TaskResult.id == result_id)
+        )
+        return result.scalar_one_or_none()
     
     async def get_recent_task_results(
         self,
@@ -214,7 +289,12 @@ class ScheduledTaskService:
         limit: int = 50
     ) -> List[TaskResult]:
         """获取最近的任务执行结果"""
-        return await self._result_dao.get_recent_results(session, limit)
+        result = await session.execute(
+            select(TaskResult)
+            .order_by(TaskResult.task_execute_time.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
     
     # CeleryTaskRecord相关方法
     async def list_task_records(
@@ -226,35 +306,52 @@ class ScheduledTaskService:
         task_status: Optional[str] = None
     ) -> Tuple[List[CeleryTaskRecord], int]:
         """列出任务执行记录"""
+        offset = (page - 1) * size
+        
         if task_name:
-            records = await self._record_dao.search_by_name(
-                session,
-                task_name,
-                status=task_status,
-                limit=size,
-                offset=(page - 1) * size
+            query = select(CeleryTaskRecord).where(
+                CeleryTaskRecord.task_name.contains(task_name)
             )
-            # 获取搜索总数
-            all_results = await self._record_dao.search_by_name(
-                session, 
-                task_name,
-                status=task_status
-            )
-            total = len(all_results)
-        else:
-            # 构建过滤条件
-            filters = {}
+            conditions = []
             if task_status:
-                filters['task_status'] = task_status
+                conditions.append(CeleryTaskRecord.task_status == task_status)
             
-            records = await self._record_dao.get_list(
-                session,
-                filters=filters if filters else None,
-                limit=size,
-                offset=(page - 1) * size,
-                order_by='create_time'
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.offset(offset).limit(size)
+            result = await session.execute(query)
+            records = list(result.scalars().all())
+            
+            # 获取搜索总数
+            count_query = select(func.count(CeleryTaskRecord.id)).where(
+                CeleryTaskRecord.task_name.contains(task_name)
             )
-            total = await self._record_dao.count(session, filters=filters if filters else None)
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await session.execute(count_query)
+            total = count_result.scalar()
+        else:
+            # 普通查询
+            query = select(CeleryTaskRecord)
+            conditions = []
+            if task_status:
+                conditions.append(CeleryTaskRecord.task_status == task_status)
+            
+            if conditions:
+                query = query.where(and_(*conditions))
+            
+            query = query.order_by(CeleryTaskRecord.create_time.desc())
+            query = query.offset(offset).limit(size)
+            result = await session.execute(query)
+            records = list(result.scalars().all())
+            
+            # 计算总数
+            count_query = select(func.count(CeleryTaskRecord.id))
+            if conditions:
+                count_query = count_query.where(and_(*conditions))
+            count_result = await session.execute(count_query)
+            total = count_result.scalar()
         
         return records, total
     
@@ -264,14 +361,23 @@ class ScheduledTaskService:
         record_id: int
     ) -> Optional[CeleryTaskRecord]:
         """根据ID获取任务执行记录"""
-        return await self._record_dao.get_by_id(session, record_id)
+        result = await session.execute(
+            select(CeleryTaskRecord).where(CeleryTaskRecord.id == record_id)
+        )
+        return result.scalar_one_or_none()
     
     async def get_record_statistics(
         self,
         session: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取任务记录状态统计"""
-        return await self._record_dao.get_status_statistics(session)
+        result = await session.execute(
+            select(
+                CeleryTaskRecord.task_status.label('status'),
+                func.count(CeleryTaskRecord.id).label('count')
+            ).group_by(CeleryTaskRecord.task_status)
+        )
+        return [{'status': row.status, 'count': row.count} for row in result.fetchall()]
     
     # 私有方法
     def _validate_json_fields(self, task_data: Dict[str, Any]) -> None:
@@ -305,24 +411,9 @@ class ScheduledTaskService:
         data = task_data.copy()
         
         # 设置默认值
-        data.setdefault('enabled', True)
-        data.setdefault('date_created', datetime.utcnow())
-        data.setdefault('date_changed', datetime.utcnow())
+        data.setdefault('task_enabled', True)
         
-        # 映射字段名
-        field_mapping = {
-            'task_name': 'name',
-            'task_path': 'task',
-            'task_description': 'description',
-            'task_enabled': 'enabled',
-            'task_args': 'args',
-            'task_kwargs': 'kwargs',
-            'task_extra_config': 'extra'
-        }
-        
-        for old_key, new_key in field_mapping.items():
-            if old_key in data:
-                data[new_key] = data.pop(old_key)
+        # 字段名已经匹配数据库模型，不需要映射
         
         return data
 
