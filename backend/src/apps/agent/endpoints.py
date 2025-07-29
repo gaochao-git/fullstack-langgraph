@@ -90,12 +90,9 @@ async def update_agent(
 ):
     """更新智能体"""
     update_dict = agent_data.model_dump(exclude_none=True)
-    if not update_dict:
-        raise BusinessException("更新数据不能为空", ResponseCode.INVALID_PARAMETER)
-    
+    if not update_dict: raise BusinessException("更新数据不能为空", ResponseCode.INVALID_PARAMETER)
     updated_agent = await agent_service.update_agent(db, agent_id, update_dict)
-    if not updated_agent:
-        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    if not updated_agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
         data=updated_agent,

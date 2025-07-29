@@ -149,11 +149,7 @@ class AgentService:
         """更新智能体配置"""
         # 检查是否存在
         existing = await self._dao.get_by_agent_id(session, agent_id)
-        if not existing:
-            raise BusinessException(
-                f"智能体 {agent_id} 不存在", 
-                ResponseCode.NOT_FOUND
-            )
+        if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
         
         # 移除不可更新的字段
         update_data.pop('agent_id', None)
