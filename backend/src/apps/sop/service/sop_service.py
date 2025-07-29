@@ -21,12 +21,12 @@ class SOPService:
     @transactional()
     async def create_sop(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         sop_data: SOPTemplateCreate
     ) -> SOPTemplate:
         """创建SOP模板"""
         # 业务验证
-        existing = await self._dao.get_by_sop_id(session, sop_data.sop_id)
+        existing = await self._dao.get_by_sop_id(db, sop_data.sop_id)
         if existing:
             raise ValueError(f"SOP template with ID {sop_data.sop_id} already exists")
         
@@ -39,19 +39,19 @@ class SOPService:
         data.setdefault('create_by', 'system')
         
         logger.info(f"Creating SOP template: {sop_data.sop_id}")
-        return await self._dao.create(session, data)
+        return await self._dao.create(db, data)
     
     async def get_sop_by_id(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         sop_id: str
     ) -> Optional[SOPTemplate]:
         """根据ID获取SOP模板"""
-        return await self._dao.get_by_sop_id(session, sop_id)
+        return await self._dao.get_by_sop_id(db, sop_id)
     
     async def list_sops(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         params: SOPQueryParams
     ) -> Tuple[List[SOPTemplate], int]:
         """列出SOP模板"""
@@ -67,7 +67,7 @@ class SOPService:
         # 搜索功能
         if params.search:
             templates = await self._dao.search_by_title(
-                session,
+                db,
                 params.search,
                 team_name=params.team_name,
                 limit=params.limit,
@@ -75,7 +75,7 @@ class SOPService:
             )
             # 获取搜索总数
             all_results = await self._dao.search_by_title(
-                session, 
+                db, 
                 params.search, 
                 team_name=params.team_name
             )
@@ -83,26 +83,26 @@ class SOPService:
         else:
             # 普通查询
             templates = await self._dao.get_list(
-                session,
+                db,
                 filters=filters if filters else None,
                 limit=params.limit,
                 offset=params.offset,
                 order_by='create_time'
             )
-            total = await self._dao.count(session, filters=filters if filters else None)
+            total = await self._dao.count(db, filters=filters if filters else None)
         
         return templates, total
     
     @transactional()
     async def update_sop(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         sop_id: str, 
         sop_data: SOPTemplateUpdate
     ) -> Optional[SOPTemplate]:
         """更新SOP模板"""
         # 检查是否存在
-        existing = await self._dao.get_by_sop_id(session, sop_id)
+        existing = await self._dao.get_by_sop_id(db, sop_id)
         if not existing:
             raise ValueError(f"SOP template with ID {sop_id} not found")
         
@@ -118,59 +118,59 @@ class SOPService:
         data['update_by'] = 'system'
         
         logger.info(f"Updating SOP template: {sop_id}")
-        return await self._dao.update_by_field(session, 'sop_id', sop_id, data)
+        return await self._dao.update_by_field(db, 'sop_id', sop_id, data)
     
     @transactional()
     async def delete_sop(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         sop_id: str
     ) -> bool:
         """删除SOP模板"""
-        existing = await self._dao.get_by_sop_id(session, sop_id)
+        existing = await self._dao.get_by_sop_id(db, sop_id)
         if not existing:
             return False
         
         logger.info(f"Deleting SOP template: {sop_id}")
-        return await self._dao.delete_by_field(session, 'sop_id', sop_id) > 0
+        return await self._dao.delete_by_field(db, 'sop_id', sop_id) > 0
     
     # ========== 旧格式方法 - 向后兼容 ==========
-    async def get_categories(self, session: AsyncSession) -> List[str]:
+    async def get_categories(self, db: AsyncSession) -> List[str]:
         """获取所有分类 - 字符串数组格式（向后兼容）"""
-        return await self._dao.get_all_categories(session)
+        return await self._dao.get_all_categories(db)
     
-    async def get_teams(self, session: AsyncSession) -> List[str]:  
+    async def get_teams(self, db: AsyncSession) -> List[str]:  
         """获取所有团队 - 字符串数组格式（向后兼容）"""
-        return await self._dao.get_all_teams(session)
+        return await self._dao.get_all_teams(db)
     
     async def get_category_statistics(
         self, 
-        session: AsyncSession
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取分类统计 - 原有格式（向后兼容）"""
-        return await self._dao.get_category_statistics(session)
+        return await self._dao.get_category_statistics(db)
     
     # ========== 新格式方法 - 统一标准格式 ==========
-    async def get_category_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_category_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取分类选项 - 统一对象格式"""
-        return await self._dao.get_category_options(session)
+        return await self._dao.get_category_options(db)
     
-    async def get_team_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_team_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取团队选项 - 统一对象格式"""
-        return await self._dao.get_team_options(session)
+        return await self._dao.get_team_options(db)
     
-    async def get_severity_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_severity_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取严重程度选项 - 统一对象格式"""
-        return await self._dao.get_severity_options(session)
+        return await self._dao.get_severity_options(db)
     
     # ========== 优化列表查询 - 使用BaseModel批量转换 ==========
     async def list_sops_dict(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         params: SOPQueryParams
     ) -> Tuple[List[Dict[str, Any]], int]:
         """列出SOP模板 - 返回字典格式"""
-        templates, total = await self.list_sops(session, params)
+        templates, total = await self.list_sops(db, params)
         
         # 使用BaseModel的批量转换方法
         from src.shared.db.models import BaseModel

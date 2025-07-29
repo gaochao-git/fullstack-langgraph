@@ -15,9 +15,7 @@ export { default as SOPManagement } from './pages/SOPManagement';
 
 // === 可复用组件 ===
 export { default as SOPFormModal } from './components/SOPFormModal';
-export { default as SOPFormModalSimple } from './components/SOPFormModalSimple';
 export { default as SOPDetailModal } from './components/SOPDetailModal';
-export { default as SOPDetailModalSimple } from './components/SOPDetailModalSimple';
 
 // === Hooks ===
 export { useSOPList } from './hooks/useSOPList';

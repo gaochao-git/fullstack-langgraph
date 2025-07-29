@@ -23,8 +23,8 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
 import { SOPApi, SOPUtils } from '../services/sopApi';
-import SOPFormModalSimple from '../components/SOPFormModalSimple';
-import SOPDetailModalSimple from '../components/SOPDetailModalSimple';
+import SOPFormModal from '../components/SOPFormModal';
+import SOPDetailModal from '../components/SOPDetailModal';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -339,7 +339,7 @@ const SOPList: React.FC = () => {
       </Card>
 
       {/* SOP表单模态框 */}
-      <SOPFormModalSimple
+      <SOPFormModal
         visible={formModalVisible}
         onCancel={() => setFormModalVisible(false)}
         onSuccess={handleFormSuccess}
@@ -347,7 +347,7 @@ const SOPList: React.FC = () => {
       />
 
       {/* SOP详情模态框 */}
-      <SOPDetailModalSimple
+      <SOPDetailModal
         visible={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
         sopData={viewingSOP}

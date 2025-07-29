@@ -18,13 +18,13 @@ import { SOPUtils } from '../services/sopApi';
 
 const { Text, Paragraph, Title } = Typography;
 
-interface SOPDetailModalSimpleProps {
+interface SOPDetailModalProps {
   visible: boolean;
   onCancel: () => void;
   sopData: SOPTemplate | null;
 }
 
-const SOPDetailModalSimple: React.FC<SOPDetailModalSimpleProps> = ({
+const SOPDetailModal: React.FC<SOPDetailModalProps> = ({
   visible,
   onCancel,
   sopData
@@ -191,4 +191,4 @@ const SOPDetailModalSimple: React.FC<SOPDetailModalSimpleProps> = ({
   );
 };
 
-export default SOPDetailModalSimple;
+export default SOPDetailModal;

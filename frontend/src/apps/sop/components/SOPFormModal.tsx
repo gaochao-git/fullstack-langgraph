@@ -5,15 +5,14 @@ import {
   Input,
   Select,
   Button,
-  message,
-  Space,
+  App,
   Card,
   Divider,
   Row,
   Col
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { SOPTemplate, SOPTemplateRequest, SOPStep, SOPSeverity } from '../types/sop';
+import { SOPTemplate, SOPTemplateRequest, SOPStep } from '../types/sop';
 import { SOPApi, SOPUtils } from '../services/sopApi';
 
 const { TextArea } = Input;
@@ -35,6 +34,7 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState<SOPStep[]>([]);
+  const { message } = App.useApp();
 
   // 初始化表单数据
   useEffect(() => {
@@ -122,27 +122,53 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
 
       setLoading(true);
 
-      const requestData: SOPTemplateRequest = {
-        sop_id: values.sop_id,
-        sop_title: values.sop_title,
-        sop_category: values.sop_category,
-        sop_description: values.sop_description,
-        sop_severity: values.sop_severity,
-        steps: steps,
-        tools_required: values.tools_required || [],
-        sop_recommendations: values.sop_recommendations,
-        team_name: values.team_name
-      };
+      if (editData) {
+        // 更新模式 - 只发送修改的字段
+        const updateData: Partial<SOPTemplateRequest> = {};
+        if (values.sop_title !== editData.sop_title) updateData.sop_title = values.sop_title;
+        if (values.sop_category !== editData.sop_category) updateData.sop_category = values.sop_category;
+        if (values.sop_description !== editData.sop_description) updateData.sop_description = values.sop_description;
+        if (values.sop_severity !== editData.sop_severity) updateData.sop_severity = values.sop_severity;
+        if (values.sop_recommendations !== editData.sop_recommendations) updateData.sop_recommendations = values.sop_recommendations;
+        if (values.team_name !== editData.team_name) updateData.team_name = values.team_name;
+        if (JSON.stringify(steps) !== editData.sop_steps) updateData.steps = steps;
+        
+        const currentTools = editData.tools_required ? JSON.parse(editData.tools_required) : [];
+        const newTools = values.tools_required || [];
+        if (JSON.stringify(currentTools) !== JSON.stringify(newTools)) {
+          updateData.tools_required = newTools;
+        }
 
-      const response = editData 
-        ? await SOPApi.updateSOP(editData.sop_id, requestData)
-        : await SOPApi.createSOP(requestData);
-
-      if (response.success) {
-        message.success(editData ? '更新成功' : '创建成功');
-        onSuccess();
+        const response = await SOPApi.updateSOP(editData.sop_id, updateData);
+        
+        if (response.success) {
+          message.success('更新成功');
+          onSuccess();
+        } else {
+          message.error(response.error || '更新失败');
+        }
       } else {
-        message.error(response.error || (editData ? '更新失败' : '创建失败'));
+        // 创建模式 - 发送完整数据
+        const requestData: SOPTemplateRequest = {
+          sop_id: values.sop_id,
+          sop_title: values.sop_title,
+          sop_category: values.sop_category,
+          sop_description: values.sop_description,
+          sop_severity: values.sop_severity,
+          steps: steps,
+          tools_required: values.tools_required || [],
+          sop_recommendations: values.sop_recommendations,
+          team_name: values.team_name
+        };
+
+        const response = await SOPApi.createSOP(requestData);
+        
+        if (response.success) {
+          message.success('创建成功');
+          onSuccess();
+        } else {
+          message.error(response.error || '创建失败');
+        }
       }
     } catch (error) {
       console.error('Form validation failed:', error);
@@ -165,7 +191,7 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
           {editData ? '更新' : '创建'}
         </Button>
       ]}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}

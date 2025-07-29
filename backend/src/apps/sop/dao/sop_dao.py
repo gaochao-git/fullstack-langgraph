@@ -14,13 +14,13 @@ class SOPDAO(BaseDAO[SOPTemplate]):
     def __init__(self):
         super().__init__(SOPTemplate)
     
-    async def get_by_sop_id(self, session: AsyncSession, sop_id: str) -> Optional[SOPTemplate]:
+    async def get_by_sop_id(self, db: AsyncSession, sop_id: str) -> Optional[SOPTemplate]:
         """根据SOP ID查询模板"""
-        return await self.get_by_field(session, 'sop_id', sop_id)
+        return await self.get_by_field(db, 'sop_id', sop_id)
     
     async def search_by_title(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         title_keyword: str,
         team_name: Optional[str] = None,
         limit: Optional[int] = None,
@@ -39,22 +39,22 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         if limit:
             query = query.limit(limit)
         
-        result = await session.execute(query)
+        result = await db.execute(query)
         return result.scalars().all()
     
     # ========== 旧格式方法 - 向后兼容 ==========
-    async def get_all_categories(self, session: AsyncSession) -> List[str]:
+    async def get_all_categories(self, db: AsyncSession) -> List[str]:
         """获取所有分类 - 字符串数组格式（向后兼容）"""
-        result = await session.execute(
+        result = await db.execute(
             select(distinct(self.model.sop_category))
             .where(self.model.sop_category.isnot(None))
             .order_by(self.model.sop_category)
         )
         return [category for category in result.scalars().all() if category]
     
-    async def get_all_teams(self, session: AsyncSession) -> List[str]:
+    async def get_all_teams(self, db: AsyncSession) -> List[str]:
         """获取所有团队 - 字符串数组格式（向后兼容）"""
-        result = await session.execute(
+        result = await db.execute(
             select(distinct(self.model.team_name))
             .where(self.model.team_name.isnot(None))
             .order_by(self.model.team_name)
@@ -62,9 +62,9 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         return [team for team in result.scalars().all() if team]
     
     # ========== 简单方法 - 直接转为[{}]格式 ==========
-    async def get_category_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_category_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取分类选项 - 简单直接"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 self.model.sop_category.label('value'),
                 func.count().label('count')
@@ -75,9 +75,9 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         )
         return self.to_dict_list(result)
     
-    async def get_team_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_team_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取团队选项 - 简单直接"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 self.model.team_name.label('value'),
                 func.count().label('count')
@@ -88,9 +88,9 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         )
         return self.to_dict_list(result)
     
-    async def get_severity_options(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_severity_options(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取严重程度选项 - 简单直接"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 self.model.sop_severity.label('value'),
                 func.count().label('count')
@@ -101,6 +101,6 @@ class SOPDAO(BaseDAO[SOPTemplate]):
         )
         return self.to_dict_list(result)
     
-    async def get_category_statistics(self, session: AsyncSession) -> List[Dict[str, Any]]:
+    async def get_category_statistics(self, db: AsyncSession) -> List[Dict[str, Any]]:
         """获取分类统计 - 简单直接"""
-        return await self.get_category_options(session)
+        return await self.get_category_options(db)
