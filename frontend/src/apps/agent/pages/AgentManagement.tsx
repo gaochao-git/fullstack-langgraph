@@ -554,7 +554,7 @@ const AgentManagement: React.FC = () => {
     // 获取完整的智能体配置信息
     try {
       const agentDetails = await agentApi.getAgents();
-      const fullAgent = agentDetails.find(a => a.id === agent.id);
+      const fullAgent = agentDetails.items.find(a => a.id === agent.id);
       
       if (fullAgent) {
         // 设置表单初始值
