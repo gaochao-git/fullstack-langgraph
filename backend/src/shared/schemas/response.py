@@ -46,10 +46,7 @@ class UnifiedResponse(BaseModel, Generic[T]):
         use_enum_values = True
 
 
-class PaginatedData(BaseModel, Generic[T]):
-    """分页数据格式"""
-    items: list[T]
-    pagination: dict[str, Any]
+# PaginatedData 类已移除，直接使用字典格式
 
 
 def success_response(
@@ -92,15 +89,16 @@ def paginated_response(
     page: int,
     size: int,
     msg: str = "查询成功"
-) -> UnifiedResponse[PaginatedData]:
+) -> UnifiedResponse:
     """分页响应 - 自动序列化模型对象列表"""
     # 自动序列化模型对象列表
     if items and hasattr(items[0], 'to_dict'):
         items = [item.to_dict() for item in items]
     
-    pagination_data = PaginatedData(
-        items=items,
-        pagination={
+    # 直接构造字典格式，符合 UnifiedResponse 的校验要求
+    pagination_dict = {
+        "items": items,
+        "pagination": {
             "page": page,
             "size": size,
             "total": total,
@@ -108,11 +106,11 @@ def paginated_response(
             "has_next": page * size < total,
             "has_prev": page > 1
         }
-    )
+    }
     
     return UnifiedResponse(
         status=ResponseStatus.OK,
         msg=msg,
-        data=pagination_data,
+        data=pagination_dict,
         code=ResponseCode.SUCCESS
     )
