@@ -1,3 +1,0 @@
-"""
-AI Model API
-"""

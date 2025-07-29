@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 # 导入数据库相关模块  
 from src.shared.db.config import get_sync_db
-from src.apps.sop.dao.sop_dao import SOPDAO
+from src.apps.sop.dao import SOPDAO
 
 
 def get_sop_from_db(sop_id: str) -> Optional[Dict[str, Any]]:

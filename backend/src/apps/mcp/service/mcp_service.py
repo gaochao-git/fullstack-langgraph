@@ -3,7 +3,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.mcp.dao.mcp_dao import MCPDAO
+from src.apps.mcp.dao import MCPDAO
 from src.apps.mcp.models import MCPServer
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import json
 from datetime import datetime
 
-from src.apps.scheduled_task.dao.scheduled_task_dao import ScheduledTaskDAO, TaskResultDAO, CeleryTaskRecordDAO
+from src.apps.scheduled_task.dao import ScheduledTaskDAO, TaskResultDAO, CeleryTaskRecordDAO
 from src.apps.scheduled_task.models import PeriodicTask, TaskResult, CeleryTaskRecord
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger

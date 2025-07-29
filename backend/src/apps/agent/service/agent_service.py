@@ -8,7 +8,7 @@ import json
 import uuid
 from datetime import datetime
 
-from src.apps.agent.dao.agent_dao import AgentDAO
+from src.apps.agent.dao import AgentDAO
 from src.apps.agent.models import AgentConfig
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger

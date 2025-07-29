@@ -3,7 +3,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.sop.dao.sop_dao import SOPDAO
+from src.apps.sop.dao import SOPDAO
 from src.apps.sop.models import SOPTemplate
 from src.shared.db.transaction import transactional
 from src.shared.core.logging import get_logger

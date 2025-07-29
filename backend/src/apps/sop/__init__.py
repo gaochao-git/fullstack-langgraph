@@ -2,7 +2,7 @@
 SOP管理模块
 """
 
-from .router.endpoints import router
+from .endpoints import router
 from .schema import *
 from .service import SOPService, sop_service
 

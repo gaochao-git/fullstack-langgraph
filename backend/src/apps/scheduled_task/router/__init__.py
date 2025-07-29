@@ -1,3 +1,0 @@
-"""
-Scheduled Task API
-"""

@@ -1,3 +1,0 @@
-"""
-SOP API endpoints
-"""
