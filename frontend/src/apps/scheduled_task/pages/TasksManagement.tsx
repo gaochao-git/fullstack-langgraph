@@ -474,7 +474,7 @@ const TasksManagement: React.FC = () => {
   useEffect(() => {
     fetchScheduledTasks();
     fetchCeleryTasks();
-    fetchAgents();
+    // 移除 fetchAgents() - 只在需要时按需加载
     
     // 定期刷新数据
     const interval = setInterval(() => {
@@ -1026,6 +1026,10 @@ const TasksManagement: React.FC = () => {
                     }
                     if (value === 'agent') {
                       form.setFieldsValue({ task_path: undefined });
+                      // 按需加载智能体列表
+                      if (agents.length === 0) {
+                        fetchAgents();
+                      }
                     }
                     if (value === 'system') {
                       form.setFieldsValue({ task_timeout: undefined });
