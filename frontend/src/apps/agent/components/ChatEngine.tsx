@@ -6,6 +6,7 @@ import { ChatMessages, type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
+import { omind_get } from "../../../utils/base_api";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -265,10 +266,8 @@ export default function ChatEngine({
   const loadHistoryThreads = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/chat/users/zhangsan123/threads?limit=20&offset=0`
-      );
-
+      const response = await omind_get('/api/chat/users/zhangsan123/threads?limit=20&offset=0');
+      
       if (response.ok) {
         const data = await response.json();
         const threads = data.threads || [];
