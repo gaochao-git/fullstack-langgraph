@@ -73,8 +73,6 @@ class MCPToolsIntegrator:
         
         # 合并工具
         combined_tools = list(system_tools) + list(mcp_tools)
-        
-        logger.info(f"🔧 工具分配策略: 系统工具(SOP+时间,{len(system_tools)}) + MCP工具(SSH+MySQL+ES+Zabbix,{len(mcp_tools)}) = 总计({len(combined_tools)})")
         return combined_tools
 
 # 全局实例
