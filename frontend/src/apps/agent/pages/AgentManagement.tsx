@@ -50,10 +50,21 @@ interface LocalMCPServer extends MCPServer {
 
 // 数据转换工具函数
 const transformAgentToLocal = (agent: Agent): LocalAgent => {
-  // 从 tools_info 中提取 MCP 配置
+  // 从 tools_info 中提取 MCP 配置，后端BaseModel会自动解析JSON字段为对象
   const toolsInfo = agent.tools_info || {};
   const mcpTools = toolsInfo.mcp_tools || [];
   const systemTools = toolsInfo.system_tools || [];
+  
+  // 计算唯一的服务器ID列表
+  const enabledServers = mcpTools
+    .map((tool: any) => tool.server_id)
+    .filter((id: string, index: number, self: string[]) => 
+      id && self.indexOf(id) === index
+    );
+  
+  // 计算所有选中的工具
+  const allMcpToolNames = mcpTools.flatMap((tool: any) => tool.tools || []);
+  const selectedTools = [...systemTools, ...allMcpToolNames];
   
   return {
     ...agent,
@@ -63,9 +74,9 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => {
     successRate: agent.success_rate,
     avgResponseTime: agent.avg_response_time,
     mcpConfig: {
-      enabledServers: mcpTools.map((tool: any) => tool.server_id).filter((id: string, index: number, self: string[]) => self.indexOf(id) === index),
-      selectedTools: [...systemTools, ...mcpTools.flatMap((tool: any) => tool.tools || [])],
-      totalTools: systemTools.length + mcpTools.reduce((total: number, tool: any) => total + (tool.tools?.length || 0), 0)
+      enabledServers,
+      selectedTools,
+      totalTools: selectedTools.length
     }
   };
 };
@@ -250,7 +261,7 @@ const AgentManagement: React.FC = () => {
         const newAgentData: CreateAgentRequest = {
           agent_name: values.agent_name,
           agent_description: values.agent_description || '',
-          agent_capabilities: values.capabilities || [],
+          agent_capabilities: values.agent_capabilities || [],
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info
@@ -264,7 +275,7 @@ const AgentManagement: React.FC = () => {
         const updateData: UpdateAgentRequest = {
           agent_name: values.agent_name,
           agent_description: values.agent_description,
-          agent_capabilities: values.capabilities,
+          agent_capabilities: values.agent_capabilities,
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info
@@ -407,7 +418,7 @@ const AgentManagement: React.FC = () => {
 
                       {/* 核心能力 */}
                       <div className="flex flex-wrap gap-1">
-                        {agent.capabilities.slice(0, 3).map(capability => (
+                        {(agent.agent_capabilities || []).slice(0, 3).map(capability => (
                           <Tag key={capability} color="blue" className="text-xs">{capability}</Tag>
                         ))}
                       </div>

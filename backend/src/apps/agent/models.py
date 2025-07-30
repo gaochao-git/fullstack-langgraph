@@ -3,12 +3,10 @@ Agent Configuration Model
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
-from src.shared.db.config import Base
-from src.shared.db.models import JSONType, now_shanghai
-import json
+from src.shared.db.models import JSONType, now_shanghai, BaseModel
 
 
-class AgentConfig(Base):
+class AgentConfig(BaseModel):
     """Agent Configuration model for storing complete agent configurations."""
     __tablename__ = "agent_configs"
 
@@ -37,99 +35,18 @@ class AgentConfig(Base):
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
 
-    def to_dict(self):
-        """Convert model to dictionary."""
-        # 解析工具配置
-        tools_config = self.tools_info or {}
-        if isinstance(tools_config, str):
-            try:
-                tools_config = json.loads(tools_config)
-            except:
-                tools_config = {}
-        elif tools_config is None:
-            tools_config = {}
-        
-        # 解析大模型配置
-        llm_config = self.llm_info or {}
-        if isinstance(llm_config, str):
-            try:
-                llm_config = json.loads(llm_config)
-            except:
-                llm_config = {}
-        elif llm_config is None:
-            llm_config = {}
-        
-        # 解析提示词配置
-        prompt_config = self.prompt_info or {}
-        if isinstance(prompt_config, str):
-            try:
-                prompt_config = json.loads(prompt_config)
-            except:
-                prompt_config = {}
-        elif prompt_config is None:
-            prompt_config = {}
-        
-        system_tools = tools_config.get('system_tools', []) if isinstance(tools_config, dict) else []
-        mcp_tools_config = tools_config.get('mcp_tools', []) if isinstance(tools_config, dict) else []
-        
-        # 从mcp_tools配置中提取启用的服务器和所有MCP工具
-        enabled_servers = []
-        all_mcp_tools = []
-        
-        if isinstance(mcp_tools_config, list):
-            for server in mcp_tools_config:
-                if isinstance(server, dict):
-                    if server.get('tools'):
-                        enabled_servers.append(server.get('server_id', ''))
-                    all_mcp_tools.extend(server.get('tools', []))
-        
-        # 解析能力列表
-        capabilities = self.agent_capabilities or []
-        if isinstance(capabilities, str):
-            try:
-                capabilities = json.loads(capabilities)
-            except:
-                capabilities = []
-        elif capabilities is None:
-            capabilities = []
-
-        return {
-            'id': self.id,
-            'agent_id': self.agent_id,
-            'name': self.agent_id,  # 前端兼容
-            'agent_name': self.agent_name,
-            'display_name': self.agent_name,  # 前端兼容
-            'agent_description': self.agent_description or '',
-            'capabilities': capabilities,
-            'version': self.agent_version,
-            'status': self.agent_status,
-            'enabled': self.agent_enabled == 'yes' if isinstance(self.agent_enabled, str) else self.agent_enabled,
-            'is_builtin': self.is_builtin,  # 直接返回字符串 'yes'/'no'
-            # 运行统计
-            'total_runs': self.total_runs,
-            'success_rate': self.success_rate,
-            'avg_response_time': self.avg_response_time,
-            'last_used': self.last_used.strftime('%Y-%m-%d %H:%M:%S') if self.last_used else None,
-            # 工具配置（保持前端兼容性）
-            'enabled_servers': enabled_servers,
-            'selected_tools': system_tools + all_mcp_tools,
-            'system_tools': system_tools,
-            'mcp_tools': all_mcp_tools,
-            'mcp_tools_config': mcp_tools_config,
-            # MCP配置（前端兼容）
-            'mcp_config': {
-                'enabled_servers': enabled_servers,
-                'selected_tools': system_tools + all_mcp_tools,
-                'total_tools': len(system_tools) + len(all_mcp_tools)
-            },
-            # 完整配置信息
-            'tools_info': tools_config,
-            'llm_info': llm_config,
-            'prompt_info': prompt_config,
-            'config_version': self.config_version,
-            'is_active': self.is_active,
-            'create_by': self.create_by,
-            'update_by': self.update_by,
-            'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else None,
-            'update_time': self.update_time.strftime('%Y-%m-%d %H:%M:%S') if self.update_time else None,
-        }
+    def _process_agent_capabilities(self, value):
+        """自定义处理agent_capabilities字段 - 解析为Python列表"""
+        return self._parse_json_field(value, default=[])
+    
+    def _process_tools_info(self, value):
+        """自定义处理tools_info字段 - 解析为Python字典"""
+        return self._parse_json_field(value, default={})
+    
+    def _process_llm_info(self, value):
+        """自定义处理llm_info字段 - 解析为Python字典"""
+        return self._parse_json_field(value, default={})
+    
+    def _process_prompt_info(self, value):
+        """自定义处理prompt_info字段 - 解析为Python字典"""
+        return self._parse_json_field(value, default={})

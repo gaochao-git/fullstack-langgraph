@@ -10,7 +10,7 @@ interface Agent {
   name: string;
   display_name: string;
   description: string;
-  capabilities: string[];
+  agent_capabilities: string[];
   is_builtin: string;
 }
 
@@ -60,7 +60,7 @@ const GenericAgentWelcome: React.FC<GenericAgentWelcomeProps> = ({ agent, onSubm
         </div>
 
         {/* 智能体能力展示 */}
-        {agent?.capabilities && agent.capabilities.length > 0 && (
+        {agent?.agent_capabilities && agent.agent_capabilities.length > 0 && (
           <div className="mb-6">
             <h3 className={cn(
               "text-sm font-medium mb-3",
@@ -69,7 +69,7 @@ const GenericAgentWelcome: React.FC<GenericAgentWelcomeProps> = ({ agent, onSubm
               我的能力
             </h3>
             <div className="flex flex-wrap gap-2">
-              {agent.capabilities.map((capability, index) => (
+              {agent.agent_capabilities.map((capability, index) => (
                 <Tag 
                   key={index}
                   className={cn(

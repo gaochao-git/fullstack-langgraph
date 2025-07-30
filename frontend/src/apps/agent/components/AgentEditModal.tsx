@@ -321,7 +321,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         setEditExpandedKeys([]);
         
         form.setFieldsValue({
-          capabilities: [],
+          agent_capabilities: [],
           available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
           temperature: 0.7,
           max_tokens: 2000,
@@ -372,7 +372,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
             agent_id: agent.agent_id,
             agent_name: agent.displayName,
             agent_description: agent.agent_description,
-            capabilities: agent.agent_capabilities,
+            agent_capabilities: agent.agent_capabilities,
             available_models: fullAgent.llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
             temperature: fullAgent.llm_info?.temperature || 0.7,
             max_tokens: fullAgent.llm_info?.max_tokens || 2000,
@@ -480,7 +480,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
             </Form.Item>
             <Form.Item
               label="核心能力"
-              name="capabilities"
+              name="agent_capabilities"
             >
               <Select
                 mode="tags"
