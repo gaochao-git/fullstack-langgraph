@@ -133,27 +133,28 @@ const AgentManagement: React.FC = () => {
     }
   };
 
-  // 数据加载
+  // 数据加载 - 只加载智能体列表
   const loadData = async () => {
     setLoading(true);
     try {
-      // 分别加载数据，避免一个失败影响全部
-      let agentsData = [];
-      let mcpServersData = [];
-      
+      const agentsData = await agentApi.getAllAgents();
+      console.log('Agents data loaded:', agentsData);
+      setAgents(agentsData.map(transformAgentToLocal));
+    } catch (error) {
+      console.error('加载智能体数据失败:', error);
+      message.error('加载智能体数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 加载辅助数据 - 在需要时调用（创建/编辑时）
+  const loadAuxiliaryData = async () => {
+    try {
+      // 加载MCP服务器
       try {
-        agentsData = await agentApi.getAllAgents();
-        console.log('Agents data loaded:', agentsData);
-        setAgents(agentsData.map(transformAgentToLocal));
-      } catch (error) {
-        console.error('加载智能体数据失败:', error);
-        message.error('加载智能体数据失败');
-      }
-      
-      try {
-        mcpServersData = await agentApi.getMCPServers();
+        const mcpServersData = await agentApi.getMCPServers();
         console.log('MCP servers data loaded:', mcpServersData);
-        console.log('Is array?', Array.isArray(mcpServersData));
         
         if (Array.isArray(mcpServersData)) {
           setMcpServers(mcpServersData.map(transformMCPServerToLocal));
@@ -163,8 +164,6 @@ const AgentManagement: React.FC = () => {
         }
       } catch (error) {
         console.error('加载MCP服务器数据失败:', error);
-        // MCP服务器加载失败不影响整体功能，只显示警告
-        console.warn('MCP服务器数据加载失败，将使用空数据');
         setMcpServers([]);
       }
       
@@ -172,10 +171,7 @@ const AgentManagement: React.FC = () => {
       await loadAvailableModels();
       
     } catch (error) {
-      console.error('加载数据失败:', error);
-      message.error('加载数据失败，请重试');
-    } finally {
-      setLoading(false);
+      console.error('加载辅助数据失败:', error);
     }
   };
 
@@ -228,9 +224,13 @@ const AgentManagement: React.FC = () => {
 
 
   // 新建智能体
-  const handleCreateAgent = () => {
+  const handleCreateAgent = async () => {
     setEditingAgent(null);
     setIsCreating(true);
+    
+    // 在打开创建模态框之前加载辅助数据
+    await loadAuxiliaryData();
+    
     setAgentEditModal(true);
   };
 
@@ -238,6 +238,10 @@ const AgentManagement: React.FC = () => {
   const handleEditAgent = async (agent: LocalAgent) => {
     setEditingAgent(agent);
     setIsCreating(false);
+    
+    // 在打开编辑模态框之前加载辅助数据
+    await loadAuxiliaryData();
+    
     setAgentEditModal(true);
   };
 
