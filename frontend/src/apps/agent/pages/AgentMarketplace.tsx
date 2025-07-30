@@ -9,11 +9,11 @@ const { Title, Text, Paragraph } = Typography;
 interface Agent {
   id: string;
   agent_id: string;
-  name: string;
-  display_name: string;
-  description: string;
-  status: string;
-  enabled: string; // 'yes' | 'no'
+  agent_name: string;
+  agent_description: string;
+  agent_status: string;
+  agent_enabled: string; // 'yes' | 'no'
+  agent_capabilities: string[];
   tools_info: {
     system_tools: string[];
     mcp_tools: any[];
@@ -119,7 +119,7 @@ const AgentMarketplace = () => {
                 icon={getAgentIcon(agent.agent_id)} 
               />
               <span style={{ fontWeight: 600, fontSize: 18, color: isDark ? '#ffffff' : '#262626' }}>
-                {agent.display_name || agent.name}
+                {agent.agent_name}
               </span>
             </div>
           </div>
@@ -127,7 +127,7 @@ const AgentMarketplace = () => {
         description={
           <div>
             <Paragraph ellipsis={{ rows: 2, expandable: false }} style={{ marginBottom: 12 }}>
-              {agent.description || '智能助手，能够帮助您完成各种任务'}
+              {agent.agent_description || '智能助手，能够帮助您完成各种任务'}
             </Paragraph>
             <div style={{ marginBottom: 8 }}>
               {getAgentTags(agent).map((tag: string) => (
