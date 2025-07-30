@@ -220,10 +220,11 @@ async def test_mcp_server(
         timeout = server.read_timeout_seconds if server.read_timeout_seconds else 5
         tools = await _test_mcp_connection(server.server_uri, timeout)
         
-        # 更新连接状态和工具列表
-        await mcp_service.update_connection_status(db, server_id, "connected")
-        if tools:
-            await mcp_service.update_server_tools(db, server_id, [tool["name"] for tool in tools])
+        # 更新连接状态和工具列表 - 使用单一事务
+        async with db.begin():
+            await mcp_service.update_connection_status(db, server_id, "connected")
+            if tools:
+                await mcp_service.update_server_tools(db, server_id, [tool["name"] for tool in tools])
         
         return success_response(
             data={
@@ -235,7 +236,8 @@ async def test_mcp_server(
         )
     except Exception as e:
         # 更新连接状态为错误
-        await mcp_service.update_connection_status(db, server_id, "error")
+        async with db.begin():
+            await mcp_service.update_connection_status(db, server_id, "error")
         
         return success_response(
             data={

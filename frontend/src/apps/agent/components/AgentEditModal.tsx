@@ -16,8 +16,43 @@ import {
 import { 
   ToolOutlined, 
   ApiOutlined, 
-  ClockCircleOutlined 
+  ClockCircleOutlined,
+  RobotOutlined,
+  SettingOutlined,
+  UserOutlined,
+  DatabaseOutlined,
+  BulbOutlined,
+  HeartOutlined,
+  BookOutlined,
+  CodeOutlined,
+  CustomerServiceOutlined
 } from '@ant-design/icons';
+import { 
+  Bot, 
+  Settings, 
+  User, 
+  Database, 
+  Lightbulb, 
+  Heart, 
+  Book, 
+  Code, 
+  Headphones,
+  Brain,
+  Sparkles,
+  Shield,
+  Search,
+  MessageCircle,
+  Zap,
+  Target,
+  TrendingUp,
+  FileText,
+  Globe,
+  Music,
+  Gamepad2,
+  Camera,
+  Palette,
+  Calculator
+} from 'lucide-react';
 import ScheduledTaskManager from './ScheduledTaskManager';
 import type { DataNode } from 'antd/es/tree';
 import { agentApi, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
@@ -35,6 +70,7 @@ interface LocalAgent {
   agent_description: string;
   agent_status: string;
   agent_enabled: string;
+  agent_icon?: string;
   lastUsed?: string;
   totalRuns: number;
   successRate: number;
@@ -89,6 +125,107 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
   const [editSystemExpandedKeys, setEditSystemExpandedKeys] = useState<string[]>(['system-root']);
   const [editCheckedKeys, setEditCheckedKeys] = useState<string[]>([]);
   const [editExpandedKeys, setEditExpandedKeys] = useState<string[]>([]);
+
+  // 定义分类颜色
+  const categoryColors = {
+    '基础': '#1677ff',    // 蓝色 - 基础功能
+    '专业': '#722ed1',    // 紫色 - 专业技术
+    '服务': '#13c2c2',    // 青色 - 服务类型
+    '教育': '#52c41a',    // 绿色 - 教育知识
+    '娱乐': '#fa8c16',    // 橙色 - 娱乐休闲
+    '工具': '#eb2f96'     // 粉色 - 工具类型
+  };
+
+  // 可选图标定义 - 带颜色的 Lucide React 图标
+  const availableIcons = [
+    // 基础类型
+    { value: 'Bot', label: '智能机器人', icon: <Bot size={16} color={categoryColors['基础']} />, description: '通用AI助手，适合各类智能体', category: '基础' },
+    { value: 'Brain', label: '智慧大脑', icon: <Brain size={16} color={categoryColors['基础']} />, description: '强调智能和思考能力', category: '基础' },
+    { value: 'Sparkles', label: '魔法星星', icon: <Sparkles size={16} color={categoryColors['基础']} />, description: '创意和灵感类智能体', category: '基础' },
+    
+    // 专业领域
+    { value: 'Settings', label: '系统设置', icon: <Settings size={16} color={categoryColors['专业']} />, description: '系统管理、运维、配置类', category: '专业' },
+    { value: 'Database', label: '数据库', icon: <Database size={16} color={categoryColors['专业']} />, description: '数据分析、存储、查询类', category: '专业' },
+    { value: 'Code', label: '代码编程', icon: <Code size={16} color={categoryColors['专业']} />, description: '编程开发、技术支持类', category: '专业' },
+    { value: 'Shield', label: '安全防护', icon: <Shield size={16} color={categoryColors['专业']} />, description: '安全分析、风险管控类', category: '专业' },
+    { value: 'Search', label: '搜索查询', icon: <Search size={16} color={categoryColors['专业']} />, description: '信息检索、搜索优化类', category: '专业' },
+    { value: 'TrendingUp', label: '趋势分析', icon: <TrendingUp size={16} color={categoryColors['专业']} />, description: '数据分析、趋势预测类', category: '专业' },
+    
+    // 服务类型
+    { value: 'User', label: '用户服务', icon: <User size={16} color={categoryColors['服务']} />, description: '客户服务、用户支持类', category: '服务' },
+    { value: 'Headphones', label: '客服支持', icon: <Headphones size={16} color={categoryColors['服务']} />, description: '客户服务、技术支持类', category: '服务' },
+    { value: 'MessageCircle', label: '对话交流', icon: <MessageCircle size={16} color={categoryColors['服务']} />, description: '聊天对话、沟通交流类', category: '服务' },
+    { value: 'Heart', label: '情感陪伴', icon: <Heart size={16} color={categoryColors['服务']} />, description: '心理支持、情感陪伴类', category: '服务' },
+    
+    // 知识教育
+    { value: 'Book', label: '知识教育', icon: <Book size={16} color={categoryColors['教育']} />, description: '教育培训、知识问答类', category: '教育' },
+    { value: 'FileText', label: '文档处理', icon: <FileText size={16} color={categoryColors['教育']} />, description: '文档编辑、内容创作类', category: '教育' },
+    { value: 'Lightbulb', label: '创意建议', icon: <Lightbulb size={16} color={categoryColors['教育']} />, description: '创意策划、建议咨询类', category: '教育' },
+    { value: 'Target', label: '目标导向', icon: <Target size={16} color={categoryColors['教育']} />, description: '任务规划、目标管理类', category: '教育' },
+    
+    // 娱乐生活
+    { value: 'Music', label: '音乐娱乐', icon: <Music size={16} color={categoryColors['娱乐']} />, description: '音乐推荐、娱乐互动类', category: '娱乐' },
+    { value: 'Gamepad2', label: '游戏娱乐', icon: <Gamepad2 size={16} color={categoryColors['娱乐']} />, description: '游戏相关、娱乐互动类', category: '娱乐' },
+    { value: 'Camera', label: '图片处理', icon: <Camera size={16} color={categoryColors['娱乐']} />, description: '图像处理、视觉分析类', category: '娱乐' },
+    { value: 'Palette', label: '艺术创作', icon: <Palette size={16} color={categoryColors['娱乐']} />, description: '设计创作、艺术相关类', category: '娱乐' },
+    
+    // 工具类
+    { value: 'Calculator', label: '计算工具', icon: <Calculator size={16} color={categoryColors['工具']} />, description: '数学计算、数据处理类', category: '工具' },
+    { value: 'Globe', label: '全球网络', icon: <Globe size={16} color={categoryColors['工具']} />, description: '网络服务、全球化应用类', category: '工具' },
+    { value: 'Zap', label: '高速处理', icon: <Zap size={16} color={categoryColors['工具']} />, description: '快速响应、高效处理类', category: '工具' }
+  ];
+
+  // 根据图标名称渲染图标组件（带颜色）
+  const renderIcon = (iconName: string, size: number = 18, color?: string) => {
+    // 如果没有指定颜色，根据图标名称找到对应的分类颜色
+    let iconColor = color;
+    if (!iconColor) {
+      const iconOption = availableIcons.find(icon => icon.value === iconName);
+      if (iconOption) {
+        iconColor = categoryColors[iconOption.category as keyof typeof categoryColors];
+      }
+    }
+    
+    const iconMap: { [key: string]: React.ReactNode } = {
+      // Lucide React 图标（带颜色）
+      'Bot': <Bot size={size} color={iconColor} />,
+      'Brain': <Brain size={size} color={iconColor} />,
+      'Sparkles': <Sparkles size={size} color={iconColor} />,
+      'Settings': <Settings size={size} color={iconColor} />,
+      'Database': <Database size={size} color={iconColor} />,
+      'Code': <Code size={size} color={iconColor} />,
+      'Shield': <Shield size={size} color={iconColor} />,
+      'Search': <Search size={size} color={iconColor} />,
+      'TrendingUp': <TrendingUp size={size} color={iconColor} />,
+      'User': <User size={size} color={iconColor} />,
+      'Headphones': <Headphones size={size} color={iconColor} />,
+      'MessageCircle': <MessageCircle size={size} color={iconColor} />,
+      'Heart': <Heart size={size} color={iconColor} />,
+      'Book': <Book size={size} color={iconColor} />,
+      'FileText': <FileText size={size} color={iconColor} />,
+      'Lightbulb': <Lightbulb size={size} color={iconColor} />,
+      'Target': <Target size={size} color={iconColor} />,
+      'Music': <Music size={size} color={iconColor} />,
+      'Gamepad2': <Gamepad2 size={size} color={iconColor} />,
+      'Camera': <Camera size={size} color={iconColor} />,
+      'Palette': <Palette size={size} color={iconColor} />,
+      'Calculator': <Calculator size={size} color={iconColor} />,
+      'Globe': <Globe size={size} color={iconColor} />,
+      'Zap': <Zap size={size} color={iconColor} />,
+      
+      // 向后兼容 Ant Design 图标
+      'RobotOutlined': <RobotOutlined />,
+      'SettingOutlined': <SettingOutlined />,
+      'UserOutlined': <UserOutlined />,
+      'DatabaseOutlined': <DatabaseOutlined />,
+      'BulbOutlined': <BulbOutlined />,
+      'HeartOutlined': <HeartOutlined />,
+      'BookOutlined': <BookOutlined />,
+      'CodeOutlined': <CodeOutlined />,
+      'CustomerServiceOutlined': <CustomerServiceOutlined />
+    };
+    return iconMap[iconName] || <Bot size={size} color={iconColor} />;
+  };
 
   // 系统工具定义
   const systemTools = [
@@ -324,6 +461,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         
         form.setFieldsValue({
           agent_capabilities: [],
+          agent_icon: 'Bot',
           available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
           temperature: 0.7,
           max_tokens: 2000,
@@ -375,6 +513,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           agent_name: fullAgent.agent_name,
           agent_description: fullAgent.agent_description,
           agent_capabilities: fullAgent.agent_capabilities,
+          agent_icon: fullAgent.agent_icon || 'Bot',
           available_models: fullAgent.llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
           temperature: fullAgent.llm_info?.temperature || 0.7,
           max_tokens: fullAgent.llm_info?.max_tokens || 2000,
@@ -489,6 +628,102 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
                 style={{ width: '100%' }}
                 tokenSeparators={[',']}
               />
+            </Form.Item>
+            <Form.Item
+              label="智能体图标"
+              name="agent_icon"
+              rules={[{ required: true, message: '请选择智能体图标' }]}
+              extra="选择合适的图标来代表您的智能体特性"
+            >
+              <Select 
+                placeholder="选择智能体显示图标"
+                showSearch
+                optionFilterProp="children"
+                style={{ width: '100%' }}
+                size="large"
+                dropdownStyle={{ maxHeight: '400px' }}
+                optionRender={(option) => {
+                  const iconOption = availableIcons.find(icon => icon.value === option.value);
+                  if (!iconOption) return option.label;
+                  
+                  return (
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '8px'
+                    }}>
+                      <div style={{ 
+                        width: '16px',
+                        height: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {renderIcon(iconOption.value, 14)}
+                      </div>
+                      <span>{iconOption.label}</span>
+                    </div>
+                  );
+                }}
+              >
+                {/* 按分类分组显示图标 */}
+                {['基础', '专业', '服务', '教育', '娱乐', '工具'].map(category => (
+                  <Select.OptGroup key={category} label={`${category}类型`}>
+                    {availableIcons
+                      .filter(icon => icon.category === category)
+                      .map(iconOption => (
+                        <Option 
+                          key={iconOption.value} 
+                          value={iconOption.value}
+                          label={iconOption.label}
+                        >
+                          <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '8px',
+                            padding: '6px 0',
+                            width: '100%'
+                          }}>
+                            <div style={{ 
+                              width: '20px',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}>
+                              {renderIcon(iconOption.value, 16)}
+                            </div>
+                            <div style={{ 
+                              flex: 1,
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{ 
+                                fontWeight: 500,
+                                fontSize: '14px',
+                                lineHeight: '20px',
+                                color: '#262626'
+                              }}>
+                                {iconOption.label}
+                              </div>
+                              <div style={{ 
+                                color: '#8c8c8c', 
+                                fontSize: '12px', 
+                                lineHeight: '16px',
+                                marginTop: '1px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {iconOption.description}
+                              </div>
+                            </div>
+                          </div>
+                        </Option>
+                    ))}
+                  </Select.OptGroup>
+                ))}
+              </Select>
             </Form.Item>
           </TabPane>
 

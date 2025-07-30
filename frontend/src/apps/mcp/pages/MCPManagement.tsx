@@ -231,12 +231,30 @@ const MCPManagement: React.FC = () => {
 
   const testServerConnection = async (serverId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}/test`, {
-        method: 'POST'
+      // 获取服务器信息
+      const server = servers.find(s => s.id === serverId);
+      if (!server) {
+        message.error('找不到服务器信息');
+        return { healthy: false, tools: [], error: '服务器不存在' };
+      }
+
+      // 构建测试请求体，包含认证信息
+      const requestBody = {
+        url: server.uri,
+        auth_type: server.authType || 'none',
+        auth_token: server.authToken || null,
+        api_key_header: server.apiKeyHeader || null
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        const data = result.data; // 解析统一响应格式
         if (data.healthy) {
           message.success('服务器连接测试成功');
           await fetchServers(); // 刷新状态
@@ -453,7 +471,8 @@ const MCPManagement: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
       });
-      const data = await resp.json();
+      const response = await resp.json();
+      const data = response.data; // 解析统一响应格式
       if (data.healthy) {
         // 转换后端返回的工具为前端MCPTool结构
         const discoveredTools = (data.tools || []).map((tool: any) => ({

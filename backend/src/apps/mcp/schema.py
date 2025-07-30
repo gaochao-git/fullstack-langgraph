@@ -93,7 +93,7 @@ class MCPQueryParams(BaseModel):
 
 class MCPTestRequest(BaseModel):
     """测试MCP服务器连接的请求schema"""
-    server_uri: str = Field(..., description="服务器URI", min_length=1, max_length=500)
+    server_uri: str = Field(..., alias="url", description="服务器URI", min_length=1, max_length=500)
     timeout: int = Field(10, description="超时时间", ge=1, le=60)
     
     @validator('server_uri')

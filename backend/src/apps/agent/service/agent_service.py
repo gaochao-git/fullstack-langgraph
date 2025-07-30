@@ -44,6 +44,7 @@ class AgentService:
             # 设置默认值
             agent_data.setdefault('agent_status', 'stopped')
             agent_data.setdefault('agent_enabled', 'yes')
+            agent_data.setdefault('agent_icon', 'Bot')
             agent_data.setdefault('is_builtin', 'no')
             agent_data.setdefault('create_by', 'system')
             agent_data.setdefault('total_runs', 0)

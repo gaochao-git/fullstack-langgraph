@@ -14,6 +14,7 @@ class AgentBase(BaseModel):
     agent_capabilities: Optional[List[str]] = Field(default_factory=list, description="智能体能力列表")
     agent_status: Optional[str] = Field(default="stopped", pattern=r'^(running|stopped|error)$', description="智能体状态")
     agent_enabled: Optional[str] = Field(default="yes", pattern=r'^(yes|no)$', description="是否启用")
+    agent_icon: Optional[str] = Field(default="Bot", max_length=50, description="智能体图标")
     
     class Config:
         str_strip_whitespace = True
@@ -41,6 +42,7 @@ class AgentUpdate(BaseModel):
     agent_capabilities: Optional[List[str]] = Field(None, description="智能体能力列表")
     agent_status: Optional[str] = Field(None, pattern=r'^(running|stopped|error)$', description="智能体状态")
     agent_enabled: Optional[str] = Field(None, pattern=r'^(yes|no)$', description="是否启用")
+    agent_icon: Optional[str] = Field(None, max_length=50, description="智能体图标")
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具配置信息")
     llm_info: Optional[Dict[str, Any]] = Field(None, description="LLM配置信息")
     prompt_info: Optional[Dict[str, Any]] = Field(None, description="提示词配置信息")
@@ -134,6 +136,7 @@ class AgentResponse(BaseModel):
     description: Optional[str] = Field(None, description="描述")
     status: str = Field(..., description="状态")
     enabled: str = Field(..., description="是否启用")
+    agent_icon: Optional[str] = Field(default="Bot", description="智能体图标")
     version: Optional[str] = Field(None, description="版本")
     last_used: Optional[datetime] = Field(None, description="最后使用时间")
     total_runs: int = Field(0, description="总运行次数")

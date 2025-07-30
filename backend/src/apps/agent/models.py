@@ -18,6 +18,7 @@ class AgentConfig(BaseModel):
     agent_version = Column(String(20), default='1.0.0', nullable=False) # 智能体版本
     agent_status = Column(String(20), default='stopped', nullable=False) # 运行状态
     agent_enabled = Column(String(10), default='yes', nullable=False)        # 是否启用
+    agent_icon = Column(String(50), nullable=True, default='Bot') # 智能体图标
     is_builtin = Column(String(10), default='no', nullable=False)    # 是否为内置智能体
     tools_info = Column(JSONType, nullable=True, default=dict)     # 工具配置
     llm_info = Column(JSONType, nullable=True, default=dict)       # 大模型配置

@@ -222,19 +222,18 @@ class MCPService:
         status: str
     ) -> Optional[MCPServer]:
         """更新连接状态"""
-        async with session.begin():
-            update_data = {
-                'connection_status': status,
-                'update_time': now_shanghai()
-            }
-            await session.execute(
-                update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
-            )
-            
-            result = await session.execute(
-                select(MCPServer).where(MCPServer.server_id == server_id)
-            )
-            return result.scalar_one_or_none()
+        update_data = {
+            'connection_status': status,
+            'update_time': now_shanghai()
+        }
+        await session.execute(
+            update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
+        )
+        
+        result = await session.execute(
+            select(MCPServer).where(MCPServer.server_id == server_id)
+        )
+        return result.scalar_one_or_none()
     
     async def update_server_tools(
         self,
@@ -243,21 +242,20 @@ class MCPService:
         tools: List[str]
     ) -> Optional[MCPServer]:
         """更新服务器工具列表"""
-        async with session.begin():
-            # 转换工具列表为JSON字符串或直接使用列表（根据数据库字段类型）
-            import json
-            update_data = {
-                'available_tools': json.dumps(tools) if tools else None,
-                'update_time': now_shanghai()
-            }
-            await session.execute(
-                update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
-            )
-            
-            result = await session.execute(
-                select(MCPServer).where(MCPServer.server_id == server_id)
-            )
-            return result.scalar_one_or_none()
+        # 转换工具列表为JSON字符串或直接使用列表（根据数据库字段类型）
+        import json
+        update_data = {
+            'available_tools': json.dumps(tools) if tools else None,
+            'update_time': now_shanghai()
+        }
+        await session.execute(
+            update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
+        )
+        
+        result = await session.execute(
+            select(MCPServer).where(MCPServer.server_id == server_id)
+        )
+        return result.scalar_one_or_none()
 
 
 # 全局实例
