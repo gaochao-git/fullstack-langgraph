@@ -31,6 +31,7 @@ export interface Agent {
   agent_version: string;
   agent_status: string; // 'running' | 'stopped' | 'error'
   agent_enabled: string; // 'yes' | 'no'
+  agent_icon?: string; // 智能体图标
   is_builtin: string; // 'yes' | 'no'
   tools_info?: any;
   llm_info?: any;
@@ -55,6 +56,7 @@ export interface CreateAgentRequest {
   agent_version?: string;
   agent_status?: string;
   agent_enabled?: string;
+  agent_icon?: string; // 智能体图标
   is_builtin?: string;
   tools_info?: any;
   llm_info?: any;
@@ -71,6 +73,7 @@ export interface UpdateAgentRequest {
   agent_version?: string;
   agent_status?: string;
   agent_enabled?: string;
+  agent_icon?: string; // 智能体图标
   is_builtin?: string;
   tools_info?: any;
   llm_info?: any;

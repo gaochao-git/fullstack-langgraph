@@ -23,6 +23,7 @@ import {
 import AgentDetailModal from '../components/AgentDetailModal';
 import AgentEditModal from '../components/AgentEditModal';
 import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
+import { renderIcon, getIconBackgroundColor } from '../components/AgentIconSystem';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -262,6 +263,7 @@ const AgentManagement: React.FC = () => {
           agent_name: values.agent_name,
           agent_description: values.agent_description || '',
           agent_capabilities: values.agent_capabilities || [],
+          agent_icon: values.agent_icon || 'Bot',
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info
@@ -276,6 +278,7 @@ const AgentManagement: React.FC = () => {
           agent_name: values.agent_name,
           agent_description: values.agent_description,
           agent_capabilities: values.agent_capabilities,
+          agent_icon: values.agent_icon,
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info
@@ -392,7 +395,21 @@ const AgentManagement: React.FC = () => {
                 ]}
               >
                 <Card.Meta
-                  avatar={null}
+                  avatar={
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        backgroundColor: agent.agent_icon ? getIconBackgroundColor(agent.agent_icon, '20') : '#1677ff20',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {agent.agent_icon ? renderIcon(agent.agent_icon, 18) : <RobotOutlined style={{ fontSize: 18 }} />}
+                    </div>
+                  }
                   title={
                     <div className="flex items-center justify-between">
                       <div className="text-base font-medium flex items-center gap-2" style={{ color: agent.is_builtin === 'yes' ? '#faad14' : undefined }}>

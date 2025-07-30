@@ -12,31 +12,11 @@ import {
   CustomerServiceOutlined
 } from "@ant-design/icons";
 import { 
-  Bot, 
-  Settings, 
-  User, 
-  Database, 
-  Lightbulb, 
-  Heart, 
-  Book, 
-  Code, 
-  Headphones,
-  Brain,
-  Sparkles,
-  Shield,
-  Search,
-  MessageCircle,
-  Zap,
-  Target,
-  TrendingUp,
-  FileText,
-  Globe,
-  Music,
-  Gamepad2,
-  Camera,
-  Palette,
-  Calculator
-} from 'lucide-react';
+  categoryColors,
+  iconCategoryMap,
+  renderIcon,
+  getIconBackgroundColor
+} from '../components/AgentIconSystem';
 import { useNavigate } from "react-router-dom";
 import { agentApi } from "../services/agentApi";
 import { useTheme } from "../../../contexts/ThemeContext";
@@ -102,78 +82,36 @@ const AgentMarketplace = () => {
     navigate(`/agents/${agentId}`);
   };
 
-  // 定义分类颜色（与配置页面保持一致）
-  const categoryColors = {
-    '基础': '#1677ff',    // 蓝色 - 基础功能
-    '专业': '#722ed1',    // 紫色 - 专业技术
-    '服务': '#13c2c2',    // 青色 - 服务类型
-    '教育': '#52c41a',    // 绿色 - 教育知识
-    '娱乐': '#fa8c16',    // 橙色 - 娱乐休闲
-    '工具': '#eb2f96'     // 粉色 - 工具类型
-  };
 
-  // 图标分类映射
-  const iconCategoryMap: { [key: string]: string } = {
-    'Bot': '基础', 'Brain': '基础', 'Sparkles': '基础',
-    'Settings': '专业', 'Database': '专业', 'Code': '专业', 'Shield': '专业', 'Search': '专业', 'TrendingUp': '专业',
-    'User': '服务', 'Headphones': '服务', 'MessageCircle': '服务', 'Heart': '服务',
-    'Book': '教育', 'FileText': '教育', 'Lightbulb': '教育', 'Target': '教育',
-    'Music': '娱乐', 'Gamepad2': '娱乐', 'Camera': '娱乐', 'Palette': '娱乐',
-    'Calculator': '工具', 'Globe': '工具', 'Zap': '工具'
-  };
-
-  // 根据图标名称渲染图标组件（带颜色）
-  const renderIcon = (iconName: string, size: number = 18) => {
-    // 获取图标对应的分类颜色
-    const category = iconCategoryMap[iconName];
-    const iconColor = category ? categoryColors[category as keyof typeof categoryColors] : '#666666';
+  // 获取智能体背景色（根据图标分类）
+  const getAgentBackgroundColor = (agent: Agent) => {
+    if (agent.agent_icon) {
+      return getIconBackgroundColor(agent.agent_icon, '20');
+    }
     
-    const iconMap: { [key: string]: React.ReactNode } = {
-      // Lucide React 图标（带颜色）
-      'Bot': <Bot size={size} color={iconColor} />,
-      'Brain': <Brain size={size} color={iconColor} />,
-      'Sparkles': <Sparkles size={size} color={iconColor} />,
-      'Settings': <Settings size={size} color={iconColor} />,
-      'Database': <Database size={size} color={iconColor} />,
-      'Code': <Code size={size} color={iconColor} />,
-      'Shield': <Shield size={size} color={iconColor} />,
-      'Search': <Search size={size} color={iconColor} />,
-      'TrendingUp': <TrendingUp size={size} color={iconColor} />,
-      'User': <User size={size} color={iconColor} />,
-      'Headphones': <Headphones size={size} color={iconColor} />,
-      'MessageCircle': <MessageCircle size={size} color={iconColor} />,
-      'Heart': <Heart size={size} color={iconColor} />,
-      'Book': <Book size={size} color={iconColor} />,
-      'FileText': <FileText size={size} color={iconColor} />,
-      'Lightbulb': <Lightbulb size={size} color={iconColor} />,
-      'Target': <Target size={size} color={iconColor} />,
-      'Music': <Music size={size} color={iconColor} />,
-      'Gamepad2': <Gamepad2 size={size} color={iconColor} />,
-      'Camera': <Camera size={size} color={iconColor} />,
-      'Palette': <Palette size={size} color={iconColor} />,
-      'Calculator': <Calculator size={size} color={iconColor} />,
-      'Globe': <Globe size={size} color={iconColor} />,
-      'Zap': <Zap size={size} color={iconColor} />,
-      
-      // 向后兼容 Ant Design 图标
-      'RobotOutlined': <RobotOutlined />,
-      'SettingOutlined': <SettingOutlined />,
-      'UserOutlined': <UserOutlined />,
-      'DatabaseOutlined': <DatabaseOutlined />,
-      'BulbOutlined': <BulbOutlined />,
-      'HeartOutlined': <HeartOutlined />,
-      'BookOutlined': <BookOutlined />,
-      'CodeOutlined': <CodeOutlined />,
-      'CustomerServiceOutlined': <CustomerServiceOutlined />
-    };
-    return iconMap[iconName] || <Bot size={size} color={iconColor} />;
+    // 回退到基于名称的颜色匹配
+    const name = agent.agent_name?.toLowerCase() || '';
+    if (name.includes('诊断') || name.includes('故障') || name.includes('监控')) {
+      return categoryColors['专业'] + '20';
+    }
+    if (name.includes('安全') || name.includes('防护') || name.includes('检测')) {
+      return categoryColors['专业'] + '20';
+    }
+    if (name.includes('故事') || name.includes('笑话') || name.includes('娱乐')) {
+      return categoryColors['娱乐'] + '20';
+    }
+    if (name.includes('研究') || name.includes('分析') || name.includes('数据')) {
+      return categoryColors['专业'] + '20';
+    }
+    
+    return categoryColors['基础'] + '20'; // 默认蓝色背景
   };
 
   // 获取智能体图标（优先使用配置的图标，回退到基于名称匹配）
   const getAgentIcon = (agent: Agent) => {
     // 如果有配置的图标，直接使用（基于agent_id获取的配置）
     if (agent.agent_icon) {
-      return renderIcon(agent.agent_icon);
+      return renderIcon(agent.agent_icon, 20); // 稍微大一点的图标
     }
     
     // 回退到基于名称的匹配（向后兼容）
@@ -248,7 +186,7 @@ const AgentMarketplace = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <Avatar 
                 size={36} 
-                style={{ backgroundColor: "#1677ff" }} 
+                style={{ backgroundColor: getAgentBackgroundColor(agent) }} 
                 icon={getAgentIcon(agent)} 
               />
               <span style={{ fontWeight: 600, fontSize: 18, color: isDark ? '#ffffff' : '#262626' }}>
