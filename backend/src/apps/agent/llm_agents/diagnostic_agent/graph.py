@@ -20,7 +20,7 @@ def create_main_graph(enable_tool_approval: bool = False):
     async def create_agent(state: DiagnosticState, config: RunnableConfig):
         configurable = config.get("configurable", {}) if config else {}
         agent_name = configurable.get("agent_name")
-        print(f"🚀完整知智能体config: {dict(config) if config else 'None'}")
+        print(f"🚀完整智能体配置: {dict(config) if config else 'None'}")
         llm = get_llm_from_config(config)
         tools = await get_diagnostic_tools(enable_tool_approval)
         # 获取智能体名称并获取对应的系统提示词
