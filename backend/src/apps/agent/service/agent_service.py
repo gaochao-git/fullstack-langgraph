@@ -34,9 +34,7 @@ class AgentService:
             # 生成agent_id（如果未提供）
             if not agent_data.get('agent_id'): agent_data['agent_id'] = f"custom_{uuid.uuid4().hex[:8]}"
             # 检查是否已存在
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_data['agent_id'])
-            )
+            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_data['agent_id']))
             existing = result.scalar_one_or_none()
             if existing: raise BusinessException(f"智能体ID {agent_data['agent_id']} 已存在", ResponseCode.DUPLICATE_RESOURCE)
             
@@ -173,9 +171,7 @@ class AgentService:
         """更新智能体配置"""
         async with session.begin():
             # 检查是否存在
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
+            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             existing = result.scalar_one_or_none()
             if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
             
@@ -188,14 +184,10 @@ class AgentService:
                 update_data['agent_capabilities'] = update_data.pop('capabilities')
             
             logger.info(f"Updating agent: {agent_id}")
-            await session.execute(
-                update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data)
-            )
+            await session.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
             
             # 返回更新后的数据
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
+            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
     async def delete_agent(
@@ -206,27 +198,15 @@ class AgentService:
         """删除智能体配置"""
         async with session.begin():
             # 检查是否存在
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
+            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             existing = result.scalar_one_or_none()
-            if not existing:
-                raise BusinessException(
-                    f"智能体 {agent_id} 不存在", 
-                    ResponseCode.NOT_FOUND
-                )
+            if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
             
             # 检查是否为内置智能体
-            if existing.is_builtin == 'yes':
-                raise BusinessException(
-                    f"不能删除内置智能体: {agent_id}", 
-                    ResponseCode.FORBIDDEN
-                )
+            if existing.is_builtin == 'yes': raise BusinessException(f"不能删除内置智能体: {agent_id}", ResponseCode.FORBIDDEN)
             
             logger.info(f"Deleting agent: {agent_id}")
-            result = await session.execute(
-                delete(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
+            result = await session.execute(delete(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.rowcount > 0
     
     async def update_mcp_config(
@@ -249,15 +229,8 @@ class AgentService:
                 })
         
         # 构建完整工具配置
-        tools_info = {
-            'system_tools': [],  # 系统工具列表
-            'mcp_tools': mcp_tools_config
-        }
-        
-        update_data = {
-            'tools_info': tools_info
-        }
-        
+        tools_info = {'system_tools': [], 'mcp_tools': mcp_tools_config}
+        update_data = {'tools_info': tools_info}
         return await self.update_agent(session, agent_id, update_data)
     
     async def update_agent_status(
@@ -268,17 +241,9 @@ class AgentService:
     ) -> Optional[AgentConfig]:
         """更新智能体状态"""
         async with session.begin():
-            update_data = {
-                'agent_status': status,
-                'update_time': now_shanghai()
-            }
-            await session.execute(
-                update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data)
-            )
-            
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
+            update_data = {'agent_status': status,'update_time': now_shanghai()}
+            await session.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
+            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
     async def update_statistics(
@@ -298,40 +263,23 @@ class AgentService:
                 'last_used': now_shanghai(),
                 'update_time': now_shanghai()
             }
-            await session.execute(
-                update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data)
-            )
-            
-            result = await session.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
+            await session.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
+            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
-    async def get_statistics(
-        self, 
-        session: AsyncSession
-    ):
+    async def get_statistics(self, session: AsyncSession):
         """获取智能体统计信息 - 返回原始查询结果让响应层处理"""
         result = await session.execute(
             select(
                 func.count(AgentConfig.id).label('total'),
                 func.sum(
-                    case(
-                        (and_(AgentConfig.agent_enabled == 'yes', AgentConfig.is_active == True), 1),
-                        else_=0
-                    )
+                    case((and_(AgentConfig.agent_enabled == 'yes', AgentConfig.is_active == True), 1),else_=0)
                 ).label('enabled'),
                 func.sum(
-                    case(
-                        (AgentConfig.agent_status == 'running', 1),
-                        else_=0
-                    )
+                    case((AgentConfig.agent_status == 'running', 1), else_=0)
                 ).label('running'),
                 func.sum(
-                    case(
-                        (AgentConfig.is_builtin == 'yes', 1),
-                        else_=0
-                    )
+                    case((AgentConfig.is_builtin == 'yes', 1), else_=0)
                 ).label('builtin')
             )
         )
@@ -345,13 +293,7 @@ class AgentService:
             return stats_dict
         
         # 如果没有数据，返回默认统计
-        return {
-            'total': 0,
-            'enabled': 0,
-            'running': 0,
-            'builtin': 0,
-            'custom': 0
-        }
+        return {'total': 0,'enabled': 0,'running': 0,'builtin': 0,'custom': 0}
     
     async def search_agents(
         self,
@@ -364,13 +306,8 @@ class AgentService:
         offset = (page - 1) * size
         
         # 搜索数据库中的智能体
-        query = select(AgentConfig).where(
-            AgentConfig.agent_name.contains(keyword)
-        ).where(
-            and_(
-                AgentConfig.agent_enabled == 'yes',
-                AgentConfig.is_active == True
-            )
+        query = select(AgentConfig).where(AgentConfig.agent_name.contains(keyword)
+        ).where(and_(AgentConfig.agent_enabled == 'yes',AgentConfig.is_active == True)
         ).offset(offset).limit(size)
         
         result = await session.execute(query)
@@ -381,11 +318,7 @@ class AgentService:
         for agent in db_agents:
             agent_dict = agent.to_dict()
             if 'mcp_config' not in agent_dict:
-                agent_dict['mcp_config'] = {
-                    'enabled_servers': [],
-                    'selected_tools': [],
-                    'total_tools': 0
-                }
+                agent_dict['mcp_config'] = {'enabled_servers': [],'selected_tools': [],'total_tools': 0}
             all_matches.append(agent_dict)
         
         return all_matches, len(all_matches)
