@@ -8,6 +8,8 @@ from src.apps.sop.models import SOPTemplate
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
 from src.apps.sop.schema import SOPTemplateCreate, SOPTemplateUpdate, SOPQueryParams
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 logger = get_logger(__name__)
 
@@ -28,7 +30,7 @@ class SOPService:
             )
             existing = result.scalar_one_or_none()
             if existing:
-                raise ValueError(f"SOP template with ID {sop_data.sop_id} already exists")
+                raise BusinessException(f"SOP template with ID {sop_data.sop_id} already exists", ResponseCode.CONFLICT)
             
             # 转换数据
             data = sop_data.dict()
@@ -126,7 +128,7 @@ class SOPService:
             )
             existing = result.scalar_one_or_none()
             if not existing:
-                raise ValueError(f"SOP template with ID {sop_id} not found")
+                raise BusinessException(f"SOP template with ID {sop_id} not found", ResponseCode.NOT_FOUND)
             
             # 转换数据
             data = sop_data.dict(exclude_unset=True)

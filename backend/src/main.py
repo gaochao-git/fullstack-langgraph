@@ -20,6 +20,7 @@ load_dotenv()
 from .shared.core.config import settings
 from .shared.core.logging import setup_logging, get_logger
 from .shared.core.middleware import setup_middlewares
+from .shared.core.exceptions import EXCEPTION_HANDLERS
 from .router import api_router
 
 # 导入LLM相关模块
@@ -62,6 +63,10 @@ def create_app() -> FastAPI:
     
     # 设置所有中间件
     setup_middlewares(app)
+    
+    # 注册异常处理器
+    for exception_type, handler in EXCEPTION_HANDLERS.items():
+        app.add_exception_handler(exception_type, handler)
 
     @app.on_event("startup")
     async def startup_event():

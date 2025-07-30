@@ -161,7 +161,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         inReturns = false;
         continue;
       }
-      if (line.trim().startsWith('Returns:')) {
+      if (line.trim().startsWith('ReturFns:')) {
         inReturns = true;
         inArgs = false;
         continue;
