@@ -1,10 +1,10 @@
 """Database configuration and setup."""
-import asyncio
+import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-
+logger = logging.getLogger(__name__)
 # 使用新的配置系统
 from src.shared.core.config import settings
 
@@ -226,8 +226,7 @@ async def test_database_connection():
     try:
         async with async_engine.begin() as conn:
             await conn.execute(text("SELECT 1"))
-        print(f"✅ Database connection successful ({DATABASE_TYPE})")
         return True
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        logger.exception(f"❌ Database connection failed: {e}")
         return False

@@ -160,13 +160,8 @@ async def handle_postgres_streaming(request_body, thread_id):
     from .agent_config_service import AgentConfigService
     
     assistant_id = request_body.assistant_id
-    logger.info(f"🔍 PostgreSQL模式 - assistant_id: {assistant_id}")
-    
     # 直接使用assistant_id作为agent_id，不再从config中获取
     agent_id = assistant_id
-    
-    logger.info(f"🔍 直接使用assistant_id作为agent_id: {agent_id}")
-    
     # 从数据库获取智能体配置
     from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
@@ -181,8 +176,6 @@ async def handle_postgres_streaming(request_body, thread_id):
     
     # 根据数据库中的is_builtin字段判断使用哪个图
     is_builtin = agent_config.get('is_builtin') == 'yes'
-    logger.info(f"🔍 智能体类型: {'内置' if is_builtin else '自定义'}")
-    
     # 按照官方模式：在async with内完成整个请求周期
     async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
         await checkpointer.setup()

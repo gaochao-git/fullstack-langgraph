@@ -94,12 +94,6 @@ class Configuration(BaseModel):
             agent_name = config.get("assistant_id", "diagnostic_agent") if config else "diagnostic_agent"
         
         selected_model = configurable.get("selected_model")
-        
-        print(f"📊 配置加载:")
-        print(f"   智能体: {agent_name}")
-        print(f"   选择的模型: {selected_model or '使用默认配置'}")
-        print(f"   完整配置: {config}")
-        
         from .....shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
@@ -107,9 +101,6 @@ class Configuration(BaseModel):
             db_config = AgentConfigService.get_model_config_from_agent(agent_name, db, selected_model)
         finally:
             db.close()
-        
-        print(f"   数据库配置: 模型={db_config.get('model_name')}, 温度={db_config.get('temperature')}")
-        
         # Get raw values from database, environment, or config (in that order)
         raw_values: dict[str, Any] = {}
         for name in cls.model_fields.keys():

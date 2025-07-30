@@ -182,13 +182,6 @@ class LoggerManager:
         # 记录配置完成日志
         logger = self.get_logger(__name__)
         log_file_names = [config["filename"] for config in log_files.values()]
-        logger.info(f"📝 日志系统配置完成", extra={
-            'log_level': log_level,
-            'log_dir': str(log_path),
-            'enable_json': enable_json,
-            'rotation_type': rotation_type,
-            'log_files': log_file_names
-        })
     
     def _create_file_handler(self, log_file, rotation_type, max_file_size, backup_count):
         """创建文件处理器的辅助方法"""

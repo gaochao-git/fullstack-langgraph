@@ -39,7 +39,7 @@ def create_app() -> FastAPI:
         enable_json=False,  # 默认使用文本格式
         rotation_type="time"  # 按时间轮转，适合长期运行的应用
     )
-    
+
     logger = get_logger(__name__)
     
     # 创建应用
@@ -62,35 +62,13 @@ def create_app() -> FastAPI:
     
     # 设置所有中间件
     setup_middlewares(app)
-    
-    
+
     @app.on_event("startup")
     async def startup_event():
         """应用启动事件"""
-        logger.info("🚀 启动LangGraph Platform API...")
-        
-        # 测试PostgreSQL连接
+        logger.info("🚀 测试PostgreSQL连接")
         await test_postgres_connection()
-        
-        # 智能体配置完全基于数据库，无需静态初始化
-        logger.info("📊 智能体配置完全基于数据库，动态加载")
-        
-        # 初始化用户线程数据库
-        from .apps.agent.service.user_threads_db import init_user_threads_db
-        await init_user_threads_db()
-        
-        # 初始化SOP数据库
-        try:
-            from .shared.db.config import init_database, test_database_connection
-            db_connected = await test_database_connection()
-            if db_connected:
-                await init_database()
-                logger.info("✅ SOP数据库初始化成功")
-            else:
-                logger.warning("⚠️  SOP数据库连接失败，跳过数据库初始化")
-        except Exception as e:
-            logger.warning(f"⚠️  SOP数据库初始化失败: {e}，API将继续启动但SOP功能可能不可用")
-    
+
     # 注册API路由
     app.include_router(api_router, prefix="/api")
     return app
