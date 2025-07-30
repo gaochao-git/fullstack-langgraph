@@ -21,53 +21,63 @@ export interface MCPServer {
   tools: MCPTool[];
 }
 
-export interface AgentMCPConfig {
-  enabled_servers: string[];
-  selected_tools: string[];
-  total_tools: number;
-}
 
 export interface Agent {
-  id: string;
-  name: string;
-  display_name: string;
-  description: string;
-  status: string;
-  enabled: string; // 'yes' | 'no'
-  version?: string;
-  last_used?: string;
-  total_runs: number;
-  success_rate: number;
-  avg_response_time: number;
-  capabilities: string[];
-  mcp_config: AgentMCPConfig;
+  id: number;
+  agent_id: string;
+  agent_name: string;
+  agent_description: string;
+  agent_capabilities: string[];
+  agent_version: string;
+  agent_status: string; // 'running' | 'stopped' | 'error'
+  agent_enabled: string; // 'yes' | 'no'
   is_builtin: string; // 'yes' | 'no'
   tools_info?: any;
   llm_info?: any;
   prompt_info?: any;
-  create_time?: string;
-  update_time?: string;
+  total_runs: number;
+  success_rate: number;
+  avg_response_time: number;
+  last_used?: string;
+  config_version: string;
+  is_active: boolean;
+  create_by: string;
+  update_by?: string;
+  create_time: string;
+  update_time: string;
 }
 
 export interface CreateAgentRequest {
   agent_id?: string;
   agent_name: string;
-  description: string;
-  agent_capabilities: string[];
+  agent_description?: string;
+  agent_capabilities?: string[];
+  agent_version?: string;
+  agent_status?: string;
+  agent_enabled?: string;
+  is_builtin?: string;
   tools_info?: any;
   llm_info?: any;
   prompt_info?: any;
+  config_version?: string;
+  is_active?: boolean;
+  create_by?: string;
 }
 
 export interface UpdateAgentRequest {
   agent_name?: string;
-  description?: string;
+  agent_description?: string;
   agent_capabilities?: string[];
+  agent_version?: string;
   agent_status?: string;
   agent_enabled?: string;
+  is_builtin?: string;
   tools_info?: any;
   llm_info?: any;
   prompt_info?: any;
+  config_version?: string;
+  is_active?: boolean;
+  update_by?: string;
 }
 
 export interface UpdateMCPConfigRequest {
@@ -157,9 +167,9 @@ class AgentApiService {
   /**
    * 获取指定智能体
    */
-  async getAgent(agentId: string, includeBuiltin: boolean = true): Promise<Agent> {
+  async getAgent(agentId: string): Promise<Agent> {
     try {
-      const url = `/api/v1/agents/${agentId}${includeBuiltin ? '?include_builtin=true' : ''}`;
+      const url = `/api/v1/agents/${agentId}`;
       const response = await omind_get(url);
       
       if (!response.ok) {
@@ -276,9 +286,9 @@ class AgentApiService {
     try {
       // 先获取当前状态
       const currentAgent = await this.getAgent(agentId);
-      const newStatus = currentAgent.status === 'running' ? 'stopped' : 'running';
+      const newEnabled = currentAgent.agent_enabled === 'yes' ? 'no' : 'yes';
       
-      return await this.updateAgentStatus(agentId, newStatus);
+      return await this.updateAgent(agentId, { agent_enabled: newEnabled });
     } catch (error) {
       console.error('切换智能体状态失败:', error);
       throw error;

@@ -65,13 +65,9 @@ class AgentService:
         self, 
         session: AsyncSession, 
         agent_id: str,
-        include_builtin: bool = True
     ) -> Optional[Dict[str, Any]]:
         """根据ID获取智能体配置"""
-        # 从数据库获取智能体配置
-        result = await session.execute(
-            select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-        )
+        result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
         db_agent = result.scalar_one_or_none()
         if db_agent:
             agent_dict = db_agent.to_dict()

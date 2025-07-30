@@ -29,14 +29,13 @@ const { Option } = Select;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 
-// 本地状态类型（兼容旧的驼峰命名）
-interface LocalAgent extends Omit<Agent, 'display_name' | 'last_used' | 'total_runs' | 'success_rate' | 'avg_response_time' | 'mcp_config' | 'is_builtin'> {
+// 本地状态类型（为了向前兼容，保持一些驼峰命名）
+interface LocalAgent extends Agent {
   displayName: string;
   lastUsed?: string;
   totalRuns: number;
   successRate: number;
   avgResponseTime: number;
-  is_builtin: string; // 'yes' | 'no'
   mcpConfig: {
     enabledServers: string[];
     selectedTools: string[];
@@ -50,23 +49,26 @@ interface LocalMCPServer extends MCPServer {
 }
 
 // 数据转换工具函数
-const transformAgentToLocal = (agent: Agent): LocalAgent => ({
-  ...agent,
-  displayName: agent.display_name,
-  lastUsed: agent.last_used,
-  totalRuns: agent.total_runs,
-  successRate: agent.success_rate,
-  avgResponseTime: agent.avg_response_time,
-  // 保证 is_builtin 始终为 'yes' 或 'no'
-  is_builtin: agent.is_builtin,
-  // 将 enabled 转换为 boolean，兼容 "yes"/"no" 和 true/false
-  enabled: agent.enabled === true || agent.enabled === 'yes',
-  mcpConfig: {
-    enabledServers: agent.mcp_config?.enabled_servers || [],
-    selectedTools: agent.mcp_config?.selected_tools || [],
-    totalTools: agent.mcp_config?.total_tools || 0
-  }
-});
+const transformAgentToLocal = (agent: Agent): LocalAgent => {
+  // 从 tools_info 中提取 MCP 配置
+  const toolsInfo = agent.tools_info || {};
+  const mcpTools = toolsInfo.mcp_tools || [];
+  const systemTools = toolsInfo.system_tools || [];
+  
+  return {
+    ...agent,
+    displayName: agent.agent_name,
+    lastUsed: agent.last_used,
+    totalRuns: agent.total_runs,
+    successRate: agent.success_rate,
+    avgResponseTime: agent.avg_response_time,
+    mcpConfig: {
+      enabledServers: mcpTools.map((tool: any) => tool.server_id).filter((id: string, index: number, self: string[]) => self.indexOf(id) === index),
+      selectedTools: [...systemTools, ...mcpTools.flatMap((tool: any) => tool.tools || [])],
+      totalTools: systemTools.length + mcpTools.reduce((total: number, tool: any) => total + (tool.tools?.length || 0), 0)
+    }
+  };
+};
 
 const transformMCPServerToLocal = (server: any): LocalMCPServer => ({
   ...server,
@@ -177,10 +179,10 @@ const AgentManagement: React.FC = () => {
       const matchSearch = !searchText || 
         agent.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
         agent.agent_description.toLowerCase().includes(searchText.toLowerCase());
-      // 状态筛选用 agent.enabled
+      // 状态筛选用 agent.agent_enabled
       let matchStatus = true;
-      if (statusFilter === 'enabled') matchStatus = agent.enabled === 'yes';
-      if (statusFilter === 'disabled') matchStatus = agent.enabled === 'no';
+      if (statusFilter === 'enabled') matchStatus = agent.agent_enabled === 'yes';
+      if (statusFilter === 'disabled') matchStatus = agent.agent_enabled === 'no';
       return matchSearch && matchStatus;
     })
     // 内置智能体排前面
@@ -248,7 +250,7 @@ const AgentManagement: React.FC = () => {
         const newAgentData: CreateAgentRequest = {
           agent_name: values.agent_name,
           agent_description: values.agent_description || '',
-          capabilities: values.capabilities || [],
+          agent_capabilities: values.capabilities || [],
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info
@@ -262,7 +264,7 @@ const AgentManagement: React.FC = () => {
         const updateData: UpdateAgentRequest = {
           agent_name: values.agent_name,
           agent_description: values.agent_description,
-          capabilities: values.capabilities,
+          agent_capabilities: values.capabilities,
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info
@@ -387,7 +389,7 @@ const AgentManagement: React.FC = () => {
                       </div>
                       <Switch
                         size="small"
-                        checked={agent.enabled}
+                        checked={agent.agent_enabled === 'yes'}
                         onChange={() => toggleAgentEnabled(agent.agent_id)}
                       />
                     </div>

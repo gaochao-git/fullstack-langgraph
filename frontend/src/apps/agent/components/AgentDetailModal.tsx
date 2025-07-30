@@ -23,19 +23,19 @@ import {
 } from '@ant-design/icons';
 
 interface LocalAgent {
-  id: string;
+  id: number;
   agent_id: string;
-  name: string;
-  version: string;
+  agent_name: string;
+  agent_version: string;
   displayName: string;
   agent_description: string;
-  status: string;
+  agent_status: string;
   lastUsed?: string;
   totalRuns: number;
   successRate: number;
   avgResponseTime: number;
   is_builtin: string;
-  capabilities: string[];
+  agent_capabilities: string[];
   mcpConfig: {
     enabledServers: string[];
     selectedTools: string[];
@@ -121,22 +121,22 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
                 <Avatar 
                   icon={<RobotOutlined />} 
                   style={{ 
-                    backgroundColor: agent.status === 'running' ? '#52c41a' : 
-                                   agent.status === 'error' ? '#ff4d4f' : '#faad14'
+                    backgroundColor: agent.agent_status === 'running' ? '#52c41a' : 
+                                   agent.agent_status === 'error' ? '#ff4d4f' : '#faad14'
                   }} 
                 />
                 <span style={{ color: agent.is_builtin === 'yes' ? '#faad14' : undefined }}>
                   {agent.displayName}
                 </span>
                 <Badge 
-                  status={agent.status === 'running' ? 'success' : 
-                         agent.status === 'error' ? 'error' : 'warning'} 
-                  text={getStatusText(agent.status)}
+                  status={agent.agent_status === 'running' ? 'success' : 
+                         agent.agent_status === 'error' ? 'error' : 'warning'} 
+                  text={getStatusText(agent.agent_status)}
                 />
               </Space>
             </Descriptions.Item>
-            <Descriptions.Item label="标识符">{agent.name}</Descriptions.Item>
-            <Descriptions.Item label="版本">{agent.version}</Descriptions.Item>
+            <Descriptions.Item label="标识符">{agent.agent_id}</Descriptions.Item>
+            <Descriptions.Item label="版本">{agent.agent_version}</Descriptions.Item>
             <Descriptions.Item label="描述" span={2}>
               {agent.agent_description}
             </Descriptions.Item>
@@ -171,7 +171,7 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
 
           <Divider>核心能力</Divider>
           <Space wrap>
-            {agent.capabilities.map(capability => (
+            {agent.agent_capabilities.map(capability => (
               <Tag key={capability} color="blue">{capability}</Tag>
             ))}
           </Space>

@@ -34,13 +34,9 @@ async def create_agent(agent_data: AgentCreate,db: AsyncSession = Depends(get_as
 
 
 @router.get("/v1/agents/{agent_id}", response_model=UnifiedResponse)
-async def get_agent(
-    agent_id: str,
-    include_builtin: bool = Query(True, description="是否包含内置智能体"),
-    db: AsyncSession = Depends(get_async_db)
-):
+async def get_agent(agent_id: str, db: AsyncSession = Depends(get_async_db)):
     """获取指定智能体"""
-    agent = await agent_service.get_agent_by_id(db, agent_id, include_builtin)
+    agent = await agent_service.get_agent_by_id(db, agent_id)
     if not agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data=agent,msg="获取智能体信息成功")
 
