@@ -62,7 +62,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       const data = await response.json();
       console.log('获取到的任务数据:', data);
       
-      const allTasks = Array.isArray(data) ? data : [];
+      const allTasks = data?.data?.items || [];
       
       // 在前端过滤属于当前智能体的任务
       const filteredTasks = allTasks.filter(task => {
