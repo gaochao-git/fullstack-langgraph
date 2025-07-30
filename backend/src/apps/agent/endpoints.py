@@ -33,14 +33,6 @@ async def create_agent(agent_data: AgentCreate,db: AsyncSession = Depends(get_as
     return success_response(data=agent,msg="智能体创建成功",code=ResponseCode.CREATED)
 
 
-@router.get("/v1/agents/{agent_id}", response_model=UnifiedResponse)
-async def get_agent(agent_id: str, db: AsyncSession = Depends(get_async_db)):
-    """获取指定智能体"""
-    agent = await agent_service.get_agent_by_id(db, agent_id)
-    if not agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-    return success_response(data=agent,msg="获取智能体信息成功")
-
-
 @router.get("/v1/agents", response_model=UnifiedResponse)
 async def list_agents(
     page: int = Query(1, ge=1, description="页码"),
@@ -54,6 +46,14 @@ async def list_agents(
     """查询智能体列表"""
     agents, total = await agent_service.list_agents(db, page, size, search, status, enabled_only, include_builtin)
     return paginated_response(items=agents,total=total,page=page,size=size,msg="查询智能体列表成功")
+
+
+@router.get("/v1/agents/{agent_id}", response_model=UnifiedResponse)
+async def get_agent(agent_id: str, db: AsyncSession = Depends(get_async_db)):
+    """获取指定智能体"""
+    agent = await agent_service.get_agent_by_id(db, agent_id)
+    if not agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    return success_response(data=agent,msg="获取智能体信息成功")
 
 
 @router.put("/v1/agents/{agent_id}", response_model=UnifiedResponse)
