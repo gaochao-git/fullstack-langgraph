@@ -27,8 +27,10 @@ def create_main_graph():
     async def create_agent(state: AgentState, config: RunnableConfig):
         """创建并运行Agent"""
         configurable = config.get("configurable", {}) if config else {}
-        # 获取agent_id，用于获取系统提示词
-        agent_id = configurable.get("agent_id", "generic_agent")
+        # 获取agent_id，必须存在，不使用默认值
+        agent_id = configurable.get("agent_id")
+        if not agent_id:
+            raise RuntimeError("配置中缺少必需的agent_id参数")
         print(f"🚀完整智能体配置: {dict(config) if config else 'None'}")
         
         # 获取LLM实例

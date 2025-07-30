@@ -87,11 +87,11 @@ class Configuration(BaseModel):
         )
 
         # Try to load configuration from database first
-        # 优先从configurable获取，fallback到assistant_id（从LangGraph上下文）
-        agent_name = configurable.get("agent_name") 
+        # 优先从configurable获取agent_id
+        agent_name = configurable.get("agent_id") 
         if not agent_name:
-            # 尝试从config的其他地方获取assistant_id
-            agent_name = config.get("assistant_id", "diagnostic_agent") if config else "diagnostic_agent"
+            # 如果没有agent_id，则使用默认值（用于向后兼容）
+            agent_name = "diagnostic_agent"
         
         selected_model = configurable.get("selected_model")
         from .....shared.db.config import get_sync_db

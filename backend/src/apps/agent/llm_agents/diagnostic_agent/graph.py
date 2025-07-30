@@ -19,19 +19,22 @@ def create_main_graph(enable_tool_approval: bool = False):
     
     async def create_agent(state: DiagnosticState, config: RunnableConfig):
         configurable = config.get("configurable", {}) if config else {}
-        agent_name = configurable.get("agent_name")
+        # 获取agent_id，必须存在，不使用默认值
+        agent_id = configurable.get("agent_id")
+        if not agent_id:
+            raise RuntimeError("配置中缺少必需的agent_id参数")
         print(f"🚀完整智能体配置: {dict(config) if config else 'None'}")
         llm = get_llm_from_config(config)
         tools = await get_diagnostic_tools(enable_tool_approval)
         
         # 获取智能体名称并获取对应的系统提示词（必须从数据库获取）
         try:
-            system_prompt = get_system_prompt(agent_name)
-            print(f"✅ 成功获取智能体 '{agent_name}' 的系统提示词")
+            system_prompt = get_system_prompt(agent_id)
+            print(f"✅ 成功获取智能体 '{agent_id}' 的系统提示词")
         except ValueError as e:
             print(f"❌ 获取智能体系统提示词失败: {e}")
             # 抛出异常，让上层处理，不允许使用空提示词运行
-            raise RuntimeError(f"智能体 '{agent_name}' 配置错误: {e}")
+            raise RuntimeError(f"智能体 '{agent_id}' 配置错误: {e}")
         
         agent = create_react_agent(model=llm, tools=tools, prompt=system_prompt)
         return await agent.ainvoke(state, config)

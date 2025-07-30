@@ -76,12 +76,19 @@ export default function ChatEngine({
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
 
-  // 获取assistantId，兼容不同的agent对象结构
-  const getAssistantId = () => {
-    if (!agent) return "diagnostic_agent"; // 默认fallback
+  // 获取agentId，用于LangGraph SDK的assistantId字段
+  const getAgentId = () => {
+    if (!agent) {
+      throw new Error("Agent对象不存在，无法获取agent_id");
+    }
     
     // 优先使用agent_id（来自API的agent对象），如果没有则使用id（硬编码的agent对象）
-    return agent.agent_id || agent.id;
+    const agentId = agent.agent_id || agent.id;
+    if (!agentId) {
+      throw new Error("Agent对象中缺少agent_id或id字段");
+    }
+    
+    return agentId;
   };
 
   // 从URL参数中获取线程ID
@@ -100,7 +107,7 @@ export default function ChatEngine({
     messages: Message[];
   }>({
     apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/chat`,
-    assistantId: getAssistantId(),
+    assistantId: getAgentId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),
     onUpdateEvent: (event: any) => {

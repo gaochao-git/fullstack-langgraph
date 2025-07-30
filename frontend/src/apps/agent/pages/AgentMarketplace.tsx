@@ -65,32 +65,55 @@ const AgentMarketplace = () => {
     navigate(`/agents/${agentId}`);
   };
 
-  // 获取智能体图标
-  const getAgentIcon = (agentId: string) => {
-    switch (agentId) {
-      case 'diagnostic_agent':
-        return <SettingOutlined />;
-      case 'security_agent':
-        return <UserOutlined />;
-      default:
-        return <RobotOutlined />;
+  // 获取智能体图标（基于agent_name匹配）
+  const getAgentIcon = (agentName: string) => {
+    const name = agentName?.toLowerCase() || '';
+    
+    // 故障诊断相关
+    if (name.includes('诊断') || name.includes('故障') || name.includes('监控')) {
+      return <SettingOutlined />;
     }
+    
+    // 安全防护相关
+    if (name.includes('安全') || name.includes('防护') || name.includes('检测')) {
+      return <UserOutlined />;
+    }
+    
+    // 故事、娱乐相关
+    if (name.includes('故事') || name.includes('笑话') || name.includes('娱乐')) {
+      return <RobotOutlined style={{ color: '#52c41a' }} />;
+    }
+    
+    // 研究分析相关
+    if (name.includes('研究') || name.includes('分析') || name.includes('数据')) {
+      return <DatabaseOutlined />;
+    }
+    
+    // 默认通用智能体图标
+    return <RobotOutlined />;
   };
 
-  // 获取智能体标签
+  // 获取智能体标签（基于agent_name和capabilities）
   const getAgentTags = (agent: Agent) => {
     const tags = [];
+    const name = agent.agent_name?.toLowerCase() || '';
     
-    // 根据智能体类型添加标签
-    switch (agent.agent_id) {
-      case 'diagnostic_agent':
+    // 优先使用agent_capabilities作为标签
+    if (agent.agent_capabilities && agent.agent_capabilities.length > 0) {
+      tags.push(...agent.agent_capabilities);
+    } else {
+      // 如果没有capabilities，基于名称添加标签
+      if (name.includes('诊断') || name.includes('故障') || name.includes('监控')) {
         tags.push('监控', '诊断', '性能分析');
-        break;
-      case 'security_agent':
+      } else if (name.includes('安全') || name.includes('防护') || name.includes('检测')) {
         tags.push('安全', '防护', '检测');
-        break;
-      default:
+      } else if (name.includes('故事') || name.includes('笑话') || name.includes('娱乐')) {
+        tags.push('娱乐', '故事', '笑话');
+      } else if (name.includes('研究') || name.includes('分析') || name.includes('数据')) {
+        tags.push('研究', '分析', '数据');
+      } else {
         tags.push('智能助手');
+      }
     }
     
     // 根据工具配置添加标签
@@ -116,7 +139,7 @@ const AgentMarketplace = () => {
               <Avatar 
                 size={36} 
                 style={{ backgroundColor: "#1677ff" }} 
-                icon={getAgentIcon(agent.agent_id)} 
+                icon={getAgentIcon(agent.agent_name)} 
               />
               <span style={{ fontWeight: 600, fontSize: 18, color: isDark ? '#ffffff' : '#262626' }}>
                 {agent.agent_name}

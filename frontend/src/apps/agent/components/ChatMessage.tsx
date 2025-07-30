@@ -693,10 +693,12 @@ interface DialogRound {
 // 智能体信息类型
 interface Agent {
   id: string;
-  name: string;
-  display_name: string;
-  description: string;
-  capabilities: string[];
+  agent_id: string;
+  agent_name: string;
+  agent_description: string;
+  agent_capabilities: string[];
+  agent_status: string;
+  agent_enabled: string;
   is_builtin: string;
 }
 
@@ -859,7 +861,7 @@ export function ChatMessages({
         <div className="flex items-center gap-2">
           <Bot className={cn("h-5 w-5", isDark ? "text-cyan-400" : "text-blue-600")} />
           <span className={cn("font-semibold", isDark ? "text-white" : "text-gray-900")}>
-            {agent?.display_name || '故障诊断助手'}
+            {agent?.agent_name || agent?.display_name || null}
           </span>
         </div>
         

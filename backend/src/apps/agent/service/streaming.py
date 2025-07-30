@@ -159,9 +159,8 @@ async def handle_postgres_streaming(request_body, thread_id):
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from .agent_config_service import AgentConfigService
     
-    assistant_id = request_body.assistant_id
-    # 直接使用assistant_id作为agent_id，不再从config中获取
-    agent_id = assistant_id
+    # LangGraph SDK使用assistant_id，转换为内部的agent_id
+    agent_id = request_body.assistant_id
     # 从数据库获取智能体配置
     from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
@@ -192,6 +191,13 @@ async def handle_postgres_streaming(request_body, thread_id):
             from ..llm_agents.generic_agent.graph import builder
             graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
         
+        # 将agent_id添加到config中，传递给graph
+        if not request_body.config:
+            request_body.config = {}
+        if not request_body.config.get("configurable"):
+            request_body.config["configurable"] = {}
+        request_body.config["configurable"]["agent_id"] = agent_id
+        
         # 在同一个async with内执行完整的流式处理
         async for item in stream_with_graph_postgres(graph, request_body, thread_id):
             yield item
@@ -200,9 +206,8 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     from .agent_config_service import AgentConfigService
     
-    # 动态检查智能体是否存在 - 直接使用assistant_id
-    assistant_id = request_body.assistant_id
-    agent_id = assistant_id
+    # LangGraph SDK使用assistant_id，转换为内部的agent_id
+    agent_id = request_body.assistant_id
     
     # 检查数据库中是否存在该智能体
     from src.shared.db.config import get_sync_db
