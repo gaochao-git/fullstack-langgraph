@@ -189,8 +189,8 @@ const AgentManagement: React.FC = () => {
   const filteredAgents = agents
     .filter(agent => {
       const matchSearch = !searchText || 
-        agent.displayName.toLowerCase().includes(searchText.toLowerCase()) ||
-        agent.agent_description.toLowerCase().includes(searchText.toLowerCase());
+        agent.displayName?.toLowerCase().includes(searchText.toLowerCase()) ||
+        (agent.agent_description || '').toLowerCase().includes(searchText.toLowerCase());
       // 状态筛选用 agent.agent_enabled
       let matchStatus = true;
       if (statusFilter === 'enabled') matchStatus = agent.agent_enabled === 'yes';
