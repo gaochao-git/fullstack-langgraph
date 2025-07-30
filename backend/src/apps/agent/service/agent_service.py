@@ -5,9 +5,7 @@ Agent服务层 - 纯异步实现
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, func, case
-import json
 import uuid
-from datetime import datetime
 
 from src.apps.agent.models import AgentConfig
 from src.shared.core.logging import get_logger
@@ -78,7 +76,7 @@ class AgentService:
                     'total_tools': 0
                 }
             return agent_dict
-        
+
         return None
     
     async def list_agents(
