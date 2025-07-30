@@ -6,7 +6,6 @@ import { ChatMessages, type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
-import { omind_get } from "@/utils/base_api";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -27,11 +26,21 @@ interface ModelInfo {
 // 智能体信息类型
 interface Agent {
   id: string;
-  name: string;
-  display_name: string;
-  description: string;
-  capabilities: string[];
+  agent_id: string;
+  agent_name: string;
+  agent_description: string;
+  agent_capabilities: string[];
+  agent_status: string;
+  agent_enabled: string;
   is_builtin: string;
+  llm_info?: {
+    available_models?: string[];
+    model_name?: string;
+    temperature?: number;
+    max_tokens?: number;
+  };
+  tools_info?: any;
+  prompt_info?: any;
 }
 
 // 欢迎页面组件接口
@@ -125,48 +134,36 @@ export default function ChatEngine({
     },
   });
 
-  // 获取智能体的配置信息（包括可用模型列表）
+  // 使用传入的agent数据获取配置信息，避免重复API请求
   useEffect(() => {
-    const fetchAgentConfig = async () => {
-      try {
-        const response = await omind_get(`/api/v1/agents/${agentId}`);
-        const result = await response.json();
-        console.log('智能体配置信息API返回:', result);
-        
-        if (result.status === 'ok' && result.data) {
-          const agentConfig = result.data;
-          
-          // 从llm_info中获取可用模型列表
-          const availableModelNames = agentConfig.llm_info?.available_models || [];
-          
-          // 转换为ModelInfo格式
-          const models: ModelInfo[] = availableModelNames.map((modelName: string) => ({
-            id: modelName,
-            name: modelName,
-            provider: 'default', // 可以根据需要调整
-            type: modelName
-          }));
-          
-          setAvailableModels(models);
-          console.log('智能体可用模型列表:', models);
-          
-          // 设置默认选中当前使用的模型，如果没有则选择第一个
-          const currentModelName = agentConfig.llm_info?.model_name;
-          if (currentModelName) {
-            setCurrentModel(currentModelName);
-          } else if (models.length > 0 && !currentModel) {
-            setCurrentModel(models[0].type);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch agent config:', error);
+    if (!agent) return;
+    
+    try {
+      // 直接从传入的agent对象中获取配置信息
+      const availableModelNames = agent.llm_info?.available_models || [];
+      
+      // 转换为ModelInfo格式
+      const models: ModelInfo[] = availableModelNames.map((modelName: string) => ({
+        id: modelName,
+        name: modelName,
+        provider: 'default',
+        type: modelName
+      }));
+      
+      setAvailableModels(models);
+      console.log('智能体可用模型列表:', models);
+      
+      // 设置默认选中当前使用的模型
+      const currentModelName = agent.llm_info?.model_name;
+      if (currentModelName) {
+        setCurrentModel(currentModelName);
+      } else if (models.length > 0 && !currentModel) {
+        setCurrentModel(models[0].type);
       }
-    };
-
-    if (agentId) {
-      fetchAgentConfig();
+    } catch (error) {
+      console.error('处理agent配置信息失败:', error);
     }
-  }, [agentId, currentModel]);
+  }, [agent, currentModel]);
 
   // 当新线程创建时，将线程ID同步到URL
   useEffect(() => {

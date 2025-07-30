@@ -10,11 +10,21 @@ import { cn } from '@/lib/utils';
 
 interface Agent {
   id: string;
-  name: string;
-  display_name: string;
-  description: string;
-  capabilities: string[];
+  agent_id: string;
+  agent_name: string;
+  agent_description: string;
+  agent_capabilities: string[];
+  agent_status: string;
+  agent_enabled: string;
   is_builtin: string;
+  llm_info?: {
+    available_models?: string[];
+    model_name?: string;
+    temperature?: number;
+    max_tokens?: number;
+  };
+  tools_info?: any;
+  prompt_info?: any;
 }
 
 const AgentChat: React.FC = () => {
@@ -42,30 +52,12 @@ const AgentChat: React.FC = () => {
       }
 
       try {
-        const response = await agentApi.getAgents();
-        let agents = [];
-        
-        // Handle API response structure
-        if (response && response.items && Array.isArray(response.items)) {
-          agents = response.items;
-        } else if (Array.isArray(response)) {
-          agents = response;
-        } else {
-          console.error('Unexpected API response format:', response);
-          setError('API响应格式错误');
-          return;
-        }
-        
-        const foundAgent = agents.find(a => a.agent_id === agentId);
-        
-        if (foundAgent) {
-          setAgent(foundAgent);
-        } else {
-          setError('未找到指定的智能体');
-        }
+        // 直接请求单个智能体，避免获取全部智能体列表
+        const agent = await agentApi.getAgent(agentId);
+        setAgent(agent);
       } catch (err) {
         console.error('加载智能体失败:', err);
-        setError('加载智能体失败');
+        setError('未找到指定的智能体或加载失败');
       } finally {
         setLoading(false);
       }
