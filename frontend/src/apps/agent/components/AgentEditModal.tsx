@@ -311,6 +311,8 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
   // 初始化表单数据
   useEffect(() => {
     if (visible) {
+      form.resetFields(); // 重置表单避免状态残留
+      
       if (isCreating) {
         // 新建时的默认值
         setEditSystemTools(['get_current_time']);
@@ -357,7 +359,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         loadAgentDetails();
       }
     }
-  }, [visible, isCreating, agent, mcpServers, availableModels]);
+  }, [visible, isCreating, agent?.agent_id]);
 
   const loadAgentDetails = async () => {
     if (!agent) return;
@@ -367,23 +369,22 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       const fullAgent = await agentApi.getAgent(agent.agent_id);
       
       if (fullAgent) {
-        setTimeout(() => {
-          form.setFieldsValue({
-            agent_id: fullAgent.agent_id,
-            agent_name: fullAgent.agent_name,
-            agent_description: fullAgent.agent_description,
-            agent_capabilities: fullAgent.agent_capabilities,
-            available_models: fullAgent.llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
-            temperature: fullAgent.llm_info?.temperature || 0.7,
-            max_tokens: fullAgent.llm_info?.max_tokens || 2000,
-            top_p: fullAgent.llm_info?.top_p || 1.0,
-            frequency_penalty: fullAgent.llm_info?.frequency_penalty || 0.0,
-            presence_penalty: fullAgent.llm_info?.presence_penalty || 0.0,
-            system_prompt: fullAgent.prompt_info?.system_prompt || `你是${fullAgent.agent_name}，请根据用户需求提供专业的帮助。`,
-            user_prompt_template: fullAgent.prompt_info?.user_prompt_template || '',
-            assistant_prompt_template: fullAgent.prompt_info?.assistant_prompt_template || ''
-          });
-        }, 100);
+        // 直接设置表单值，不使用setTimeout避免覆盖用户正在编辑的内容
+        form.setFieldsValue({
+          agent_id: fullAgent.agent_id,
+          agent_name: fullAgent.agent_name,
+          agent_description: fullAgent.agent_description,
+          agent_capabilities: fullAgent.agent_capabilities,
+          available_models: fullAgent.llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
+          temperature: fullAgent.llm_info?.temperature || 0.7,
+          max_tokens: fullAgent.llm_info?.max_tokens || 2000,
+          top_p: fullAgent.llm_info?.top_p || 1.0,
+          frequency_penalty: fullAgent.llm_info?.frequency_penalty || 0.0,
+          presence_penalty: fullAgent.llm_info?.presence_penalty || 0.0,
+          system_prompt: fullAgent.prompt_info?.system_prompt || `你是${fullAgent.agent_name}，请根据用户需求提供专业的帮助。`,
+          user_prompt_template: fullAgent.prompt_info?.user_prompt_template || '',
+          assistant_prompt_template: fullAgent.prompt_info?.assistant_prompt_template || ''
+        });
       }
     } catch (error) {
       console.error('获取智能体详细配置失败:', error);
