@@ -34,6 +34,7 @@ if __name__ == '__main__':
     # 启动 Celery Worker
     argv = [
         'worker',
+        '--purge',  # 直接添加这一行即可
         f'--loglevel={LOG_LEVEL}',
         '-n', f'{WORKER_NAME}@%h',
         f'--concurrency={CONCURRENCY}',

@@ -23,7 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 智能体 API 配置
-AGENT_API_BASE_URL = os.getenv('AGENT_API_BASE_URL', 'http://192.168.1.10:8000')
+AGENT_API_BASE_URL = os.getenv('AGENT_API_BASE_URL', 'http://172.20.10.2:8000')
 
 
 def call_agent_task(agent_id, message, user_name="system", conversation_id=None):
@@ -44,7 +44,7 @@ def call_agent_task(agent_id, message, user_name="system", conversation_id=None)
         # 第一步：创建线程
         if not conversation_id:
             thread_response = requests.post(
-                f"{AGENT_API_BASE_URL}/threads",
+                f"{AGENT_API_BASE_URL}/api/chat/threads",
                 json={"metadata": {}},
                 headers={"Content-Type": "application/json"},
                 timeout=10
@@ -78,7 +78,7 @@ def call_agent_task(agent_id, message, user_name="system", conversation_id=None)
             "assistant_id": agent_id  # 直接使用agent_id
         }
         
-        api_url = f"{AGENT_API_BASE_URL}/threads/{conversation_id}/runs/stream"
+        api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{conversation_id}/runs/stream"
         logger.info(f"调用智能体对话API: {api_url}")
         
         # 根据消息复杂度动态调整超时时间
@@ -288,6 +288,7 @@ def execute_agent_periodic_task(self, task_config_id):
     try:
         # 从数据库获取任务配置
         task_config = session.query(PeriodicTask).filter(PeriodicTask.id == task_config_id).first()
+        print(f"定时任务从数据库里面获取到的信息:{task_config}")
         if not task_config:
             error_msg = f"找不到任务配置，ID: {task_config_id}"
             logger.error(error_msg)
@@ -356,6 +357,7 @@ def execute_agent_periodic_task(self, task_config_id):
         message = extra_config.get('message', '执行定时任务')
         user_name = extra_config.get('user', 'system')
         conversation_id = extra_config.get('conversation_id')
+
         
         logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
         

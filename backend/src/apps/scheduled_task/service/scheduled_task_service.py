@@ -39,8 +39,8 @@ class ScheduledTaskService:
             
             # 转换数据
             data = self._prepare_task_data(task_data)
-            data.setdefault('date_created', now_shanghai())
-            data.setdefault('date_changed', now_shanghai())
+            data.setdefault('create_time', now_shanghai())
+            data.setdefault('update_time', now_shanghai())
             
             logger.info(f"Creating scheduled task: {task_data['task_name']}")
             instance = PeriodicTask(**data)
@@ -156,7 +156,7 @@ class ScheduledTaskService:
             
             # 移除不可更新字段
             data.pop('id', None)
-            data.pop('date_created', None)
+            data.pop('create_time', None)
             data['update_time'] = now_shanghai()
             
             logger.info(f"Updating scheduled task: {task_id}")
