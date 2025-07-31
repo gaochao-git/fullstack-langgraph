@@ -854,7 +854,7 @@ async def get_mock_gateway_configs():
             "routers": [{
                 "server": "db-server",
                 "prefix": "/db",
-                "ssePrefix": "/db",
+                "ssePrefix": "",
                 "cors": {
                     "allowOrigins": ["*"],
                     "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -912,7 +912,7 @@ async def get_mock_gateway_configs():
             "routers": [{
                 "server": "system-server",
                 "prefix": "/system",
-                "ssePrefix": "/system",
+                "ssePrefix": "",
                 "cors": {
                     "allowOrigins": ["*"],
                     "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

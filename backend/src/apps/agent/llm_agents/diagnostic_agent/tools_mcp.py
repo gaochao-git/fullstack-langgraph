@@ -16,10 +16,11 @@ class MCPToolsIntegrator:
     
     def __init__(self):
         self.server_config = {
-            "database": {"url": "http://localhost:3001/sse", "transport": "sse"},
-            "ssh": {"url": "http://localhost:3002/sse", "transport": "sse"},
-            "elasticsearch": {"url": "http://localhost:3003/sse", "transport": "sse"},
-            "zabbix": {"url": "http://localhost:3004/sse", "transport": "sse"}
+            # "database": {"url": "http://localhost:3001/sse", "transport": "sse"},
+            # "ssh": {"url": "http://localhost:3002/sse", "transport": "sse"},
+            # "elasticsearch": {"url": "http://localhost:3003/sse", "transport": "sse"},
+            # "zabbix": {"url": "http://localhost:3004/sse", "transport": "sse"},
+            "system": {"url": "http://127.0.0.1:5235/gateway/9xuv/sse", "transport": "sse"},
         }
     
     async def get_mcp_tools(self):
@@ -28,6 +29,7 @@ class MCPToolsIntegrator:
             # 官方推荐的简单用法
             client = MultiServerMCPClient(self.server_config)
             all_mcp_tools = await client.get_tools()
+            print(111111111,all_mcp_tools)
             
             # 过滤工具 - 可以根据需要排除某些工具
             filtered_tools = self._filter_tools(all_mcp_tools)
