@@ -20,7 +20,7 @@ class MCPToolsIntegrator:
             # "ssh": {"url": "http://localhost:3002/sse", "transport": "sse"},
             # "elasticsearch": {"url": "http://localhost:3003/sse", "transport": "sse"},
             # "zabbix": {"url": "http://localhost:3004/sse", "transport": "sse"},
-            "system": {"url": "http://127.0.0.1:5235/gateway/9xuv/sse", "transport": "sse"},
+            "system": {"url": "http://127.0.0.1:5236/gateway/9xuv/sse", "transport": "sse"},
         }
     
     async def get_mcp_tools(self):

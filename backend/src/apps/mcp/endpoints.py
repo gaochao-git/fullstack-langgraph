@@ -843,176 +843,72 @@ def _build_tools_config(server, server_tools: TypingList[str]) -> TypingList[Dic
 @router.get("/v1/mcp/gateway/configs/mock", response_model=UnifiedResponse)
 async def get_mock_gateway_configs():
     """
-    返回Mock MCP Gateway配置数据 - 用于测试
+    返回完全按照Docker中工作配置的MCP Gateway配置数据
+    Docker中成功工作的配置：
+    - 路由前缀: /gateway/9xuv
+    - 服务器: nn
+    - 工具: systeminfo
+    - SSE连接成功示例: /gateway/9xuv/sse
     """
-    mock_configs = [
+    docker_working_configs = [
         {
-            "name": "database-tools",
-            "tenant": "default",
-            "createdAt": datetime.now().isoformat() + "Z",
-            "updatedAt": datetime.now().isoformat() + "Z",
-            "routers": [{
-                "server": "db-server",
-                "prefix": "/db",
-                "ssePrefix": "",
-                "cors": {
-                    "allowOrigins": ["*"],
-                    "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                    "allowHeaders": ["Content-Type", "Authorization", "Mcp-Session-Id"],
-                    "exposeHeaders": ["Mcp-Session-Id"],
-                    "allowCredentials": True
+            "name": "systemhaha",
+            "tenant": "default", 
+            "createdAt": "2025-07-31T11:23:13.337+00:00",
+            "updatedAt": "2025-07-31T19:42:07.924994148+08:00",
+            
+            # Docker中注册的路由配置 - 从日志: registered router tenant=default prefix=/gateway/9xuv server=nn
+            "routers": [
+                {
+                    "server": "nn",
+                    "prefix": "/gateway/9xuv",  # Docker中实际工作的前缀
+                    "ssePrefix": "",  # SSE连接使用的前缀
+                    "cors": {
+                        "allowOrigins": ["*"],
+                        "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                        "allowHeaders": ["Content-Type", "Authorization", "Mcp-Session-Id"],
+                        "exposeHeaders": ["Mcp-Session-Id"],
+                        "allowCredentials": True
+                    }
                 }
-            }],
-            "servers": [{
-                "name": "db-server",
-                "description": "Database MCP Server",
-                "allowedTools": ["execute_sql"],
-                "config": {
-                    "database_type": "mysql",
-                    "max_connections": "10"
+            ],
+            
+            # Docker中的服务器配置 - server_count=1, tool_count=1
+            "servers": [
+                {
+                    "name": "nn",
+                    "description": "",
+                    "allowedTools": ["systeminfo"],
+                    "config": {}
                 }
-            }],
-            "mcpServers": [{
-                "type": "stdio",
-                "name": "db-server",
-                "command": "python",
-                "args": ["/path/to/db_mcp_server.py"],
-                "env": {
-                    "DB_HOST": "localhost",
-                    "DB_PORT": "3306"
-                },
-                "policy": "onDemand",
-                "preinstalled": False
-            }],
-            "tools": [{
-                "name": "execute_sql",
-                "description": "Execute SQL query on database",
-                "method": "POST",
-                "endpoint": "http://localhost:5235/db/mcp",
-                "headers": {
-                    "Content-Type": "application/json"
-                },
-                "requestBody": '{"method": "tools/call", "params": {"name": "execute_sql", "arguments": {{args}}}}',
-                "responseBody": "SQL执行结果: {{response.result}}",
-                "args": [{
-                    "name": "query",
-                    "position": "body",
-                    "required": True,
-                    "type": "string",
-                    "description": "SQL query to execute"
-                }]
-            }],
-            "prompts": []
-        },
-        {
-            "name": "system-tools", 
-            "tenant": "default",
-            "createdAt": datetime.now().isoformat() + "Z",
-            "updatedAt": datetime.now().isoformat() + "Z",
-            "routers": [{
-                "server": "system-server",
-                "prefix": "/system",
-                "ssePrefix": "",
-                "cors": {
-                    "allowOrigins": ["*"],
-                    "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                    "allowHeaders": ["Content-Type", "Authorization", "Mcp-Session-Id"],
-                    "exposeHeaders": ["Mcp-Session-Id"],
-                    "allowCredentials": True
-                }
-            }],
-            "servers": [{
-                "name": "system-server",
-                "description": "System Operations MCP Server - Real Backend APIs",
-                "allowedTools": ["system_info", "execute_command", "list_files"],
-                "config": {
-                    "backend_base_url": "http://localhost:8000",
-                    "timeout": "30"
-                }
-            }],
-            "mcpServers": [{
-                "type": "streamable-http",
-                "name": "system-server", 
-                "url": "http://localhost:8000/api",
-                "policy": "onDemand",
-                "preinstalled": False
-            }],
+            ],
+            
+            # Docker中没有配置MCP服务器 - 使用HTTP工具
+            "mcpServers": [],
+            
+            # Docker中的工具配置 - 直接HTTP调用后端API
             "tools": [
                 {
-                    "name": "system_info",
-                    "description": "获取系统信息，包括CPU、内存、磁盘使用情况",
+                    "name": "systeminfo",
+                    "description": "获取系统信息工具",
                     "method": "POST",
-                    "endpoint": "http://localhost:8000/api/v1/mcp/tools/system_info",
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    "requestBody": "{}",
-                    "responseBody": "系统信息: {{response.data}}",
-                    "args": []
-                },
-                {
-                    "name": "execute_command",
-                    "description": "执行安全的系统命令",
-                    "method": "POST",
-                    "endpoint": "http://localhost:8000/api/v1/mcp/tools/execute_command",
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    "requestBody": '{"command": "{{args.command}}", "timeout": "{{args.timeout}}"}',
-                    "responseBody": "命令执行结果: {{response.data}}",
-                    "args": [
-                        {
-                            "name": "command",
-                            "position": "body",
-                            "required": True,
-                            "type": "string",
-                            "description": "要执行的命令 (仅支持安全命令: ls, pwd, whoami, date, uptime, df, free, ps, uname, id, echo)"
-                        },
-                        {
-                            "name": "timeout",
-                            "position": "body",
-                            "required": False,
-                            "type": "integer",
-                            "description": "超时时间（秒），默认10秒"
-                        }
-                    ]
-                },
-                {
-                    "name": "list_files",
-                    "description": "列出指定目录的文件和文件夹",
-                    "method": "GET",
-                    "endpoint": "http://localhost:8000/api/v1/mcp/tools/list_files",
+                    "endpoint": "http://172.20.10.2:8000/api/v1/mcp/tools/system_info",
                     "headers": {
                         "Content-Type": "application/json",
                         "Accept": "application/json"
                     },
                     "requestBody": "",
-                    "responseBody": "文件列表: {{response.data}}",
-                    "args": [
-                        {
-                            "name": "path",
-                            "position": "query",
-                            "required": False,
-                            "type": "string",
-                            "description": "目录路径，默认为当前目录"
-                        },
-                        {
-                            "name": "show_hidden",
-                            "position": "query",
-                            "required": False,
-                            "type": "boolean",
-                            "description": "是否显示隐藏文件，默认false"
-                        }
-                    ]
+                    "responseBody": "{{.Response.Body}}",
+                    "args": []
                 }
             ],
+            
+            # Docker中没有提示词配置
             "prompts": []
         }
     ]
     
     return success_response(
-        data={"configs": mock_configs},
-        msg=f"获取Mock配置成功 (共{len(mock_configs)}个)"
+        data={"configs": docker_working_configs},
+        msg=f"获取Docker工作配置成功 (共{len(docker_working_configs)}个)"
     )
