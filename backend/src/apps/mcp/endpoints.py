@@ -10,9 +10,11 @@ import logging
 from src.shared.db.config import get_async_db
 from src.apps.mcp.schema import (
     MCPServerCreate, MCPServerUpdate, MCPQueryParams,
-    MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate
+    MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate,
+    OpenAPIMCPConfigCreate, OpenAPIMCPConfigUpdate
 )
 from src.apps.mcp.service.mcp_service import mcp_service
+from src.apps.mcp.service.openapi_mcp_service import OpenAPIMCPConfigService
 from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
 )
@@ -21,6 +23,9 @@ from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["MCP Server Management"])
+
+# 服务实例
+openapi_mcp_service = OpenAPIMCPConfigService()
 
 
 async def _test_mcp_connection(server_uri: str, timeout: int = 10) -> List[dict]:
@@ -335,3 +340,147 @@ async def test_server_connection(
             },
             msg="MCP连接测试失败"
         )
+
+
+# OpenAPI MCP 配置管理端点
+@router.post("/v1/mcp/openapi/configs", response_model=UnifiedResponse)
+async def create_openapi_config(
+    config_data: OpenAPIMCPConfigCreate,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """创建 OpenAPI MCP 配置"""
+    try:
+        config_record = await openapi_mcp_service.create_config(db, config_data)
+        
+        return success_response(
+            data=config_record.to_dict(),
+            msg="OpenAPI MCP 配置创建成功",
+            code=ResponseCode.CREATED
+        )
+    except ValueError as e:
+        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"创建OpenAPI MCP配置失败: {str(e)}")
+        raise BusinessException("创建配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/mcp/openapi/configs", response_model=UnifiedResponse)
+async def list_openapi_configs(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    mcp_server_prefix: Optional[str] = Query(None, description="服务器前缀过滤"),
+    mcp_tool_enabled: Optional[int] = Query(None, description="工具启用状态过滤"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取 OpenAPI MCP 配置列表"""
+    try:
+        configs, total = await openapi_mcp_service.list_configs(
+            db, 
+            offset=(page - 1) * size,
+            limit=size,
+            mcp_server_prefix=mcp_server_prefix,
+            mcp_tool_enabled=mcp_tool_enabled
+        )
+        config_list = [config.to_dict() for config in configs]
+        
+        return paginated_response(
+            items=config_list,
+            total=total,
+            page=page,
+            size=size,
+            msg="获取配置列表成功"
+        )
+    except Exception as e:
+        logger.error(f"获取OpenAPI配置列表失败: {str(e)}")
+        raise BusinessException("获取配置列表失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/mcp/openapi/configs/{config_id}", response_model=UnifiedResponse)
+async def get_openapi_config(
+    config_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取指定的 OpenAPI MCP 配置"""
+    try:
+        config = await openapi_mcp_service.get_config(db, config_id)
+        if not config:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        return success_response(
+            data=config.to_dict(),
+            msg="获取配置成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"获取OpenAPI配置失败: {str(e)}")
+        raise BusinessException("获取配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.put("/v1/mcp/openapi/configs/{config_id}", response_model=UnifiedResponse)
+async def update_openapi_config(
+    config_id: int,
+    config_data: OpenAPIMCPConfigUpdate,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """更新 OpenAPI MCP 配置"""
+    try:
+        updated_config = await openapi_mcp_service.update_config(db, config_id, config_data)
+        if not updated_config:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        return success_response(
+            data=updated_config.to_dict(),
+            msg="配置更新成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"更新OpenAPI配置失败: {str(e)}")
+        raise BusinessException("更新配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.delete("/v1/mcp/openapi/configs/{config_id}", response_model=UnifiedResponse)
+async def delete_openapi_config(
+    config_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """删除 OpenAPI MCP 配置（软删除）"""
+    try:
+        success = await openapi_mcp_service.delete_config(db, config_id)
+        if not success:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        return success_response(
+            data={"deleted": True},
+            msg="配置删除成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"删除OpenAPI配置失败: {str(e)}")
+        raise BusinessException("删除配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.patch("/v1/mcp/openapi/configs/{config_id}/enable", response_model=UnifiedResponse)
+async def toggle_config_enable(
+    config_id: int,
+    enabled: bool,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """启用/禁用 OpenAPI MCP 配置"""
+    try:
+        updated_config = await openapi_mcp_service.toggle_enable(db, config_id, enabled)
+        if not updated_config:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        action = "启用" if enabled else "禁用"
+        return success_response(
+            data=updated_config.to_dict(),
+            msg=f"配置已{action}成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"切换配置状态失败: {str(e)}")
+        raise BusinessException("切换配置状态失败", ResponseCode.INTERNAL_ERROR)

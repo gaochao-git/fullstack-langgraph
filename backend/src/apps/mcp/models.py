@@ -2,7 +2,8 @@
 MCP Server Model
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, UniqueConstraint, Index
+from sqlalchemy.dialects.mysql import TINYINT
 from src.shared.db.config import Base
 from src.shared.db.models import now_shanghai
 import json
@@ -73,3 +74,65 @@ class MCPServer(Base):
             'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else None,
             'update_time': self.update_time.strftime('%Y-%m-%d %H:%M:%S') if self.update_time else None,
         }
+
+
+class OpenAPIMCPConfig(Base):
+    """OpenAPI MCP配置模型"""
+    __tablename__ = "openapi_mcp_configs"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    mcp_server_prefix = Column(String(255), nullable=False, comment="mcpserver前缀")
+    mcp_tool_name = Column(String(255), nullable=False, comment="工具名称")
+    mcp_tool_enabled = Column(TINYINT, nullable=False, default=0, comment="是否开启:0关闭,1开启")
+    openapi_schema = Column(Text, nullable=False, comment="原始OpenAPI规范JSON/YAML")
+    auth_config = Column(Text, nullable=False, comment="认证配置")
+    extra_config = Column(Text, nullable=False, comment="其他配置")
+    is_deleted = Column(TINYINT, nullable=False, default=0, comment="是否删除:0未删除,1已删除")
+    create_by = Column(String(100), nullable=False, comment="创建者")
+    update_by = Column(String(100), nullable=True, comment="更新者") 
+    create_time = Column(DateTime, nullable=False, default=now_shanghai, comment="创建时间")
+    update_time = Column(DateTime, nullable=False, default=now_shanghai, onupdate=now_shanghai, comment="更新时间")
+    
+    __table_args__ = (
+        UniqueConstraint('mcp_server_prefix', 'mcp_tool_name', name='uniq_prefix_tool'),
+        Index('idx_mcp_tool_name', 'mcp_tool_name'),
+        Index('idx_create_time', 'create_time'),
+    )
+
+    def to_dict(self):
+        """转换为字典格式"""
+        result = {
+            'id': self.id,
+            'mcp_server_prefix': self.mcp_server_prefix,
+            'mcp_tool_name': self.mcp_tool_name,
+            'mcp_tool_enabled': self.mcp_tool_enabled,
+            'openapi_schema': self.openapi_schema,
+            'auth_config': self.auth_config,
+            'extra_config': self.extra_config,
+            'is_deleted': self.is_deleted,
+            'create_by': self.create_by,
+            'update_by': self.update_by,
+            'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else None,
+            'update_time': self.update_time.strftime('%Y-%m-%d %H:%M:%S') if self.update_time else None
+        }
+        
+        # 解析JSON字段
+        try:
+            if self.openapi_schema:
+                result['openapi_schema'] = json.loads(self.openapi_schema)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        try:
+            if self.auth_config:
+                result['auth_config'] = json.loads(self.auth_config)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        try:
+            if self.extra_config:
+                result['extra_config'] = json.loads(self.extra_config)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        return result

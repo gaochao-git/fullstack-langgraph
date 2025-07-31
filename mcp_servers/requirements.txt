@@ -1,15 +1,20 @@
-# MCP服务器依赖
-fastmcp==2.10.6
-uvicorn==0.34.3
+# OpenAPI MCP服务器依赖
 
-# 数据库工具依赖
-PyMySQL==1.1.1
+# MCP相关
+fastmcp>=0.1.0
+pydantic>=2.0.0
 
-# SSH工具依赖
-paramiko==3.5.1
+# HTTP客户端
+httpx>=0.25.0
 
-# Elasticsearch工具依赖
-requests==2.32.4
+# Web服务器
+fastapi>=0.104.0
+uvicorn>=0.24.0
 
-# 管理脚本依赖
-PyYAML==6.0.2
+# 数据库
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+aiomysql>=0.2.0
+
+# 工具库
+python-multipart>=0.0.6

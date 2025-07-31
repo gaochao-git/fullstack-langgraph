@@ -126,3 +126,22 @@ CREATE TABLE `user_threads` (
     -- 联合唯一索引
     UNIQUE KEY `uk_user_thread` (`user_name`, `thread_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户线程关联表';
+
+CREATE TABLE `openapi_mcp_configs` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `mcp_server_prefix` varchar(255) NOT NULL COMMENT 'mcpserver前缀',
+    `mcp_tool_name` varchar(255) NOT NULL COMMENT '工具名称',
+    `mcp_tool_enabled` tinyint NOT NULL DEFAULT '0' COMMENT '是否开启:0关闭,1开启',
+    `openapi_schema` longtext NOT NULL COMMENT '原始OpenAPI规范JSON/YAML',
+    `auth_config` text NOT NULL COMMENT '认证配置',
+    `extra_config` text NOT NULL COMMENT '其他配置',
+    `is_deleted` tinyint NOT NULL DEFAULT '0' COMMENT '是否删除:0未删除,1已删除',
+    `create_by` varchar(100) NOT NULL COMMENT '创建者',
+    `update_by` varchar(100) DEFAULT NULL COMMENT '更新者',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uniq_prefix_tool` (`mcp_server_prefix`, `mcp_tool_name`),
+    KEY `idx_mcp_tool_name` (`mcp_tool_name`),
+    KEY `idx_create_time` (`create_time`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OpenAPI转MCP配置表';

@@ -119,3 +119,218 @@ class MCPStatusUpdate(BaseModel):
 class MCPEnableUpdate(BaseModel):
     """启用/禁用MCP服务器的schema"""
     enabled: Literal["on", "off"] = Field(..., description="启用状态")
+
+
+class OpenAPIConvertRequest(BaseModel):
+    """OpenAPI转换请求schema"""
+    config_name: str = Field(..., description="MCP服务器名称", min_length=1, max_length=255)
+    config_description: Optional[str] = Field(None, description="服务器描述", max_length=1000)
+    api_base_url: str = Field(..., description="API基础地址", min_length=1, max_length=500)
+    openapi_spec_content: Dict[str, Any] = Field(..., description="OpenAPI规范")
+    auth_type: Optional[str] = Field("none", description="认证类型：none, bearer, basic, api_key, oauth2等", max_length=20)
+    auth_config: Optional[Dict[str, Any]] = Field(None, description="认证配置JSON")
+    timeout_config: Optional[Dict[str, Any]] = Field(None, description="超时配置JSON：读取超时、连接超时、重试等")
+    
+    @validator('api_base_url')
+    def validate_api_base_url(cls, v):
+        """验证api_base_url格式"""
+        if not (v.startswith('http://') or v.startswith('https://')):
+            raise ValueError('api_base_url必须是有效的HTTP/HTTPS URL')
+        return v.rstrip('/')
+    
+    @validator('openapi_spec_content')
+    def validate_openapi_spec_content(cls, v):
+        """验证OpenAPI规范"""
+        if not isinstance(v, dict):
+            raise ValueError('openapi_spec_content必须是有效的JSON对象')
+        
+        # 检查基本的OpenAPI结构
+        if 'openapi' not in v and 'swagger' not in v:
+            raise ValueError('无效的OpenAPI规范：缺少版本信息')
+        
+        if 'info' not in v:
+            raise ValueError('无效的OpenAPI规范：缺少info字段')
+        
+        if 'paths' not in v:
+            raise ValueError('无效的OpenAPI规范：缺少paths字段')
+            
+        return v
+
+
+class OpenAPIConvertResponse(BaseModel):
+    """OpenAPI转换响应schema"""
+    id: int = Field(..., description="配置ID")
+    config_name: str = Field(..., description="服务器名称")
+    config_description: str = Field(..., description="服务器描述")
+    api_base_url: str = Field(..., description="API基础地址")
+    tools: List[Dict[str, Any]] = Field(..., description="转换后的工具列表")
+    tools_count: int = Field(..., description="工具数量")
+    create_time: str = Field(..., description="创建时间")
+
+
+class SimpleAPIExample(BaseModel):
+    """简单API案例"""
+    http_url: str = Field(..., description="完整HTTP请求地址", min_length=1, max_length=1000)
+    method: str = Field("GET", description="HTTP方法", pattern=r'^(GET|POST|PUT|DELETE|PATCH)$')
+    description: Optional[str] = Field(None, description="API描述", max_length=500)
+    request_params: Optional[str] = Field(None, description="请求参数案例(JSON字符串)", max_length=5000)
+    request_body: Optional[str] = Field(None, description="请求体案例(JSON字符串)", max_length=5000)
+    response_example: Optional[str] = Field(None, description="返回结果案例(JSON字符串)", max_length=10000)
+    
+    @validator('http_url')
+    def validate_http_url(cls, v):
+        """验证HTTP URL格式"""
+        if not (v.startswith('http://') or v.startswith('https://')):
+            raise ValueError('HTTP URL必须以http://或https://开头')
+        return v
+    
+    @validator('request_params', 'request_body', 'response_example')
+    def validate_json_strings(cls, v):
+        """验证JSON字符串格式"""
+        if v:
+            try:
+                json.loads(v)
+            except json.JSONDecodeError:
+                raise ValueError('必须是有效的JSON格式')
+        return v
+
+
+class AIGenerateOpenAPIRequest(BaseModel):
+    """AI生成OpenAPI规范请求schema"""
+    api_name: str = Field(..., description="API服务名称", min_length=1, max_length=100)
+    api_description: Optional[str] = Field(None, description="API服务描述", max_length=1000)
+    examples: List[SimpleAPIExample] = Field(..., description="API使用案例列表", min_items=1, max_items=20)
+    template_type: Optional[str] = Field("standard", description="生成模板类型", pattern=r'^(standard|restful|minimal)$')
+    
+    @validator('examples')
+    def validate_examples(cls, v):
+        """验证案例列表"""
+        if not v:
+            raise ValueError('至少需要提供一个API使用案例')
+        return v
+
+
+class AIGenerateOpenAPIResponse(BaseModel):
+    """AI生成OpenAPI规范响应schema"""
+    openapi_spec: Dict[str, Any] = Field(..., description="生成的OpenAPI规范")
+    generated_endpoints: int = Field(..., description="生成的端点数量")
+    api_summary: str = Field(..., description="API功能总结")
+
+
+# OpenAPI MCP 配置相关Schema
+class OpenAPIMCPConfigCreate(BaseModel):
+    """创建OpenAPI MCP配置"""
+    mcp_server_prefix: str = Field(..., description="MCP服务器前缀", min_length=1, max_length=255)
+    mcp_tool_name: str = Field(..., description="工具名称", min_length=1, max_length=255)
+    mcp_tool_enabled: int = Field(0, description="是否开启:0关闭,1开启", ge=0, le=1)
+    openapi_schema: str = Field(..., description="原始OpenAPI规范JSON/YAML")
+    auth_config: str = Field("", description="认证配置JSON")
+    extra_config: str = Field("", description="其他配置JSON")
+    create_by: str = Field(..., description="创建者", min_length=1, max_length=100)
+
+    @validator('openapi_schema')
+    def validate_openapi_schema(cls, v):
+        if not v or not v.strip():
+            raise ValueError("OpenAPI规范不能为空")
+        # 尝试解析JSON格式
+        try:
+            import json
+            parsed = json.loads(v)
+            # 检查基本OpenAPI结构
+            if not isinstance(parsed, dict):
+                raise ValueError("OpenAPI规范必须是有效的JSON对象")
+            if 'openapi' not in parsed and 'swagger' not in parsed:
+                raise ValueError("无效的OpenAPI规范：缺少版本信息")
+        except json.JSONDecodeError:
+            raise ValueError("OpenAPI规范必须是有效的JSON格式")
+        return v
+
+    @validator('mcp_server_prefix')
+    def validate_prefix(cls, v):
+        if not v or not v.strip():
+            raise ValueError("MCP服务器前缀不能为空")
+        # 只允许字母、数字、下划线
+        import re
+        if not re.match(r'^[a-zA-Z0-9_]+$', v):
+            raise ValueError("MCP服务器前缀只能包含字母、数字和下划线")
+        return v.strip()
+
+    @validator('mcp_tool_name')
+    def validate_tool_name(cls, v):
+        if not v or not v.strip():
+            raise ValueError("工具名称不能为空")
+        # 工具名称允许字母、数字、下划线、连字符
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("工具名称只能包含字母、数字、下划线和连字符")
+        return v.strip()
+
+    @validator('auth_config', 'extra_config')
+    def validate_json_fields(cls, v):
+        if v and v.strip():
+            try:
+                import json
+                json.loads(v)
+            except json.JSONDecodeError:
+                raise ValueError("配置字段必须是有效的JSON格式")
+        return v
+
+
+class OpenAPIMCPConfigUpdate(BaseModel):
+    """更新OpenAPI MCP配置"""
+    mcp_server_prefix: Optional[str] = Field(None, description="MCP服务器前缀", min_length=1, max_length=255)
+    mcp_tool_name: Optional[str] = Field(None, description="工具名称", min_length=1, max_length=255)
+    mcp_tool_enabled: Optional[int] = Field(None, description="是否开启:0关闭,1开启", ge=0, le=1)
+    openapi_schema: Optional[str] = Field(None, description="原始OpenAPI规范JSON/YAML")
+    auth_config: Optional[str] = Field(None, description="认证配置JSON")
+    extra_config: Optional[str] = Field(None, description="其他配置JSON")
+    update_by: Optional[str] = Field(None, description="更新者", min_length=1, max_length=100)
+
+    @validator('openapi_schema')
+    def validate_openapi_schema(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError("OpenAPI规范不能为空")
+            try:
+                import json
+                parsed = json.loads(v)
+                if not isinstance(parsed, dict):
+                    raise ValueError("OpenAPI规范必须是有效的JSON对象")
+                if 'openapi' not in parsed and 'swagger' not in parsed:
+                    raise ValueError("无效的OpenAPI规范：缺少版本信息")
+            except json.JSONDecodeError:
+                raise ValueError("OpenAPI规范必须是有效的JSON格式")
+            return v.strip()
+        return v
+
+    @validator('mcp_server_prefix')
+    def validate_prefix(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError("MCP服务器前缀不能为空")
+            import re
+            if not re.match(r'^[a-zA-Z0-9_]+$', v):
+                raise ValueError("MCP服务器前缀只能包含字母、数字和下划线")
+            return v.strip()
+        return v
+
+    @validator('mcp_tool_name')
+    def validate_tool_name(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError("工具名称不能为空")
+            import re
+            if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+                raise ValueError("工具名称只能包含字母、数字、下划线和连字符")
+            return v.strip()
+        return v
+
+    @validator('auth_config', 'extra_config')
+    def validate_json_fields(cls, v):
+        if v is not None and v.strip():
+            try:
+                import json
+                json.loads(v)
+            except json.JSONDecodeError:
+                raise ValueError("配置字段必须是有效的JSON格式")
+        return v

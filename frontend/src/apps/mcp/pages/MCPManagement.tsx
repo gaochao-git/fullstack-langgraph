@@ -20,6 +20,7 @@ import {
   Divider,
   Form,
   Collapse,
+  Tabs,
   message as antdMessage
 } from 'antd';
 import { 
@@ -35,6 +36,7 @@ import {
   LinkOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import OpenAPIConfigTable from '../components/OpenAPIConfigTable';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -676,10 +678,27 @@ const MCPManagement: React.FC = () => {
     }
   ];
 
+  const handleOpenAPISuccess = (config: any) => {
+    message.success('OpenAPI 转换成功！');
+    // 可以在这里处理转换成功后的逻辑，比如刷新服务器列表
+    fetchServers();
+  };
+
   return (
     <div>
-      {/* MCP服务器管理 */}
-      <Card title="MCP服务器管理">
+      <Tabs
+        defaultActiveKey="management"
+        items={[
+          {
+            key: 'management',
+            label: (
+              <Space>
+                <SettingOutlined />
+                服务器管理
+              </Space>
+            ),
+            children: (
+              <Card title="MCP服务器管理">
         <div className="mb-4">
           <Row gutter={[16, 16]} align="middle">
             <Col xs={24} sm={12} md={8}>
@@ -739,7 +758,23 @@ const MCPManagement: React.FC = () => {
             defaultPageSize: 10
           }}
         />
-      </Card>
+              </Card>
+            )
+          },
+          {
+            key: 'openapi-converter',
+            label: (
+              <Space>
+                <ApiOutlined />
+                OpenAPI 转换
+              </Space>
+            ),
+            children: (
+              <OpenAPIConfigTable onSuccess={handleOpenAPISuccess} />
+            )
+          }
+        ]}
+      />
 
       {/* 服务器详情模态框 */}
       <Modal
