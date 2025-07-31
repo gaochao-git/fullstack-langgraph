@@ -1,0 +1,68 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "**********"
+      POSTGRES_DB: mcp-gateway
+    volumes:
+      - ./db:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    restart: always
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis:/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    command: redis-server --appendonly yes --save "900 1" --save "300 10" --save "60 10000" --requirepass "**********"
+    restart: always
+
+  web:
+    image: ghcr.io/amoylab/unla/web:latest
+    ports:
+      - "8080:80"
+      - "5234:5234"
+    environment:
+      - ENV=production
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./.env:/app/.env
+      - ./data:/app/data
+    depends_on:
+      - postgres
+      - mcp-gateway
+      - mock-server
+    restart: always
+
+  mcp-gateway:
+    image: ghcr.io/amoylab/unla/mcp-gateway:latest
+    ports:
+      - "5235:5235"
+    environment:
+      - ENV=production
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./.env:/app/.env
+      - ./data:/app/data
+    depends_on:
+      - postgres
+    restart: always
+
+  mock-server:
+    image: ghcr.io/amoylab/unla/mock-server:latest
+    ports:
+      - "5236:5236"
+    environment:
+      - ENV=production
+      - TZ=Asia/Shanghai
+    volumes:
+      - ./.env:/app/.env
+    depends_on:
+      - postgres
+    restart: always
