@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
     setup_logging(
         log_level=settings.LOG_LEVEL,
         log_dir=settings.LOG_DIR,
-        app_name="error",  # 日志文件名为error.log
+        app_name="omind",  # 日志文件名前缀
         enable_json=False,  # 默认使用文本格式
         rotation_type="time"  # 按时间轮转，适合长期运行的应用
     )

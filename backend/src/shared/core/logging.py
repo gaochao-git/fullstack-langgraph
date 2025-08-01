@@ -7,6 +7,7 @@ import os
 import json
 import logging
 import uuid
+import socket
 from datetime import datetime
 from typing import Optional, Dict, Any
 from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
@@ -14,7 +15,6 @@ from pathlib import Path
 from contextvars import ContextVar
 import colorlog
 
-app_name = "omind"
 """
 日志规范：
 日志文件名：
@@ -30,6 +30,19 @@ app_name = "omind"
 request_id_ctx: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 user_id_ctx: ContextVar[Optional[str]] = ContextVar('user_id', default=None)
 agent_id_ctx: ContextVar[Optional[str]] = ContextVar('agent_id', default=None)
+
+# 获取本机IP地址
+def get_local_ip():
+    """获取本机IP地址"""
+    try:
+        # 连接到一个远程地址来获取本机IP
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+
+LOCAL_IP = get_local_ip()
 
 
 class JSONFormatter(logging.Formatter):
@@ -68,6 +81,60 @@ class JSONFormatter(logging.Formatter):
             log_entry.update(record.extra_fields)
         
         return json.dumps(log_entry, ensure_ascii=False)
+
+
+class AccessLogFormatter(logging.Formatter):
+    """请求日志格式化器 - 符合企业规范的管道分隔格式"""
+    
+    def format(self, record):
+        log_time = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        trace_id = request_id_ctx.get() or "-"
+        parent_id = getattr(record, 'parent_id', '-')
+        request_type = getattr(record, 'request_type', 'HTTP')
+        app_name_val = getattr(record, 'app_name', 'omind')
+        idc = getattr(record, 'idc', 'idc0')
+        ip = getattr(record, 'ip', LOCAL_IP)
+        start_time = getattr(record, 'start_time', '-')
+        cost_time = getattr(record, 'cost_time', '-')
+        error_code = getattr(record, 'error_code', '0')
+        ext1 = getattr(record, 'ext1', '-')
+        ext2 = getattr(record, 'ext2', '-')
+        
+        return f"{log_time}|{trace_id}|{parent_id}|{request_type}|{app_name_val}|{idc}|{ip}|{start_time}|{cost_time}|{error_code}|{ext1}|{ext2}"
+
+
+class AlarmLogFormatter(logging.Formatter):
+    """报警日志格式化器 - 符合企业规范的管道分隔格式"""
+    
+    def format(self, record):
+        log_time = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        trace_id = request_id_ctx.get() or "-"
+        alarm_id = getattr(record, 'alarm_id', str(uuid.uuid4())[:8])
+        request_type = getattr(record, 'request_type', 'ALARM')
+        app_name_val = getattr(record, 'app_name', 'omind')
+        idc = getattr(record, 'idc', 'idc0')
+        ip = getattr(record, 'ip', LOCAL_IP)
+        error_code = getattr(record, 'error_code', '500')
+        error_msg = record.getMessage()
+        ext1 = getattr(record, 'ext1', '-')
+        ext2 = getattr(record, 'ext2', '-')
+        
+        return f"{log_time}|{trace_id}|{alarm_id}|{request_type}|{app_name_val}|{idc}|{ip}|{error_code}|{error_msg}|{ext1}|{ext2}"
+
+
+class AppLogFormatter(logging.Formatter):
+    """应用日志格式化器 - 符合企业规范的管道分隔格式"""
+    
+    def format(self, record):
+        log_time = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        log_level = record.levelname
+        thread_id = record.thread
+        trace_id = request_id_ctx.get() or "-"
+        idc = getattr(record, 'idc', 'idc0')
+        ip = getattr(record, 'ip', LOCAL_IP)
+        msg = record.getMessage()
+        
+        return f"{log_time}|{log_level}|{thread_id}|{trace_id}|{idc}|{ip}|{msg}"
 
 
 class ColoredConsoleFormatter(colorlog.ColoredFormatter):
@@ -125,6 +192,8 @@ class LoggerManager:
     
     def __init__(self):
         self._loggers = {}
+        self._access_logger = None
+        self._alarm_logger = None
         self._configured = False
     
     def setup_logging(
@@ -168,12 +237,25 @@ class LoggerManager:
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
         
-        # 默认单文件配置
+        # 默认三文件配置 - acc/alarm/app 日志分离
         if log_files is None:
             log_files = {
+                "access": {
+                    "filename": f"{app_name}_acc.log",
+                    "level": "INFO",
+                    "formatter": "access",
+                    "filter": None
+                },
+                "alarm": {
+                    "filename": f"{app_name}_alam.log", 
+                    "level": "WARNING",
+                    "formatter": "alarm",
+                    "filter": None
+                },
                 "app": {
-                    "filename": f"{app_name}.log",
+                    "filename": f"{app_name}_app.log",
                     "level": log_level,
+                    "formatter": "app",
                     "filter": None
                 }
             }
@@ -192,16 +274,47 @@ class LoggerManager:
                 handler.addFilter(config["filter"])
             
             # 设置格式化器
+            formatter_type = config.get("formatter", "app")
             if enable_json:
                 handler.setFormatter(JSONFormatter())
-            else:
-                handler.setFormatter(self._create_file_formatter())
+            elif formatter_type == "access":
+                handler.setFormatter(AccessLogFormatter())
+            elif formatter_type == "alarm":
+                handler.setFormatter(AlarmLogFormatter())
+            else:  # app or default
+                handler.setFormatter(AppLogFormatter())
             
             file_handlers.append(handler)
         
         # 添加所有文件处理器
         for handler in file_handlers:
             root_logger.addHandler(handler)
+        
+        # 创建专用logger实例
+        self._access_logger = logging.getLogger('access')
+        self._access_logger.setLevel(logging.INFO)
+        self._access_logger.handlers.clear()
+        
+        self._alarm_logger = logging.getLogger('alarm') 
+        self._alarm_logger.setLevel(logging.WARNING)
+        self._alarm_logger.handlers.clear()
+        
+        # 为专用logger添加对应的文件处理器
+        for log_name, config in log_files.items():
+            if log_name == "access":
+                handler = self._create_file_handler(
+                    log_path / config["filename"], rotation_type, max_file_size, backup_count
+                )
+                handler.setFormatter(AccessLogFormatter())
+                self._access_logger.addHandler(handler)
+                self._access_logger.propagate = False  # 不传播到root logger
+            elif log_name == "alarm":
+                handler = self._create_file_handler(
+                    log_path / config["filename"], rotation_type, max_file_size, backup_count
+                )
+                handler.setFormatter(AlarmLogFormatter())
+                self._alarm_logger.addHandler(handler)
+                self._alarm_logger.propagate = False  # 不传播到root logger
         
         # 配置第三方库日志级别
         logging.getLogger('uvicorn.access').setLevel(logging.WARNING)  # 关闭uvicorn访问日志
@@ -298,6 +411,18 @@ class LoggerManager:
             self._loggers[name] = logging.getLogger(name)
         return self._loggers[name]
     
+    def get_access_logger(self) -> logging.Logger:
+        """获取请求日志记录器"""
+        if not self._access_logger:
+            raise RuntimeError("请先调用 setup_logging() 初始化日志系统")
+        return self._access_logger
+    
+    def get_alarm_logger(self) -> logging.Logger:
+        """获取报警日志记录器"""
+        if not self._alarm_logger:
+            raise RuntimeError("请先调用 setup_logging() 初始化日志系统")
+        return self._alarm_logger
+    
     def set_request_context(
         self,
         request_id: Optional[str] = None,
@@ -345,6 +470,16 @@ def set_request_context(**kwargs):
 def clear_request_context():
     """清除请求上下文的便捷函数"""
     return logger_manager.clear_request_context()
+
+
+def get_access_logger() -> logging.Logger:
+    """获取请求日志记录器的便捷函数"""
+    return logger_manager.get_access_logger()
+
+
+def get_alarm_logger() -> logging.Logger:
+    """获取报警日志记录器的便捷函数"""
+    return logger_manager.get_alarm_logger()
 
 
 def log_with_context(logger: logging.Logger, level: str, message: str, **extra_fields):
@@ -420,6 +555,90 @@ def log_execution_time(logger_name: Optional[str] = None):
         
         return wrapper
     return decorator
+
+
+# 中间件辅助函数
+def log_request(
+    method: str,
+    url: str, 
+    status_code: int,
+    response_time: float,
+    ip: str = "-",
+    user_id: str = None,
+    error_code: str = "0",
+    **extra_kwargs
+):
+    """记录请求日志的辅助函数 - 供中间件使用"""
+    access_logger = get_access_logger()
+    
+    # 构建日志记录
+    record = access_logger.makeRecord(
+        access_logger.name,
+        logging.INFO,
+        "",
+        0,
+        f"{method} {url}",
+        (),
+        None
+    )
+    
+    # 添加请求相关字段
+    record.request_type = method
+    record.ip = LOCAL_IP  # 使用本机IP，忽略传入的客户端IP
+    record.start_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    record.cost_time = f"{response_time:.3f}ms"
+    record.error_code = str(status_code) if status_code >= 400 else error_code
+    record.app_name = 'omind'
+    record.parent_id = extra_kwargs.get('parent_id', '-')
+    record.idc = extra_kwargs.get('idc', 'idc0')
+    record.ext1 = extra_kwargs.get('ext1', f"client:{extra_kwargs.get('client_ip', '-')}" if extra_kwargs.get('client_ip') else '-')
+    record.ext2 = extra_kwargs.get('ext2', f"path:{url}")
+    
+    # 添加额外字段
+    for key, value in extra_kwargs.items():
+        setattr(record, key, value)
+    
+    # 记录日志
+    access_logger.handle(record)
+
+
+def log_alarm(
+    error_msg: str,
+    error_code: str = "500",
+    alarm_id: str = None,
+    ip: str = "-",
+    **extra_kwargs
+):
+    """记录报警日志的辅助函数"""
+    alarm_logger = get_alarm_logger()
+    
+    # 构建日志记录
+    record = alarm_logger.makeRecord(
+        alarm_logger.name,
+        logging.ERROR,
+        "",
+        0,
+        error_msg,
+        (),
+        None
+    )
+    
+    # 添加报警相关字段
+    record.alarm_id = alarm_id or str(uuid.uuid4())[:8]
+    record.error_code = error_code
+    record.ip = LOCAL_IP  # 使用本机IP
+    record.app_name = 'omind'
+    record.idc = extra_kwargs.get('idc', 'idc0')
+    record.request_type = extra_kwargs.get('request_type', 'ALARM')
+    record.ext1 = extra_kwargs.get('ext1', '-')
+    record.ext2 = extra_kwargs.get('ext2', '-')
+    
+    # 添加额外字段
+    for key, value in extra_kwargs.items():
+        setattr(record, key, value)
+    
+    # 记录日志
+    alarm_logger.handle(record)
 
 
 # 装饰器：自动记录异步函数执行时间

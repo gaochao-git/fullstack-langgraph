@@ -5,13 +5,14 @@ FastAPI中间件模块
 
 import time
 import json
+import logging
 from typing import Callable
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from .logging import get_logger, set_request_context, clear_request_context, logger_manager
+from .logging import get_logger, set_request_context, clear_request_context, logger_manager, log_request, log_alarm
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -53,14 +54,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             except:
                 request_body = None
         
-        self.logger.info(f"Request started: {request.method} {request.url.path}", extra={
-            'method': request.method,
-            'url': str(request.url),
-            'path': request.url.path,
-            'client_ip': request.client.host if request.client else None,
-            'user_agent': request.headers.get("user-agent"),
-            'request_body': request_body
-        })
+        # 请求开始时只做简单记录，详细信息在完成时记录
         
         try:
             # 处理请求
@@ -69,14 +63,26 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # 计算处理时间
             process_time = time.time() - start_time
             
-            # 记录响应
-            self.logger.info(f"Request completed: {request.method} {request.url.path} - {response.status_code} ({process_time:.3f}s)", extra={
-                'method': request.method,
-                'url': str(request.url),
-                'path': request.url.path,
-                'status_code': response.status_code,
-                'process_time': f"{process_time:.3f}s"
-            })
+            # 使用新的请求日志格式
+            log_request(
+                method=request.method,
+                url=request.url.path,
+                status_code=response.status_code,
+                response_time=process_time * 1000,  # 转换为毫秒
+                client_ip=request.client.host if request.client else "-",
+                user_id=user_id,
+                error_code=str(response.status_code)
+            )
+            
+            # 仅在DEBUG模式下记录详细日志
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(f"Request completed: {request.method} {request.url.path} - {response.status_code} ({process_time:.3f}s)", extra={
+                    'method': request.method,
+                    'url': str(request.url),
+                    'path': request.url.path,
+                    'status_code': response.status_code,
+                    'process_time': f"{process_time:.3f}s"
+                })
             
             # 添加响应头
             response.headers["X-Request-ID"] = request_id
@@ -88,16 +94,26 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             # 计算处理时间
             process_time = time.time() - start_time
             
-            # 记录错误 - 这将自动写入error.log
-            self.logger.error(f"Request failed: {request.method} {request.url.path} - {type(e).__name__}: {str(e)} ({process_time:.3f}s)", extra={
-                'method': request.method,
-                'url': str(request.url),
-                'path': request.url.path,
-                'process_time': f"{process_time:.3f}s",
-                'error': str(e),
-                'error_type': type(e).__name__,
-                'client_ip': request.client.host if request.client else None
-            })
+            # 记录请求日志（错误状态）
+            log_request(
+                method=request.method,
+                url=request.url.path,
+                status_code=500,
+                response_time=process_time * 1000,
+                client_ip=request.client.host if request.client else "-",
+                user_id=user_id,
+                error_code="500"
+            )
+            
+            # 记录报警日志
+            log_alarm(
+                error_msg=f"{type(e).__name__}: {str(e)}",
+                error_code="INTERNAL_ERROR",
+                client_ip=request.client.host if request.client else "-"
+            )
+            
+            # 应用日志记录错误概要
+            self.logger.error(f"Request failed: {request.method} {request.url.path} - {type(e).__name__}: {str(e)}")
             
             # 返回错误响应
             return JSONResponse(
