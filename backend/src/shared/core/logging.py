@@ -24,7 +24,6 @@ app_name = "omind"
   <log_time>|<trace_id>|<alarm_id>|<request_type>|<app_name>|idc|<ip>|<error_code>|<error_msg>|[ext1]|[ext2]
   应用日志文件名：{app_name}_app.log
   <log_time>|<log_level>|<thread_id>|<trace_id>|[idc]|<ip>|<msg>
-  审计日志文件名：{app_name}_security.log
 """
 
 # 请求追踪上下文
