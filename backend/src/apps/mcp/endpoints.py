@@ -691,83 +691,6 @@ async def get_real_gateway_configs(
         logger.error(f"获取MCP Gateway配置失败: {str(e)}")
         raise BusinessException("获取配置失败", ResponseCode.INTERNAL_ERROR)
 
-
-def _build_gateway_config(server) -> Dict[str, Any]:
-    """
-    将数据库中的MCP服务器转换为MCP Gateway需要的配置格式
-    """
-    import json
-    
-    # 解析服务器工具
-    server_tools = []
-    if server.server_tools:
-        try:
-            if isinstance(server.server_tools, str):
-                server_tools = json.loads(server.server_tools)
-            elif isinstance(server.server_tools, list):
-                server_tools = server.server_tools
-        except:
-            server_tools = []
-    
-    # 解析服务器配置
-    server_config = {}
-    if server.server_config:
-        try:
-            if isinstance(server.server_config, str):
-                server_config = json.loads(server.server_config)
-            elif isinstance(server.server_config, dict):
-                server_config = server.server_config
-        except:
-            server_config = {}
-    
-    # 构建配置
-    config = {
-        "name": f"config-{server.server_id}",
-        "tenant": server.team_name or "default", 
-        "createdAt": server.create_time.isoformat() if server.create_time else datetime.now().isoformat(),
-        "updatedAt": server.update_time.isoformat() if server.update_time else datetime.now().isoformat(),
-        
-        # 路由配置 - 定义HTTP路径映射
-        "routers": [{
-            "server": f"server-{server.server_id}",
-            "prefix": f"/{server.server_id}",
-            "ssePrefix": f"/{server.server_id}",
-            "cors": {
-                "allowOrigins": ["*"],
-                "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allowHeaders": ["Content-Type", "Authorization", "Mcp-Session-Id"],
-                "exposeHeaders": ["Mcp-Session-Id"],
-                "allowCredentials": True
-            }
-        }],
-        
-        # 服务器配置 - 基本信息
-        "servers": [{
-            "name": f"server-{server.server_id}",
-            "description": server.server_description or f"MCP Server: {server.server_name}",
-            "allowedTools": server_tools,
-            "config": server_config
-        }],
-        
-        # MCP服务器配置 - 核心配置
-        "mcpServers": [{
-            "type": _detect_transport_type(server.server_uri),
-            "name": f"server-{server.server_id}",
-            "policy": "onStart",
-            "preinstalled": True,
-            **_build_transport_config(server)
-        }],
-        
-        # 工具配置 - 如果有自定义工具
-        "tools": _build_tools_config(server, server_tools),
-        
-        # 提示词配置 - 暂时为空
-        "prompts": []
-    }
-    
-    return config
-
-
 def _detect_transport_type(server_uri: str) -> str:
     """检测传输类型"""
     if not server_uri:
@@ -782,135 +705,39 @@ def _detect_transport_type(server_uri: str) -> str:
         return "stdio"
 
 
-def _build_transport_config(server) -> Dict[str, Any]:
-    """构建传输配置"""
-    transport_type = _detect_transport_type(server.server_uri)
-    
-    if transport_type == "stdio":
-        # 如果是命令行模式
-        if server.server_uri and ' ' in server.server_uri:
-            # 解析命令和参数 "python /path/to/server.py"
-            parts = server.server_uri.split()
-            return {
-                "command": parts[0],
-                "args": parts[1:] if len(parts) > 1 else [],
-                "env": {}
-            }
-        else:
-            return {
-                "command": server.server_uri or "python",
-                "args": [],
-                "env": {}
-            }
-    else:
-        # HTTP/SSE模式
-        return {
-            "url": server.server_uri
-        }
-
-
-def _build_tools_config(server, server_tools: TypingList[str]) -> TypingList[Dict[str, Any]]:
-    """构建工具配置 - 为REST API转MCP工具提供配置"""
-    tools = []
-    
-    # 为每个工具创建基本配置
-    for tool_name in server_tools:
-        tool_config = {
-            "name": tool_name,
-            "description": f"Tool from {server.server_name}: {tool_name}",
-            "method": "POST",
-            "endpoint": f"http://localhost:5235/{server.server_id}/mcp",
-            "headers": {
-                "Content-Type": "application/json",
-                "Mcp-Session-Id": "{{session.id}}"
-            },
-            "requestBody": "{{request.body}}",
-            "responseBody": "{{response.body}}",
-            "args": [{
-                "name": "input",
-                "position": "body", 
-                "required": True,
-                "type": "object",
-                "description": f"Input for {tool_name}"
-            }]
-        }
-        tools.append(tool_config)
-    
-    return tools
-
-
-@router.get("/v1/mcp/gateway/configs/mock", response_model=UnifiedResponse)
-async def get_mock_gateway_configs():
+@router.get("/v1/mcp/gateway/configs/all", response_model=UnifiedResponse)
+async def get_all_gateway_configs(
+    tenant: Optional[str] = Query(None, description="租户名称过滤"),
+    db: AsyncSession = Depends(get_async_db)
+):
     """
-    返回完全按照Docker中工作配置的MCP Gateway配置数据
-    Docker中成功工作的配置：
-    - 路由前缀: /gateway/9xuv
-    - 服务器: nn
-    - 工具: systeminfo
-    - SSE连接成功示例: /gateway/9xuv/sse
+    获取所有MCP Gateway配置数据（用于MCP Gateway服务加载配置）
     """
-    docker_working_configs = [
-        {
-            "name": "systemhaha",
-            "tenant": "default", 
-            "createdAt": "2025-07-31T11:23:13.337+00:00",
-            "updatedAt": "2025-07-31T19:42:07.924994148+08:00",
-            
-            # Docker中注册的路由配置 - 从日志: registered router tenant=default prefix=/gateway/9xuv server=nn
-            "routers": [
-                {
-                    "server": "nn",
-                    "prefix": "/gateway/9xuv",  # Docker中实际工作的前缀
-                    "ssePrefix": "",  # SSE连接使用的前缀
-                    "cors": {
-                        "allowOrigins": ["*"],
-                        "allowMethods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                        "allowHeaders": ["Content-Type", "Authorization", "Mcp-Session-Id"],
-                        "exposeHeaders": ["Mcp-Session-Id"],
-                        "allowCredentials": True
-                    }
-                }
-            ],
-            
-            # Docker中的服务器配置 - server_count=1, tool_count=1
-            "servers": [
-                {
-                    "name": "nn",
-                    "description": "",
-                    "allowedTools": ["systeminfo"],
-                    "config": {}
-                }
-            ],
-            
-            # Docker中没有配置MCP服务器 - 使用HTTP工具
-            "mcpServers": [],
-            
-            # Docker中的工具配置 - 直接HTTP调用后端API
-            "tools": [
-                {
-                    "name": "systeminfo",
-                    "description": "获取系统信息工具",
-                    "method": "POST",
-                    "endpoint": "http://172.20.10.2:8000/api/v1/mcp/tools/system_info",
-                    "headers": {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    "requestBody": "",
-                    "responseBody": "{{.Response.Body}}",
-                    "args": []
-                }
-            ],
-            
-            # Docker中没有提示词配置
-            "prompts": []
-        }
-    ]
-    
-    return success_response(
-        data={"configs": docker_working_configs},
-        msg=f"获取Docker工作配置成功 (共{len(docker_working_configs)}个)"
-    )
+    try:
+        # 构建查询参数
+        query_params = MCPGatewayConfigQueryParams(
+            tenant=tenant,
+            limit=100,  # 获取较多数据
+            offset=0
+        )
+        
+        # 从数据库获取配置
+        configs, total = await mcp_gateway_service.list_configs(db, query_params)
+        
+        # 转换为Gateway配置格式
+        gateway_configs = []
+        for config in configs:
+            gateway_config = config.to_gateway_config()
+            gateway_configs.append(gateway_config)
+        
+        return success_response(
+            data={"configs": gateway_configs},
+            msg=f"获取MCP Gateway配置成功 (共{len(gateway_configs)}个配置)"
+        )
+        
+    except Exception as e:
+        logger.error(f"获取MCP Gateway配置失败: {str(e)}")
+        raise BusinessException(f"获取配置失败: {str(e)}", ResponseCode.INTERNAL_SERVER_ERROR)
 
 
 # =============================================================================

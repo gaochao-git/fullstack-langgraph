@@ -111,7 +111,23 @@ class MCPConfig(BaseModel):
     
     def _process_tools(self, value):
         """自定义处理tools字段 - 解析为Python对象"""
-        return self._parse_json_field(value, default=[])
+        tools_list = self._parse_json_field(value, default=[])
+        
+        # 处理每个工具中的headers字段，确保它是对象而不是字符串
+        for tool in tools_list:
+            if isinstance(tool, dict) and 'headers' in tool:
+                headers = tool['headers']
+                if isinstance(headers, str) and headers:
+                    try:
+                        # 将headers字符串解析为JSON对象
+                        tool['headers'] = self._parse_json_field(headers, default={})
+                    except:
+                        # 如果解析失败，设为空对象
+                        tool['headers'] = {}
+                elif not isinstance(headers, dict):
+                    tool['headers'] = {}
+        
+        return tools_list
     
     def _process_prompts(self, value):
         """自定义处理prompts字段 - 解析为Python对象"""
@@ -128,8 +144,8 @@ class MCPConfig(BaseModel):
             "config_id": self.config_id,
             "name": self.name,
             "tenant": self.tenant,
-            "createdAt": self.create_time.isoformat() if self.create_time else None,
-            "updatedAt": self.update_time.isoformat() if self.update_time else None,
+            "createdAt": self.create_time.strftime('%Y-%m-%dT%H:%M:%S+08:00') if self.create_time else None,
+            "updatedAt": self.update_time.strftime('%Y-%m-%dT%H:%M:%S+08:00') if self.update_time else None,
             "routers": self._process_routers(self.routers),
             "servers": self._process_servers(self.servers),
             "tools": self._process_tools(self.tools),
