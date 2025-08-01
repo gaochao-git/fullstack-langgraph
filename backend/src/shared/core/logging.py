@@ -14,6 +14,19 @@ from pathlib import Path
 from contextvars import ContextVar
 import colorlog
 
+app_name = "omind"
+"""
+日志规范：
+日志文件名：
+  请求日志文件名：{app_name}_acc.log
+  <log_time>|<trace_id>|[parentId]|<request_type>|<app_name>|[idc]|<ip>|<start_time>|<cost_time>|<error_code>|[ext1]|[ext2]
+  报警日志文件名：{app_name}_alam.log
+  <log_time>|<trace_id>|<alarm_id>|<request_type>|<app_name>|idc|<ip>|<error_code>|<error_msg>|[ext1]|[ext2]
+  应用日志文件名：{app_name}_app.log
+  <log_time>|<log_level>|<thread_id>|<trace_id>|[idc]|<ip>|<msg>
+  审计日志文件名：{app_name}_security.log
+"""
+
 # 请求追踪上下文
 request_id_ctx: ContextVar[Optional[str]] = ContextVar('request_id', default=None)
 user_id_ctx: ContextVar[Optional[str]] = ContextVar('user_id', default=None)
@@ -70,17 +83,40 @@ class ColoredConsoleFormatter(colorlog.ColoredFormatter):
         # 构建上下文部分
         context_parts = []
         if request_id:
-            context_parts.append(f"req:{request_id[:8]}")
+            context_parts.append(request_id)
         if user_id:
             context_parts.append(f"user:{user_id}")
         if agent_id:
             context_parts.append(f"agent:{agent_id}")
         
-        context_str = f" | [{','.join(context_parts)}]" if context_parts else ""
+        context_str = f" | {','.join(context_parts)}" if context_parts else ""
         
-        # 动态设置格式，包含上下文
+        # 处理 extra 字段
+        extra_info = ""
+        if hasattr(record, '__dict__'):
+            # 获取所有非标准字段作为 extra 信息
+            standard_fields = {
+                'name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename',
+                'module', 'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
+                'thread', 'threadName', 'processName', 'process', 'message', 'getMessage',
+                'exc_info', 'exc_text', 'stack_info', 'extra_fields'
+            }
+            extra_fields = {}
+            for key, value in record.__dict__.items():
+                if key not in standard_fields and not key.startswith('_'):
+                    extra_fields[key] = value
+            
+            # 如果有 extra_fields 属性，使用它
+            if hasattr(record, 'extra_fields'):
+                extra_fields.update(record.extra_fields)
+            
+            if extra_fields:
+                extra_items = [f"{k}={v}" for k, v in extra_fields.items()]
+                extra_info = f" | {', '.join(extra_items)}"
+        
+        # 动态设置格式，包含上下文和额外信息
         location = "%(name)s:%(lineno)d:%(funcName)s"
-        self._style._fmt = f"%(log_color)s%(asctime)s%(reset)s | %(log_color)s%(levelname)s%(reset)s | {location}{context_str} | %(message)s"
+        self._style._fmt = f"%(log_color)s%(asctime)s%(reset)s | %(log_color)s%(levelname)s%(reset)s | {location}{context_str} | %(message)s{extra_info}"
         
         return super().format(record)
 
@@ -219,16 +255,39 @@ class LoggerManager:
                 # 构建上下文字符串
                 context_parts = []
                 if request_id:
-                    context_parts.append(f"req:{request_id[:8]}")
+                    context_parts.append(request_id)
                 if user_id:
                     context_parts.append(f"user:{user_id}")
                 if agent_id:
                     context_parts.append(f"agent:{agent_id}")
                 
-                context_str = f" | [{','.join(context_parts)}]" if context_parts else ""
+                context_str = f" | {','.join(context_parts)}" if context_parts else ""
+                
+                # 处理 extra 字段
+                extra_info = ""
+                if hasattr(record, '__dict__'):
+                    # 获取所有非标准字段作为 extra 信息
+                    standard_fields = {
+                        'name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename',
+                        'module', 'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
+                        'thread', 'threadName', 'processName', 'process', 'message', 'getMessage',
+                        'exc_info', 'exc_text', 'stack_info', 'extra_fields'
+                    }
+                    extra_fields = {}
+                    for key, value in record.__dict__.items():
+                        if key not in standard_fields and not key.startswith('_'):
+                            extra_fields[key] = value
+                    
+                    # 如果有 extra_fields 属性，使用它
+                    if hasattr(record, 'extra_fields'):
+                        extra_fields.update(record.extra_fields)
+                    
+                    if extra_fields:
+                        extra_items = [f"{k}={v}" for k, v in extra_fields.items()]
+                        extra_info = f" | {', '.join(extra_items)}"
                 
                 # 基础格式
-                base_format = f"%(asctime)s | %(levelname)s | %(name)s:%(lineno)d:%(funcName)s{context_str} | %(message)s"
+                base_format = f"%(asctime)s | %(levelname)s | %(name)s:%(lineno)d:%(funcName)s{context_str} | %(message)s{extra_info}"
                 formatter = logging.Formatter(base_format)
                 return formatter.format(record)
         
@@ -262,7 +321,7 @@ class LoggerManager:
     
     def generate_request_id(self) -> str:
         """生成请求ID"""
-        return str(uuid.uuid4())
+        return str(uuid.uuid4()).replace('-', '')
 
 
 # 全局日志管理器实例
