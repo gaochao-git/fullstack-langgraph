@@ -334,3 +334,114 @@ class OpenAPIMCPConfigUpdate(BaseModel):
             except json.JSONDecodeError:
                 raise ValueError("配置字段必须是有效的JSON格式")
         return v
+
+
+# MCP Gateway 配置相关Schema
+class MCPGatewayConfigCreate(BaseModel):
+    """创建MCP Gateway配置"""
+    name: str = Field(..., description="配置名称", min_length=1, max_length=50)
+    tenant: str = Field("default", description="租户名称", min_length=1, max_length=50)
+    routers: Optional[List[Dict[str, Any]]] = Field([], description="路由配置")
+    servers: Optional[List[Dict[str, Any]]] = Field([], description="服务器配置")
+    tools: Optional[List[Dict[str, Any]]] = Field([], description="工具配置")
+    prompts: Optional[List[Dict[str, Any]]] = Field([], description="提示词配置")
+    mcp_servers: Optional[List[Dict[str, Any]]] = Field([], description="MCP服务器配置")
+    create_by: str = Field(..., description="创建者", min_length=1, max_length=100)
+
+    @validator('name')
+    def validate_name(cls, v):
+        """验证配置名称"""
+        if not v or not v.strip():
+            raise ValueError("配置名称不能为空")
+        # 只允许字母、数字、下划线、连字符
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("配置名称只能包含字母、数字、下划线和连字符")
+        return v.strip()
+
+    @validator('tenant')
+    def validate_tenant(cls, v):
+        """验证租户名称"""
+        if not v or not v.strip():
+            raise ValueError("租户名称不能为空")
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+            raise ValueError("租户名称只能包含字母、数字、下划线和连字符")
+        return v.strip()
+
+
+class MCPGatewayConfigUpdate(BaseModel):
+    """更新MCP Gateway配置"""
+    name: Optional[str] = Field(None, description="配置名称", min_length=1, max_length=50)
+    tenant: Optional[str] = Field(None, description="租户名称", min_length=1, max_length=50)
+    routers: Optional[List[Dict[str, Any]]] = Field(None, description="路由配置")
+    servers: Optional[List[Dict[str, Any]]] = Field(None, description="服务器配置")
+    tools: Optional[List[Dict[str, Any]]] = Field(None, description="工具配置")
+    prompts: Optional[List[Dict[str, Any]]] = Field(None, description="提示词配置")
+    mcp_servers: Optional[List[Dict[str, Any]]] = Field(None, description="MCP服务器配置")
+    update_by: Optional[str] = Field(None, description="更新者", min_length=1, max_length=100)
+
+    @validator('name')
+    def validate_name(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError("配置名称不能为空")
+            import re
+            if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+                raise ValueError("配置名称只能包含字母、数字、下划线和连字符")
+            return v.strip()
+        return v
+
+    @validator('tenant')
+    def validate_tenant(cls, v):
+        if v is not None:
+            if not v.strip():
+                raise ValueError("租户名称不能为空")
+            import re
+            if not re.match(r'^[a-zA-Z0-9_-]+$', v):
+                raise ValueError("租户名称只能包含字母、数字、下划线和连字符")
+            return v.strip()
+        return v
+
+
+class MCPGatewayConfigResponse(BaseModel):
+    """MCP Gateway配置响应"""
+    id: int
+    config_id: str
+    name: str
+    tenant: str
+    routers: List[Dict[str, Any]]
+    servers: List[Dict[str, Any]]
+    tools: List[Dict[str, Any]]
+    prompts: List[Dict[str, Any]]
+    mcp_servers: List[Dict[str, Any]]
+    is_deleted: int
+    create_by: str
+    update_by: Optional[str]
+    create_time: str
+    update_time: str
+
+    class Config:
+        from_attributes = True
+
+
+class MCPGatewayConfigQueryParams(BaseModel):
+    """MCP Gateway配置查询参数"""
+    name: Optional[str] = Field(None, description="配置名称过滤", max_length=50)
+    tenant: Optional[str] = Field(None, description="租户名称过滤", max_length=50)
+    create_by: Optional[str] = Field(None, description="创建者过滤", max_length=100)
+    limit: Optional[int] = Field(10, description="返回数量", ge=1, le=100)
+    offset: Optional[int] = Field(0, description="偏移量", ge=0)
+
+
+class MCPGatewayConfigExport(BaseModel):
+    """MCP Gateway配置导出格式"""
+    name: str
+    tenant: str
+    createdAt: str
+    updatedAt: str
+    routers: List[Dict[str, Any]]
+    servers: List[Dict[str, Any]]
+    tools: List[Dict[str, Any]]
+    prompts: List[Dict[str, Any]]
+    mcpServers: List[Dict[str, Any]]

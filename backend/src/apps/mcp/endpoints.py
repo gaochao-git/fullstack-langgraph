@@ -11,10 +11,12 @@ from src.shared.db.config import get_async_db
 from src.apps.mcp.schema import (
     MCPServerCreate, MCPServerUpdate, MCPQueryParams,
     MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate,
-    OpenAPIMCPConfigCreate, OpenAPIMCPConfigUpdate
+    OpenAPIMCPConfigCreate, OpenAPIMCPConfigUpdate,
+    MCPGatewayConfigCreate, MCPGatewayConfigUpdate, MCPGatewayConfigQueryParams
 )
 from src.apps.mcp.service.mcp_service import mcp_service
 from src.apps.mcp.service.openapi_mcp_service import OpenAPIMCPConfigService
+from src.apps.mcp.service.mcp_gateway_service import mcp_gateway_service
 from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
 )
@@ -641,13 +643,14 @@ async def list_files(
 # =============================================================================
 
 
-@router.get("/v1/mcp/gateway/configs", response_model=UnifiedResponse)
-async def get_gateway_configs(
+@router.get("/v1/mcp/gateway/configs/real", response_model=UnifiedResponse)
+async def get_real_gateway_configs(
     since: Optional[str] = Query(None, description="增量更新时间戳 (ISO 8601)"),
+    tenant: Optional[str] = Query(None, description="租户过滤"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    为MCP Gateway提供配置数据
+    为MCP Gateway提供真实配置数据 - 从数据库获取
     支持全量和增量拉取
     """
     try:
@@ -659,31 +662,27 @@ async def get_gateway_configs(
             except ValueError:
                 raise BusinessException("时间格式错误，请使用ISO 8601格式", ResponseCode.BAD_REQUEST)
         
-        # 获取MCP服务器列表
-        params = MCPQueryParams(
-            is_enabled="on",  # 只返回启用的服务器
-            limit=1000,      # 大量限制
-            offset=0
-        )
-        
-        servers, total = await mcp_service.list_servers(db, params)
+        # 获取配置数据
+        if tenant:
+            configs = await mcp_gateway_service.get_configs_by_tenant(db, tenant)
+        else:
+            configs = await mcp_gateway_service.get_all_active_configs(db)
         
         # 过滤增量更新
         if since_datetime:
-            servers = [s for s in servers if s.update_time > since_datetime]
-            logger.info(f"增量更新: 找到 {len(servers)} 个更新的MCP服务器 (since: {since_datetime})")
+            configs = [c for c in configs if c.update_time > since_datetime]
+            logger.info(f"增量更新: 找到 {len(configs)} 个更新的MCP Gateway配置 (since: {since_datetime})")
         else:
-            logger.info(f"全量拉取: 返回 {len(servers)} 个MCP服务器")
+            logger.info(f"全量拉取: 返回 {len(configs)} 个MCP Gateway配置")
         
-        # 构建MCP Gateway配置格式
-        configs = []
-        for server in servers:
-            config = _build_gateway_config(server)
-            configs.append(config)
+        # 转换为Gateway配置格式
+        gateway_configs = []
+        for config in configs:
+            gateway_configs.append(config.to_gateway_config())
         
         return success_response(
-            data={"configs": configs},
-            msg=f"获取MCP Gateway配置成功 (共{len(configs)}个)"
+            data={"configs": gateway_configs},
+            msg=f"获取MCP Gateway配置成功 (共{len(gateway_configs)}个)"
         )
         
     except BusinessException:
@@ -912,3 +911,150 @@ async def get_mock_gateway_configs():
         data={"configs": docker_working_configs},
         msg=f"获取Docker工作配置成功 (共{len(docker_working_configs)}个)"
     )
+
+
+# =============================================================================
+# MCP Gateway 配置管理接口
+# =============================================================================
+
+@router.post("/v1/mcp/gateway/configs", response_model=UnifiedResponse)
+async def create_gateway_config(
+    config_data: MCPGatewayConfigCreate,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """创建MCP Gateway配置"""
+    try:
+        config = await mcp_gateway_service.create_config(db, config_data)
+        return success_response(
+            data=config.to_dict(),
+            msg="MCP Gateway配置创建成功",
+            code=ResponseCode.CREATED
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"创建MCP Gateway配置失败: {str(e)}")
+        raise BusinessException("创建配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/mcp/gateway/configs", response_model=UnifiedResponse)
+async def list_gateway_configs(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    name: Optional[str] = Query(None, description="配置名称过滤"),
+    tenant: Optional[str] = Query(None, description="租户过滤"),
+    create_by: Optional[str] = Query(None, description="创建者过滤"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取MCP Gateway配置列表"""
+    try:
+        params = MCPGatewayConfigQueryParams(
+            name=name,
+            tenant=tenant,
+            create_by=create_by,
+            limit=size,
+            offset=(page - 1) * size
+        )
+        
+        configs, total = await mcp_gateway_service.list_configs(db, params)
+        config_list = [config.to_dict() for config in configs]
+        
+        return paginated_response(
+            items=config_list,
+            total=total,
+            page=page,
+            size=size,
+            msg="获取MCP Gateway配置列表成功"
+        )
+    except Exception as e:
+        logger.error(f"获取MCP Gateway配置列表失败: {str(e)}")
+        raise BusinessException("获取配置列表失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/mcp/gateway/configs/{config_id}", response_model=UnifiedResponse)
+async def get_gateway_config(
+    config_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取指定的MCP Gateway配置"""
+    try:
+        config = await mcp_gateway_service.get_config_by_id(db, config_id)
+        if not config:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        return success_response(
+            data=config.to_dict(),
+            msg="获取配置成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"获取MCP Gateway配置失败: {str(e)}")
+        raise BusinessException("获取配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.put("/v1/mcp/gateway/configs/{config_id}", response_model=UnifiedResponse)
+async def update_gateway_config(
+    config_id: int,
+    config_data: MCPGatewayConfigUpdate,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """更新MCP Gateway配置"""
+    try:
+        updated_config = await mcp_gateway_service.update_config(db, config_id, config_data)
+        if not updated_config:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        return success_response(
+            data=updated_config.to_dict(),
+            msg="配置更新成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"更新MCP Gateway配置失败: {str(e)}")
+        raise BusinessException("更新配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.delete("/v1/mcp/gateway/configs/{config_id}", response_model=UnifiedResponse)
+async def delete_gateway_config(
+    config_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """删除MCP Gateway配置（软删除）"""
+    try:
+        success = await mcp_gateway_service.delete_config(db, config_id)
+        if not success:
+            raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
+        
+        return success_response(
+            data={"deleted": True},
+            msg="配置删除成功"
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"删除MCP Gateway配置失败: {str(e)}")
+        raise BusinessException("删除配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/mcp/gateway/configs/export/{tenant}", response_model=UnifiedResponse)
+async def export_gateway_configs(
+    tenant: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """导出指定租户的MCP Gateway配置"""
+    try:
+        configs = await mcp_gateway_service.get_configs_by_tenant(db, tenant)
+        
+        export_configs = []
+        for config in configs:
+            export_configs.append(config.to_gateway_config())
+        
+        return success_response(
+            data={"configs": export_configs},
+            msg=f"导出租户 {tenant} 的配置成功 (共{len(export_configs)}个)"
+        )
+    except Exception as e:
+        logger.error(f"导出MCP Gateway配置失败: {str(e)}")
+        raise BusinessException("导出配置失败", ResponseCode.INTERNAL_ERROR)

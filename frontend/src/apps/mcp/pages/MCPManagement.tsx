@@ -36,7 +36,7 @@ import {
   LinkOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import OpenAPIConfigTable from '../components/OpenAPIConfigTable';
+import MCPGatewayManagement from '../components/MCPGatewayManagement';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -678,9 +678,9 @@ const MCPManagement: React.FC = () => {
     }
   ];
 
-  const handleOpenAPISuccess = (config: any) => {
-    message.success('OpenAPI 转换成功！');
-    // 可以在这里处理转换成功后的逻辑，比如刷新服务器列表
+  const handleGatewayConfigSuccess = (config: any) => {
+    message.success('MCP Gateway配置操作成功！');
+    // 可以在这里处理成功后的逻辑
     fetchServers();
   };
 
@@ -762,15 +762,15 @@ const MCPManagement: React.FC = () => {
             )
           },
           {
-            key: 'openapi-converter',
+            key: 'gateway-management',
             label: (
               <Space>
                 <ApiOutlined />
-                OpenAPI 转换
+                MCP Gateway管理
               </Space>
             ),
             children: (
-              <OpenAPIConfigTable onSuccess={handleOpenAPISuccess} />
+              <MCPGatewayManagement onSuccess={handleGatewayConfigSuccess} />
             )
           }
         ]}
