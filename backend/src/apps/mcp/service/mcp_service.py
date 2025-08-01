@@ -2,6 +2,7 @@
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy import select, update, delete, and_, func, case, distinct
 
 from src.apps.mcp.models import MCPServer
@@ -55,6 +56,17 @@ class MCPService:
     ) -> Optional[MCPServer]:
         """根据ID获取MCP服务器"""
         result = await session.execute(
+            select(MCPServer).where(MCPServer.server_id == server_id)
+        )
+        return result.scalar_one_or_none()
+    
+    def get_server_by_id_sync(
+        self, 
+        session: Session, 
+        server_id: str
+    ) -> Optional[MCPServer]:
+        """根据ID获取MCP服务器（同步版本）"""
+        result = session.execute(
             select(MCPServer).where(MCPServer.server_id == server_id)
         )
         return result.scalar_one_or_none()

@@ -8,7 +8,7 @@ from .configuration import Configuration
 from .state import DiagnosticState
 from .utils import compile_graph_with_checkpointer
 from .prompts import get_system_prompt
-from .tools_mcp import get_diagnostic_tools
+from .tools import get_diagnostic_tools
 
 def create_main_graph(enable_tool_approval: bool = False):
     """创建主图"""
@@ -21,11 +21,10 @@ def create_main_graph(enable_tool_approval: bool = False):
         configurable = config.get("configurable", {}) if config else {}
         # 获取agent_id，必须存在，不使用默认值
         agent_id = configurable.get("agent_id")
-        if not agent_id:
-            raise RuntimeError("配置中缺少必需的agent_id参数")
+        if not agent_id: raise RuntimeError("配置中缺少必需的agent_id参数")
         print(f"🚀完整智能体配置: {dict(config) if config else 'None'}")
         llm = get_llm_from_config(config)
-        tools = await get_diagnostic_tools(enable_tool_approval)
+        tools = await get_diagnostic_tools(agent_id)
         
         # 获取智能体名称并获取对应的系统提示词（必须从数据库获取）
         try:

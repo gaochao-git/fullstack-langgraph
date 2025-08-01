@@ -863,25 +863,3 @@ async def delete_gateway_config(
     except Exception as e:
         logger.error(f"删除MCP Gateway配置失败: {str(e)}")
         raise BusinessException("删除配置失败", ResponseCode.INTERNAL_ERROR)
-
-
-@router.get("/v1/mcp/gateway/configs/export/{tenant}", response_model=UnifiedResponse)
-async def export_gateway_configs(
-    tenant: str,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """导出指定租户的MCP Gateway配置"""
-    try:
-        configs = await mcp_gateway_service.get_configs_by_tenant(db, tenant)
-        
-        export_configs = []
-        for config in configs:
-            export_configs.append(config.to_gateway_config())
-        
-        return success_response(
-            data={"configs": export_configs},
-            msg=f"导出租户 {tenant} 的配置成功 (共{len(export_configs)}个)"
-        )
-    except Exception as e:
-        logger.error(f"导出MCP Gateway配置失败: {str(e)}")
-        raise BusinessException("导出配置失败", ResponseCode.INTERNAL_ERROR)

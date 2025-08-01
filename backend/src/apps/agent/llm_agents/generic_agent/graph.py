@@ -10,7 +10,7 @@ from .prompts import get_system_prompt
 from .configuration import Configuration
 from .state import AgentState
 from .utils import compile_graph_with_checkpointer
-from .tools import get_langchain_tools_by_categories
+from .tools import get_generic_agent_tools
 
 
 def create_main_graph():
@@ -37,7 +37,7 @@ def create_main_graph():
         
         # 获取配置实例并获取工具
         agent_config = Configuration.from_runnable_config(config)
-        tools = get_langchain_tools_by_categories(agent_config.enabled_tool_categories)
+        tools = await get_generic_agent_tools(agent_id)
         
         # 获取系统提示词（必须从数据库获取）
         try:
