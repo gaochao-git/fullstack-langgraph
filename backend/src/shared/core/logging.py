@@ -23,7 +23,7 @@ import colorlog
   报警日志文件名：{app_name}_alam.log
   <log_time>|<trace_id>|<alarm_id>|<request_type>|<app_name>|idc|<ip>|<error_code>|<error_msg>|[ext1]|[ext2]
   应用日志文件名：{app_name}_app.log
-  <log_time>|<log_level>|<thread_id>|<trace_id>|[idc]|<ip>|<msg>
+  <log_time>|<log_level>|<thread_id>|<trace_id>|[idc]|<ip>|<filename>|<module>|<lineno>|<msg，能够打印错误堆栈>|[ext1]|[ext2]
 """
 
 # 请求追踪上下文
