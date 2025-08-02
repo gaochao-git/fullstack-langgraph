@@ -10,6 +10,7 @@ export interface MCPServer {
   server_id: string;
   server_name: string;
   server_uri: string;
+  transport_type?: string;
   server_description?: string;
   is_enabled: string;
   connection_status: string;
@@ -30,6 +31,7 @@ export interface MCPServerCreateRequest {
   server_id: string;
   server_name: string;
   server_uri: string;
+  transport_type?: string;
   server_description?: string;
   is_enabled?: 'on' | 'off';
   connection_status?: 'connected' | 'disconnected' | 'error';
@@ -37,7 +39,7 @@ export interface MCPServerCreateRequest {
   auth_token?: string;
   api_key_header?: string;
   read_timeout_seconds?: number;
-  server_tools?: string[];
+  server_tools?: any[];
   server_config?: Record<string, any>;
   team_name: string;
 }
@@ -45,6 +47,7 @@ export interface MCPServerCreateRequest {
 export interface MCPServerUpdateRequest {
   server_name?: string;
   server_uri?: string;
+  transport_type?: string;
   server_description?: string;
   is_enabled?: 'on' | 'off';
   connection_status?: 'connected' | 'disconnected' | 'error';
@@ -52,7 +55,7 @@ export interface MCPServerUpdateRequest {
   auth_token?: string;
   api_key_header?: string;
   read_timeout_seconds?: number;
-  server_tools?: string[];
+  server_tools?: any[];
   server_config?: Record<string, any>;
   team_name?: string;
 }

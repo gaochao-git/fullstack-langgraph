@@ -34,6 +34,16 @@ class MCPService:
             # 转换数据
             data = server_data.dict()
             
+            # 处理server_tools字段 - 转换为JSON字符串
+            if 'server_tools' in data and data['server_tools'] is not None:
+                import json
+                data['server_tools'] = json.dumps(data['server_tools'])
+            
+            # 处理server_config字段 - 转换为JSON字符串
+            if 'server_config' in data and data['server_config'] is not None:
+                import json
+                data['server_config'] = json.dumps(data['server_config'])
+            
             # 设置默认值
             data.setdefault('is_enabled', 'on')
             data.setdefault('connection_status', 'disconnected')
@@ -152,11 +162,23 @@ class MCPService:
             # 转换数据
             data = server_data.dict(exclude_unset=True)
             
+            # 处理server_tools字段 - 转换为JSON字符串
+            if 'server_tools' in data and data['server_tools'] is not None:
+                import json
+                data['server_tools'] = json.dumps(data['server_tools'])
+            
+            # 处理server_config字段 - 转换为JSON字符串
+            if 'server_config' in data and data['server_config'] is not None:
+                import json
+                data['server_config'] = json.dumps(data['server_config'])
+            
             # 移除不可更新字段
             data.pop('server_id', None)
             data.pop('create_time', None)
             data.pop('create_by', None)
-            data['update_by'] = 'system'
+            # 如果没有指定update_by，则设置为system
+            if 'update_by' not in data:
+                data['update_by'] = 'system'
             data['update_time'] = now_shanghai()
             
             logger.info(f"Updating MCP server: {server_id}")

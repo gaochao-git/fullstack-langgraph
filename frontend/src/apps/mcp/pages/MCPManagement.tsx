@@ -54,6 +54,7 @@ interface MCPServer {
   id: string;
   name: string;
   uri: string;
+  transportType?: string;
   status: 'connected' | 'disconnected' | 'error';
   description: string;
   tools: MCPTool[];
@@ -78,6 +79,7 @@ const transformServerFromAPI = (apiServer: any): MCPServer => {
     id: apiServer.server_id,
     name: apiServer.server_name,
     uri: apiServer.server_uri,
+    transportType: apiServer.transport_type,
     status: apiServer.connection_status as 'connected' | 'disconnected' | 'error',
     description: apiServer.server_description || '',
     enabled: apiServer.is_enabled === 'on',
@@ -102,6 +104,7 @@ const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'fr
     server_id: server.id,
     server_name: server.name,
     server_uri: server.uri,
+    transport_type: server.transportType || 'streamable-http',
     server_description: server.description,
     is_enabled: server.enabled ? 'on' : 'off',
     connection_status: server.status || 'disconnected',
@@ -257,11 +260,11 @@ const MCPManagement: React.FC = () => {
       if (response.ok) {
         const result = await response.json();
         const data = result.data; // 解析统一响应格式
-        if (data.healthy) {
+        if (data) {
           message.success('服务器连接测试成功');
           await fetchServers(); // 刷新状态
         } else {
-          message.error(`连接测试失败: ${data.error || '未知错误'}`);
+          message.error(`连接测试失败: ${result.msg || '未知错误'}`);
         }
         return data;
       } else {
@@ -385,6 +388,7 @@ const MCPManagement: React.FC = () => {
       id: editingServer?.id || `server-${Date.now()}`,
       name: values.name,
       uri: values.uri,
+      transportType: values.transportType,
       description: values.description,
       readTimeoutSeconds: values.readTimeoutSeconds,
       authType: values.authType,
@@ -474,7 +478,6 @@ const MCPManagement: React.FC = () => {
         body: JSON.stringify(requestBody)
       });
       const response = await resp.json();
-      console.log(1111,response.msg)
       const tools = response.data; // 解析统一响应格式
       const msg = response.msg; // 解析统一响应格式
       if (tools) {
@@ -541,7 +544,7 @@ const MCPManagement: React.FC = () => {
       title: '服务器名称',
       dataIndex: 'name',
       key: 'name',
-      width: 150,
+      width: 180,
       render: (name: string, record: MCPServer) => (
         <Space>
           <ApiOutlined />
@@ -556,9 +559,10 @@ const MCPManagement: React.FC = () => {
       title: '连接地址',
       dataIndex: 'uri',
       key: 'uri',
-      width: 300,
+      flex: 1,
+      minWidth: 250,
       render: (uri: string) => (
-        <div style={{ minWidth: 200, maxWidth: 300 }}>
+        <div style={{ minWidth: 200, maxWidth: 400 }}>
           <code 
             className="px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
             style={{ 
@@ -575,10 +579,41 @@ const MCPManagement: React.FC = () => {
       )
     },
     {
+      title: '传输类型',
+      dataIndex: 'transportType',
+      key: 'transportType',
+      width: 140,
+      render: (transportType: string) => {
+        const getTransportColor = (type: string) => {
+          switch(type) {
+            case 'sse': return 'blue';
+            case 'streamable-http': return 'green';
+            case 'stdio': return 'orange';
+            default: return 'default';
+          }
+        };
+        
+        const getTransportText = (type: string) => {
+          switch(type) {
+            case 'sse': return 'sse';
+            case 'streamable-http': return 'streamable-http';
+            case 'stdio': return 'stdio';
+            default: return type || 'streamable-http';
+          }
+        };
+        
+        return (
+          <Tag color={getTransportColor(transportType)}>
+            {getTransportText(transportType)}
+          </Tag>
+        );
+      }
+    },
+    {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 80,
       render: (status: MCPServer['status']) => (
         <Tag color={getStatusColor(status)}>
           {getStatusText(status)}
@@ -588,7 +623,7 @@ const MCPManagement: React.FC = () => {
     {
       title: '工具数量',
       key: 'toolsCount',
-      width: 100,
+      width: 80,
       render: (_, record: MCPServer) => {
         const enabledCount = record.tools.filter(tool => tool.globalEnabled).length;
         const totalCount = record.tools.length;
@@ -606,22 +641,22 @@ const MCPManagement: React.FC = () => {
       title: '版本',
       dataIndex: 'version',
       key: 'version',
-      width: 100,
+      width: 80,
       render: (version: string) => (
-        <Tag color="default">{version}</Tag>
+        <Tag color="default">{version || '-'}</Tag>
       )
     },
     {
       title: '最后连接时间',
       dataIndex: 'lastConnected',
       key: 'lastConnected',
-      width: 150,
+      width: 140,
       render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
     },
     {
       title: '启用状态',
       key: 'enabled',
-      width: 120,
+      width: 100,
       render: (_, record: MCPServer) => (
         <Switch
           checked={record.enabled}
@@ -636,6 +671,7 @@ const MCPManagement: React.FC = () => {
       title: '操作',
       key: 'actions',
       width: 160,
+      fixed: 'right',
       render: (_, record: MCPServer) => (
         <Space size="small">
           <Button 
@@ -932,6 +968,7 @@ const MCPManagement: React.FC = () => {
           initialValues={editingServer ? {
             name: editingServer.name,
             uri: editingServer.uri,
+            transportType: editingServer.transportType || 'streamable-http',
             description: editingServer.description,
             readTimeoutSeconds: editingServer.readTimeoutSeconds || 5,
             authType: editingServer.authType || 'none',
@@ -939,6 +976,7 @@ const MCPManagement: React.FC = () => {
             apiKeyHeader: editingServer.apiKeyHeader || 'X-API-Key'
           } : {
             authType: 'none',
+            transportType: 'streamable-http',
             readTimeoutSeconds: 5
           }}
         >
@@ -979,6 +1017,19 @@ const MCPManagement: React.FC = () => {
                 </Button>
               </Col>
             </Row>
+          </Form.Item>
+
+          {/* 传输类型选择 */}
+          <Form.Item
+            label="传输类型"
+            name="transportType"
+            initialValue="streamable-http"
+          >
+            <Select size="middle">
+              <Option value="streamable-http">streamable-http</Option>
+              <Option value="sse">sse</Option>
+              <Option value="stdio">stdio</Option>
+            </Select>
           </Form.Item>
 
           {/* 认证类型选择 */}

@@ -107,4 +107,4 @@ async def execute_mysql_query(
 
 if __name__ == "__main__":
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="sse", host="localhost", port=3001)
+    mcp.run(transport="streamable-http", host="localhost", port=3001)

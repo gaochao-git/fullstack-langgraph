@@ -17,6 +17,7 @@ class MCPServer(Base):
     server_id = Column(String(100), unique=True, index=True, nullable=False)
     server_name = Column(String(200), nullable=False)
     server_uri = Column(String(500), nullable=False)
+    transport_type = Column(String(50), default='streamable-http', nullable=False)
     server_description = Column(Text, nullable=True)
     is_enabled = Column(String(10), default='on', nullable=False)
     connection_status = Column(String(20), default='disconnected', nullable=False)
@@ -59,6 +60,7 @@ class MCPServer(Base):
             'server_id': self.server_id,
             'server_name': self.server_name,
             'server_uri': self.server_uri,
+            'transport_type': self.transport_type,
             'server_description': self.server_description,
             'is_enabled': self.is_enabled,
             'connection_status': self.connection_status,

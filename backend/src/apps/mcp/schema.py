@@ -11,6 +11,7 @@ class MCPServerCreate(BaseModel):
                           pattern=r'^[a-zA-Z0-9_-]+$')
     server_name: str = Field(..., description="服务器名称", min_length=1, max_length=200)
     server_uri: str = Field(..., description="服务器URI", min_length=1, max_length=500)
+    transport_type: Optional[str] = Field("streamable-http", description="传输类型", max_length=50)
     server_description: Optional[str] = Field(None, description="服务器描述", max_length=1000)
     is_enabled: Optional[Literal["on", "off"]] = Field("on", description="是否启用")
     connection_status: Optional[Literal["connected", "disconnected", "error"]] = Field(
@@ -19,7 +20,7 @@ class MCPServerCreate(BaseModel):
     auth_token: Optional[str] = Field(None, description="认证令牌", max_length=500)
     api_key_header: Optional[str] = Field(None, description="API密钥头", max_length=100)
     read_timeout_seconds: Optional[int] = Field(5, description="读取超时秒数", ge=1, le=300)
-    server_tools: Optional[List[str]] = Field(None, description="服务器工具列表", max_items=100)
+    server_tools: Optional[List[Dict[str, Any]]] = Field(None, description="服务器工具列表", max_items=100)
     server_config: Optional[Dict[str, Any]] = Field(None, description="服务器配置")
     team_name: str = Field(..., description="团队名称", min_length=1, max_length=100)
     
@@ -37,6 +38,7 @@ class MCPServerUpdate(BaseModel):
     """更新MCP服务器的schema"""
     server_name: Optional[str] = Field(None, description="服务器名称", min_length=1, max_length=200)
     server_uri: Optional[str] = Field(None, description="服务器URI", min_length=1, max_length=500)
+    transport_type: Optional[str] = Field(None, description="传输类型", max_length=50)
     server_description: Optional[str] = Field(None, description="服务器描述", max_length=1000)
     is_enabled: Optional[Literal["on", "off"]] = Field(None, description="是否启用")
     connection_status: Optional[Literal["connected", "disconnected", "error"]] = Field(
@@ -45,7 +47,7 @@ class MCPServerUpdate(BaseModel):
     auth_token: Optional[str] = Field(None, description="认证令牌", max_length=500)
     api_key_header: Optional[str] = Field(None, description="API密钥头", max_length=100)
     read_timeout_seconds: Optional[int] = Field(None, description="读取超时秒数", ge=1, le=300)
-    server_tools: Optional[List[str]] = Field(None, description="服务器工具列表", max_items=100)
+    server_tools: Optional[List[Dict[str, Any]]] = Field(None, description="服务器工具列表", max_items=100)
     server_config: Optional[Dict[str, Any]] = Field(None, description="服务器配置")
     team_name: Optional[str] = Field(None, description="团队名称", min_length=1, max_length=100)
     
@@ -65,6 +67,7 @@ class MCPServerResponse(BaseModel):
     server_id: str
     server_name: str
     server_uri: str
+    transport_type: str
     server_description: Optional[str]
     is_enabled: str
     connection_status: str

@@ -57,10 +57,10 @@ async def get_diagnostic_tools(agent_id: str = "diagnostic_agent"):
                     if server_id:
                         # 查询mcp_servers表获取server_uri（使用同步方法）
                         server = mcp_service.get_server_by_id_sync(db, server_id)
-                        if server and server.is_enabled == 'on' and server.connection_status == 'connected':
+                        if server and server.is_enabled == 'on':
                             server_config[server_id] = {
                                 "url": server.server_uri,
-                                "transport": "sse"
+                                "transport": server.transport_type
                             }
             finally:
                 db.close()
