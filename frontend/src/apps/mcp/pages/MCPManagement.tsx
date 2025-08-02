@@ -544,7 +544,6 @@ const MCPManagement: React.FC = () => {
       title: '服务器名称',
       dataIndex: 'name',
       key: 'name',
-      width: 180,
       render: (name: string, record: MCPServer) => (
         <Space>
           <ApiOutlined />
@@ -559,30 +558,25 @@ const MCPManagement: React.FC = () => {
       title: '连接地址',
       dataIndex: 'uri',
       key: 'uri',
-      flex: 1,
-      minWidth: 250,
       render: (uri: string) => (
-        <div style={{ minWidth: 200, maxWidth: 400 }}>
-          <code 
-            className="px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
-            style={{ 
-              fontSize: '11px',
-              scrollbarWidth: 'thin',
-              backgroundColor: isDark ? '#374151' : '#f3f4f6',
-              color: isDark ? '#e5e7eb' : '#374151',
-              border: `1px solid ${isDark ? '#4b5563' : '#d1d5db'}`
-            }}
-          >
-            {uri}
-          </code>
-        </div>
+        <code 
+          className="px-2 py-1 rounded block overflow-x-auto whitespace-nowrap"
+          style={{ 
+            fontSize: '11px',
+            scrollbarWidth: 'thin',
+            backgroundColor: isDark ? '#374151' : '#f3f4f6',
+            color: isDark ? '#e5e7eb' : '#374151',
+            border: `1px solid ${isDark ? '#4b5563' : '#d1d5db'}`
+          }}
+        >
+          {uri}
+        </code>
       )
     },
     {
       title: '传输类型',
       dataIndex: 'transportType',
       key: 'transportType',
-      width: 140,
       render: (transportType: string) => {
         const getTransportColor = (type: string) => {
           switch(type) {
@@ -613,7 +607,6 @@ const MCPManagement: React.FC = () => {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 80,
       render: (status: MCPServer['status']) => (
         <Tag color={getStatusColor(status)}>
           {getStatusText(status)}
@@ -623,7 +616,6 @@ const MCPManagement: React.FC = () => {
     {
       title: '工具数量',
       key: 'toolsCount',
-      width: 80,
       render: (_, record: MCPServer) => {
         const enabledCount = record.tools.filter(tool => tool.globalEnabled).length;
         const totalCount = record.tools.length;
@@ -641,7 +633,6 @@ const MCPManagement: React.FC = () => {
       title: '版本',
       dataIndex: 'version',
       key: 'version',
-      width: 80,
       render: (version: string) => (
         <Tag color="default">{version || '-'}</Tag>
       )
@@ -650,13 +641,11 @@ const MCPManagement: React.FC = () => {
       title: '最后连接时间',
       dataIndex: 'lastConnected',
       key: 'lastConnected',
-      width: 140,
       render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
     },
     {
       title: '启用状态',
       key: 'enabled',
-      width: 100,
       render: (_, record: MCPServer) => (
         <Switch
           checked={record.enabled}
@@ -670,8 +659,6 @@ const MCPManagement: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 160,
-      fixed: 'right',
       render: (_, record: MCPServer) => (
         <Space size="small">
           <Button 
@@ -787,7 +774,7 @@ const MCPManagement: React.FC = () => {
           dataSource={filteredServers}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1000 }}
+          scroll={{ x: 'max-content' }}
           pagination={{
             showSizeChanger: true,
             showQuickJumper: true,
