@@ -60,7 +60,7 @@ async def get_generic_agent_tools(agent_id: str = "generic_agent") -> List[Any]:
                         if server and server.is_enabled == 'on':
                             server_config[server_id] = {
                                 "url": server.server_uri,
-                                "transport": server.transport_type
+                                "transport": server.transport_type.replace('-','_')         # langgraph要求'streamable_http'
                             }
             finally:
                 db.close()
