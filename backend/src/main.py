@@ -61,6 +61,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
+    # 设置API审计中间件（在其他中间件之前，确保能捕获到所有请求）
+    from .shared.core.api_audit import setup_api_audit_middleware
+    setup_api_audit_middleware(app)
+    
     # 设置所有中间件
     setup_middlewares(app)
     

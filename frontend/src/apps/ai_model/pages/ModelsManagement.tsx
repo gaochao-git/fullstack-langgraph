@@ -358,7 +358,7 @@ const ModelsManagement = () => {
         message.success(`连接测试成功 (延迟: ${result.latency_ms}ms)`);
       } else {
         setTestResults(prev => new Map(prev).set(model.id, 'error'));
-        message.error(`连接测试失败: ${result.message}`);
+        message.error(`连接测试失败: ${result.msg}`);
       }
     } catch (error) {
       setTestResults(prev => new Map(prev).set(model.id, 'error'));
@@ -415,7 +415,7 @@ const ModelsManagement = () => {
         message.success(`连接测试成功 (延迟: ${result.latency_ms}ms)`);
       } else {
         setFormTestStatus('error');
-        message.error(`连接测试失败: ${result.message}`);
+        message.error(`连接测试失败: ${result.msg}`);
       }
       
       // 3秒后重置状态

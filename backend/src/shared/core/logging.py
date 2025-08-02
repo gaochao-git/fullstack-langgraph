@@ -137,6 +137,30 @@ class AppLogFormatter(logging.Formatter):
         return f"{log_time}|{log_level}|{thread_id}|{trace_id}|{idc}|{ip}|{msg}"
 
 
+class AuditLogFormatter(logging.Formatter):
+    """API审计日志格式化器 - 专用于审计日志"""
+    
+    def format(self, record):
+        log_time = datetime.fromtimestamp(record.created).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        
+        # 提取审计字段
+        resource = getattr(record, 'resource', 'unknown')
+        resource_id = getattr(record, 'resource_id', '-')
+        user_id = getattr(record, 'user_id', 'anonymous')
+        client_ip = getattr(record, 'client_ip', '-')
+        server_ip = getattr(record, 'server_ip', LOCAL_IP)
+        status_code = getattr(record, 'status_code', '-')
+        process_time = getattr(record, 'process_time', '-')
+        trace_id = getattr(record, 'trace_id', request_id_ctx.get() or '-')
+        method = getattr(record, 'method', '-')
+        full_url = getattr(record, 'full_url', '-')
+        request_params = getattr(record, 'request_params', '-')
+        msg = record.getMessage()
+        
+        # 审计格式：时间|资源|资源ID|用户|客户端IP|服务器IP|方法|完整URL|请求参数|状态码|处理时间|跟踪ID|消息
+        return f"{log_time}|{resource}|{resource_id}|{user_id}|{client_ip}|{server_ip}|{method}|{full_url}|{request_params}|{status_code}|{process_time}|{trace_id}|{msg}"
+
+
 class ColoredConsoleFormatter(colorlog.ColoredFormatter):
     """使用colorlog的彩色控制台格式化器"""
     
@@ -237,7 +261,7 @@ class LoggerManager:
         console_handler.setFormatter(console_formatter)
         root_logger.addHandler(console_handler)
         
-        # 默认三文件配置 - acc/alarm/app 日志分离
+        # 默认四文件配置 - acc/alarm/app/audit 日志分离
         if log_files is None:
             log_files = {
                 "access": {
@@ -256,6 +280,12 @@ class LoggerManager:
                     "filename": f"{app_name}_app.log",
                     "level": log_level,
                     "formatter": "app",
+                    "filter": None
+                },
+                "audit": {
+                    "filename": f"{app_name}_audit.log",
+                    "level": "INFO",
+                    "formatter": "audit",
                     "filter": None
                 }
             }
@@ -281,6 +311,8 @@ class LoggerManager:
                 handler.setFormatter(AccessLogFormatter())
             elif formatter_type == "alarm":
                 handler.setFormatter(AlarmLogFormatter())
+            elif formatter_type == "audit":
+                handler.setFormatter(AuditLogFormatter())
             else:  # app or default
                 handler.setFormatter(AppLogFormatter())
             

@@ -81,7 +81,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """参数验证异常处理器"""
-    logger.warning(f"参数验证失败: {exc.errors()}")
+    # 简化日志记录，详细信息由审计中间件处理
+    logger.warning("参数验证失败")
     
     # 提取第一个验证错误的详细信息
     first_error = exc.errors()[0] if exc.errors() else {}
@@ -92,12 +93,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     
     response = error_response(
         msg=error_msg,
-        code=ResponseCode.VALIDATION_ERROR,
-        data=exc.errors()  # 返回详细的验证错误信息
+        code=ResponseCode.VALIDATION_ERROR
     )
     
     return JSONResponse(
-        status_code=200,
+        status_code=422,  # 使用标准的422状态码
         content=response.dict()
     )
 

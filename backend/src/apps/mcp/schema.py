@@ -1,7 +1,7 @@
 """MCP Server schemas - 增强验证"""
 
 from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator,validator
 import json
 
 
@@ -23,11 +23,13 @@ class MCPServerCreate(BaseModel):
     server_config: Optional[Dict[str, Any]] = Field(None, description="服务器配置")
     team_name: str = Field(..., description="团队名称", min_length=1, max_length=100)
     
-    @validator('server_uri')
+    @field_validator('server_uri')
     def validate_server_uri(cls, v):
         """验证服务器URI格式"""
         if not (v.startswith('http://') or v.startswith('https://') or ':' in v):
             raise ValueError('服务器URI必须是有效的HTTP/HTTPS URL或host:port格式')
+        if not (v.endswith('/sse') or v.endswith('/mcp')):
+            raise ValueError('结尾类型必须是/sse或/mcp')
         return v
 
 
@@ -47,11 +49,13 @@ class MCPServerUpdate(BaseModel):
     server_config: Optional[Dict[str, Any]] = Field(None, description="服务器配置")
     team_name: Optional[str] = Field(None, description="团队名称", min_length=1, max_length=100)
     
-    @validator('server_uri')
+    @field_validator('server_uri')
     def validate_server_uri(cls, v):
         """验证服务器URI格式"""
-        if v and not (v.startswith('http://') or v.startswith('https://') or ':' in v):
+        if not (v.startswith('http://') or v.startswith('https://') or ':' in v):
             raise ValueError('服务器URI必须是有效的HTTP/HTTPS URL或host:port格式')
+        if not (v.endswith('/sse') or v.endswith('/mcp')):
+            raise ValueError('结尾类型必须是/sse或/mcp')
         return v
 
 
@@ -96,11 +100,13 @@ class MCPTestRequest(BaseModel):
     server_uri: str = Field(..., alias="url", description="服务器URI", min_length=1, max_length=500)
     timeout: int = Field(10, description="超时时间", ge=1, le=60)
     
-    @validator('server_uri')
+    @field_validator('server_uri')
     def validate_server_uri(cls, v):
         """验证服务器URI格式"""
         if not (v.startswith('http://') or v.startswith('https://') or ':' in v):
             raise ValueError('服务器URI必须是有效的HTTP/HTTPS URL或host:port格式')
+        if not (v.endswith('/sse') or v.endswith('/mcp')):
+            raise ValueError('结尾类型必须是/sse或/mcp')
         return v
 
 
@@ -121,53 +127,6 @@ class MCPEnableUpdate(BaseModel):
     enabled: Literal["on", "off"] = Field(..., description="启用状态")
 
 
-class OpenAPIConvertRequest(BaseModel):
-    """OpenAPI转换请求schema"""
-    config_name: str = Field(..., description="MCP服务器名称", min_length=1, max_length=255)
-    config_description: Optional[str] = Field(None, description="服务器描述", max_length=1000)
-    api_base_url: str = Field(..., description="API基础地址", min_length=1, max_length=500)
-    openapi_spec_content: Dict[str, Any] = Field(..., description="OpenAPI规范")
-    auth_type: Optional[str] = Field("none", description="认证类型：none, bearer, basic, api_key, oauth2等", max_length=20)
-    auth_config: Optional[Dict[str, Any]] = Field(None, description="认证配置JSON")
-    timeout_config: Optional[Dict[str, Any]] = Field(None, description="超时配置JSON：读取超时、连接超时、重试等")
-    
-    @validator('api_base_url')
-    def validate_api_base_url(cls, v):
-        """验证api_base_url格式"""
-        if not (v.startswith('http://') or v.startswith('https://')):
-            raise ValueError('api_base_url必须是有效的HTTP/HTTPS URL')
-        return v.rstrip('/')
-    
-    @validator('openapi_spec_content')
-    def validate_openapi_spec_content(cls, v):
-        """验证OpenAPI规范"""
-        if not isinstance(v, dict):
-            raise ValueError('openapi_spec_content必须是有效的JSON对象')
-        
-        # 检查基本的OpenAPI结构
-        if 'openapi' not in v and 'swagger' not in v:
-            raise ValueError('无效的OpenAPI规范：缺少版本信息')
-        
-        if 'info' not in v:
-            raise ValueError('无效的OpenAPI规范：缺少info字段')
-        
-        if 'paths' not in v:
-            raise ValueError('无效的OpenAPI规范：缺少paths字段')
-            
-        return v
-
-
-class OpenAPIConvertResponse(BaseModel):
-    """OpenAPI转换响应schema"""
-    id: int = Field(..., description="配置ID")
-    config_name: str = Field(..., description="服务器名称")
-    config_description: str = Field(..., description="服务器描述")
-    api_base_url: str = Field(..., description="API基础地址")
-    tools: List[Dict[str, Any]] = Field(..., description="转换后的工具列表")
-    tools_count: int = Field(..., description="工具数量")
-    create_time: str = Field(..., description="创建时间")
-
-
 class SimpleAPIExample(BaseModel):
     """简单API案例"""
     http_url: str = Field(..., description="完整HTTP请求地址", min_length=1, max_length=1000)
@@ -177,14 +136,14 @@ class SimpleAPIExample(BaseModel):
     request_body: Optional[str] = Field(None, description="请求体案例(JSON字符串)", max_length=5000)
     response_example: Optional[str] = Field(None, description="返回结果案例(JSON字符串)", max_length=10000)
     
-    @validator('http_url')
+    @field_validator('http_url')
     def validate_http_url(cls, v):
         """验证HTTP URL格式"""
         if not (v.startswith('http://') or v.startswith('https://')):
             raise ValueError('HTTP URL必须以http://或https://开头')
         return v
     
-    @validator('request_params', 'request_body', 'response_example')
+    @field_validator('request_params', 'request_body', 'response_example')
     def validate_json_strings(cls, v):
         """验证JSON字符串格式"""
         if v:
@@ -202,7 +161,7 @@ class AIGenerateOpenAPIRequest(BaseModel):
     examples: List[SimpleAPIExample] = Field(..., description="API使用案例列表", min_items=1, max_items=20)
     template_type: Optional[str] = Field("standard", description="生成模板类型", pattern=r'^(standard|restful|minimal)$')
     
-    @validator('examples')
+    @field_validator('examples')
     def validate_examples(cls, v):
         """验证案例列表"""
         if not v:
@@ -228,7 +187,7 @@ class OpenAPIMCPConfigCreate(BaseModel):
     extra_config: str = Field("", description="其他配置JSON")
     create_by: str = Field(..., description="创建者", min_length=1, max_length=100)
 
-    @validator('openapi_schema')
+    @field_validator('openapi_schema')
     def validate_openapi_schema(cls, v):
         if not v or not v.strip():
             raise ValueError("OpenAPI规范不能为空")
@@ -245,7 +204,7 @@ class OpenAPIMCPConfigCreate(BaseModel):
             raise ValueError("OpenAPI规范必须是有效的JSON格式")
         return v
 
-    @validator('mcp_server_prefix')
+    @field_validator('mcp_server_prefix')
     def validate_prefix(cls, v):
         if not v or not v.strip():
             raise ValueError("MCP服务器前缀不能为空")
@@ -255,7 +214,7 @@ class OpenAPIMCPConfigCreate(BaseModel):
             raise ValueError("MCP服务器前缀只能包含字母、数字和下划线")
         return v.strip()
 
-    @validator('mcp_tool_name')
+    @field_validator('mcp_tool_name')
     def validate_tool_name(cls, v):
         if not v or not v.strip():
             raise ValueError("工具名称不能为空")
@@ -265,7 +224,7 @@ class OpenAPIMCPConfigCreate(BaseModel):
             raise ValueError("工具名称只能包含字母、数字、下划线和连字符")
         return v.strip()
 
-    @validator('auth_config', 'extra_config')
+    @field_validator('auth_config', 'extra_config')
     def validate_json_fields(cls, v):
         if v and v.strip():
             try:
@@ -286,7 +245,7 @@ class OpenAPIMCPConfigUpdate(BaseModel):
     extra_config: Optional[str] = Field(None, description="其他配置JSON")
     update_by: Optional[str] = Field(None, description="更新者", min_length=1, max_length=100)
 
-    @validator('openapi_schema')
+    @field_validator('openapi_schema')
     def validate_openapi_schema(cls, v):
         if v is not None:
             if not v.strip():
@@ -303,7 +262,7 @@ class OpenAPIMCPConfigUpdate(BaseModel):
             return v.strip()
         return v
 
-    @validator('mcp_server_prefix')
+    @field_validator('mcp_server_prefix')
     def validate_prefix(cls, v):
         if v is not None:
             if not v.strip():
@@ -314,7 +273,7 @@ class OpenAPIMCPConfigUpdate(BaseModel):
             return v.strip()
         return v
 
-    @validator('mcp_tool_name')
+    @field_validator('mcp_tool_name')
     def validate_tool_name(cls, v):
         if v is not None:
             if not v.strip():
@@ -325,7 +284,7 @@ class OpenAPIMCPConfigUpdate(BaseModel):
             return v.strip()
         return v
 
-    @validator('auth_config', 'extra_config')
+    @field_validator('auth_config', 'extra_config')
     def validate_json_fields(cls, v):
         if v is not None and v.strip():
             try:
@@ -348,7 +307,7 @@ class MCPGatewayConfigCreate(BaseModel):
     mcp_servers: Optional[List[Dict[str, Any]]] = Field([], description="MCP服务器配置")
     create_by: str = Field(..., description="创建者", min_length=1, max_length=100)
 
-    @validator('name')
+    @field_validator('name')
     def validate_name(cls, v):
         """验证配置名称"""
         if not v or not v.strip():
@@ -359,7 +318,7 @@ class MCPGatewayConfigCreate(BaseModel):
             raise ValueError("配置名称只能包含字母、数字、下划线和连字符")
         return v.strip()
 
-    @validator('tenant')
+    @field_validator('tenant')
     def validate_tenant(cls, v):
         """验证租户名称"""
         if not v or not v.strip():
@@ -381,7 +340,7 @@ class MCPGatewayConfigUpdate(BaseModel):
     mcp_servers: Optional[List[Dict[str, Any]]] = Field(None, description="MCP服务器配置")
     update_by: Optional[str] = Field(None, description="更新者", min_length=1, max_length=100)
 
-    @validator('name')
+    @field_validator('name')
     def validate_name(cls, v):
         if v is not None:
             if not v.strip():
@@ -392,7 +351,7 @@ class MCPGatewayConfigUpdate(BaseModel):
             return v.strip()
         return v
 
-    @validator('tenant')
+    @field_validator('tenant')
     def validate_tenant(cls, v):
         if v is not None:
             if not v.strip():

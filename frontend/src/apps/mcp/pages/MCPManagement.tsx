@@ -474,10 +474,12 @@ const MCPManagement: React.FC = () => {
         body: JSON.stringify(requestBody)
       });
       const response = await resp.json();
-      const data = response.data; // 解析统一响应格式
-      if (data.healthy) {
+      console.log(1111,response.msg)
+      const tools = response.data; // 解析统一响应格式
+      const msg = response.msg; // 解析统一响应格式
+      if (tools) {
         // 转换后端返回的工具为前端MCPTool结构
-        const discoveredTools = (data.tools || []).map((tool: any) => ({
+        const discoveredTools = (tools || []).map((tool: any) => ({
           name: tool.name,
           description: tool.description,
           globalEnabled: true, // 默认全局启用，可根据需要调整
@@ -490,12 +492,12 @@ const MCPManagement: React.FC = () => {
       } else {
         setFormConnectionStatus('error');
         setFormDiscoveredTools([]);
-        message.error('连接测试失败: ' + (data.error || '未知错误'));
+        message.error('连接测试失败: ' + (msg || '未知错误'));
       }
     } catch (error: any) {
       setFormConnectionStatus('error');
       setFormDiscoveredTools([]);
-      message.error('连接测试失败: ' + (error?.message || '未知错误'));
+      message.error('连接测试失败: ' + (error?.msg || '未知错误'));
     }
   };
 
