@@ -34,7 +34,9 @@ import {
   GlobalOutlined,
   ToolOutlined,
   CloudServerOutlined,
-  BulbOutlined
+  BulbOutlined,
+  DownOutlined,
+  UpOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -80,6 +82,9 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   const [configFormModal, setConfigFormModal] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<MCPGatewayConfig | null>(null);
   const [editingConfig, setEditingConfig] = useState<MCPGatewayConfig | null>(null);
+  
+  // 工具展开状态
+  const [expandedTools, setExpandedTools] = useState<Record<number, boolean>>({});
   
   const { message } = App.useApp();
   const [form] = Form.useForm();
@@ -237,12 +242,21 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   // 编辑配置
   const handleEditConfig = (config: MCPGatewayConfig) => {
     setEditingConfig(config);
+    
+    // 处理工具配置中的headers字段，确保它们是字符串格式
+    const processedTools = (config.tools || []).map(tool => ({
+      ...tool,
+      headers: typeof tool.headers === 'object' && tool.headers !== null 
+        ? JSON.stringify(tool.headers, null, 2) 
+        : tool.headers
+    }));
+    
     form.setFieldsValue({
       name: config.name,
       tenant: config.tenant,
       routers: config.routers || [],
       servers: config.servers || [],
-      tools: config.tools || [],
+      tools: processedTools,
       prompts: config.prompts || [],
       mcp_servers: config.mcp_servers || []
     });
@@ -252,12 +266,26 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   // 保存配置（新增或编辑）
   const handleSaveConfig = async (values: any) => {
     try {
+      // 处理工具配置中的headers字段，将字符串转换为对象
+      const processedTools = (values.tools || []).map(tool => ({
+        ...tool,
+        headers: tool.headers && typeof tool.headers === 'string' 
+          ? (() => {
+              try {
+                return JSON.parse(tool.headers);
+              } catch {
+                return {};
+              }
+            })()
+          : tool.headers
+      }));
+      
       const configData = {
         name: values.name,
         tenant: values.tenant || 'default',
         routers: values.routers || [],
         servers: values.servers || [],
-        tools: values.tools || [],
+        tools: processedTools,
         prompts: values.prompts || [],
         mcp_servers: values.mcp_servers || []
       };
@@ -604,93 +632,138 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                     <Form.List name="tools">
                       {(fields, { add, remove }) => (
                         <>
-                          {fields.map(({ key, name, ...restField }) => (
-                            <Card key={key} size="small" style={{ marginBottom: 8, background: isDark ? '#374151' : '#fafafa' }}>
-                              <Row gutter={16}>
-                                <Col span={6}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'name']}
-                                    label="工具名称"
-                                    rules={[{ required: true, message: '请输入工具名称' }]}
-                                  >
-                                    <Input placeholder="systeminfo" />
-                                  </Form.Item>
-                                </Col>
-                                <Col span={4}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'method']}
-                                    label="HTTP方法"
-                                    rules={[{ required: true, message: '请选择HTTP方法' }]}
-                                  >
-                                    <Select placeholder="POST">
-                                      <Select.Option value="GET">GET</Select.Option>
-                                      <Select.Option value="POST">POST</Select.Option>
-                                      <Select.Option value="PUT">PUT</Select.Option>
-                                      <Select.Option value="DELETE">DELETE</Select.Option>
-                                    </Select>
-                                  </Form.Item>
-                                </Col>
-                                <Col span={12}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'endpoint']}
-                                    label="端点地址"
-                                    rules={[{ required: true, message: '请输入端点地址' }]}
-                                  >
-                                    <Input placeholder="http://localhost:8000/api/v1/mcp/tools/system_info" />
-                                  </Form.Item>
-                                </Col>
-                                <Col span={2}>
-                                  <Button 
-                                    type="text" 
-                                    danger 
-                                    icon={<MinusCircleOutlined />} 
-                                    onClick={() => remove(name)}
-                                    title="删除工具"
-                                  />
-                                </Col>
-                              </Row>
-                              <Row gutter={16}>
-                                <Col span={8}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'requestBody']}
-                                    label="请求体"
-                                  >
-                                    <TextArea 
-                                      rows={2} 
-                                      placeholder='{"key": "value"}' 
+                          {fields.map(({ key, name, ...restField }) => {
+                            const toggleExpand = (toolKey: number) => {
+                              setExpandedTools(prev => ({
+                                ...prev,
+                                [toolKey]: !prev[toolKey]
+                              }));
+                            };
+                            
+                            const isExpanded = expandedTools[key] || false;
+                            
+                            return (
+                              <Card key={key} size="small" style={{ marginBottom: 8, background: isDark ? '#374151' : '#fafafa' }}>
+                                <Row gutter={16} align="middle">
+                                  <Col span={6}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[name, 'name']}
+                                      label="工具名称"
+                                      rules={[{ required: true, message: '请输入工具名称' }]}
+                                      style={{ marginBottom: isExpanded ? 24 : 0 }}
+                                    >
+                                      <Input placeholder="systeminfo" />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={4}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[name, 'method']}
+                                      label="HTTP方法"
+                                      rules={[{ required: true, message: '请选择HTTP方法' }]}
+                                      style={{ marginBottom: isExpanded ? 24 : 0 }}
+                                    >
+                                      <Select placeholder="POST">
+                                        <Select.Option value="GET">GET</Select.Option>
+                                        <Select.Option value="POST">POST</Select.Option>
+                                        <Select.Option value="PUT">PUT</Select.Option>
+                                        <Select.Option value="DELETE">DELETE</Select.Option>
+                                      </Select>
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={10}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[name, 'endpoint']}
+                                      label="端点地址"
+                                      rules={[{ required: true, message: '请输入端点地址' }]}
+                                      style={{ marginBottom: isExpanded ? 24 : 0 }}
+                                    >
+                                      <Input placeholder="http://localhost:8000/api/v1/mcp/tools/system_info" />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={2}>
+                                    <Button 
+                                      type="text" 
+                                      icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+                                      onClick={() => toggleExpand(key)}
+                                      title={isExpanded ? "收起详细配置" : "展开详细配置"}
                                     />
-                                  </Form.Item>
-                                </Col>
-                                <Col span={8}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'responseBody']}
-                                    label="响应体模板"
-                                    initialValue="{{.Response.Body}}"
-                                  >
-                                    <Input placeholder="{{.Response.Body}}" />
-                                  </Form.Item>
-                                </Col>
-                                <Col span={8}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'headers']}
-                                    label="请求头"
-                                    initialValue='{"Content-Type": "application/json"}'
-                                  >
-                                    <TextArea 
-                                      rows={2} 
-                                      placeholder='{"Content-Type": "application/json"}' 
+                                  </Col>
+                                  <Col span={2}>
+                                    <Button 
+                                      type="text" 
+                                      danger 
+                                      icon={<DeleteOutlined />} 
+                                      onClick={() => remove(name)}
+                                      title="删除工具"
                                     />
-                                  </Form.Item>
-                                </Col>
-                              </Row>
-                            </Card>
-                          ))}
+                                  </Col>
+                                </Row>
+                                {isExpanded && (
+                                  <Row gutter={16}>
+                                    <Col span={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'description']}
+                                        label="描述"
+                                      >
+                                        <Input placeholder="工具功能描述" />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col span={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'requestBody']}
+                                        label="请求体"
+                                      >
+                                        <TextArea 
+                                          rows={1} 
+                                          placeholder='{"key": "value"}' 
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col span={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'headers']}
+                                        label="请求头"
+                                        initialValue='{"Content-Type": "application/json"}'
+                                        normalize={(value) => {
+                                          // 如果是对象，转换为字符串
+                                          if (typeof value === 'object' && value !== null) {
+                                            return JSON.stringify(value, null, 2);
+                                          }
+                                          return value;
+                                        }}
+                                        getValueFromEvent={(e) => {
+                                          // 确保始终返回字符串
+                                          const value = e.target.value;
+                                          return value;
+                                        }}
+                                      >
+                                        <TextArea 
+                                          rows={1} 
+                                          placeholder='{"Content-Type": "application/json"}' 
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col span={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[name, 'responseBody']}
+                                        label="响应体模板"
+                                        initialValue="{{.Response.Body}}"
+                                      >
+                                        <Input placeholder="{{.Response.Body}}" />
+                                      </Form.Item>
+                                    </Col>
+                                  </Row>
+                                )}
+                              </Card>
+                            );
+                          })}
                           <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} block>
                             添加工具
                           </Button>
