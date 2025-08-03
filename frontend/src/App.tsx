@@ -12,7 +12,7 @@ import { MCPManagement } from "./pages/mcp";
 import { AgentManagement, AgentMarketplace, AgentChat } from "./pages/agent";
 import { ModelsManagement } from "./pages/ai_model";
 import { TasksManagement } from "./pages/scheduled_task";
-import { UserManagement, RoleManagement, PermissionManagement } from "./pages/user";
+import { UserManagement, RoleManagement, PermissionManagement, MenuManagement } from "./pages/user";
 import TenantManagement from "./pages/tenant/TenantManagement";
 import KnowledgeManagement from "./pages/KnowledgeManagement";
 import { ThemeProvider, useTheme } from "./hooks/ThemeContext";
@@ -311,6 +311,7 @@ function AppContent() {
               <Route path="/system/user" element={<UserManagement />} />
               <Route path="/system/userRole" element={<RoleManagement />} />
               <Route path="/system/permission" element={<PermissionManagement />} />
+              <Route path="/system/menu" element={<MenuManagement />} />
               <Route path="/system/tenant" element={<TenantManagement />} />
               <Route
                 path="*"
