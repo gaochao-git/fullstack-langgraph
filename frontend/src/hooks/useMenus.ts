@@ -64,18 +64,27 @@ export const useMenus = (): UseMenusReturn => {
           }
           
           // 处理动态路由（如 /agents/:agentId）
-          if (menu.route_path !== '/' && path.startsWith(menu.route_path)) {
-            // 检查是否是动态路由
-            const isDynamicRoute = menu.route_path.includes('/:') || 
-                                  menu.route_path.split('/').length === path.split('/').length;
-            if (isDynamicRoute || path === menu.route_path || path.startsWith(menu.route_path + '/')) {
+          if (menu.route_path !== '/') {
+            // 精确匹配
+            if (path === menu.route_path) {
               result.push(...currentParents);
-              
-              // 如果有子菜单，继续查找以确保包含所有相关父菜单
-              if (menu.children) {
-                findMenu(menu.children, path, currentParents);
-              }
               return true;
+            }
+            // 动态路由匹配或子路径匹配
+            if (path.startsWith(menu.route_path)) {
+              // 检查是否是动态路由或完整子路径
+              const isDynamicRoute = menu.route_path.includes('/:');
+              const isExactSubPath = path === menu.route_path || path.startsWith(menu.route_path + '/');
+              
+              if (isDynamicRoute || isExactSubPath) {
+                result.push(...currentParents);
+                
+                // 如果有子菜单，继续查找以确保包含所有相关父菜单
+                if (menu.children) {
+                  findMenu(menu.children, path, currentParents);
+                }
+                return true;
+              }
             }
           }
           
