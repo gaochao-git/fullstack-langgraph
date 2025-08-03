@@ -5,8 +5,7 @@
 
 import { MenuInfo, MenuApiResponse, UserMenuPermission } from '../types/menu';
 import { defaultMenusData } from '../data/defaultMenus';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+import { omind_get } from '../utils/base_api';
 
 export class MenuApiService {
   /**
@@ -16,22 +15,10 @@ export class MenuApiService {
   static async getUserMenus(userId?: string): Promise<UserMenuPermission> {
     try {
       const url = userId 
-        ? `${API_BASE_URL}/api/v1/menus/user/${userId}`
-        : `${API_BASE_URL}/api/v1/menus/current-user`;
+        ? `/api/v1/menus/user/${userId}`
+        : `/api/v1/menus/current-user`;
         
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // TODO: 添加认证头
-          // 'Authorization': `Bearer ${getToken()}`
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch user menus');
-      }
-
+      const response = await omind_get(url);
       const result: MenuApiResponse = await response.json();
       
       if (!result.success) {
@@ -52,13 +39,7 @@ export class MenuApiService {
    */
   static async getAllMenus(): Promise<MenuInfo[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/menus`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
+      const response = await omind_get('/api/v1/menus');
       const result: MenuApiResponse = await response.json();
       
       if (!result.success) {
