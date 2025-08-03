@@ -1,101 +1,155 @@
-import { useState } from 'react';
-import { Card, Table, Button, Space, Input, Modal, Form, message, Tabs, Select } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import { 
+  Card, Table, Button, Space, Input, Modal, Form, message, 
+  Tag, Tooltip, Row, Col, InputNumber, Select, Statistic, Tabs
+} from 'antd';
+import { 
+  PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, 
+  KeyOutlined, ReloadOutlined, SettingOutlined, ApiOutlined
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+import type { TabsProps } from 'antd';
+import { permissionApi } from '../services/rbacApi';
+import type { 
+  RbacPermission, PermissionCreateRequest, PermissionUpdateRequest, PermissionQueryParams 
+} from '../types/rbac';
 
 const { Search } = Input;
 const { Option } = Select;
 
-interface Permission {
-  id: number;
-  name: string;
-  code: string;
-  description: string;
-  module: string;
-  type: 'menu' | 'button' | 'api';
-  status: 'active' | 'inactive';
-  createTime: string;
-}
-
 export function PermissionManagement() {
   const [loading, setLoading] = useState(false);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingPermission, setEditingPermission] = useState<Permission | null>(null);
+  const [editingPermission, setEditingPermission] = useState<RbacPermission | null>(null);
   const [form] = Form.useForm();
+  
+  // 分页和搜索状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 20,
+    total: 0,
+  });
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [filters, setFilters] = useState({
+    release_disable: undefined as string | undefined,
+  });
   const [activeTab, setActiveTab] = useState('all');
 
-  const permissionTypes = {
-    menu: '菜单权限',
-    button: '按钮权限',
-    api: '接口权限',
-  };
-
-  const columns = [
+  const columns: ColumnsType<RbacPermission> = [
+    {
+      title: '权限ID',
+      dataIndex: 'permission_id',
+      key: 'permission_id',
+      width: 100,
+    },
     {
       title: '权限名称',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'permission_name',
+      key: 'permission_name',
+      width: 150,
+      ellipsis: true,
     },
     {
-      title: '权限编码',
-      dataIndex: 'code',
-      key: 'code',
+      title: '权限描述',
+      dataIndex: 'permission_description',
+      key: 'permission_description',
+      width: 200,
+      ellipsis: true,
     },
     {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-    },
-    {
-      title: '模块',
-      dataIndex: 'module',
-      key: 'module',
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: keyof typeof permissionTypes) => permissionTypes[type],
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
+      title: '发布状态',
+      dataIndex: 'release_disable',
+      key: 'release_disable',
+      width: 100,
       render: (status: string) => (
-        <span className={status === 'active' ? 'text-green-600' : 'text-red-600'}>
-          {status === 'active' ? '启用' : '禁用'}
-        </span>
+        <Tag color={status === 'off' ? 'green' : 'red'}>
+          {status === 'off' ? '启用' : '禁用'}
+        </Tag>
       ),
     },
     {
+      title: '允许客户端',
+      dataIndex: 'permission_allow_client',
+      key: 'permission_allow_client',
+      width: 150,
+      ellipsis: true,
+      render: (text: string) => text || '-',
+    },
+    {
       title: '创建时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
+      dataIndex: 'create_time',
+      key: 'create_time',
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: '创建人',
+      dataIndex: 'create_by',
+      key: 'create_by',
+      width: 100,
+      ellipsis: true,
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: Permission) => (
-        <Space size="middle">
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            删除
-          </Button>
+      width: 120,
+      fixed: 'right',
+      render: (_: any, record: RbacPermission) => (
+        <Space size="small">
+          <Tooltip title="编辑">
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="删除">
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
   ];
+
+  // 获取权限列表
+  const fetchPermissions = async () => {
+    try {
+      setLoading(true);
+      const params: PermissionQueryParams = {
+        page: pagination.current,
+        page_size: pagination.pageSize,
+        search: searchKeyword || undefined,
+        release_disable: filters.release_disable,
+      };
+      
+      const response = await permissionApi.listPermissions(params);
+      console.log('权限API响应:', response);
+      const items = response.items || [];
+      console.log('设置权限数据:', items.length, '条');
+      setPermissions(items);
+      setPagination(prev => ({
+        ...prev,
+        total: response.pagination?.total || 0,
+      }));
+    } catch (error) {
+      message.error('获取权限列表失败');
+      console.error('获取权限列表失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPermissions();
+  }, [pagination.current, pagination.pageSize, searchKeyword, filters]);
 
   const handleAdd = () => {
     setEditingPermission(null);
@@ -103,18 +157,38 @@ export function PermissionManagement() {
     setModalVisible(true);
   };
 
-  const handleEdit = (permission: Permission) => {
+  const handleEdit = (permission: RbacPermission) => {
     setEditingPermission(permission);
-    form.setFieldsValue(permission);
+    form.setFieldsValue({
+      permission_id: permission.permission_id,
+      permission_name: permission.permission_name,
+      permission_description: permission.permission_description,
+      release_disable: permission.release_disable,
+      permission_allow_client: permission.permission_allow_client,
+    });
     setModalVisible(true);
   };
 
-  const handleDelete = (permission: Permission) => {
+  const handleDelete = (permission: RbacPermission) => {
     Modal.confirm({
       title: '确认删除',
-      content: `确定要删除权限 "${permission.name}" 吗？`,
+      content: (
+        <div>
+          <p>确定要删除权限 <strong>"{permission.permission_name}"</strong> 吗？</p>
+          <p className="text-gray-500">删除后，关联该权限的所有角色将失去此权限。</p>
+        </div>
+      ),
+      okText: '确定',
+      cancelText: '取消',
       onOk: async () => {
-        message.success('删除成功');
+        try {
+          await permissionApi.deletePermission(permission.permission_id);
+          message.success('删除成功');
+          fetchPermissions();
+        } catch (error) {
+          message.error('删除失败');
+          console.error('删除权限失败:', error);
+        }
       },
     });
   };
@@ -122,37 +196,105 @@ export function PermissionManagement() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      message.success(editingPermission ? '更新成功' : '创建成功');
-      setModalVisible(false);
-      form.resetFields();
+      
+      if (editingPermission) {
+        // 更新权限
+        const updateData: PermissionUpdateRequest = {
+          permission_name: values.permission_name,
+          permission_description: values.permission_description,
+          release_disable: values.release_disable,
+          permission_allow_client: values.permission_allow_client,
+        };
+        
+        await permissionApi.updatePermission(editingPermission.permission_id, updateData);
+        message.success('更新成功');
+        setModalVisible(false);
+        form.resetFields();
+        fetchPermissions();
+      } else {
+        // 创建权限
+        const createData: PermissionCreateRequest = {
+          permission_id: values.permission_id,
+          permission_name: values.permission_name,
+          permission_description: values.permission_description,
+          release_disable: values.release_disable || 'off',
+          permission_allow_client: values.permission_allow_client,
+        };
+        
+        await permissionApi.createPermission(createData);
+        message.success('创建成功');
+        setModalVisible(false);
+        form.resetFields();
+        fetchPermissions();
+      }
     } catch (error) {
       console.error('表单验证失败:', error);
     }
   };
 
+  const handleSearch = (value: string) => {
+    setSearchKeyword(value);
+    setPagination(prev => ({ ...prev, current: 1 }));
+  };
+
+  const handleTableChange = (paginationConfig: any) => {
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: paginationConfig.total,
+    });
+  };
+
+  // 筛选数据
   const filteredPermissions = permissions.filter(permission => {
     if (activeTab === 'all') return true;
-    return permission.type === activeTab;
+    if (activeTab === 'enabled') return permission.release_disable === 'off';
+    if (activeTab === 'disabled') return permission.release_disable !== 'off';
+    return true;
   });
 
-  const tabItems = [
-    { label: '全部权限', key: 'all' },
-    { label: '菜单权限', key: 'menu' },
-    { label: '按钮权限', key: 'button' },
-    { label: '接口权限', key: 'api' },
+  // 统计信息
+  const totalPermissions = pagination.total;
+  const enabledCount = permissions.filter(p => p.release_disable === 'off').length;
+  const disabledCount = permissions.filter(p => p.release_disable !== 'off').length;
+
+  const tabItems: TabsProps['items'] = [
+    {
+      key: 'all',
+      label: `全部权限 (${totalPermissions})`,
+    },
+    {
+      key: 'enabled',
+      label: `启用 (${enabledCount})`,
+    },
+    {
+      key: 'disabled',
+      label: `禁用 (${disabledCount})`,
+    },
   ];
 
   return (
     <div>
       <Card
-        title="权限管理"
+        title={
+          <Space>
+            <KeyOutlined />
+            权限管理
+          </Space>
+        }
         extra={
           <Space>
             <Search
-              placeholder="搜索权限"
+              placeholder="搜索权限名称、描述"
               allowClear
-              style={{ width: 200 }}
+              style={{ width: 240 }}
+              onSearch={handleSearch}
               prefix={<SearchOutlined />}
+            />
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={() => fetchPermissions()}
+              title="刷新"
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
               新增权限
@@ -160,17 +302,69 @@ export function PermissionManagement() {
           </Space>
         }
       >
-        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
+        {/* 统计信息 */}
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}>
+            <Statistic
+              title="总权限数"
+              value={totalPermissions}
+              prefix={<KeyOutlined />}
+            />
+          </Col>
+          <Col span={6}>
+            <Statistic
+              title="启用权限"
+              value={enabledCount}
+              prefix={<SettingOutlined />}
+              valueStyle={{ color: '#3f8600' }}
+            />
+          </Col>
+          <Col span={6}>
+            <Statistic
+              title="禁用权限"
+              value={disabledCount}
+              prefix={<ApiOutlined />}
+              valueStyle={{ color: '#cf1322' }}
+            />
+          </Col>
+        </Row>
+
+        {/* 筛选器 */}
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}>
+            <Select
+              placeholder="选择发布状态"
+              allowClear
+              style={{ width: '100%' }}
+              onChange={(value) => setFilters(prev => ({ ...prev, release_disable: value }))}
+            >
+              <Option value="off">启用</Option>
+              <Option value="on">禁用</Option>
+            </Select>
+          </Col>
+        </Row>
+
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={setActiveTab} 
+          items={tabItems}
+          style={{ marginBottom: 16 }}
+        />
+
         <Table
           columns={columns}
           dataSource={filteredPermissions}
           loading={loading}
           rowKey="id"
+          scroll={{ x: 1200 }}
           pagination={{
+            ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total) => `共 ${total} 条记录`,
+            pageSizeOptions: ['10', '20', '50', '100'],
           }}
+          onChange={handleTableChange}
         />
       </Card>
 
@@ -178,50 +372,77 @@ export function PermissionManagement() {
         title={editingPermission ? '编辑权限' : '新增权限'}
         open={modalVisible}
         onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          setModalVisible(false);
+          form.resetFields();
+        }}
         okText="确定"
         cancelText="取消"
+        width={600}
+        destroyOnClose
       >
         <Form form={form} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="permission_id"
+                label="权限ID"
+                rules={[{ required: true, message: '请输入权限ID' }]}
+              >
+                <InputNumber 
+                  placeholder="请输入权限ID" 
+                  style={{ width: '100%' }}
+                  disabled={!!editingPermission}
+                  min={1}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="permission_name"
+                label="权限名称"
+                rules={[{ required: true, message: '请输入权限名称' }]}
+              >
+                <Input placeholder="请输入权限名称" />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Form.Item
-            name="name"
-            label="权限名称"
-            rules={[{ required: true, message: '请输入权限名称' }]}
-          >
-            <Input placeholder="请输入权限名称" />
-          </Form.Item>
-          <Form.Item
-            name="code"
-            label="权限编码"
-            rules={[{ required: true, message: '请输入权限编码' }]}
-          >
-            <Input placeholder="请输入权限编码" />
-          </Form.Item>
-          <Form.Item
-            name="description"
+            name="permission_description"
             label="权限描述"
             rules={[{ required: true, message: '请输入权限描述' }]}
           >
-            <Input.TextArea placeholder="请输入权限描述" rows={3} />
+            <Input.TextArea 
+              placeholder="请输入权限描述" 
+              rows={3} 
+              showCount 
+              maxLength={200}
+            />
           </Form.Item>
-          <Form.Item
-            name="module"
-            label="所属模块"
-            rules={[{ required: true, message: '请输入所属模块' }]}
-          >
-            <Input placeholder="请输入所属模块" />
-          </Form.Item>
-          <Form.Item
-            name="type"
-            label="权限类型"
-            rules={[{ required: true, message: '请选择权限类型' }]}
-          >
-            <Select placeholder="请选择权限类型">
-              <Option value="menu">菜单权限</Option>
-              <Option value="button">按钮权限</Option>
-              <Option value="api">接口权限</Option>
-            </Select>
-          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="release_disable"
+                label="发布状态"
+                initialValue="off"
+              >
+                <Select>
+                  <Option value="off">启用</Option>
+                  <Option value="on">禁用</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="permission_allow_client"
+                label="允许客户端"
+              >
+                <Input placeholder="允许访问的客户端列表" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </div>

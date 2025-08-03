@@ -1,117 +1,230 @@
-import { useState } from 'react';
-import { Card, Table, Button, Space, Input, Modal, Form, message, Tree } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import { 
+  Card, Table, Button, Space, Input, Modal, Form, message, 
+  Tag, Tooltip, Row, Col, InputNumber, Transfer, Statistic
+} from 'antd';
+import { 
+  PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, 
+  TeamOutlined, ReloadOutlined, SettingOutlined
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
+// import type { TransferProps } from 'antd/es/transfer';
+import { roleApi, permissionApi } from '../services/rbacApi';
+import type { 
+  RbacRole, RbacPermission, RoleCreateRequest, RoleUpdateRequest, RoleQueryParams 
+} from '../types/rbac';
 
 const { Search } = Input;
 
-interface Role {
-  id: number;
-  name: string;
-  description: string;
-  status: 'active' | 'inactive';
-  createTime: string;
-  permissions: string[];
+interface TransferItem {
+  key: string;
+  title: string;
+  description?: string;
 }
 
 export function RoleManagement() {
   const [loading, setLoading] = useState(false);
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [roles, setRoles] = useState<RbacRole[]>([]);
+  const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [editingRole, setEditingRole] = useState<RbacRole | null>(null);
   const [form] = Form.useForm();
+  
+  // 分页和搜索状态
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 20,
+    total: 0,
+  });
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
-  const permissionTreeData = [
+  const columns: ColumnsType<RbacRole> = [
     {
-      title: '系统管理',
-      key: 'system',
-      children: [
-        { title: '用户管理', key: 'user' },
-        { title: '角色管理', key: 'role' },
-        { title: '权限管理', key: 'permission' },
-      ],
+      title: '角色ID',
+      dataIndex: 'role_id',
+      key: 'role_id',
+      width: 100,
     },
-    {
-      title: '运维管理',
-      key: 'ops',
-      children: [
-        { title: '智能体管理', key: 'agent' },
-        { title: 'SOP管理', key: 'sop' },
-        { title: 'MCP管理', key: 'mcp' },
-        { title: '模型管理', key: 'model' },
-        { title: '任务管理', key: 'task' },
-      ],
-    },
-  ];
-
-  const columns = [
     {
       title: '角色名称',
-      dataIndex: 'name',
-      key: 'name',
+      dataIndex: 'role_name',
+      key: 'role_name',
+      width: 150,
+      ellipsis: true,
     },
     {
-      title: '描述',
+      title: '角色描述',
       dataIndex: 'description',
       key: 'description',
+      width: 200,
+      ellipsis: true,
     },
     {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <span className={status === 'active' ? 'text-green-600' : 'text-red-600'}>
-          {status === 'active' ? '启用' : '禁用'}
-        </span>
+      title: '权限数量',
+      dataIndex: 'permission_count',
+      key: 'permission_count',
+      width: 100,
+      render: (count: number) => (
+        <Tag color="blue">{count || 0}</Tag>
+      ),
+    },
+    {
+      title: '用户数量',
+      dataIndex: 'user_count',
+      key: 'user_count',
+      width: 100,
+      render: (count: number) => (
+        <Tag color="green">{count || 0}</Tag>
       ),
     },
     {
       title: '创建时间',
-      dataIndex: 'createTime',
-      key: 'createTime',
+      dataIndex: 'create_time',
+      key: 'create_time',
+      width: 150,
+      ellipsis: true,
+    },
+    {
+      title: '创建人',
+      dataIndex: 'create_by',
+      key: 'create_by',
+      width: 100,
+      ellipsis: true,
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: Role) => (
-        <Space size="middle">
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            删除
-          </Button>
+      width: 150,
+      fixed: 'right',
+      render: (_: any, record: RbacRole) => (
+        <Space size="small">
+          <Tooltip title="编辑">
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="权限管理">
+            <Button
+              type="link"
+              size="small"
+              icon={<SettingOutlined />}
+              onClick={() => handleManagePermissions(record)}
+            />
+          </Tooltip>
+          <Tooltip title="删除">
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
   ];
 
+  // 获取角色列表
+  const fetchRoles = async () => {
+    try {
+      setLoading(true);
+      const params: RoleQueryParams = {
+        page: pagination.current,
+        page_size: pagination.pageSize,
+        search: searchKeyword || undefined,
+      };
+      
+      const response = await roleApi.listRoles(params);
+      console.log('角色API响应:', response);
+      const items = response.items || [];
+      console.log('设置角色数据:', items.length, '条');
+      setRoles(items);
+      setPagination(prev => ({
+        ...prev,
+        total: response.pagination?.total || 0,
+      }));
+    } catch (error) {
+      message.error('获取角色列表失败');
+      console.error('获取角色列表失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 获取权限列表
+  const fetchPermissions = async () => {
+    try {
+      const response = await permissionApi.listPermissions({ page: 1, page_size: 100 });
+      setPermissions(response.items || []);
+    } catch (error) {
+      console.error('获取权限列表失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchRoles();
+    fetchPermissions();
+  }, [pagination.current, pagination.pageSize, searchKeyword]);
+
   const handleAdd = () => {
     setEditingRole(null);
     form.resetFields();
+    setSelectedPermissions([]);
     setModalVisible(true);
   };
 
-  const handleEdit = (role: Role) => {
+  const handleEdit = (role: RbacRole) => {
     setEditingRole(role);
-    form.setFieldsValue(role);
+    form.setFieldsValue({
+      role_id: role.role_id,
+      role_name: role.role_name,
+      description: role.description,
+    });
+    // 设置已选中的权限（这里需要从后端获取角色的权限列表）
+    setSelectedPermissions([]);
     setModalVisible(true);
   };
 
-  const handleDelete = (role: Role) => {
+  const handleManagePermissions = (role: RbacRole) => {
+    setEditingRole(role);
+    form.setFieldsValue({
+      role_id: role.role_id,
+      role_name: role.role_name,
+      description: role.description,
+    });
+    // 这里可以专门打开权限管理的模态框
+    message.info('权限管理功能开发中...');
+  };
+
+  const handleDelete = (role: RbacRole) => {
     Modal.confirm({
       title: '确认删除',
-      content: `确定要删除角色 "${role.name}" 吗？`,
+      content: (
+        <div>
+          <p>确定要删除角色 <strong>"{role.role_name}"</strong> 吗？</p>
+          <p className="text-gray-500">删除后，该角色关联的所有用户权限将被清除。</p>
+        </div>
+      ),
+      okText: '确定',
+      cancelText: '取消',
       onOk: async () => {
-        message.success('删除成功');
+        try {
+          const response = await roleApi.deleteRole(role.role_id);
+          if (response.success) {
+            message.success('删除成功');
+            fetchRoles();
+          } else {
+            message.error(response.message || '删除失败');
+          }
+        } catch (error) {
+          message.error('删除失败');
+          console.error('删除角色失败:', error);
+        }
       },
     });
   };
@@ -119,25 +232,100 @@ export function RoleManagement() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      message.success(editingRole ? '更新成功' : '创建成功');
-      setModalVisible(false);
-      form.resetFields();
+      
+      if (editingRole) {
+        // 更新角色
+        const updateData: RoleUpdateRequest = {
+          role_name: values.role_name,
+          description: values.description,
+          permission_ids: selectedPermissions.map(id => parseInt(id)),
+        };
+        
+        const response = await roleApi.updateRole(editingRole.role_id, updateData);
+        if (response.success) {
+          message.success('更新成功');
+          setModalVisible(false);
+          form.resetFields();
+          setSelectedPermissions([]);
+          fetchRoles();
+        } else {
+          message.error(response.message || '更新失败');
+        }
+      } else {
+        // 创建角色
+        const createData: RoleCreateRequest = {
+          role_id: values.role_id,
+          role_name: values.role_name,
+          description: values.description,
+          permission_ids: selectedPermissions.map(id => parseInt(id)),
+        };
+        
+        const response = await roleApi.createRole(createData);
+        if (response.success) {
+          message.success('创建成功');
+          setModalVisible(false);
+          form.resetFields();
+          setSelectedPermissions([]);
+          fetchRoles();
+        } else {
+          message.error(response.message || '创建失败');
+        }
+      }
     } catch (error) {
       console.error('表单验证失败:', error);
     }
   };
 
+  const handleSearch = (value: string) => {
+    setSearchKeyword(value);
+    setPagination(prev => ({ ...prev, current: 1 }));
+  };
+
+  const handleTableChange = (paginationConfig: any) => {
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: paginationConfig.total,
+    });
+  };
+
+  // 准备穿梭框数据
+  const transferDataSource: TransferItem[] = permissions.map(permission => ({
+    key: permission.permission_id.toString(),
+    title: permission.permission_name,
+    description: permission.permission_description,
+  }));
+
+  const handleTransferChange = (nextTargetKeys: string[]) => {
+    setSelectedPermissions(nextTargetKeys);
+  };
+
+  // 统计信息
+  const totalRoles = pagination.total;
+  const totalPermissions = permissions.length;
+
   return (
     <div>
       <Card
-        title="角色管理"
+        title={
+          <Space>
+            <TeamOutlined />
+            角色管理
+          </Space>
+        }
         extra={
           <Space>
             <Search
-              placeholder="搜索角色"
+              placeholder="搜索角色名称、描述"
               allowClear
-              style={{ width: 200 }}
+              style={{ width: 240 }}
+              onSearch={handleSearch}
               prefix={<SearchOutlined />}
+            />
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={() => fetchRoles()}
+              title="刷新"
             />
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
               新增角色
@@ -145,16 +333,38 @@ export function RoleManagement() {
           </Space>
         }
       >
+        {/* 统计信息 */}
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}>
+            <Statistic
+              title="总角色数"
+              value={totalRoles}
+              prefix={<TeamOutlined />}
+            />
+          </Col>
+          <Col span={6}>
+            <Statistic
+              title="总权限数"
+              value={totalPermissions}
+              prefix={<SettingOutlined />}
+            />
+          </Col>
+        </Row>
+
         <Table
           columns={columns}
           dataSource={roles}
           loading={loading}
           rowKey="id"
+          scroll={{ x: 1200 }}
           pagination={{
+            ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total) => `共 ${total} 条记录`,
+            pageSizeOptions: ['10', '20', '50', '100'],
           }}
+          onChange={handleTableChange}
         />
       </Card>
 
@@ -162,37 +372,76 @@ export function RoleManagement() {
         title={editingRole ? '编辑角色' : '新增角色'}
         open={modalVisible}
         onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => {
+          setModalVisible(false);
+          form.resetFields();
+          setSelectedPermissions([]);
+        }}
         okText="确定"
         cancelText="取消"
-        width={600}
+        width={800}
+        destroyOnClose
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="角色名称"
-            rules={[{ required: true, message: '请输入角色名称' }]}
-          >
-            <Input placeholder="请输入角色名称" />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="role_id"
+                label="角色ID"
+                rules={[{ required: true, message: '请输入角色ID' }]}
+              >
+                <InputNumber 
+                  placeholder="请输入角色ID" 
+                  style={{ width: '100%' }}
+                  disabled={!!editingRole}
+                  min={1}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="role_name"
+                label="角色名称"
+                rules={[{ required: true, message: '请输入角色名称' }]}
+              >
+                <Input placeholder="请输入角色名称" />
+              </Form.Item>
+            </Col>
+          </Row>
+
           <Form.Item
             name="description"
             label="角色描述"
             rules={[{ required: true, message: '请输入角色描述' }]}
           >
-            <Input.TextArea placeholder="请输入角色描述" rows={3} />
+            <Input.TextArea 
+              placeholder="请输入角色描述" 
+              rows={3} 
+              showCount 
+              maxLength={200}
+            />
           </Form.Item>
+
           <Form.Item
-            name="permissions"
-            label="权限配置"
+            label="权限分配"
+            extra={`已选择 ${selectedPermissions.length} 项权限`}
           >
-            <Tree
-              checkable
-              treeData={permissionTreeData}
-              defaultExpandAll
-              onCheck={(checkedKeys) => {
-                form.setFieldsValue({ permissions: checkedKeys });
+            <Transfer
+              dataSource={transferDataSource}
+              targetKeys={selectedPermissions}
+              onChange={(targetKeys) => handleTransferChange(targetKeys as string[])}
+              render={item => `${item.title} - ${item.description}`}
+              titles={['可选权限', '已分配权限']}
+              showSearch
+              listStyle={{
+                width: 300,
+                height: 300,
               }}
+              operations={['分配', '取消']}
+              filterOption={(inputValue, item) => 
+                (item.title.toLowerCase().includes(inputValue.toLowerCase()) ||
+                (item.description?.toLowerCase().includes(inputValue.toLowerCase()) || false))
+              }
             />
           </Form.Item>
         </Form>
