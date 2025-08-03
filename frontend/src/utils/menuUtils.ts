@@ -36,8 +36,10 @@ export const transformMenusForAntd = (menus: MenuTreeNode[]): any[] => {
       label: menu.menu_name,
     };
 
-    // 如果有路由路径或重定向路径，添加链接
-    const path = menu.redirect_path || menu.route_path;
+    // 如果有重定向路径，添加链接；如果没有子菜单且有路由路径，也添加链接
+    const hasChildren = menu.children && menu.children.length > 0;
+    const path = menu.redirect_path || (!hasChildren ? menu.route_path : null);
+    
     if (path) {
       menuItem.label = createElement(Link, { to: path }, menu.menu_name);
     } else {

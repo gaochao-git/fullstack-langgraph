@@ -110,6 +110,12 @@ export const useMenus = (): UseMenusReturn => {
     const saved = localStorage.getItem('menuOpenKeys');
     return saved ? JSON.parse(saved) : [];
   });
+  
+  // 跟踪用户手动折叠的菜单项
+  const [manuallyClosedKeys, setManuallyClosedKeys] = useState<string[]>(() => {
+    const saved = localStorage.getItem('menuManuallyClosedKeys');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const findMenuByKey = (menu: MenuTreeNode, targetKey: string): boolean => {
     if (menu.key === targetKey) return true;
@@ -145,19 +151,69 @@ export const useMenus = (): UseMenusReturn => {
 
     findParentKeys(userMenus.menus, location.pathname);
     
-    // 合并自动展开和持久化的展开状态
-    const autoOpenKeys = keys;
+    // 合并自动展开和持久化的展开状态，但排除用户手动折叠的项
+    const autoOpenKeys = keys.filter(key => !manuallyClosedKeys.includes(key));
     const manualOpenKeys = persistentOpenKeys.filter(key => 
-      userMenus.menus?.some(menu => findMenuByKey(menu, key))
+      userMenus.menus?.some(menu => findMenuByKey(menu, key)) && !manuallyClosedKeys.includes(key)
     );
     
     return [...new Set([...autoOpenKeys, ...manualOpenKeys])];
-  }, [userMenus?.menus, location.pathname, persistentOpenKeys]);
+  }, [userMenus?.menus, location.pathname, persistentOpenKeys, manuallyClosedKeys]);
 
   // 持久化展开的菜单项
   const handleOpenChange = (keys: string[]) => {
+    const currentOpenKeys = openKeys;
+    
+    // 找出被折叠的菜单项（在当前打开列表中但不在新列表中）
+    const closedKeys = currentOpenKeys.filter(key => !keys.includes(key));
+    
+    // 计算当前应该自动展开的菜单项
+    const currentAutoKeys: string[] = [];
+    const findCurrentAutoKeys = (menus: MenuTreeNode[], targetPath: string): boolean => {
+      for (const menu of menus) {
+        if (menu.route_path === targetPath || 
+            (targetPath.startsWith(menu.route_path) && menu.route_path !== '/' && 
+             (targetPath[menu.route_path.length] === '/' || targetPath[menu.route_path.length] === undefined))) {
+          return true;
+        }
+        
+        if (menu.children) {
+          const found = findCurrentAutoKeys(menu.children, targetPath);
+          if (found) {
+            currentAutoKeys.push(menu.key);
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+    
+    if (userMenus?.menus) {
+      findCurrentAutoKeys(userMenus.menus, location.pathname);
+    }
+    
+    // 更新手动折叠的菜单项
+    const newManuallyClosedKeys = [...manuallyClosedKeys];
+    
+    // 如果用户折叠了应该自动展开的菜单，记录为手动折叠
+    closedKeys.forEach(key => {
+      if (currentAutoKeys.includes(key) && !newManuallyClosedKeys.includes(key)) {
+        newManuallyClosedKeys.push(key);
+      }
+    });
+    
+    // 如果用户展开了之前手动折叠的菜单，从手动折叠列表中移除
+    keys.forEach(key => {
+      const index = newManuallyClosedKeys.indexOf(key);
+      if (index > -1) {
+        newManuallyClosedKeys.splice(index, 1);
+      }
+    });
+    
     setPersistentOpenKeys(keys);
+    setManuallyClosedKeys(newManuallyClosedKeys);
     localStorage.setItem('menuOpenKeys', JSON.stringify(keys));
+    localStorage.setItem('menuManuallyClosedKeys', JSON.stringify(newManuallyClosedKeys));
   };
 
   // 生成面包屑导航

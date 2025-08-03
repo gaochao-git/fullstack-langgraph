@@ -125,6 +125,19 @@
     /* 平滑的主题切换过渡 */
     transition: background-color 0.3s ease, color 0.3s ease;
   }
+  
+  /* 菜单高亮样式修复 - 确保Link继承父级颜色 */
+  .ant-menu-item-selected a,
+  .ant-menu-submenu-selected a {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+  
+  /* 确保菜单使用默认颜色 */
+  .ant-menu-item,
+  .ant-menu-submenu-title {
+    color: inherit !important;
+  }
   html {
     /* Prevent scroll bounce on the entire page */
     overscroll-behavior: none;
