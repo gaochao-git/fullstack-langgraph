@@ -33,6 +33,7 @@ export function PermissionManagement() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filters, setFilters] = useState({
     release_disable: undefined as string | undefined,
+    http_method: undefined as string | undefined,
   });
   const [activeTab, setActiveTab] = useState('all');
 
@@ -56,6 +57,22 @@ export function PermissionManagement() {
       key: 'permission_description',
       width: 200,
       ellipsis: true,
+    },
+    {
+      title: 'HTTP方法',
+      dataIndex: 'http_method',
+      key: 'http_method',
+      width: 100,
+      render: (method: string) => (
+        <Tag color={
+          method === 'GET' ? 'blue' :
+          method === 'POST' ? 'green' :
+          method === 'PUT' ? 'orange' :
+          method === 'DELETE' ? 'red' : 'default'
+        }>
+          {method}
+        </Tag>
+      ),
     },
     {
       title: '发布状态',
@@ -128,6 +145,7 @@ export function PermissionManagement() {
         page_size: pagination.pageSize,
         search: searchKeyword || undefined,
         release_disable: filters.release_disable,
+        http_method: filters.http_method,
       };
       
       const response = await permissionApi.listPermissions(params);
@@ -163,6 +181,7 @@ export function PermissionManagement() {
       permission_id: permission.permission_id,
       permission_name: permission.permission_name,
       permission_description: permission.permission_description,
+      http_method: permission.http_method,
       release_disable: permission.release_disable,
       permission_allow_client: permission.permission_allow_client,
     });
@@ -202,6 +221,7 @@ export function PermissionManagement() {
         const updateData: PermissionUpdateRequest = {
           permission_name: values.permission_name,
           permission_description: values.permission_description,
+          http_method: values.http_method,
           release_disable: values.release_disable,
           permission_allow_client: values.permission_allow_client,
         };
@@ -217,6 +237,7 @@ export function PermissionManagement() {
           permission_id: values.permission_id,
           permission_name: values.permission_name,
           permission_description: values.permission_description,
+          http_method: values.http_method || '*',
           release_disable: values.release_disable || 'off',
           permission_allow_client: values.permission_allow_client,
         };
@@ -342,6 +363,20 @@ export function PermissionManagement() {
               <Option value="on">禁用</Option>
             </Select>
           </Col>
+          <Col span={6}>
+            <Select
+              placeholder="选择HTTP方法"
+              allowClear
+              style={{ width: '100%' }}
+              onChange={(value) => setFilters(prev => ({ ...prev, http_method: value }))}
+            >
+              <Option value="*">全部(*)</Option>
+              <Option value="GET">GET</Option>
+              <Option value="POST">POST</Option>
+              <Option value="PUT">PUT</Option>
+              <Option value="DELETE">DELETE</Option>
+            </Select>
+          </Col>
         </Row>
 
         <Tabs 
@@ -378,12 +413,12 @@ export function PermissionManagement() {
         }}
         okText="确定"
         cancelText="取消"
-        width={600}
+        width={800}
         destroyOnClose
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="permission_id"
                 label="权限ID"
@@ -397,13 +432,29 @@ export function PermissionManagement() {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="permission_name"
                 label="权限名称"
                 rules={[{ required: true, message: '请输入权限名称' }]}
               >
                 <Input placeholder="请输入权限名称" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="http_method"
+                label="HTTP方法"
+                initialValue="*"
+                rules={[{ required: true, message: '请选择HTTP方法' }]}
+              >
+                <Select placeholder="选择HTTP方法">
+                  <Option value="*">全部(*)</Option>
+                  <Option value="GET">GET</Option>
+                  <Option value="POST">POST</Option>
+                  <Option value="PUT">PUT</Option>
+                  <Option value="DELETE">DELETE</Option>
+                </Select>
               </Form.Item>
             </Col>
           </Row>

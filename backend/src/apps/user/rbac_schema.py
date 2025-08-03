@@ -109,14 +109,16 @@ class RoleCreateRequest(BaseModel):
     role_id: int = Field(..., description="角色ID")
     role_name: str = Field(..., min_length=1, max_length=50, description="角色名称")
     description: str = Field(..., min_length=1, max_length=200, description="角色描述")
-    permission_ids: Optional[List[int]] = Field([], description="权限ID列表")
+    permission_ids: Optional[List[int]] = Field([], description="后端API权限ID列表")
+    menu_ids: Optional[List[int]] = Field([], description="前端菜单权限ID列表")
 
 
 class RoleUpdateRequest(BaseModel):
     """更新角色请求"""
     role_name: Optional[str] = Field(None, min_length=1, max_length=50, description="角色名称")
     description: Optional[str] = Field(None, min_length=1, max_length=200, description="角色描述")
-    permission_ids: Optional[List[int]] = Field(None, description="权限ID列表")
+    permission_ids: Optional[List[int]] = Field(None, description="后端API权限ID列表")
+    menu_ids: Optional[List[int]] = Field(None, description="前端菜单权限ID列表")
 
 
 class RoleResponse(BaseModel):
@@ -156,7 +158,8 @@ class PermissionCreateRequest(BaseModel):
     """创建权限请求 - 对应rbac_permissions表"""
     permission_id: int = Field(..., description="权限ID")
     permission_description: str = Field(..., min_length=1, max_length=200, description="权限描述")
-    permission_name: str = Field(..., min_length=1, max_length=100, description="权限名称")
+    permission_name: str = Field(..., min_length=1, max_length=100, description="权限名称(API路径)")
+    http_method: str = Field("*", max_length=10, description="HTTP方法: GET,POST,PUT,DELETE,*")
     release_disable: str = Field("off", max_length=10, description="发布禁用")
     permission_allow_client: Optional[str] = Field(None, description="允许的客户端")
 
@@ -164,7 +167,8 @@ class PermissionCreateRequest(BaseModel):
 class PermissionUpdateRequest(BaseModel):
     """更新权限请求"""
     permission_description: Optional[str] = Field(None, min_length=1, max_length=200, description="权限描述")
-    permission_name: Optional[str] = Field(None, min_length=1, max_length=100, description="权限名称")
+    permission_name: Optional[str] = Field(None, min_length=1, max_length=100, description="权限名称(API路径)")
+    http_method: Optional[str] = Field(None, max_length=10, description="HTTP方法: GET,POST,PUT,DELETE,*")
     release_disable: Optional[str] = Field(None, max_length=10, description="发布禁用")
     permission_allow_client: Optional[str] = Field(None, description="允许的客户端")
 
@@ -175,6 +179,7 @@ class PermissionResponse(BaseModel):
     permission_id: int
     permission_description: str
     permission_name: str
+    http_method: str
     release_disable: str
     permission_allow_client: Optional[str]
     create_time: str
@@ -190,6 +195,7 @@ class PermissionQueryParams(PaginationParams):
     """权限查询参数"""
     permission_id: Optional[int] = Field(None, description="权限ID筛选")
     release_disable: Optional[str] = Field(None, description="发布状态筛选")
+    http_method: Optional[str] = Field(None, description="HTTP方法筛选")
 
 
 class PermissionListResponse(BaseModel):

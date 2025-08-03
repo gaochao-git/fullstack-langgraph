@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Card, Table, Button, Space, Input, Modal, Form, message, 
-  Tag, Tooltip, Row, Col, InputNumber, Transfer, Statistic
+  Tag, Tooltip, Row, Col, InputNumber, Transfer, Statistic, Tabs
 } from 'antd';
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, 
@@ -9,9 +9,9 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 // import type { TransferProps } from 'antd/es/transfer';
-import { roleApi, permissionApi } from '../services/rbacApi';
+import { roleApi, permissionApi, menuApi } from '../services/rbacApi';
 import type { 
-  RbacRole, RbacPermission, RoleCreateRequest, RoleUpdateRequest, RoleQueryParams 
+  RbacRole, RbacPermission, RbacMenu, RoleCreateRequest, RoleUpdateRequest, RoleQueryParams 
 } from '../types/rbac';
 
 const { Search } = Input;
@@ -26,6 +26,7 @@ export function RoleManagement() {
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState<RbacRole[]>([]);
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
+  const [menus, setMenus] = useState<RbacMenu[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<RbacRole | null>(null);
   const [form] = Form.useForm();
@@ -38,6 +39,7 @@ export function RoleManagement() {
   });
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
 
   const columns: ColumnsType<RbacRole> = [
     {
@@ -166,15 +168,27 @@ export function RoleManagement() {
     }
   };
 
+  // 获取菜单列表
+  const fetchMenus = async () => {
+    try {
+      const response = await menuApi.listMenus({ page: 1, page_size: 100 });
+      setMenus(response.items || []);
+    } catch (error) {
+      console.error('获取菜单列表失败:', error);
+    }
+  };
+
   useEffect(() => {
     fetchRoles();
     fetchPermissions();
+    fetchMenus();
   }, [pagination.current, pagination.pageSize, searchKeyword]);
 
   const handleAdd = () => {
     setEditingRole(null);
     form.resetFields();
     setSelectedPermissions([]);
+    setSelectedMenus([]);
     setModalVisible(true);
   };
 
@@ -239,6 +253,7 @@ export function RoleManagement() {
           role_name: values.role_name,
           description: values.description,
           permission_ids: selectedPermissions.map(id => parseInt(id)),
+          menu_ids: selectedMenus.map(id => parseInt(id)),
         };
         
         const response = await roleApi.updateRole(editingRole.role_id, updateData);
@@ -247,6 +262,7 @@ export function RoleManagement() {
           setModalVisible(false);
           form.resetFields();
           setSelectedPermissions([]);
+          setSelectedMenus([]);
           fetchRoles();
         } else {
           message.error(response.message || '更新失败');
@@ -258,6 +274,7 @@ export function RoleManagement() {
           role_name: values.role_name,
           description: values.description,
           permission_ids: selectedPermissions.map(id => parseInt(id)),
+          menu_ids: selectedMenus.map(id => parseInt(id)),
         };
         
         const response = await roleApi.createRole(createData);
@@ -266,6 +283,7 @@ export function RoleManagement() {
           setModalVisible(false);
           form.resetFields();
           setSelectedPermissions([]);
+          setSelectedMenus([]);
           fetchRoles();
         } else {
           message.error(response.message || '创建失败');
@@ -296,8 +314,18 @@ export function RoleManagement() {
     description: permission.permission_description,
   }));
 
+  const menuTransferDataSource: TransferItem[] = menus.map(menu => ({
+    key: menu.menu_id.toString(),
+    title: menu.menu_name,
+    description: menu.route_path,
+  }));
+
   const handleTransferChange = (nextTargetKeys: string[]) => {
     setSelectedPermissions(nextTargetKeys);
+  };
+
+  const handleMenuTransferChange = (nextTargetKeys: string[]) => {
+    setSelectedMenus(nextTargetKeys);
   };
 
   // 统计信息
@@ -422,26 +450,56 @@ export function RoleManagement() {
             />
           </Form.Item>
 
-          <Form.Item
-            label="权限分配"
-            extra={`已选择 ${selectedPermissions.length} 项权限`}
-          >
-            <Transfer
-              dataSource={transferDataSource}
-              targetKeys={selectedPermissions}
-              onChange={(targetKeys) => handleTransferChange(targetKeys as string[])}
-              render={item => `${item.title} - ${item.description}`}
-              titles={['可选权限', '已分配权限']}
-              showSearch
-              listStyle={{
-                width: 300,
-                height: 300,
-              }}
-              operations={['分配', '取消']}
-              filterOption={(inputValue, item) => 
-                (item.title.toLowerCase().includes(inputValue.toLowerCase()) ||
-                (item.description?.toLowerCase().includes(inputValue.toLowerCase()) || false))
-              }
+          <Form.Item label="权限分配">
+            <Tabs
+              items={[
+                {
+                  key: 'api',
+                  label: `API权限 (${selectedPermissions.length})`,
+                  children: (
+                    <Transfer
+                      dataSource={transferDataSource}
+                      targetKeys={selectedPermissions}
+                      onChange={(targetKeys) => handleTransferChange(targetKeys as string[])}
+                      render={item => `${item.title} - ${item.description}`}
+                      titles={['可选API权限', '已分配API权限']}
+                      showSearch
+                      listStyle={{
+                        width: 300,
+                        height: 300,
+                      }}
+                      operations={['分配', '取消']}
+                      filterOption={(inputValue, item) => 
+                        (item.title.toLowerCase().includes(inputValue.toLowerCase()) ||
+                        (item.description?.toLowerCase().includes(inputValue.toLowerCase()) || false))
+                      }
+                    />
+                  )
+                },
+                {
+                  key: 'menu',
+                  label: `菜单权限 (${selectedMenus.length})`,
+                  children: (
+                    <Transfer
+                      dataSource={menuTransferDataSource}
+                      targetKeys={selectedMenus}
+                      onChange={(targetKeys) => handleMenuTransferChange(targetKeys as string[])}
+                      render={item => `${item.title} - ${item.description}`}
+                      titles={['可选菜单', '已分配菜单']}
+                      showSearch
+                      listStyle={{
+                        width: 300,
+                        height: 300,
+                      }}
+                      operations={['分配', '取消']}
+                      filterOption={(inputValue, item) => 
+                        (item.title.toLowerCase().includes(inputValue.toLowerCase()) ||
+                        (item.description?.toLowerCase().includes(inputValue.toLowerCase()) || false))
+                      }
+                    />
+                  )
+                }
+              ]}
             />
           </Form.Item>
         </Form>

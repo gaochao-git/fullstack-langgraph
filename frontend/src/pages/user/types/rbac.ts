@@ -37,6 +37,7 @@ export interface RbacPermission {
   permission_id: number;
   permission_description: string;
   permission_name: string;
+  http_method: string;
   release_disable: string;
   permission_allow_client?: string;
   create_time: string;
@@ -91,18 +92,21 @@ export interface RoleCreateRequest {
   role_name: string;
   description: string;
   permission_ids?: number[];
+  menu_ids?: number[];
 }
 
 export interface RoleUpdateRequest {
   role_name?: string;
   description?: string;
   permission_ids?: number[];
+  menu_ids?: number[];
 }
 
 export interface PermissionCreateRequest {
   permission_id: number;
   permission_description: string;
   permission_name: string;
+  http_method?: string;
   release_disable?: string;
   permission_allow_client?: string;
 }
@@ -110,6 +114,7 @@ export interface PermissionCreateRequest {
 export interface PermissionUpdateRequest {
   permission_description?: string;
   permission_name?: string;
+  http_method?: string;
   release_disable?: string;
   permission_allow_client?: string;
 }
@@ -155,6 +160,7 @@ export interface RoleQueryParams extends PaginationParams {
 export interface PermissionQueryParams extends PaginationParams {
   permission_id?: number;
   release_disable?: string;
+  http_method?: string;
 }
 
 export interface MenuQueryParams extends PaginationParams {

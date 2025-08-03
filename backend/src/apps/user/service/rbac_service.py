@@ -241,7 +241,7 @@ class RbacRoleService:
                 raise BusinessException("角色ID已存在", ResponseCode.CONFLICT)
             
             # 创建角色
-            data = role_data.dict(exclude={'permission_ids'})
+            data = role_data.dict(exclude={'permission_ids', 'menu_ids'})
             data['create_by'] = create_by
             data['update_by'] = create_by
             data['create_time'] = now_shanghai()
@@ -252,9 +252,15 @@ class RbacRoleService:
             db.add(role)
             await db.flush()
             
-            # 分配权限
-            if role_data.permission_ids:
-                await self._assign_permissions_to_role(db, role_data.role_id, role_data.permission_ids, create_by)
+            # 分配权限（API权限和菜单权限）
+            if role_data.permission_ids or role_data.menu_ids:
+                await self._update_role_permissions(
+                    db, 
+                    role_data.role_id, 
+                    role_data.permission_ids or [], 
+                    role_data.menu_ids or [],
+                    create_by
+                )
             
             await db.refresh(role)
             return role
@@ -324,7 +330,7 @@ class RbacRoleService:
                 raise BusinessException("角色不存在", ResponseCode.NOT_FOUND)
             
             # 更新数据
-            data = role_data.dict(exclude_unset=True, exclude={'permission_ids'})
+            data = role_data.dict(exclude_unset=True, exclude={'permission_ids', 'menu_ids'})
             data['update_by'] = update_by
             data['update_time'] = now_shanghai()
             
@@ -333,9 +339,15 @@ class RbacRoleService:
                 update(RbacRole).where(RbacRole.role_id == role_id).values(**data)
             )
             
-            # 更新权限关联
-            if role_data.permission_ids is not None:
-                await self._update_role_permissions(db, role_id, role_data.permission_ids, update_by)
+            # 更新权限关联（API权限和菜单权限）
+            if role_data.permission_ids is not None or role_data.menu_ids is not None:
+                await self._update_role_permissions(
+                    db, 
+                    role_id, 
+                    role_data.permission_ids or [], 
+                    role_data.menu_ids or [],
+                    update_by
+                )
             
             # 返回更新后的数据
             result = await db.execute(
@@ -390,27 +402,70 @@ class RbacRoleService:
         db: AsyncSession, 
         role_id: int, 
         permission_ids: List[int],
+        menu_ids: List[int] = None,
         update_by: str = 'system'
     ):
-        """更新角色权限关联"""
+        """更新角色权限关联 - 同时处理API权限和菜单权限"""
         # 删除现有关联
         await db.execute(
             delete(RbacRolesPermissions).where(RbacRolesPermissions.role_id == role_id)
         )
         
-        # 添加新关联
+        # 添加后端API权限关联
         for permission_id in permission_ids:
             role_permission = RbacRolesPermissions(
                 role_id=role_id,
                 back_permission_id=permission_id,
-                front_permission_id=permission_id,
-                permission_type=1,
+                front_permission_id=-1,  # API权限不关联前端
+                permission_type=2,  # 2表示API权限
                 create_by=update_by,
                 update_by=update_by,
                 create_time=now_shanghai(),
                 update_time=now_shanghai()
             )
             db.add(role_permission)
+        
+        # 添加前端菜单权限关联
+        if menu_ids:
+            for menu_id in menu_ids:
+                role_permission = RbacRolesPermissions(
+                    role_id=role_id,
+                    back_permission_id=-1,  # 菜单权限不关联后端
+                    front_permission_id=menu_id,
+                    permission_type=1,  # 1表示菜单权限
+                    create_by=update_by,
+                    update_by=update_by,
+                    create_time=now_shanghai(),
+                    update_time=now_shanghai()
+                )
+                db.add(role_permission)
+    
+    async def get_role_permissions_and_menus(
+        self, 
+        db: AsyncSession, 
+        role_id: int
+    ) -> dict:
+        """获取角色关联的权限和菜单"""
+        # 获取角色的权限关联
+        result = await db.execute(
+            select(RbacRolesPermissions).where(RbacRolesPermissions.role_id == role_id)
+        )
+        role_permissions = list(result.scalars().all())
+        
+        # 分离API权限和菜单权限
+        api_permission_ids = []
+        menu_ids = []
+        
+        for rp in role_permissions:
+            if rp.permission_type == 2 and rp.back_permission_id != -1:  # API权限
+                api_permission_ids.append(rp.back_permission_id)
+            elif rp.permission_type == 1 and rp.front_permission_id != -1:  # 菜单权限
+                menu_ids.append(rp.front_permission_id)
+        
+        return {
+            'api_permission_ids': api_permission_ids,
+            'menu_ids': menu_ids
+        }
 
 
 class RbacPermissionService:
@@ -481,6 +536,8 @@ class RbacPermissionService:
             conditions.append(RbacPermission.permission_id == params.permission_id)
         if params.release_disable:
             conditions.append(RbacPermission.release_disable == params.release_disable)
+        if params.http_method:
+            conditions.append(RbacPermission.http_method == params.http_method)
         
         if conditions:
             query = query.where(and_(*conditions))
