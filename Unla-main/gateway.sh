@@ -3,11 +3,11 @@
 # MCP Gateway 管理脚本
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="/tmp/mcp-gateway.pid"
-LOG_FILE="/tmp/mcp-gateway.log"
+PID_FILE="/tmp/unla_gateway.pid"
+LOG_FILE="/tmp/unla_gateway.log"
 
 # 设置Go路径
-export PATH=/usr/local/go/bin:$PATH
+GO_CMD=/usr/local/go1.24.5/bin/go
 
 start() {
     if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
@@ -17,9 +17,9 @@ start() {
     
     echo "Starting MCP Gateway..."
     cd "$SCRIPT_DIR"
-    nohup go run cmd/mcp-gateway/main.go -c configs/mcp-gateway.yaml > "$LOG_FILE" 2>&1 &
-    echo $! > "$PID_FILE"
-    echo "MCP Gateway started (PID: $!)"
+    nohup $GO_CMD run cmd/mcp-gateway/main.go > "$LOG_FILE" 2>&1 &
+    sleep 3
+    echo "Pid file: $PID_FILE($(cat "$PID_FILE"))"
     echo "Log file: $LOG_FILE"
 }
 

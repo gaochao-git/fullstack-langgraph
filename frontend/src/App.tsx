@@ -1,19 +1,10 @@
-import { Routes, Route, Link } from "react-router-dom";
-import { Layout, Menu, Drawer, ConfigProvider, App as AntdApp } from "antd";
+import { Routes, Route, Link, useLocation } from "react-router-dom";
+import { Layout, Menu, Drawer, ConfigProvider, App as AntdApp, Breadcrumb, Spin } from "antd";
 import {
-  RobotOutlined,
-  UserOutlined,
-  FileTextOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  LinkOutlined,
-  ApiOutlined,
-  SettingOutlined,
-  AppstoreOutlined,
-  BookOutlined,
-  CustomerServiceOutlined,
   CloseOutlined,
-  ClockCircleOutlined,
+  HomeOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import { SOPList } from "./apps/sop";
@@ -21,17 +12,45 @@ import { MCPManagement } from "./apps/mcp";
 import { AgentManagement, AgentMarketplace, AgentChat } from "./apps/agent";
 import { ModelsManagement } from "./apps/ai_model";
 import { TasksManagement } from "./apps/scheduled_task";
+import KnowledgeManagement from "./pages/KnowledgeManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
+import { useMenus } from "./hooks/useMenus";
+import { transformMenusForAntd } from "./utils/menuUtils";
 
 const { Sider, Content } = Layout;
 
+// 组件映射表（用于动态路由渲染）
+const ComponentMap: Record<string, React.ComponentType> = {
+  'AgentMarketplace': AgentMarketplace,
+  'KnowledgeManagement': KnowledgeManagement,
+  'AgentManagement': AgentManagement,
+  'SOPManagement': SOPList,
+  'MCPManagement': MCPManagement,
+  'ModelsManagement': ModelsManagement,
+  'TasksManagement': TasksManagement,
+};
+
 // 主应用组件（包装在主题提供者内部）
 function AppContent() {
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const { antdTheme, isDark } = useTheme();
+  
+  // 使用新的菜单系统
+  const { 
+    menus, 
+    loading: menuLoading, 
+    error: menuError, 
+    selectedKeys, 
+    openKeys, 
+    breadcrumb,
+    hasPermission,
+    onOpenChange
+  } = useMenus();
+  
   // Theme token removed as not used
 
   // 检测屏幕尺寸
@@ -49,57 +68,8 @@ function AppContent() {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  const menuItems = [
-    {
-      key: 'user-service',
-      icon: <CustomerServiceOutlined />,
-      label: '用户服务',
-      children: [
-        {
-          key: '1',
-          icon: <AppstoreOutlined />,
-          label: <Link to="/">智能体广场</Link>,
-        },
-        {
-          key: 'knowledge',
-          icon: <BookOutlined />,
-          label: <Link to="/knowledge">知识中心</Link>,
-        },
-      ],
-    },
-    {
-      key: 'management',
-      icon: <SettingOutlined />,
-      label: '系统管理',
-      children: [
-        {
-          key: '2',
-          icon: <UserOutlined />,
-          label: <Link to="/agents">智能体管理</Link>,
-        },
-        {
-          key: '3',
-          icon: <FileTextOutlined />,
-          label: <Link to="/sop">SOP管理</Link>,
-        },
-        {
-          key: '4',
-          icon: <LinkOutlined />,
-          label: <Link to="/mcp">MCP管理</Link>,
-        },
-        {
-          key: '5',
-          icon: <ApiOutlined />,
-          label: <Link to="/models">模型管理</Link>,
-        },
-        {
-          key: '6',
-          icon: <ClockCircleOutlined />,
-          label: <Link to="/tasks">任务管理</Link>,
-        },
-      ],
-    },
-  ];
+  // 转换菜单数据为 Ant Design 格式
+  const menuItems = transformMenusForAntd(menus);
 
   return (
     <ConfigProvider theme={antdTheme}>
@@ -142,12 +112,29 @@ function AppContent() {
               </button>
             </div>
           </div>
-          <Menu
-            theme={isDark ? "dark" : "light"}
-            mode="inline"
-            defaultSelectedKeys={['1']}
-            items={menuItems}
-          />
+          {menuLoading ? (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <Spin size="small" />
+            </div>
+          ) : (
+            <Menu
+              theme={isDark ? "dark" : "light"}
+              mode="inline"
+              selectedKeys={selectedKeys}
+              openKeys={openKeys}
+              items={menuItems}
+              onClick={(e) => {
+                // 处理菜单点击事件
+                const menuItem = menuItems.find(item => item.key === e.key);
+                if (menuItem && menuItem.label && typeof menuItem.label !== 'string') {
+                  // 菜单标签已包含Link组件，路由会自动处理
+                  console.log('菜单点击:', e.key, menuItem);
+                }
+              }}
+              onOpenChange={onOpenChange}
+              style={{ border: 'none' }}
+            />
+          )}
         </Sider>
       )}
 
@@ -195,17 +182,33 @@ function AppContent() {
               <ThemeToggleSimple />
             </div>
           </div>
-          <Menu
-            mode="inline"
-            defaultSelectedKeys={['1']}
-            items={menuItems}
-            onClick={() => setMobileMenuVisible(false)}
-            style={{
-              fontSize: '16px',
-              border: 'none'
-            }}
-            className="mobile-menu-optimized"
-          />
+          {menuLoading ? (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              <Spin size="small" />
+            </div>
+          ) : (
+            <Menu
+              mode="inline"
+              selectedKeys={selectedKeys}
+              openKeys={openKeys}
+              items={menuItems}
+              onClick={(e) => {
+                setMobileMenuVisible(false);
+                // 处理菜单点击事件
+                const menuItem = menuItems.find(item => item.key === e.key);
+                if (menuItem && menuItem.label && typeof menuItem.label !== 'string') {
+                  // 菜单标签已包含Link组件，路由会自动处理
+                  console.log('移动端菜单点击:', e.key, menuItem);
+                }
+              }}
+              onOpenChange={onOpenChange}
+              style={{
+                fontSize: '16px',
+                border: 'none'
+              }}
+              className="mobile-menu-optimized"
+            />
+          )}
         </Drawer>
       )}
       <Layout>
@@ -220,6 +223,28 @@ function AppContent() {
               paddingTop: isMobile ? 56 : undefined // 预留头部空间
             }}
           >
+            {/* 面包屑导航 */}
+            {!isMobile && breadcrumb.length > 0 && (
+              <Breadcrumb 
+                style={{ 
+                  marginBottom: '16px',
+                  padding: '8px 0'
+                }}
+                items={[
+                  {
+                    href: '/',
+                    title: <HomeOutlined />,
+                  },
+                  ...breadcrumb.map(crumb => ({
+                    title: crumb.path ? (
+                      <Link to={crumb.path}>{crumb.title}</Link>
+                    ) : (
+                      crumb.title
+                    ),
+                  }))
+                ]}
+              />
+            )}
             {/* 移动端自定义头部 */}
             {isMobile && (
               <div
@@ -268,6 +293,7 @@ function AppContent() {
             )}
             <Routes>
               <Route path="/" element={<AgentMarketplace />} />
+              <Route path="/knowledge" element={<KnowledgeManagement />} />
               <Route path="/agents/:agentId" element={<AgentChat />} />
               <Route path="/agents" element={<AgentManagement />} />
               <Route path="/sop" element={<SOPList />} />
