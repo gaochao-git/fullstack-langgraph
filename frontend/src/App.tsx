@@ -7,13 +7,13 @@ import {
   HomeOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
-import { SOPList } from "./apps/sop";
-import { MCPManagement } from "./apps/mcp";
-import { AgentManagement, AgentMarketplace, AgentChat } from "./apps/agent";
-import { ModelsManagement } from "./apps/ai_model";
-import { TasksManagement } from "./apps/scheduled_task";
-import { UserManagement, RoleManagement, PermissionManagement } from "./apps/user";
-import TenantManagement from "./apps/tenant/TenantManagement";
+import { SOPList } from "./pages/sop";
+import { MCPManagement } from "./pages/mcp";
+import { AgentManagement, AgentMarketplace, AgentChat } from "./pages/agent";
+import { ModelsManagement } from "./pages/ai_model";
+import { TasksManagement } from "./pages/scheduled_task";
+import { UserManagement, RoleManagement, PermissionManagement } from "./pages/user";
+import TenantManagement from "./pages/tenant/TenantManagement";
 import KnowledgeManagement from "./pages/KnowledgeManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
