@@ -143,22 +143,31 @@ export const useMenus = (): UseMenusReturn => {
     const buildBreadcrumb = (menus: MenuTreeNode[], targetPath: string, parents: MenuTreeNode[] = []): boolean => {
       for (const menu of menus) {
         const currentParents = [...parents, menu];
-        
+
+        // 先检查子菜单
+        if (menu.children) {
+          const foundInChildren = buildBreadcrumb(menu.children, targetPath, currentParents);
+          if (foundInChildren) return true;
+        }
+
+        // 再检查当前菜单
         if (menu.route_path === targetPath || 
             (targetPath.startsWith(menu.route_path) && menu.route_path !== '/')) {
           // 找到匹配的菜单，构建面包屑
           currentParents.forEach(parent => {
+            let path = parent.redirect_path || parent.route_path || undefined;
+
+            // 如果当前菜单有子菜单但没有自己的路由和重定向路径，跳转到第一个子菜单
+            if (parent.children && parent.children.length > 0 && !path) {
+              path = parent.children[0].route_path;
+            }
+            
             crumbs.push({
               title: parent.menu_name,
-              path: parent.route_path || undefined,
+              path: path,
             });
           });
           return true;
-        }
-        
-        if (menu.children) {
-          const found = buildBreadcrumb(menu.children, targetPath, currentParents);
-          if (found) return true;
         }
       }
       

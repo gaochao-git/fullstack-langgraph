@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import { Layout, Menu, Drawer, ConfigProvider, App as AntdApp, Breadcrumb, Spin } from "antd";
 import {
   MenuFoldOutlined,
@@ -12,6 +12,8 @@ import { MCPManagement } from "./apps/mcp";
 import { AgentManagement, AgentMarketplace, AgentChat } from "./apps/agent";
 import { ModelsManagement } from "./apps/ai_model";
 import { TasksManagement } from "./apps/scheduled_task";
+import { UserManagement, RoleManagement, PermissionManagement } from "./apps/user";
+import TenantManagement from "./apps/tenant/TenantManagement";
 import KnowledgeManagement from "./pages/KnowledgeManagement";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
@@ -29,6 +31,10 @@ const ComponentMap: Record<string, React.ComponentType> = {
   'MCPManagement': MCPManagement,
   'ModelsManagement': ModelsManagement,
   'TasksManagement': TasksManagement,
+  'UserManagement': UserManagement,
+  'RoleManagement': RoleManagement,
+  'PermissionManagement': PermissionManagement,
+  'TenantManagement': TenantManagement,
 };
 
 // 主应用组件（包装在主题提供者内部）
@@ -294,12 +300,16 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<AgentMarketplace />} />
               <Route path="/knowledge" element={<KnowledgeManagement />} />
-              <Route path="/agents/:agentId" element={<AgentChat />} />
-              <Route path="/agents" element={<AgentManagement />} />
-              <Route path="/sop" element={<SOPList />} />
-              <Route path="/mcp" element={<MCPManagement />} />
-              <Route path="/models" element={<ModelsManagement />} />
-              <Route path="/tasks" element={<TasksManagement />} />
+              <Route path="/system/agents/:agentId" element={<AgentChat />} />
+              <Route path="/system/agents" element={<AgentManagement />} />
+              <Route path="/system/sop" element={<SOPList />} />
+              <Route path="/system/mcp" element={<MCPManagement />} />
+              <Route path="/system/models" element={<ModelsManagement />} />
+              <Route path="/system/tasks" element={<TasksManagement />} />
+              <Route path="/system/user" element={<UserManagement />} />
+              <Route path="/system/userRole" element={<RoleManagement />} />
+              <Route path="/system/permission" element={<PermissionManagement />} />
+              <Route path="/system/tenant" element={<TenantManagement />} />
               <Route
                 path="*"
                 element={
