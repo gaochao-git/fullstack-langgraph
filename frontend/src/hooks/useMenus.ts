@@ -50,34 +50,50 @@ export const useMenus = (): UseMenusReturn => {
   const selectedKeys = useMemo(() => {
     if (!userMenus?.menus) return [];
     
-    const findMenuByPath = (menus: MenuTreeNode[], path: string): MenuTreeNode | null => {
-      for (const menu of menus) {
-        // 精确匹配
-        if (menu.route_path === path) {
-          return menu;
-        }
-        
-        // 处理动态路由（如 /agents/:agentId）
-        if (menu.route_path !== '/' && path.startsWith(menu.route_path)) {
-          // 检查是否是动态路由
-          const isDynamicRoute = menu.route_path.includes('/:') || 
-                                menu.route_path.split('/').length === path.split('/').length;
-          if (isDynamicRoute || path === menu.route_path || path.startsWith(menu.route_path + '/')) {
-            return menu;
+    const findMenuAndParentsByPath = (menus: MenuTreeNode[], path: string): MenuTreeNode[] => {
+      const result: MenuTreeNode[] = [];
+      
+      const findMenu = (menus: MenuTreeNode[], path: string, parents: MenuTreeNode[] = []): boolean => {
+        for (const menu of menus) {
+          const currentParents = [...parents, menu];
+          
+          // 精确匹配
+          if (menu.route_path === path) {
+            result.push(...currentParents);
+            return true;
+          }
+          
+          // 处理动态路由（如 /agents/:agentId）
+          if (menu.route_path !== '/' && path.startsWith(menu.route_path)) {
+            // 检查是否是动态路由
+            const isDynamicRoute = menu.route_path.includes('/:') || 
+                                  menu.route_path.split('/').length === path.split('/').length;
+            if (isDynamicRoute || path === menu.route_path || path.startsWith(menu.route_path + '/')) {
+              result.push(...currentParents);
+              
+              // 如果有子菜单，继续查找以确保包含所有相关父菜单
+              if (menu.children) {
+                findMenu(menu.children, path, currentParents);
+              }
+              return true;
+            }
+          }
+          
+          // 递归查找子菜单
+          if (menu.children) {
+            const found = findMenu(menu.children, path, currentParents);
+            if (found) return true;
           }
         }
-        
-        // 递归查找子菜单
-        if (menu.children) {
-          const found = findMenuByPath(menu.children, path);
-          if (found) return found;
-        }
-      }
-      return null;
+        return false;
+      };
+
+      findMenu(menus, path);
+      return result;
     };
 
-    const currentMenu = findMenuByPath(userMenus.menus, location.pathname);
-    return currentMenu ? [currentMenu.key] : [];
+    const matchedMenus = findMenuAndParentsByPath(userMenus.menus, location.pathname);
+    return matchedMenus.map(menu => menu.key);
   }, [userMenus?.menus, location.pathname]);
 
   // 计算需要展开的菜单项
