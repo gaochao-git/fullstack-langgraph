@@ -79,7 +79,7 @@ const AgentMarketplace = () => {
   }, []);
 
   const handleAgentClick = (agentId: string) => {
-    navigate(`/agents/${agentId}`);
+    navigate(`/service/agents/${agentId}`);
   };
 
 

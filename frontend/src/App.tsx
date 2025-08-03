@@ -298,8 +298,10 @@ function AppContent() {
               </div>
             )}
             <Routes>
-              <Route path="/" element={<AgentMarketplace />} />
-              <Route path="/knowledge" element={<KnowledgeManagement />} />
+              <Route path="/" element={<Navigate to="/service/agents" replace />} />
+              <Route path="/service/agents" element={<AgentMarketplace />} />
+              <Route path="/service/agents/:agentId" element={<AgentChat />} />
+              <Route path="/service/knowledge" element={<KnowledgeManagement />} />
               <Route path="/system/agents/:agentId" element={<AgentChat />} />
               <Route path="/system/agents" element={<AgentManagement />} />
               <Route path="/system/sop" element={<SOPList />} />

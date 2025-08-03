@@ -63,20 +63,20 @@ export const useMenus = (): UseMenusReturn => {
             return true;
           }
           
-          // 处理动态路由（如 /agents/:agentId）
+          // 处理动态路由和子路径匹配
           if (menu.route_path !== '/') {
             // 精确匹配
             if (path === menu.route_path) {
               result.push(...currentParents);
               return true;
             }
-            // 动态路由匹配或子路径匹配
+            
+            // 子路径匹配：当前路径以菜单路径开头，并且下一个字符是 '/' 或路径结束
             if (path.startsWith(menu.route_path)) {
-              // 检查是否是动态路由或完整子路径
-              const isDynamicRoute = menu.route_path.includes('/:');
-              const isExactSubPath = path === menu.route_path || path.startsWith(menu.route_path + '/');
+              const nextChar = path[menu.route_path.length];
+              const isValidSubPath = nextChar === '/' || nextChar === undefined;
               
-              if (isDynamicRoute || isExactSubPath) {
+              if (isValidSubPath) {
                 result.push(...currentParents);
                 
                 // 如果有子菜单，继续查找以确保包含所有相关父菜单
@@ -127,7 +127,8 @@ export const useMenus = (): UseMenusReturn => {
     const findParentKeys = (menus: MenuTreeNode[], targetPath: string): boolean => {
       for (const menu of menus) {
         if (menu.route_path === targetPath || 
-            (targetPath.startsWith(menu.route_path) && menu.route_path !== '/')) {
+            (targetPath.startsWith(menu.route_path) && menu.route_path !== '/' && 
+             (targetPath[menu.route_path.length] === '/' || targetPath[menu.route_path.length] === undefined))) {
           return true;
         }
         
@@ -177,7 +178,8 @@ export const useMenus = (): UseMenusReturn => {
 
         // 再检查当前菜单
         if (menu.route_path === targetPath || 
-            (targetPath.startsWith(menu.route_path) && menu.route_path !== '/')) {
+            (targetPath.startsWith(menu.route_path) && menu.route_path !== '/' && 
+             (targetPath[menu.route_path.length] === '/' || targetPath[menu.route_path.length] === undefined))) {
           // 找到匹配的菜单，构建面包屑
           currentParents.forEach(parent => {
             let path = parent.redirect_path || parent.route_path || undefined;
