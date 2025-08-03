@@ -126,17 +126,32 @@
     transition: background-color 0.3s ease, color 0.3s ease;
   }
   
-  /* 菜单高亮样式修复 - 确保Link继承父级颜色 */
+  /* 菜单样式简化 - 只修复Link颜色继承问题 */
   .ant-menu-item-selected a,
   .ant-menu-submenu-selected a {
     color: inherit !important;
     text-decoration: none !important;
   }
   
-  /* 确保菜单使用默认颜色 */
-  .ant-menu-item,
-  .ant-menu-submenu-title {
-    color: inherit !important;
+  /* 只调整一级菜单的颜色 */
+  /* 未选中的一级菜单 */
+  .ant-menu-submenu-title:not(.ant-menu-submenu-selected) {
+    color: rgba(255, 255, 255, 0.85) !important;
+  }
+  
+  .ant-menu-light .ant-menu-submenu-title:not(.ant-menu-submenu-selected) {
+    color: rgba(0, 0, 0, 0.85) !important;
+  }
+  
+  /* 选中的一级菜单 - 颜色加重 */
+  .ant-menu-submenu-selected .ant-menu-submenu-title {
+    color: rgba(255, 255, 255, 1) !important;
+    font-weight: 600 !important;
+  }
+  
+  .ant-menu-light .ant-menu-submenu-selected .ant-menu-submenu-title {
+    color: rgba(0, 0, 0, 1) !important;
+    font-weight: 600 !important;
   }
   html {
     /* Prevent scroll bounce on the entire page */
