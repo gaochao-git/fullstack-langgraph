@@ -15,7 +15,7 @@ import { TasksManagement } from "./pages/scheduled_task";
 import { UserManagement, RoleManagement, PermissionManagement } from "./pages/user";
 import TenantManagement from "./pages/tenant/TenantManagement";
 import KnowledgeManagement from "./pages/KnowledgeManagement";
-import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import { ThemeProvider, useTheme } from "./hooks/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 import { useMenus } from "./hooks/useMenus";
 import { transformMenusForAntd } from "./utils/menuUtils";

@@ -23,7 +23,7 @@ import {
   CopyOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
-import { useTheme } from '../../../contexts/ThemeContext';
+import { useTheme } from '../../../hooks/ThemeContext';
 import { omind_post } from '../../../utils/base_api';
 
 const { TextArea } = Input;

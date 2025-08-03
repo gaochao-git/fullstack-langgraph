@@ -12,8 +12,8 @@ import {
   Loader2
 } from "lucide-react";
 import ReactEcharts from 'echarts-for-react';
-import { useTheme } from '@/contexts/ThemeContext';
-import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/ThemeContext';
+import { cn } from '@/utils/lib-utils';
 
 // 故障类型定义
 type FaultPriority = "P1" | "P2" | "P3";

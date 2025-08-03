@@ -4,12 +4,12 @@ import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot,
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/lib-utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
 import ZabbixDataRenderer, { canRenderChart } from "../../components/ZabbixDataRenderer";
-import { useTheme } from "@/contexts/ThemeContext";
+import { useTheme } from "@/hooks/ThemeContext";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [

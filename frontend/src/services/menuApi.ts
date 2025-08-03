@@ -4,7 +4,7 @@
  */
 
 import { MenuInfo, MenuApiResponse, UserMenuPermission } from '../types/menu';
-import { defaultMenusData } from '../data/defaultMenus';
+import { defaultMenusData } from '../utils/defaultMenus';
 import { omind_get } from '../utils/base_api';
 
 export class MenuApiService {

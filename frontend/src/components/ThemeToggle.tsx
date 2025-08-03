@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Dropdown, Space } from 'antd';
 import { SunOutlined, MoonOutlined, DesktopOutlined, DownOutlined } from '@ant-design/icons';
-import { useTheme, ThemeMode } from '../contexts/ThemeContext';
+import { useTheme, ThemeMode } from '../hooks/ThemeContext';
 
 export const ThemeToggle: React.FC = () => {
   const { mode, setMode, isDark } = useTheme();

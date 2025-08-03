@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Space, Tag, Modal, Form, Input, Select, message } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons';
 import { tenantMockData, Tenant } from './tenantMockData';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks/ThemeContext';
 
 const { Option } = Select;
 

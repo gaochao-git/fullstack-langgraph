@@ -1,8 +1,8 @@
 import React from 'react';
 import { Tag } from 'antd';
 import { RobotOutlined } from '@ant-design/icons';
-import { useTheme } from '@/contexts/ThemeContext';
-import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/ThemeContext';
+import { cn } from '@/utils/lib-utils';
 
 // 智能体信息类型
 interface Agent {

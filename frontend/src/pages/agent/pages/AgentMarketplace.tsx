@@ -19,7 +19,7 @@ import {
 } from '../components/AgentIconSystem';
 import { useNavigate } from "react-router-dom";
 import { agentApi } from "../../../services/agentApi";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { useTheme } from "../../../hooks/ThemeContext";
 
 const { Title, Text, Paragraph } = Typography;
 interface Agent {

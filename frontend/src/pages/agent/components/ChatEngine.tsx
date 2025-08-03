@@ -4,8 +4,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { ChatMessages, type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
-import { useTheme } from "@/contexts/ThemeContext";
-import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/ThemeContext";
+import { cn } from "@/utils/lib-utils";
 import { omind_get } from "../../../utils/base_api";
 
 // 历史会话类型定义
