@@ -2,7 +2,7 @@
  * 定时任务 API服务 - 真实API调用，适配统一响应格式
  */
 
-import { omind_get, omind_post, omind_put, omind_del } from '../../../utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
 // 定时任务类型定义
 export interface ScheduledTask {

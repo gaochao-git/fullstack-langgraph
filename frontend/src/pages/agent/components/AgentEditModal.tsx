@@ -36,7 +36,7 @@ import {
 } from './AgentIconSystem';
 import ScheduledTaskManager from './ScheduledTaskManager';
 import type { DataNode } from 'antd/es/tree';
-import { agentApi, type CreateAgentRequest, type UpdateAgentRequest } from '../services/agentApi';
+import { agentApi, type CreateAgentRequest, type UpdateAgentRequest } from '../../../services/agentApi';
 
 const { Option } = Select;
 const { TabPane } = Tabs;

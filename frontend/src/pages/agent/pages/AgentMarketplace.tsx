@@ -18,7 +18,7 @@ import {
   getIconBackgroundColor
 } from '../components/AgentIconSystem';
 import { useNavigate } from "react-router-dom";
-import { agentApi } from "../services/agentApi";
+import { agentApi } from "../../../services/agentApi";
 import { useTheme } from "../../../contexts/ThemeContext";
 
 const { Title, Text, Paragraph } = Typography;

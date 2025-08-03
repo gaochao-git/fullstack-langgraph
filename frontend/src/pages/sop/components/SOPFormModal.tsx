@@ -13,7 +13,7 @@ import {
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { SOPTemplate, SOPTemplateRequest, SOPStep } from '../types/sop';
-import { SOPApi, SOPUtils } from '../services/sopApi';
+import { SOPApi, SOPUtils } from '../../../services/sopApi';
 
 const { TextArea } = Input;
 const { Option } = Select;

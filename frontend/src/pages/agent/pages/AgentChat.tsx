@@ -4,7 +4,7 @@ import { Spin, Alert } from 'antd';
 import { Button } from '@/components/ui/button';
 import ChatEngine from '../components/ChatEngine';
 import GenericAgentWelcome from '../components/GenericAgentWelcome';
-import { agentApi } from '../services/agentApi';
+import { agentApi } from '../../../services/agentApi';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 

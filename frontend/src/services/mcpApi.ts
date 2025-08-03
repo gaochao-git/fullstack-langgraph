@@ -2,7 +2,7 @@
  * MCP API服务 - 真实API调用，适配统一响应格式
  */
 
-import { omind_get, omind_post, omind_put, omind_del, omind_patch } from '../../../utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del, omind_patch } from '../utils/base_api';
 
 // MCP服务器类型定义
 export interface MCPServer {

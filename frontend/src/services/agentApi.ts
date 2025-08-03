@@ -2,7 +2,7 @@
  * 智能体管理API服务 - 使用统一响应格式
  */
 
-import { omind_get, omind_post, omind_put, omind_del } from '../../../utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
 // 类型定义
 export interface MCPTool {

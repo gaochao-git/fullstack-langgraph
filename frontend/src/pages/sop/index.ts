@@ -21,7 +21,7 @@ export { default as SOPDetailModal } from './components/SOPDetailModal';
 export { useSOPList } from './hooks/useSOPList';
 
 // === 服务 ===
-export { SOPApi, SOPUtils } from './services/sopApi';
+export { SOPApi, SOPUtils } from '../../services/sopApi';
 
 // === 类型定义 ===
 export * from './types/sop';

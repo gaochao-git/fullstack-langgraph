@@ -10,7 +10,7 @@
 export { default as ModelsManagement } from './pages/ModelsManagement';
 
 // === 服务 ===
-export { AIModelApi } from './services/aiModelApi';
+export { AIModelApi } from '../../services/aiModelApi';
 
 // === 类型定义 (从服务中导出) ===
 export type { 
@@ -18,7 +18,7 @@ export type {
   AIModelCreateRequest, 
   AIModelUpdateRequest, 
   AIModelListParams
-} from './services/aiModelApi';
+} from '../../services/aiModelApi';
 
 // === 默认导出 ===
 export { default } from './pages/ModelsManagement';
