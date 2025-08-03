@@ -229,8 +229,8 @@ function AppContent() {
               paddingTop: isMobile ? 56 : undefined // 预留头部空间
             }}
           >
-            {/* 面包屑导航 */}
-            {!isMobile && breadcrumb.length > 0 && (
+            {/* 面包屑导航 - 智能体聊天页面不显示 */}
+            {!isMobile && breadcrumb.length > 0 && !location.pathname.match(/^\/service\/agents\/[^\/]+$/) && (
               <Breadcrumb 
                 style={{ 
                   marginBottom: '16px',
