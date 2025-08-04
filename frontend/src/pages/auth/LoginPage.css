@@ -1,0 +1,204 @@
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 20px;
+}
+
+.login-container.dark {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d3748 100%);
+}
+
+.login-content {
+  width: 100%;
+  max-width: 480px;
+}
+
+.login-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+}
+
+.dark .login-card {
+  background: #2d3748;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 8px;
+}
+
+.dark .login-title {
+  color: #f7fafc;
+}
+
+.login-subtitle {
+  font-size: 16px;
+  color: #718096;
+  margin: 0;
+}
+
+.dark .login-subtitle {
+  color: #a0aec0;
+}
+
+.login-form {
+  margin-top: 24px;
+}
+
+.login-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.sso-login-container {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.sso-icon {
+  font-size: 48px;
+  color: #1890ff;
+  margin-bottom: 16px;
+}
+
+.dark .sso-icon {
+  color: #40a9ff;
+}
+
+.sso-description p {
+  margin: 8px 0;
+  color: #2d3748;
+  font-size: 16px;
+}
+
+.dark .sso-description p {
+  color: #e2e8f0;
+}
+
+.sso-hint {
+  font-size: 14px !important;
+  color: #718096 !important;
+}
+
+.dark .sso-hint {
+  color: #a0aec0 !important;
+}
+
+.sso-button {
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: 8px;
+  margin-top: 24px;
+}
+
+.login-divider {
+  margin: 32px 0 24px 0;
+  color: #cbd5e0;
+}
+
+.dark .login-divider {
+  color: #4a5568;
+  border-top-color: #4a5568;
+}
+
+.login-tips {
+  background-color: #f7fafc;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 14px;
+  color: #4a5568;
+}
+
+.dark .login-tips {
+  background-color: #1a202c;
+  color: #cbd5e0;
+}
+
+.login-tips p {
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.login-tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.login-tips li {
+  margin: 4px 0;
+}
+
+/* Ant Design 组件样式覆盖 */
+.dark .ant-card {
+  background: #2d3748;
+  border-color: #4a5568;
+}
+
+.dark .ant-tabs-tab {
+  color: #a0aec0;
+}
+
+.dark .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #40a9ff;
+}
+
+.dark .ant-input,
+.dark .ant-input-password {
+  background-color: #1a202c;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.dark .ant-input::placeholder,
+.dark .ant-input-password::placeholder {
+  color: #718096;
+}
+
+.dark .ant-input:hover,
+.dark .ant-input-password:hover {
+  border-color: #718096;
+}
+
+.dark .ant-input:focus,
+.dark .ant-input-password:focus {
+  border-color: #40a9ff;
+  box-shadow: 0 0 0 2px rgba(64, 169, 255, 0.2);
+}
+
+.dark .ant-input-prefix {
+  color: #718096;
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .login-container {
+    padding: 16px;
+  }
+  
+  .login-card {
+    box-shadow: none;
+  }
+  
+  .login-title {
+    font-size: 24px;
+  }
+  
+  .login-subtitle {
+    font-size: 14px;
+  }
+}

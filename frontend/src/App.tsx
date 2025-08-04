@@ -5,6 +5,7 @@ import {
   MenuUnfoldOutlined,
   CloseOutlined,
   HomeOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
 import { useState, useEffect } from "react";
 import { SOPList } from "./pages/sop";
@@ -19,6 +20,11 @@ import { ThemeProvider, useTheme } from "./hooks/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 import { useMenus } from "./hooks/useMenus";
 import { transformMenusForAntd } from "./utils/menuUtils";
+import { LoginPage } from "./pages/auth/LoginPage";
+import { SSOCallback } from "./pages/auth/SSOCallback";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { useAuth } from "./hooks/useAuth";
+import { configureAuthInterceptor } from "./utils/authInterceptor";
 
 const { Sider, Content } = Layout;
 
@@ -44,6 +50,7 @@ function AppContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const { antdTheme, isDark } = useTheme();
+  const { isAuthenticated, checkAuth, logout, user } = useAuth();
   
   // 使用新的菜单系统
   const { 
@@ -58,6 +65,16 @@ function AppContent() {
   } = useMenus();
   
   // Theme token removed as not used
+
+  // 初始化认证检查和拦截器
+  useEffect(() => {
+    checkAuth();
+    configureAuthInterceptor({
+      onUnauthorized: () => {
+        logout();
+      }
+    });
+  }, []);
 
   // 检测屏幕尺寸
   useEffect(() => {
@@ -77,12 +94,15 @@ function AppContent() {
   // 转换菜单数据为 Ant Design 格式
   const menuItems = transformMenusForAntd(menus);
 
+  // 判断是否为公开页面（不需要显示菜单的页面）
+  const isPublicPage = ['/login', '/sso/callback'].includes(location.pathname);
+
   return (
     <ConfigProvider theme={antdTheme}>
       <AntdApp>
         <Layout style={{ minHeight: "100vh" }}>
-      {/* 桌面端侧边栏 */}
-      {!isMobile && (
+      {/* 桌面端侧边栏 - 只在已登录且非公开页面时显示 */}
+      {!isMobile && isAuthenticated && !isPublicPage && (
         <Sider trigger={null} collapsible collapsed={collapsed} theme={isDark ? "dark" : "light"}>
           <div style={{
             display: 'flex',
@@ -97,8 +117,13 @@ function AppContent() {
                 智能运维平台
               </span>
             )}
-            {/* 主题切换按钮 */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+            {/* 主题切换和用户信息 */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {user && !collapsed && (
+                <span style={{ color: isDark ? '#fff' : '#000', fontSize: 14 }}>
+                  {user.display_name || user.username}
+                </span>
+              )}
               <ThemeToggleSimple />
               <button
                 type="button"
@@ -141,11 +166,40 @@ function AppContent() {
               style={{ border: 'none' }}
             />
           )}
+          {/* 登出按钮 */}
+          {isAuthenticated && (
+            <div style={{ 
+              padding: '0 16px 16px', 
+              borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
+              marginTop: 'auto'
+            }}>
+              <button
+                onClick={logout}
+                style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  border: 'none',
+                  borderRadius: 6,
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  color: isDark ? '#fff' : '#000',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  gap: 8,
+                  fontSize: 14
+                }}
+              >
+                <LogoutOutlined />
+                {!collapsed && '退出登录'}
+              </button>
+            </div>
+          )}
         </Sider>
       )}
 
-      {/* 移动端抽屉菜单 */}
-      {isMobile && (
+      {/* 移动端抽屉菜单 - 只在已登录且非公开页面时显示 */}
+      {isMobile && isAuthenticated && !isPublicPage && (
         <Drawer
           title={null}
           placement="left"
@@ -229,8 +283,8 @@ function AppContent() {
               paddingTop: isMobile ? 56 : undefined // 预留头部空间
             }}
           >
-            {/* 面包屑导航 - 智能体聊天页面不显示 */}
-            {!isMobile && breadcrumb.length > 0 && !location.pathname.match(/^\/service\/agents\/[^\/]+$/) && (
+            {/* 面包屑导航 - 只在已登录且非公开页面时显示，智能体聊天页面不显示 */}
+            {!isMobile && isAuthenticated && !isPublicPage && breadcrumb.length > 0 && !location.pathname.match(/^\/service\/agents\/[^\/]+$/) && (
               <Breadcrumb 
                 style={{ 
                   marginBottom: '16px',
@@ -251,8 +305,8 @@ function AppContent() {
                 ]}
               />
             )}
-            {/* 移动端自定义头部 */}
-            {isMobile && (
+            {/* 移动端自定义头部 - 只在已登录且非公开页面时显示 */}
+            {isMobile && isAuthenticated && !isPublicPage && (
               <div
                 style={{
                   position: 'fixed',
@@ -298,21 +352,86 @@ function AppContent() {
               </div>
             )}
             <Routes>
-              <Route path="/" element={<Navigate to="/service/agents" replace />} />
-              <Route path="/service/agents" element={<AgentMarketplace />} />
-              <Route path="/service/agents/:agentId" element={<AgentChat />} />
-              <Route path="/service/knowledge" element={<KnowledgeManagement />} />
-              <Route path="/system/agents/:agentId" element={<AgentChat />} />
-              <Route path="/system/agents" element={<AgentManagement />} />
-              <Route path="/system/sop" element={<SOPList />} />
-              <Route path="/system/mcp" element={<MCPManagement />} />
-              <Route path="/system/models" element={<ModelsManagement />} />
-              <Route path="/system/tasks" element={<TasksManagement />} />
-              <Route path="/system/user" element={<UserManagement />} />
-              <Route path="/system/userRole" element={<RoleManagement />} />
-              <Route path="/system/permission" element={<PermissionManagement />} />
-              <Route path="/system/menu" element={<MenuManagement />} />
-              <Route path="/system/tenant" element={<TenantManagement />} />
+              {/* 公开路由 */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/sso/callback" element={<SSOCallback />} />
+              
+              {/* 受保护的路由 */}
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Navigate to="/service/agents" replace />
+                </ProtectedRoute>
+              } />
+              <Route path="/service/agents" element={
+                <ProtectedRoute>
+                  <AgentMarketplace />
+                </ProtectedRoute>
+              } />
+              <Route path="/service/agents/:agentId" element={
+                <ProtectedRoute>
+                  <AgentChat />
+                </ProtectedRoute>
+              } />
+              <Route path="/service/knowledge" element={
+                <ProtectedRoute>
+                  <KnowledgeManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/agents/:agentId" element={
+                <ProtectedRoute>
+                  <AgentChat />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/agents" element={
+                <ProtectedRoute>
+                  <AgentManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/sop" element={
+                <ProtectedRoute>
+                  <SOPList />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/mcp" element={
+                <ProtectedRoute>
+                  <MCPManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/models" element={
+                <ProtectedRoute>
+                  <ModelsManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/tasks" element={
+                <ProtectedRoute>
+                  <TasksManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/user" element={
+                <ProtectedRoute>
+                  <UserManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/userRole" element={
+                <ProtectedRoute>
+                  <RoleManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/permission" element={
+                <ProtectedRoute>
+                  <PermissionManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/menu" element={
+                <ProtectedRoute>
+                  <MenuManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/system/tenant" element={
+                <ProtectedRoute>
+                  <TenantManagement />
+                </ProtectedRoute>
+              } />
               <Route
                 path="*"
                 element={
