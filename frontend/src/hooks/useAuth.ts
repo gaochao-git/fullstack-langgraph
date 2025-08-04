@@ -63,6 +63,8 @@ export const useAuth = create<AuthState>((set) => ({
       isAuthenticated: false,
       loading: false 
     });
+    // 跳转到登录页
+    window.location.href = '/login';
   },
 
   checkAuth: async () => {

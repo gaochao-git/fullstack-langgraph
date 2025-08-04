@@ -21,6 +21,7 @@ import { ThemeToggleSimple } from "./components/ThemeToggle";
 import { useMenus } from "./hooks/useMenus";
 import { transformMenusForAntd } from "./utils/menuUtils";
 import { LoginPage } from "./pages/auth/LoginPage";
+import { RegisterPage } from "./pages/auth/RegisterPage";
 import { SSOCallback } from "./pages/auth/SSOCallback";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
@@ -95,7 +96,7 @@ function AppContent() {
   const menuItems = transformMenusForAntd(menus);
 
   // 判断是否为公开页面（不需要显示菜单的页面）
-  const isPublicPage = ['/login', '/sso/callback'].includes(location.pathname);
+  const isPublicPage = ['/login', '/register', '/sso/callback'].includes(location.pathname);
 
   return (
     <ConfigProvider theme={antdTheme}>
@@ -117,13 +118,8 @@ function AppContent() {
                 智能运维平台
               </span>
             )}
-            {/* 主题切换和用户信息 */}
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-              {user && !collapsed && (
-                <span style={{ color: isDark ? '#fff' : '#000', fontSize: 14 }}>
-                  {user.display_name || user.username}
-                </span>
-              )}
+            {/* 主题切换 */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
               <ThemeToggleSimple />
               <button
                 type="button"
@@ -165,35 +161,6 @@ function AppContent() {
               onOpenChange={onOpenChange}
               style={{ border: 'none' }}
             />
-          )}
-          {/* 登出按钮 */}
-          {isAuthenticated && (
-            <div style={{ 
-              padding: '0 16px 16px', 
-              borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
-              marginTop: 'auto'
-            }}>
-              <button
-                onClick={logout}
-                style={{
-                  width: '100%',
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: 6,
-                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
-                  color: isDark ? '#fff' : '#000',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  gap: 8,
-                  fontSize: 14
-                }}
-              >
-                <LogoutOutlined />
-                {!collapsed && '退出登录'}
-              </button>
-            </div>
           )}
         </Sider>
       )}
@@ -269,10 +236,107 @@ function AppContent() {
               className="mobile-menu-optimized"
             />
           )}
+          {/* 移动端登出按钮 */}
+          {isAuthenticated && (
+            <div style={{ 
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: '16px',
+              borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
+              background: isDark ? '#141414' : '#fff'
+            }}>
+              <button
+                onClick={() => {
+                  setMobileMenuVisible(false);
+                  logout();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: 6,
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  color: isDark ? '#fff' : '#000',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  fontSize: 16
+                }}
+              >
+                <LogoutOutlined />
+                退出登录
+              </button>
+            </div>
+          )}
         </Drawer>
       )}
       <Layout>
-        {/* 删除Header，主内容区直接顶到顶部 */}
+        {/* 桌面端顶部栏 - 只在已登录时显示 */}
+        {!isMobile && isAuthenticated && !isPublicPage && (
+          <div style={{
+            height: 48,
+            background: isDark ? '#141414' : '#fff',
+            borderBottom: isDark ? '1px solid #303030' : '1px solid #f0f0f0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 24px',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000
+          }}>
+            {/* 左侧：面包屑导航 */}
+            <div style={{ flex: 1 }}>
+              {breadcrumb.length > 0 && !location.pathname.match(/^\/service\/agents\/[^\/]+$/) && (
+                <Breadcrumb
+                  items={[
+                    {
+                      href: '/',
+                      title: <HomeOutlined />,
+                    },
+                    ...breadcrumb.map(crumb => ({
+                      title: crumb.path ? (
+                        <Link to={crumb.path}>{crumb.title}</Link>
+                      ) : (
+                        crumb.title
+                      ),
+                    }))
+                  ]}
+                />
+              )}
+            </div>
+            
+            {/* 右侧：用户信息和操作 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{ color: isDark ? '#fff' : '#000', fontSize: 14 }}>
+                {user?.display_name || user?.username}
+              </span>
+              <button
+                onClick={logout}
+                style={{
+                  padding: '4px 16px',
+                  border: 'none',
+                  borderRadius: 4,
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  color: isDark ? '#fff' : '#000',
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}
+              >
+                <LogoutOutlined />
+                退出登录
+              </button>
+            </div>
+          </div>
+        )}
+        
         <Layout style={{ height: '100vh' }}>
           <Content 
             className={`${isDark ? 'bg-slate-800' : 'bg-gray-50'} transition-colors duration-300`}
@@ -283,28 +347,6 @@ function AppContent() {
               paddingTop: isMobile ? 56 : undefined // 预留头部空间
             }}
           >
-            {/* 面包屑导航 - 只在已登录且非公开页面时显示，智能体聊天页面不显示 */}
-            {!isMobile && isAuthenticated && !isPublicPage && breadcrumb.length > 0 && !location.pathname.match(/^\/service\/agents\/[^\/]+$/) && (
-              <Breadcrumb 
-                style={{ 
-                  marginBottom: '16px',
-                  padding: '8px 0'
-                }}
-                items={[
-                  {
-                    href: '/',
-                    title: <HomeOutlined />,
-                  },
-                  ...breadcrumb.map(crumb => ({
-                    title: crumb.path ? (
-                      <Link to={crumb.path}>{crumb.title}</Link>
-                    ) : (
-                      crumb.title
-                    ),
-                  }))
-                ]}
-              />
-            )}
             {/* 移动端自定义头部 - 只在已登录且非公开页面时显示 */}
             {isMobile && isAuthenticated && !isPublicPage && (
               <div
@@ -348,12 +390,18 @@ function AppContent() {
                 <span style={{ flex: 1, textAlign: 'center', color: isDark ? '#fff' : '#222', fontSize: 18, fontWeight: 600 }}>
                   智能运维平台
                 </span>
-                {/* 右侧可加更多按钮 */}
+                {/* 右侧：用户信息 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: isDark ? '#fff' : '#000', fontSize: 14 }}>
+                    {user?.display_name || user?.username}
+                  </span>
+                </div>
               </div>
             )}
             <Routes>
               {/* 公开路由 */}
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
               <Route path="/sso/callback" element={<SSOCallback />} />
               
               {/* 受保护的路由 */}

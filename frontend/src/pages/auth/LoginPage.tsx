@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, Tabs, message, Divider, Space } from 'antd';
 import { UserOutlined, LockOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/ThemeContext';
+import { DevLoginHint } from '../../components/DevLoginHint';
 import './LoginPage.css';
 
 const { TabPane } = Tabs;
@@ -132,9 +133,14 @@ export function LoginPage() {
                 <li>SSO登录：使用企业统一身份认证</li>
               </ul>
             </div>
+            
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              还没有账号？ <Link to="/register">立即注册</Link>
+            </div>
           </Space>
         </Card>
       </div>
+      <DevLoginHint />
     </div>
   );
 }

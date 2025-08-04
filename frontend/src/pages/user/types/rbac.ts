@@ -73,6 +73,8 @@ export interface UserCreateRequest {
   user_source?: number;
   is_active?: number;
   role_ids?: number[];
+  password?: string;
+  auth_type?: string;
 }
 
 export interface UserUpdateRequest {

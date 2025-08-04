@@ -267,6 +267,8 @@ export function UserManagement() {
           user_source: values.user_source || 3,
           is_active: values.is_active ?? 1,
           role_ids: values.role_ids || [],
+          password: values.password,
+          auth_type: values.auth_type || 'jwt',
         };
         
         const response = await userApi.createUser(createData);
@@ -409,6 +411,36 @@ export function UserManagement() {
               </Form.Item>
             </Col>
           </Row>
+
+          {/* 新增用户时显示密码字段 */}
+          {!editingUser && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="password"
+                  label="初始密码"
+                  rules={[
+                    { required: true, message: '请输入初始密码' },
+                    { min: 6, message: '密码至少6个字符' }
+                  ]}
+                >
+                  <Input.Password placeholder="请输入初始密码" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="auth_type"
+                  label="认证类型"
+                  initialValue="jwt"
+                >
+                  <Select>
+                    <Option value="jwt">JWT认证</Option>
+                    <Option value="sso">SSO认证</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
 
           <Row gutter={16}>
             <Col span={12}>

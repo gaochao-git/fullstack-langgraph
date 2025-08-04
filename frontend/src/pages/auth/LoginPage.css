@@ -21,6 +21,10 @@
   border-radius: 12px;
 }
 
+.login-card .ant-card-body {
+  padding: 32px 40px 24px;
+}
+
 .dark .login-card {
   background: #2d3748;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -28,14 +32,14 @@
 
 .login-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .login-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 600;
   color: #1a202c;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .dark .login-title {
@@ -43,7 +47,7 @@
 }
 
 .login-subtitle {
-  font-size: 16px;
+  font-size: 14px;
   color: #718096;
   margin: 0;
 }
@@ -53,26 +57,26 @@
 }
 
 .login-form {
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .login-button {
-  height: 48px;
-  font-size: 16px;
+  height: 42px;
+  font-size: 15px;
   font-weight: 500;
   border-radius: 8px;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .sso-login-container {
   text-align: center;
-  padding: 24px 0;
+  padding: 16px 0;
 }
 
 .sso-icon {
-  font-size: 48px;
+  font-size: 40px;
   color: #1890ff;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .dark .sso-icon {
@@ -80,9 +84,9 @@
 }
 
 .sso-description p {
-  margin: 8px 0;
+  margin: 4px 0;
   color: #2d3748;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .dark .sso-description p {
@@ -99,15 +103,15 @@
 }
 
 .sso-button {
-  height: 48px;
-  font-size: 16px;
+  height: 42px;
+  font-size: 15px;
   font-weight: 500;
   border-radius: 8px;
-  margin-top: 24px;
+  margin-top: 16px;
 }
 
 .login-divider {
-  margin: 32px 0 24px 0;
+  margin: 20px 0 16px 0;
   color: #cbd5e0;
 }
 
@@ -119,8 +123,8 @@
 .login-tips {
   background-color: #f7fafc;
   border-radius: 8px;
-  padding: 16px;
-  font-size: 14px;
+  padding: 12px;
+  font-size: 13px;
   color: #4a5568;
 }
 
@@ -130,7 +134,7 @@
 }
 
 .login-tips p {
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   font-weight: 500;
 }
 
@@ -140,7 +144,16 @@
 }
 
 .login-tips li {
-  margin: 4px 0;
+  margin: 2px 0;
+}
+
+/* Form间距调整 */
+.login-form .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.login-form .ant-form-item:last-child {
+  margin-bottom: 0;
 }
 
 /* Ant Design 组件样式覆盖 */
