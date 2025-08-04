@@ -5,23 +5,53 @@
 
 import { MenuTreeNode } from '../types/menu';
 import * as Icons from '@ant-design/icons';
+import * as LucideIcons from 'lucide-react';
 import { createElement } from 'react';
 import { Link } from 'react-router-dom';
+import iconConfig from '../icons/icon-config.json';
 
 /**
- * 根据图标名称获取 Ant Design 图标组件
+ * 根据图标名称获取图标组件（支持 Ant Design 和 Lucide 图标）
  */
 export const getAntdIcon = (iconName: string) => {
   if (!iconName) return null;
   
-  // 处理图标名称，确保首字母大写
+  // 处理 lucide: 前缀的图标
+  if (iconName.startsWith('lucide:')) {
+    const lucideIconName = iconName.replace('lucide:', '');
+    
+    // 将 kebab-case 转换为 PascalCase
+    const pascalCaseName = lucideIconName
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+    
+    console.log(`尝试加载 Lucide 图标: ${iconName} -> ${pascalCaseName}`);
+    
+    // 检查图标是否在配置文件中定义
+    if (iconConfig.icons[iconName]) {
+      const LucideIconComponent = (LucideIcons as any)[pascalCaseName];
+      
+      if (LucideIconComponent) {
+        console.log(`✅ 成功加载 Lucide 图标: ${pascalCaseName}`);
+        return createElement(LucideIconComponent, { size: 16 });
+      }
+    }
+    
+    console.log(`❌ 找不到 Lucide 图标: ${pascalCaseName}，使用默认图标`);
+    return createElement(Icons.AppstoreOutlined);
+  }
+  
+  // 处理 Ant Design 图标
+  console.log(`尝试加载 Ant Design 图标: ${iconName}`);
   const IconComponent = (Icons as any)[iconName];
   
   if (IconComponent) {
+    console.log(`✅ 成功加载 Ant Design 图标: ${iconName}`);
     return createElement(IconComponent);
   }
   
-  // 如果找不到对应图标，返回默认图标
+  console.log(`❌ 找不到 Ant Design 图标: ${iconName}，使用默认图标`);
   return createElement(Icons.AppstoreOutlined);
 };
 
@@ -29,7 +59,17 @@ export const getAntdIcon = (iconName: string) => {
  * 将菜单树转换为 Ant Design Menu 组件所需的格式
  */
 export const transformMenusForAntd = (menus: MenuTreeNode[]): any[] => {
-  return menus.map(menu => {
+  const result: any[] = [];
+  
+  menus.forEach(menu => {
+    // 如果是首页菜单，跳过该层级，直接添加其子菜单到结果中
+    if (menu.menu_name === '首页' || menu.route_path === '/') {
+      if (menu.children && menu.children.length > 0) {
+        result.push(...transformMenusForAntd(menu.children));
+      }
+      return;
+    }
+
     const menuItem: any = {
       key: menu.key,
       icon: getAntdIcon(menu.menu_icon),
@@ -51,8 +91,10 @@ export const transformMenusForAntd = (menus: MenuTreeNode[]): any[] => {
       menuItem.children = transformMenusForAntd(menu.children);
     }
 
-    return menuItem;
+    result.push(menuItem);
   });
+  
+  return result;
 };
 
 /**

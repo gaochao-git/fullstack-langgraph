@@ -13,6 +13,7 @@ export interface MenuInfo {
   redirect_path: string;
   menu_component: string;
   show_menu: number; // 0: 隐藏, 1: 显示
+  sort_order?: number; // 排序顺序
   create_time: string;
   update_time: string;
   create_by: string;

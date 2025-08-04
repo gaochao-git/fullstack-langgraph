@@ -98,6 +98,7 @@ class RbacMenu(BaseModel):
     redirect_path = Column(String(200), nullable=False, comment="重定向路径")
     menu_component = Column(String(100), nullable=False, comment="组件名称")
     show_menu = Column(Integer, default=0, nullable=False, comment="是否显示菜单")
+    sort_order = Column(Integer, default=0, nullable=False, comment="排序顺序")
     create_time = Column(TIMESTAMP, default=now_shanghai, nullable=False)
     update_time = Column(TIMESTAMP, default=now_shanghai, onupdate=now_shanghai, nullable=False)
     create_by = Column(String(50), nullable=False, comment="创建人")

@@ -48,7 +48,27 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["*"]
     # 安全配置
     SECRET_KEY: str = "your-secret-key-change-in-production"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30    
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    
+    # JWT认证配置
+    JWT_SECRET_KEY: Optional[str] = None
+    JWT_ALGORITHM: str = "HS256"
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
+    # 登录安全配置
+    MAX_LOGIN_ATTEMPTS: int = 5
+    LOCKOUT_DURATION_MINUTES: int = 30
+    
+    # 密码策略配置
+    MIN_PASSWORD_LENGTH: int = 8
+    REQUIRE_UPPERCASE: bool = True
+    REQUIRE_LOWERCASE: bool = True
+    REQUIRE_DIGITS: bool = True
+    REQUIRE_SPECIAL_CHARS: bool = True
+    
+    # MFA配置
+    MFA_ISSUER_NAME: str = "智能运维平台"
+    MFA_ENABLED: bool = False    
     # DeepSeek配置
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_BASE_URL: Optional[str] = None

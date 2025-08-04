@@ -1,0 +1,518 @@
+{
+  "icons": {
+    "lucide:bot": {
+      "label": "机器人",
+      "category": "基础"
+    },
+    "lucide:brain": {
+      "label": "大脑",
+      "category": "基础"
+    },
+    "lucide:sparkles": {
+      "label": "星光",
+      "category": "基础"
+    },
+    "lucide:cpu": {
+      "label": "CPU",
+      "category": "基础"
+    },
+    "lucide:monitor": {
+      "label": "显示器",
+      "category": "基础"
+    },
+    "lucide:smartphone": {
+      "label": "手机",
+      "category": "基础"
+    },
+    "lucide:laptop": {
+      "label": "笔记本",
+      "category": "基础"
+    },
+    "lucide:server": {
+      "label": "服务器",
+      "category": "基础"
+    },
+    "lucide:hard-drive": {
+      "label": "硬盘",
+      "category": "基础"
+    },
+    "lucide:wifi": {
+      "label": "WiFi",
+      "category": "基础"
+    },
+    "lucide:router": {
+      "label": "路由器",
+      "category": "基础"
+    },
+    "lucide:activity": {
+      "label": "活动",
+      "category": "基础"
+    },
+    "lucide:bar-chart": {
+      "label": "柱状图",
+      "category": "基础"
+    },
+    "lucide:pie-chart": {
+      "label": "饼图",
+      "category": "基础"
+    },
+    "lucide:line-chart": {
+      "label": "折线图",
+      "category": "基础"
+    },
+    "lucide:star": {
+      "label": "星星",
+      "category": "基础"
+    },
+    "lucide:home": {
+      "label": "首页",
+      "category": "基础"
+    },
+    "lucide:app-window": {
+      "label": "应用商店",
+      "category": "基础"
+    },
+    "lucide:settings": {
+      "label": "设置",
+      "category": "专业"
+    },
+    "lucide:database": {
+      "label": "数据库",
+      "category": "专业"
+    },
+    "lucide:code": {
+      "label": "代码",
+      "category": "专业"
+    },
+    "lucide:shield": {
+      "label": "盾牌",
+      "category": "专业"
+    },
+    "lucide:search": {
+      "label": "搜索",
+      "category": "专业"
+    },
+    "lucide:trending-up": {
+      "label": "趋势",
+      "category": "专业"
+    },
+    "lucide:terminal": {
+      "label": "终端",
+      "category": "专业"
+    },
+    "lucide:git-branch": {
+      "label": "Git分支",
+      "category": "专业"
+    },
+    "lucide:package": {
+      "label": "包",
+      "category": "专业"
+    },
+    "lucide:wrench": {
+      "label": "扳手",
+      "category": "专业"
+    },
+    "lucide:cog": {
+      "label": "齿轮",
+      "category": "专业"
+    },
+    "lucide:bug": {
+      "label": "错误",
+      "category": "专业"
+    },
+    "lucide:test-tube": {
+      "label": "试管",
+      "category": "专业"
+    },
+    "lucide:microscope": {
+      "label": "显微镜",
+      "category": "专业"
+    },
+    "lucide:flask-conical": {
+      "label": "锥形瓶",
+      "category": "专业"
+    },
+    "lucide:binary": {
+      "label": "二进制",
+      "category": "专业"
+    },
+    "lucide:hash": {
+      "label": "哈希",
+      "category": "专业"
+    },
+    "lucide:key": {
+      "label": "钥匙",
+      "category": "专业"
+    },
+    "lucide:lock": {
+      "label": "锁",
+      "category": "专业"
+    },
+    "lucide:unlock": {
+      "label": "解锁",
+      "category": "专业"
+    },
+    "lucide:eye": {
+      "label": "眼睛",
+      "category": "专业"
+    },
+    "lucide:eye-off": {
+      "label": "隐藏",
+      "category": "专业"
+    },
+    "lucide:scan": {
+      "label": "扫描",
+      "category": "专业"
+    },
+    "lucide:fingerprint": {
+      "label": "指纹",
+      "category": "专业"
+    },
+    "lucide:alert-triangle": {
+      "label": "警告",
+      "category": "专业"
+    },
+    "lucide:alert-circle": {
+      "label": "提醒",
+      "category": "专业"
+    },
+    "lucide:check-circle": {
+      "label": "成功",
+      "category": "专业"
+    },
+    "lucide:x-circle": {
+      "label": "错误",
+      "category": "专业"
+    },
+    "lucide:info": {
+      "label": "信息",
+      "category": "专业"
+    },
+    "lucide:user": {
+      "label": "用户",
+      "category": "服务"
+    },
+    "lucide:headphones": {
+      "label": "客服",
+      "category": "服务"
+    },
+    "lucide:message-circle": {
+      "label": "消息",
+      "category": "服务"
+    },
+    "lucide:heart": {
+      "label": "心形",
+      "category": "服务"
+    },
+    "lucide:phone": {
+      "label": "电话",
+      "category": "服务"
+    },
+    "lucide:mail": {
+      "label": "邮件",
+      "category": "服务"
+    },
+    "lucide:message-square": {
+      "label": "对话",
+      "category": "服务"
+    },
+    "lucide:users": {
+      "label": "用户组",
+      "category": "服务"
+    },
+    "lucide:user-check": {
+      "label": "用户确认",
+      "category": "服务"
+    },
+    "lucide:user-plus": {
+      "label": "添加用户",
+      "category": "服务"
+    },
+    "lucide:user-minus": {
+      "label": "删除用户",
+      "category": "服务"
+    },
+    "lucide:crown": {
+      "label": "皇冠",
+      "category": "服务"
+    },
+    "lucide:award": {
+      "label": "奖励",
+      "category": "服务"
+    },
+    "lucide:gift": {
+      "label": "礼物",
+      "category": "服务"
+    },
+    "lucide:handshake": {
+      "label": "握手",
+      "category": "服务"
+    },
+    "lucide:thumbs-up": {
+      "label": "点赞",
+      "category": "服务"
+    },
+    "lucide:thumbs-down": {
+      "label": "点踩",
+      "category": "服务"
+    },
+    "lucide:smile": {
+      "label": "微笑",
+      "category": "服务"
+    },
+    "lucide:frown": {
+      "label": "皱眉",
+      "category": "服务"
+    },
+    "lucide:book": {
+      "label": "书籍",
+      "category": "教育"
+    },
+    "lucide:file-text": {
+      "label": "文档",
+      "category": "教育"
+    },
+    "lucide:lightbulb": {
+      "label": "灯泡",
+      "category": "教育"
+    },
+    "lucide:target": {
+      "label": "目标",
+      "category": "教育"
+    },
+    "lucide:graduation-cap": {
+      "label": "学士帽",
+      "category": "教育"
+    },
+    "lucide:school": {
+      "label": "学校",
+      "category": "教育"
+    },
+    "lucide:library": {
+      "label": "图书馆",
+      "category": "教育"
+    },
+    "lucide:bookmark": {
+      "label": "书签",
+      "category": "教育"
+    },
+    "lucide:book-open": {
+      "label": "翻开的书",
+      "category": "教育"
+    },
+    "lucide:pen-tool": {
+      "label": "钢笔工具",
+      "category": "教育"
+    },
+    "lucide:edit": {
+      "label": "编辑",
+      "category": "教育"
+    },
+    "lucide:file-edit": {
+      "label": "文件编辑",
+      "category": "教育"
+    },
+    "lucide:file-plus": {
+      "label": "新建文件",
+      "category": "教育"
+    },
+    "lucide:folder-open": {
+      "label": "打开文件夹",
+      "category": "教育"
+    },
+    "lucide:archive": {
+      "label": "归档",
+      "category": "教育"
+    },
+    "lucide:clipboard": {
+      "label": "剪贴板",
+      "category": "教育"
+    },
+    "lucide:clipboard-check": {
+      "label": "剪贴板确认",
+      "category": "教育"
+    },
+    "lucide:music": {
+      "label": "音乐",
+      "category": "娱乐"
+    },
+    "lucide:gamepad-2": {
+      "label": "游戏手柄",
+      "category": "娱乐"
+    },
+    "lucide:camera": {
+      "label": "相机",
+      "category": "娱乐"
+    },
+    "lucide:palette": {
+      "label": "调色板",
+      "category": "娱乐"
+    },
+    "lucide:video": {
+      "label": "视频",
+      "category": "娱乐"
+    },
+    "lucide:play": {
+      "label": "播放",
+      "category": "娱乐"
+    },
+    "lucide:pause": {
+      "label": "暂停",
+      "category": "娱乐"
+    },
+    "lucide:radio": {
+      "label": "收音机",
+      "category": "娱乐"
+    },
+    "lucide:tv": {
+      "label": "电视",
+      "category": "娱乐"
+    },
+    "lucide:film": {
+      "label": "电影",
+      "category": "娱乐"
+    },
+    "lucide:image": {
+      "label": "图片",
+      "category": "娱乐"
+    },
+    "lucide:image-plus": {
+      "label": "添加图片",
+      "category": "娱乐"
+    },
+    "lucide:brush": {
+      "label": "画笔",
+      "category": "娱乐"
+    },
+    "lucide:scissors": {
+      "label": "剪刀",
+      "category": "娱乐"
+    },
+    "lucide:zap": {
+      "label": "闪电",
+      "category": "娱乐"
+    },
+    "lucide:party-popper": {
+      "label": "派对",
+      "category": "娱乐"
+    },
+    "lucide:coffee": {
+      "label": "咖啡",
+      "category": "娱乐"
+    },
+    "lucide:pizza": {
+      "label": "披萨",
+      "category": "娱乐"
+    },
+    "lucide:calculator": {
+      "label": "计算器",
+      "category": "工具"
+    },
+    "lucide:globe": {
+      "label": "地球",
+      "category": "工具"
+    },
+    "lucide:compass": {
+      "label": "指南针",
+      "category": "工具"
+    },
+    "lucide:map": {
+      "label": "地图",
+      "category": "工具"
+    },
+    "lucide:map-pin": {
+      "label": "地图标记",
+      "category": "工具"
+    },
+    "lucide:navigation": {
+      "label": "导航",
+      "category": "工具"
+    },
+    "lucide:calendar": {
+      "label": "日历",
+      "category": "工具"
+    },
+    "lucide:clock": {
+      "label": "时钟",
+      "category": "工具"
+    },
+    "lucide:timer": {
+      "label": "计时器",
+      "category": "工具"
+    },
+    "lucide:alarm-clock": {
+      "label": "闹钟",
+      "category": "工具"
+    },
+    "lucide:bell": {
+      "label": "铃铛",
+      "category": "工具"
+    },
+    "lucide:bell-ring": {
+      "label": "响铃",
+      "category": "工具"
+    },
+    "lucide:download": {
+      "label": "下载",
+      "category": "工具"
+    },
+    "lucide:upload": {
+      "label": "上传",
+      "category": "工具"
+    },
+    "lucide:share": {
+      "label": "分享",
+      "category": "工具"
+    },
+    "lucide:link": {
+      "label": "链接",
+      "category": "工具"
+    },
+    "lucide:copy": {
+      "label": "复制",
+      "category": "工具"
+    },
+    "lucide:folder": {
+      "label": "文件夹",
+      "category": "工具"
+    },
+    "lucide:folder-plus": {
+      "label": "新建文件夹",
+      "category": "工具"
+    },
+    "lucide:trash": {
+      "label": "垃圾桶",
+      "category": "工具"
+    },
+    "lucide:refresh-cw": {
+      "label": "刷新",
+      "category": "工具"
+    }
+  },
+  "categories": {
+    "基础": {
+      "color": "#1677ff",
+      "label": "基础功能"
+    },
+    "专业": {
+      "color": "#722ed1",
+      "label": "专业技术"
+    },
+    "服务": {
+      "color": "#13c2c2",
+      "label": "服务类型"
+    },
+    "教育": {
+      "color": "#52c41a",
+      "label": "教育知识"
+    },
+    "娱乐": {
+      "color": "#fa8c16",
+      "label": "娱乐休闲"
+    },
+    "工具": {
+      "color": "#eb2f96",
+      "label": "工具类型"
+    }
+  }
+}

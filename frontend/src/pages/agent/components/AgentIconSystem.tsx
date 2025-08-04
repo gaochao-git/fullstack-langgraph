@@ -25,6 +25,8 @@ import {
   Palette,
   Calculator,
   Star,
+  Home,
+  AppWindow,
   // 基础功能类
   Cpu,
   Monitor,
@@ -141,7 +143,7 @@ export const categoryColors = {
 // 图标分类映射
 export const iconCategoryMap: { [key: string]: string } = {
   // 基础功能
-  'Bot': '基础', 'Brain': '基础', 'Sparkles': '基础', 'Cpu': '基础', 'Monitor': '基础', 'Smartphone': '基础', 'Laptop': '基础', 'Server': '基础', 'HardDrive': '基础', 'Wifi': '基础', 'Router': '基础', 'Activity': '基础', 'BarChart': '基础', 'PieChart': '基础', 'LineChart': '基础', 'Star': '基础',
+  'Bot': '基础', 'Brain': '基础', 'Sparkles': '基础', 'Cpu': '基础', 'Monitor': '基础', 'Smartphone': '基础', 'Laptop': '基础', 'Server': '基础', 'HardDrive': '基础', 'Wifi': '基础', 'Router': '基础', 'Activity': '基础', 'BarChart': '基础', 'PieChart': '基础', 'LineChart': '基础', 'Star': '基础', 'Home': '基础', 'AppWindow': '基础',
   // 专业技术
   'Settings': '专业', 'Database': '专业', 'Code': '专业', 'Shield': '专业', 'Search': '专业', 'TrendingUp': '专业', 'Terminal': '专业', 'GitBranch': '专业', 'Package': '专业', 'Wrench': '专业', 'Cog': '专业', 'Bug': '专业', 'TestTube': '专业', 'Microscope': '专业', 'FlaskConical': '专业', 'Binary': '专业', 'Hash': '专业', 'Key': '专业', 'Lock': '专业', 'Unlock': '专业', 'Eye': '专业', 'EyeOff': '专业', 'Scan': '专业', 'Fingerprint': '专业', 'AlertTriangle': '专业', 'AlertCircle': '专业', 'CheckCircle': '专业', 'XCircle': '专业', 'Info': '专业',
   // 服务类型
@@ -173,6 +175,8 @@ export const iconConfig = [
   { name: 'PieChart', label: '饼图', category: '基础' },
   { name: 'LineChart', label: '折线图', category: '基础' },
   { name: 'Star', label: '星星', category: '基础' },
+  { name: 'Home', label: '首页', category: '基础' },
+  { name: 'AppWindow', label: '应用商店', category: '基础' },
   
   // 专业技术 (24个)
   { name: 'Settings', label: '设置', category: '专业' },
@@ -315,6 +319,8 @@ export const renderIcon = (iconName: string, size: number = 18, color?: string) 
     'PieChart': <PieChart size={size} color={color} />,
     'LineChart': <LineChart size={size} color={color} />,
     'Star': <Star size={size} color={color} />,
+    'Home': <Home size={size} color={color} />,
+    'AppWindow': <AppWindow size={size} color={color} />,
     
     // 专业技术
     'Settings': <Settings size={size} color={color} />,

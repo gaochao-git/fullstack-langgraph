@@ -15,18 +15,28 @@ export class MenuApiService {
   static async getUserMenus(userId?: string): Promise<UserMenuPermission> {
     try {
       const url = userId 
-        ? `/api/v1/menus/user/${userId}`
-        : `/api/v1/menus/current-user`;
+        ? `/api/v1/auth/admin/menus/user/${userId}`
+        : `/api/v1/auth/me/menus`;
         
       const response = await omind_get(url);
-      const result: MenuApiResponse = await response.json();
+      const result = await response.json();
       
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to get menu data');
+      console.log('🔍 getUserMenus 原始响应:', result);
+      
+      // 后端直接返回 {menus: [...]} 格式，不是标准的 ApiResponse
+      const menusData = result.menus || result.data || result;
+      
+      if (Array.isArray(menusData)) {
+        // 扁平化嵌套的菜单数据
+        const flattenedMenus = this.flattenNestedMenus(menusData);
+        console.log('🔍 扁平化后的菜单:', flattenedMenus);
+        
+        // 转换为菜单权限格式
+        return this.transformToUserMenuPermission(flattenedMenus);
+      } else {
+        console.warn('菜单数据格式不正确:', result);
+        throw new Error('菜单数据格式错误');
       }
-
-      // 转换为菜单权限格式
-      return this.transformToUserMenuPermission(result.data);
     } catch (error) {
       console.error('Error fetching user menus:', error);
       // 返回默认菜单或空菜单
@@ -35,11 +45,34 @@ export class MenuApiService {
   }
 
   /**
+   * 扁平化嵌套的菜单数据
+   */
+  private static flattenNestedMenus(nestedMenus: any[]): MenuInfo[] {
+    const result: MenuInfo[] = [];
+    
+    const flatten = (menus: any[]) => {
+      menus.forEach(menu => {
+        // 提取菜单信息（去掉children字段）
+        const { children, ...menuInfo } = menu;
+        result.push(menuInfo);
+        
+        // 递归处理子菜单
+        if (children && Array.isArray(children)) {
+          flatten(children);
+        }
+      });
+    };
+    
+    flatten(nestedMenus);
+    return result;
+  }
+
+  /**
    * 获取所有菜单（管理员用）
    */
   static async getAllMenus(): Promise<MenuInfo[]> {
     try {
-      const response = await omind_get('/api/v1/menus');
+      const response = await omind_get('/api/v1/auth/admin/menus');
       const result: MenuApiResponse = await response.json();
       
       if (!result.success) {
@@ -99,7 +132,7 @@ export class MenuApiService {
       const currentNode = menuMap.get(menu.menu_id);
       if (!currentNode) return;
 
-      if (menu.parent_id === 0) {
+      if (menu.parent_id === -1) {
         // 根节点
         currentNode.level = 1;
         rootMenus.push(currentNode);
@@ -126,7 +159,14 @@ export class MenuApiService {
    * 递归排序菜单树
    */
   private static sortMenuTree(menus: import('../types/menu').MenuTreeNode[]) {
-    menus.sort((a, b) => a.menu_id - b.menu_id);
+    // 按 sort_order 排序，如果没有 sort_order 则默认为 0
+    menus.sort((a, b) => {
+      const aOrder = a.sort_order || 0;
+      const bOrder = b.sort_order || 0;
+      return aOrder - bOrder;
+    });
+    
+    // 递归排序子菜单
     menus.forEach(menu => {
       if (menu.children && menu.children.length > 0) {
         this.sortMenuTree(menu.children);

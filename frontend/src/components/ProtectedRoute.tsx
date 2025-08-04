@@ -12,14 +12,19 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
-      }}>
-        <Spin size="large" tip="验证中..." />
-      </div>
+      <Spin 
+        size="large" 
+        tip="验证中..." 
+        spinning={true}
+        style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh' 
+        }}
+      >
+        <div style={{ minHeight: '100vh' }} />
+      </Spin>
     );
   }
 

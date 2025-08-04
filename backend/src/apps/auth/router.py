@@ -20,6 +20,11 @@ from src.apps.auth.schemas import (
     SessionInfo, TerminateSessionRequest,
     TokenValidationResponse, PermissionCheckRequest
 )
+from src.apps.auth.menu_schemas import (
+    MenuCreateRequest, MenuUpdateRequest, MenuResponse, 
+    MenuTreeResponse, MenuListResponse, UserMenuResponse
+)
+from src.apps.auth.menu_service import menu_service
 from src.apps.auth.dependencies import get_current_user, require_auth, require_roles
 
 
@@ -133,17 +138,6 @@ async def get_current_user_permissions(
     
     service = RBACService(db)
     return service.get_permission_tree(current_user["sub"])
-
-
-@router.get("/me/menus", summary="获取当前用户菜单")
-async def get_current_user_menus(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取当前用户可访问的菜单树"""
-    from src.apps.auth.rbac_service import get_user_menu_tree
-    
-    return get_user_menu_tree(current_user["sub"], db)
 
 
 @router.post("/verify", response_model=TokenValidationResponse, summary="验证令牌")
@@ -482,6 +476,134 @@ async def check_permission(
         "allowed": True,
         "reason": "用户有权限"
     }
+
+
+# ============= 菜单管理 =============
+
+@router.get("/admin/menus", response_model=MenuListResponse, summary="获取菜单列表")
+async def get_menus(
+    show_menu_only: bool = False,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取所有菜单（树形结构）"""
+    menu_tree = await menu_service.get_menu_tree(db, show_menu_only)
+    return MenuListResponse(
+        menus=menu_tree,
+        total=len(menu_tree)
+    )
+
+
+@router.get("/admin/menus/parent-options", summary="获取父菜单选项")
+async def get_parent_menu_options(db: AsyncSession = Depends(get_async_db)):
+    """获取可作为父菜单的选项（树形结构）"""
+    menus = await menu_service.get_all_menus(db)
+    
+    def build_tree_options(parent_id, level=0):
+        children = []
+        for menu in menus:
+            if menu.parent_id == parent_id:
+                children.append({
+                    "value": menu.menu_id,
+                    "label": f"{'  ' * level}{menu.menu_name}",
+                    "title": menu.menu_name,
+                    "children": build_tree_options(menu.menu_id, level + 1)
+                })
+        return children
+    
+    options = [
+        {
+            "value": -1,
+            "label": "根菜单",
+            "title": "根菜单",
+            "children": build_tree_options(-1)
+        }
+    ]
+    
+    return {"options": options}
+
+
+@router.post("/admin/menus", response_model=MenuResponse, summary="创建菜单")
+async def create_menu(
+    menu_data: MenuCreateRequest,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """创建新菜单"""
+    menu = await menu_service.create_menu(
+        db, 
+        menu_data.dict(exclude_unset=True),
+        creator="admin"
+    )
+    await db.commit()
+    return MenuResponse(**menu.to_dict())
+
+
+@router.get("/admin/menus/{menu_id}", response_model=MenuResponse, summary="获取菜单详情")
+async def get_menu(
+    menu_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取指定菜单详情"""
+    menu = await menu_service.get_menu_by_id(db, menu_id)
+    if not menu:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"菜单 {menu_id} 不存在"
+        )
+    return MenuResponse(**menu.to_dict())
+
+
+@router.put("/admin/menus/{menu_id}", response_model=MenuResponse, summary="更新菜单")
+async def update_menu(
+    menu_id: int,
+    menu_data: MenuUpdateRequest,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """更新菜单"""
+    menu = await menu_service.update_menu(
+        db, 
+        menu_id, 
+        menu_data.dict(exclude_unset=True),
+        updater="admin"
+    )
+    await db.commit()
+    return MenuResponse(**menu.to_dict())
+
+
+@router.delete("/admin/menus/{menu_id}", summary="删除菜单")
+async def delete_menu(
+    menu_id: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """删除菜单"""
+    await menu_service.delete_menu(db, menu_id)
+    await db.commit()
+    return {"message": f"菜单 {menu_id} 删除成功"}
+
+
+@router.get("/me/menus", response_model=UserMenuResponse, summary="获取当前用户菜单")
+async def get_user_menus(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取当前用户有权限的菜单树"""
+    user_menus = await menu_service.get_user_menus(db, current_user["sub"])
+    return UserMenuResponse(menus=user_menus)
+
+
+@router.put("/admin/menus/{menu_id}/sort", summary="更新菜单排序")
+async def update_menu_sort(
+    menu_id: int,
+    sort_order: int,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """更新菜单排序顺序"""
+    menu = await menu_service.update_menu(
+        db, 
+        menu_id, 
+        {"sort_order": sort_order}
+    )
+    await db.commit()
+    return {"message": "排序更新成功"}
 
 
 # ============= 初始化相关 =============
