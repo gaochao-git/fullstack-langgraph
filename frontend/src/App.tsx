@@ -14,7 +14,7 @@ import { ModelsManagement } from "./pages/ai_model";
 import { TasksManagement } from "./pages/scheduled_task";
 import { UserManagement, RoleManagement, PermissionManagement, MenuManagement } from "./pages/user";
 import TenantManagement from "./pages/tenant/TenantManagement";
-import KnowledgeManagement from "./pages/KnowledgeManagement";
+import KnowledgeManagement from "./pages/kb";
 import { ThemeProvider, useTheme } from "./hooks/ThemeContext";
 import { ThemeToggleSimple } from "./components/ThemeToggle";
 import { useMenus } from "./hooks/useMenus";
