@@ -7,10 +7,12 @@ import { cn } from '@/utils/lib-utils';
 // 智能体信息类型
 interface Agent {
   id: string;
-  name: string;
-  display_name: string;
-  description: string;
+  agent_id: string;
+  agent_name: string;
+  agent_description: string;
   agent_capabilities: string[];
+  agent_status: string;
+  agent_enabled: string;
   is_builtin: string;
 }
 
@@ -49,13 +51,13 @@ const GenericAgentWelcome: React.FC<GenericAgentWelcomeProps> = ({ agent, onSubm
             "text-2xl font-bold mb-2",
             isDark ? "text-white" : "text-gray-900"
           )}>
-            {agent?.display_name}
+            {agent?.agent_name || '智能助手'}
           </h2>
           <p className={cn(
-            "text-lg",
-            isDark ? "text-blue-200" : "text-gray-600"
+            "text-lg mb-6",
+            isDark ? "text-gray-300" : "text-gray-600"
           )}>
-            {agent?.description || '我是您的智能助手，随时为您提供帮助'}
+            {agent?.agent_description || '欢迎使用智能助手，我可以帮助您完成各种任务。'}
           </p>
         </div>
 

@@ -20,10 +20,10 @@ import {
   ReloadOutlined,
   DeleteOutlined
 } from '@ant-design/icons';
-import AgentDetailModal from '../components/AgentDetailModal';
-import AgentEditModal from '../components/AgentEditModal';
-import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../../../services/agentApi';
-import { renderIcon, getIconBackgroundColor } from '../components/AgentIconSystem';
+import AgentDetailModal from './components/AgentDetailModal';
+import AgentEditModal from './components/AgentEditModal';
+import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/agentApi';
+import { renderIcon, getIconBackgroundColor } from './components/AgentIconSystem';
 
 const { Search } = Input;
 const { Option } = Select;

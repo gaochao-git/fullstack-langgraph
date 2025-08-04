@@ -1,8 +1,8 @@
 // Agent module exports
 export { agentApi } from '../../services/agentApi';
-export { default as AgentManagement } from './pages/AgentManagement';
-export { default as AgentMarketplace } from './pages/AgentMarketplace';
-export { default as AgentChat } from './pages/AgentChat';
+export { default as AgentManagement } from './AgentManagement';
+export { default as AgentMarketplace } from './AgentMarketplace';
+export { default as AgentChat } from './AgentChat';
 export { default as ChatEngine } from './components/ChatEngine';
 
 // Chat component exports

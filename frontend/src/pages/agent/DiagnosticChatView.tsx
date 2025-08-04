@@ -8,7 +8,7 @@ import { cn } from "@/utils/lib-utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { FaultWelcomeSimple } from "./FaultWelcomeSimple";
-import ZabbixDataRenderer, { canRenderChart } from "../../components/ZabbixDataRenderer";
+import ZabbixDataRenderer, { canRenderChart } from "./components/ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护

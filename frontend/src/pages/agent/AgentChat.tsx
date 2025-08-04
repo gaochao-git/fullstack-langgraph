@@ -2,11 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { Spin, Alert } from 'antd';
 import { Button } from '@/components/ui/button';
-import ChatEngine from '../components/ChatEngine';
-import GenericAgentWelcome from '../components/GenericAgentWelcome';
-import { agentApi } from '../../../services/agentApi';
-import { useTheme } from '../../../hooks/ThemeContext';
+import ChatEngine from './components/ChatEngine';
+import GenericAgentWelcome from './components/GenericAgentWelcome';
+import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
+import { agentApi } from '@/services/agentApi';
 
 interface Agent {
   id: string;
