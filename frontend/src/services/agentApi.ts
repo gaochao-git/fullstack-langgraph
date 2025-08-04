@@ -33,9 +33,22 @@ export interface Agent {
   agent_enabled: string; // 'yes' | 'no'
   agent_icon?: string; // 智能体图标
   is_builtin: string; // 'yes' | 'no'
-  tools_info?: any;
-  llm_info?: any;
-  prompt_info?: any;
+  tools_info?: {
+    system_tools: string[];
+    mcp_tools: any[];
+  };
+  llm_info?: {
+    model_name: string;
+    temperature: number;
+    max_tokens: number;
+  };
+  prompt_info?: {
+    system_prompt: string;
+  };
+  mcp_config?: {
+    total_tools: number;
+    selected_tools: string[];
+  };
   total_runs: number;
   success_rate: number;
   avg_response_time: number;

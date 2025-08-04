@@ -22,33 +22,9 @@ import { agentApi } from "../../services/agentApi";
 import { useTheme } from "../../hooks/ThemeContext";
 
 const { Title, Text, Paragraph } = Typography;
-interface Agent {
-  id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_description: string;
-  agent_status: string;
-  agent_enabled: string; // 'yes' | 'no'
-  agent_icon?: string;
-  agent_capabilities: string[];
-  tools_info: {
-    system_tools: string[];
-    mcp_tools: any[];
-  };
-  llm_info: {
-    model_name: string;
-    temperature: number;
-    max_tokens: number;
-  };
-  prompt_info: {
-    system_prompt: string;
-  };
-  mcp_config: {
-    total_tools: number;
-    selected_tools: string[];
-  };
-  is_builtin: string; // 'yes' | 'no'
-}
+import { Agent as ApiAgent } from '../../services/agentApi';
+
+type Agent = ApiAgent;
 
 const AgentMarketplace = () => {
   const navigate = useNavigate();
@@ -297,4 +273,4 @@ const AgentMarketplace = () => {
   );
 };
 
-export default AgentMarketplace; 
+export default AgentMarketplace;
