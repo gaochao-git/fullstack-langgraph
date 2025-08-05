@@ -302,15 +302,8 @@ export default function ChatEngine({
   const shouldShowCustomWelcome = WelcomeComponent && (!thread.messages || thread.messages.length === 0);
 
   return (
-    <div className={cn(
-      "flex h-full font-sans antialiased overflow-x-hidden transition-colors duration-200",
-      isDark 
-        ? "bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900" 
-        : "bg-gradient-to-br from-blue-50 via-white to-blue-50"
-    )}>
-      {/* 主内容区域 */}
-      <main className="h-full relative flex-1 min-w-0">        
-        {error ? (
+    <>
+      {error ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className={cn(
               "flex flex-col items-center justify-center gap-4 p-8 rounded-lg shadow-lg border",
@@ -350,7 +343,6 @@ export default function ChatEngine({
             agent={agent}
           />
         )}
-      </main>
       
       {/* 历史会话抽屉 */}
       <Drawer
@@ -445,6 +437,6 @@ export default function ChatEngine({
           )}
         </div>
       </Drawer>
-    </div>
+    </>
   );
 }

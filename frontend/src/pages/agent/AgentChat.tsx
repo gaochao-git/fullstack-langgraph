@@ -97,22 +97,13 @@ const AgentChat: React.FC = () => {
   const welcomeComponent = isDiagnosticAgent ? undefined : GenericAgentWelcome;
 
   return (
-    <div className={cn(
-      "flex h-screen font-sans antialiased overflow-x-hidden transition-colors duration-200",
-      isDark 
-        ? "bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 text-gray-100" 
-        : "bg-gradient-to-br from-blue-50 via-white to-blue-50 text-gray-900"
-    )}>
-      <main className="h-full w-full overflow-x-hidden">
-        <ChatEngine
-          key={sessionKey}
-          agentId={agentId!}
-          agent={agent}
-          WelcomeComponent={welcomeComponent}
-          onNewSession={handleNewSession}
-        />
-      </main>
-    </div>
+    <ChatEngine
+      key={sessionKey}
+      agentId={agentId!}
+      agent={agent}
+      WelcomeComponent={welcomeComponent}
+      onNewSession={handleNewSession}
+    />
   );
 };
 
