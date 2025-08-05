@@ -59,9 +59,6 @@ const componentMap: Record<string, React.LazyExoticComponent<React.FC>> = {
   
   // 任务调度模块
   'pages/scheduled_task/TasksManagement': loadComponent('pages/scheduled_task/TasksManagement'),
-  
-  // 租户管理模块
-  'pages/tenant/TenantManagement': loadComponent('pages/tenant/TenantManagement'),
 };
 
 // 加载中组件

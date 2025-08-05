@@ -4,7 +4,6 @@
  */
 
 import { MenuInfo, MenuApiResponse, UserMenuPermission } from '../types/menu';
-import { defaultMenusData } from '../utils/defaultMenus';
 import { omind_get } from '../utils/base_api';
 
 export class MenuApiService {
@@ -38,8 +37,11 @@ export class MenuApiService {
       }
     } catch (error) {
       console.error('Error fetching user menus:', error);
-      // 返回默认菜单或空菜单
-      return this.getDefaultMenus();
+      // 返回空菜单
+      return {
+        menus: [],
+        permissions: []
+      };
     }
   }
 
@@ -202,20 +204,4 @@ export class MenuApiService {
     return routes;
   }
 
-  /**
-   * 获取默认菜单（当API失败时的备用方案）
-   */
-  private static getDefaultMenus(): UserMenuPermission {
-    // 使用导入的默认菜单数据
-    const defaultMenuData: MenuInfo[] = defaultMenusData.map(menu => ({
-      ...menu,
-      id: menu.menu_id,
-      create_time: '',
-      update_time: '',
-      create_by: 'system',
-      update_by: 'system',
-    }));
-
-    return this.transformToUserMenuPermission(defaultMenuData);
-  }
 }
