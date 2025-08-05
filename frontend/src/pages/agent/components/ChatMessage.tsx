@@ -932,7 +932,7 @@ export function ChatMessages({
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6 pl-4">
                 <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
-                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2 border border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
+                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 py-2.5 border border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>

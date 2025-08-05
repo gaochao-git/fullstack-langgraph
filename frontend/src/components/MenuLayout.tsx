@@ -584,8 +584,8 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           <Content
             style={{
               flex: 1,
-              paddingLeft: isMobile ? 12 : 24,
-              paddingRight: isMobile ? 12 : 24,
+              paddingLeft: 5,
+              paddingRight: 5,
               paddingTop: 5,
               paddingBottom: 5,
               margin: isMobile ? 0 : 24,
