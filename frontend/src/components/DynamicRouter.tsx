@@ -19,13 +19,9 @@ const loadComponent = (componentPath: string): React.LazyExoticComponent<React.F
   return lazy(() => 
     import(`../pages/${module}`)
       .then(m => {
-        // 尝试获取命名导出的组件
+        // 直接使用命名导出
         if (m[componentName]) {
           return { default: m[componentName] };
-        }
-        // 如果没有命名导出，尝试默认导出
-        if (m.default) {
-          return { default: m.default };
         }
         throw new Error(`Component ${componentName} not found in module ${module}`);
       })
