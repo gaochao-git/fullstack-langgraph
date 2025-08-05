@@ -77,6 +77,17 @@ def create_app() -> FastAPI:
         """应用启动事件"""
         logger.info("🚀 测试PostgreSQL连接")
         await test_postgres_connection()
+        
+        # 自动扫描并同步API权限
+        try:
+            from .shared.core.api_permission_scanner import scan_and_sync_api_permissions
+            stats = await scan_and_sync_api_permissions(app)
+            logger.info(f"✅ API权限同步完成: 新增 {stats['created']}, 跳过 {stats['skipped']}")
+            if stats['orphaned'] > 0:
+                logger.warning(f"⚠️ 发现 {stats['orphaned']} 个孤立权限")
+        except Exception as e:
+            logger.error(f"❌ API权限同步失败: {e}")
+            # 不阻止应用启动
 
     # 注册API路由
     app.include_router(api_router, prefix="/api")
