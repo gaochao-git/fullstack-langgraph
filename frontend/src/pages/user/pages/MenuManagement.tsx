@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Tree, Card, Form, Input, Select, Button, Space, 
-  message, Modal, Dropdown, Menu as AntMenu, Spin
+  message, Modal, Spin
 } from 'antd';
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, 
-  EyeOutlined, EyeInvisibleOutlined, MoreOutlined,
+  EyeOutlined, EyeInvisibleOutlined,
   HomeOutlined, MenuOutlined, HolderOutlined
 } from '@ant-design/icons';
 import type { DataNode, TreeProps } from 'antd/es/tree';
@@ -103,7 +103,7 @@ const IconDisplay: React.FC<{ iconKey: string; size?: number }> = ({ iconKey, si
           {renderIcon(pascalCaseName, size)}
         </div>;
       } catch (error) {
-        console.warn(`Icon not found: ${pascalCaseName}`);
+        // Icon not found, will fall back to default
       }
     }
   }
@@ -171,7 +171,6 @@ export function MenuManagement() {
       const allKeys = getAllNodeKeys(treeData);
       setExpandedKeys(allKeys);
     } catch (error) {
-      console.error('Load menu error:', error);
       message.error('加载菜单失败');
     } finally {
       setLoading(false);
@@ -496,7 +495,6 @@ export function MenuManagement() {
         message.error(errorData.msg || '创建根菜单失败');
       }
     } catch (error) {
-      console.error('Create root menu error:', error);
       message.error('创建根菜单失败');
     }
   };
@@ -621,7 +619,6 @@ export function MenuManagement() {
         message.error(errorData.msg || '创建子菜单失败');
       }
     } catch (error) {
-      console.error('Create child menu error:', error);
       message.error('创建子菜单失败');
     }
   };
@@ -689,7 +686,6 @@ export function MenuManagement() {
         message.error(errorData.msg || '状态更新失败');
       }
     } catch (error) {
-      console.error('Toggle visibility error:', error);
       message.error('状态更新失败');
     }
   };
@@ -785,7 +781,6 @@ export function MenuManagement() {
         message.error(errorData.msg || '保存失败');
       }
     } catch (error) {
-      console.error('Save menu error:', error);
       message.error('保存失败');
     }
   };
@@ -996,7 +991,6 @@ export function MenuManagement() {
         message.error(errorData.msg || '调整菜单失败');
       }
     } catch (error) {
-      console.error('Drag drop error:', error);
       message.error('调整菜单失败');
     }
   };
@@ -1051,7 +1045,7 @@ export function MenuManagement() {
               <HomeOutlined style={{ marginRight: 8 }} />
               菜单树
             </div>
-            <div style={{ fontSize: 12, color: '#999' }}>
+            <div style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>
               <HolderOutlined style={{ marginRight: 4 }} />
               可拖拽调整菜单顺序和层级
             </div>
