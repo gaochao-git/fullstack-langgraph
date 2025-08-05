@@ -132,27 +132,6 @@
     color: inherit !important;
     text-decoration: none !important;
   }
-  
-  /* 只调整一级菜单的颜色 */
-  /* 未选中的一级菜单 */
-  .ant-menu-submenu-title:not(.ant-menu-submenu-selected) {
-    color: rgba(255, 255, 255, 0.85) !important;
-  }
-  
-  .ant-menu-light .ant-menu-submenu-title:not(.ant-menu-submenu-selected) {
-    color: rgba(0, 0, 0, 0.85) !important;
-  }
-  
-  /* 选中的一级菜单 - 颜色加重 */
-  .ant-menu-submenu-selected .ant-menu-submenu-title {
-    color: rgba(255, 255, 255, 1) !important;
-    font-weight: 600 !important;
-  }
-  
-  .ant-menu-light .ant-menu-submenu-selected .ant-menu-submenu-title {
-    color: rgba(0, 0, 0, 1) !important;
-    font-weight: 600 !important;
-  }
   html {
     /* Prevent scroll bounce on the entire page */
     overscroll-behavior: none;

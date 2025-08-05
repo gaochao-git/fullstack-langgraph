@@ -7,7 +7,6 @@ import { MenuTreeNode } from '../types/menu';
 import * as Icons from '@ant-design/icons';
 import * as LucideIcons from 'lucide-react';
 import { createElement } from 'react';
-import { Link } from 'react-router-dom';
 import iconConfig from '../icons/icon-config.json';
 
 /**
@@ -32,24 +31,22 @@ export const getAntdIcon = (iconName: string) => {
       const LucideIconComponent = (LucideIcons as any)[pascalCaseName];
       
       if (LucideIconComponent) {
-        return createElement(LucideIconComponent, { size: 16 });
+        return createElement(LucideIconComponent, { 
+          size: 16,
+          style: { color: 'currentColor' } 
+        });
       }
     }
     
-    console.log(`❌ 找不到 Lucide 图标: ${pascalCaseName}，使用默认图标`);
     return createElement(Icons.AppstoreOutlined);
   }
   
   // 处理 Ant Design 图标
-  console.log(`尝试加载 Ant Design 图标: ${iconName}`);
   const IconComponent = (Icons as any)[iconName];
   
   if (IconComponent) {
-    console.log(`✅ 成功加载 Ant Design 图标: ${iconName}`);
     return createElement(IconComponent);
   }
-  
-  console.log(`❌ 找不到 Ant Design 图标: ${iconName}，使用默认图标`);
   return createElement(Icons.AppstoreOutlined);
 };
 
@@ -69,20 +66,10 @@ export const transformMenusForAntd = (menus: MenuTreeNode[]): any[] => {
     }
 
     const menuItem: any = {
-      key: menu.key,
+      key: menu.route_path, // 使用 route_path 作为 key，以便展开逻辑正常工作
       icon: getAntdIcon(menu.menu_icon),
       label: menu.menu_name,
     };
-
-    // 如果有重定向路径，添加链接；如果没有子菜单且有路由路径，也添加链接
-    const hasChildren = menu.children && menu.children.length > 0;
-    const path = menu.redirect_path || (!hasChildren ? menu.route_path : null);
-    
-    if (path) {
-      menuItem.label = createElement(Link, { to: path }, menu.menu_name);
-    } else {
-      menuItem.label = menu.menu_name;
-    }
 
     // 递归处理子菜单
     if (menu.children && menu.children.length > 0) {

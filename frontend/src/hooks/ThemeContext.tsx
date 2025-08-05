@@ -76,71 +76,9 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, [isDark]);
 
-  // Antd 主题配置
+  // Antd 主题配置 - 使用默认主题，不覆盖
   const antdTheme = {
     algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-    token: {
-      // 自定义品牌色
-      colorPrimary: '#3b82f6', // blue-500
-      colorSuccess: '#10b981', // emerald-500
-      colorWarning: '#f59e0b', // amber-500
-      colorError: '#ef4444',   // red-500
-      colorInfo: '#06b6d4',    // cyan-500
-      
-      // 字体配置
-      fontSize: 14,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-      
-      // 圆角配置
-      borderRadius: 6,
-      
-      // 自定义暗黑模式下的背景色
-      ...(isDark && {
-        colorBgContainer: '#1f2937', // gray-800
-        colorBgElevated: '#374151',  // gray-700
-        colorBgLayout: '#111827',    // gray-900
-        colorBgSpotlight: '#1f2937', // gray-800
-        colorBorder: '#4b5563',      // gray-600
-        colorBorderSecondary: '#374151', // gray-700
-        colorText: '#f9fafb',        // gray-50
-        colorTextSecondary: '#d1d5db', // gray-300
-        colorTextTertiary: '#9ca3af',  // gray-400
-        colorTextQuaternary: '#6b7280', // gray-500
-      }),
-    },
-    components: {
-      // 自定义组件样式
-      Button: {
-        fontSize: 14,
-        controlHeight: 36,
-      },
-      Input: {
-        fontSize: 14,
-        controlHeight: 36,
-        ...(isDark && {
-          colorBgContainer: '#1f2937',
-          colorBorder: '#374151',
-        }),
-      },
-      Select: {
-        fontSize: 14,
-        controlHeight: 36,
-        ...(isDark && {
-          colorBgContainer: '#1f2937',
-          colorBorder: '#374151',
-        }),
-      },
-      Table: {
-        fontSize: 14,
-        ...(isDark && {
-          colorBgContainer: '#1f2937',
-          colorBorderSecondary: '#374151',
-          colorFillAlter: '#374151',
-          colorFillContent: '#1f2937',
-        }),
-      },
-      // 其他组件配置...
-    },
   };
 
   const value: ThemeContextType = {

@@ -26,6 +26,7 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const [sideMenuItems, setSideMenuItems] = useState<MenuProps['items']>([]);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
+  const [openKeys, setOpenKeys] = useState<string[]>([]);
 
   // 检测屏幕尺寸
   useEffect(() => {
@@ -105,7 +106,23 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     const firstLevel = getFirstLevelPath(location.pathname);
     setSelectedTopMenu(firstLevel);
     setSideMenuItems(getSideMenuItems(firstLevel));
-  }, [location.pathname, menus]);
+    
+    // 计算需要展开的父级菜单
+    const pathParts = location.pathname.split('/').filter(Boolean);
+    const parentPaths: string[] = [];
+    
+    // 从第二级开始，到倒数第二级为止，都是需要展开的父级菜单
+    for (let i = 2; i < pathParts.length; i++) {
+      const parentPath = '/' + pathParts.slice(0, i).join('/');
+      parentPaths.push(parentPath);
+    }
+    
+    // 合并现有的展开项和新的父级路径，避免覆盖用户手动展开的菜单
+    setOpenKeys(prevKeys => {
+      const newKeys = new Set([...prevKeys, ...parentPaths]);
+      return Array.from(newKeys);
+    });
+  }, [location.pathname, menus]); // 添加 menus 依赖，确保菜单数据加载后更新
 
   // 获取侧边栏选中的菜单项
   const getSelectedKeys = (): string[] => {
@@ -118,8 +135,8 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     const keys: string[] = [];
     const pathParts = location.pathname.split('/').filter(Boolean);
     
-    // 构建所有父级路径
-    for (let i = 2; i <= pathParts.length; i++) {
+    // 构建所有父级路径（不包含当前路径）
+    for (let i = 2; i < pathParts.length; i++) {
       keys.push('/' + pathParts.slice(0, i).join('/'));
     }
     
@@ -422,10 +439,14 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
               <div style={{ fontSize: 14, color: isDark ? '#999' : '#666', marginBottom: 8, paddingLeft: 16 }}>菜单</div>
               <Menu
                 mode="inline"
+                theme={isDark ? "dark" : "light"}
                 selectedKeys={getSelectedKeys()}
                 defaultOpenKeys={getOpenKeys()}
                 items={sideMenuItems}
-                onClick={() => setMobileMenuVisible(false)}
+                onClick={({ key }) => {
+                  navigate(key);
+                  setMobileMenuVisible(false);
+                }}
                 style={{
                   border: 'none',
                   background: 'transparent'
@@ -510,13 +531,19 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             }}>
               <Menu
                 mode="inline"
+                theme={isDark ? "dark" : "light"}
                 selectedKeys={getSelectedKeys()}
-                defaultOpenKeys={getOpenKeys()}
+                openKeys={openKeys}
+                onOpenChange={setOpenKeys}
                 style={{ 
                   borderInlineEnd: 0,
                   minHeight: '100%'
                 }}
                 items={sideMenuItems}
+                onClick={({ key }) => {
+                  // 导航到对应的路径
+                  navigate(key);
+                }}
               />
             </div>
           </Sider>
