@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     LOG_DIR: str = "logs"
+
+    AUTH_MOCK: str = False
     
     class Config:
         env_file = ".env"

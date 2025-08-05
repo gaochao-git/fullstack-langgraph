@@ -87,25 +87,29 @@ async def get_current_user(
     
     🔧 开发模式：临时返回mock admin用户
     """
-    # 🔧 临时Mock：开发模式下返回admin用户，跳过认证
-    print("🔧 开发模式：使用Mock Admin用户")
-    return {
-        "sub": "admin_user_mock",
-        "username": "admin", 
-        "email": "admin@example.com",
-        "display_name": "管理员",
-        "token_type": "mock"
-    }
+    # 🔧 临时Mock：开发模式下返回gaochao用户，跳过认证
+    import os
+    if os.getenv("AUTH_MOCK", "").lower() == "true":
+        print("🔧 开发模式：使用Mock gaochao用户")
+        return {
+            "sub": "gaochao",
+            "username": "gaochao", 
+            "email": "gaochao@example.com",
+            "display_name": "高超",
+            "token_type": "mock",
+            "roles": ["super_admin"],  # 所有权限
+            "permissions": ["*"]  # 所有权限
+        }
     
-    # 原有的认证逻辑（暂时注释）
-    # if not user:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="未认证",
-    #         headers={"WWW-Authenticate": "Bearer"},
-    #     )
-    # 
-    # return user
+    # 原有的认证逻辑
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未认证",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return user
 
 
 async def get_current_active_user(
