@@ -931,7 +931,7 @@ export function ChatMessages({
             <div key={round.user.id || idx}>
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6 pl-4">
-                <div className="flex items-center gap-2 justify-end max-w-[90%] w-full">
+                <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
                   <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2 border border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
@@ -969,7 +969,7 @@ export function ChatMessages({
                 return hasRenderableContent;
               })() && (
                 <div className="flex flex-col items-start mb-6 mr-2">
-                  <div className="flex items-start gap-2 w-full">
+                  <div className="flex items-start w-full" style={{ gap: '5px' }}>
                     <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
                       <Bot className="h-5 w-5 text-blue-200" />
                     </div>
