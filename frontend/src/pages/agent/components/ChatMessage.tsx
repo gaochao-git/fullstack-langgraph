@@ -837,7 +837,7 @@ export function ChatMessages({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col relative w-full overflow-hidden" style={{ height: '70vh', background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
+    <div className="flex flex-col relative w-full overflow-hidden h-full" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
       <style>
         {`
           @keyframes buttonSpin {
@@ -853,7 +853,7 @@ export function ChatMessages({
       
       {/* 头部工具栏 - 固定高度 */}
       <div className={cn(
-        "flex-shrink-0 flex items-center justify-between px-4 py-2 border-b transition-colors duration-200",
+        "flex-shrink-0 flex items-center justify-between px-4 pt-1 pb-0 border-b transition-colors duration-200",
         isDark 
           ? "bg-gray-800 border-gray-700" 
           : "bg-white border-gray-200"
@@ -901,7 +901,7 @@ export function ChatMessages({
       <div
         ref={messagesContainerRef}
         className={cn(
-          "flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 relative transition-colors duration-200",
+          "flex-1 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-0 relative transition-colors duration-200",
           isDark 
             ? "bg-gradient-to-b from-gray-900 to-gray-800" 
             : "bg-gradient-to-b from-white to-gray-50"
@@ -1142,7 +1142,7 @@ export function ChatMessages({
             : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
         )}
       >
-        <form onSubmit={handleSubmit} className="p-2 sm:p-4">
+        <form onSubmit={handleSubmit} className="px-2 sm:px-4 pt-1 pb-0">
           {/* 地址栏样式的输入容器 */}
           <div className={cn(
             "flex items-center border-2 rounded-lg overflow-hidden shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-400",

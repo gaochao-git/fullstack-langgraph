@@ -560,7 +560,7 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           {/* 桌面端面包屑 */}
           {!isMobile && breadcrumb.length > 0 && (
             <div style={{ 
-              padding: '16px 24px 0 24px',
+              padding: '5px 24px 0 24px',
               background: isDark ? '#141414' : '#f0f0f0'
             }}>
               <Breadcrumb
@@ -584,10 +584,13 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           <Content
             style={{
               flex: 1,
-              padding: isMobile ? 12 : 24,
+              paddingLeft: isMobile ? 12 : 24,
+              paddingRight: isMobile ? 12 : 24,
+              paddingTop: 5,
+              paddingBottom: 0,
               margin: isMobile ? 0 : 24,
-              marginTop: isMobile ? 48 : 16,
-              marginBottom: isMobile ? 0 : 24,
+              marginTop: 5,
+              marginBottom: 0,
               background: colorBgContainer,
               borderRadius: isMobile ? 0 : borderRadiusLG,
               overflow: 'auto'
