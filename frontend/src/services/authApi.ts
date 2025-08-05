@@ -55,7 +55,15 @@ class AuthApi {
   async login(data: LoginRequest): Promise<LoginResponse> {
     // 直接调用后端API，不使用mock
     const response = await omind_post(`${this.baseUrl}/login`, data);
-    return response.json();
+    const result = await response.json();
+    
+    // 检查是否有错误
+    if (result.status === 'error') {
+      throw new Error(result.msg || '登录失败');
+    }
+    
+    // 如果成功，返回数据
+    return result.data || result;
   }
 
   /**

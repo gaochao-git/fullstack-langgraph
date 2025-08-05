@@ -67,10 +67,10 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     const response = await fetch(fullUrl, fetchConfig);
     clearTimeout(timeoutId);
     
-    // 检查响应状态
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
+    // 不在这里检查响应状态，让调用方处理
+    // if (!response.ok) {
+    //   throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    // }
     
     return response;
   } catch (error) {
