@@ -127,12 +127,7 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
       message.success(successMessage || responseData.msg || '操作成功');
     }
 
-    // 返回数据
-    if ('status' in responseData && responseData.status === 'ok') {
-      return responseData.data;
-    }
-    
-    // 兼容没有统一格式的响应
+    // 返回完整的响应数据，让调用方自己处理
     return responseData;
     
   } catch (error) {

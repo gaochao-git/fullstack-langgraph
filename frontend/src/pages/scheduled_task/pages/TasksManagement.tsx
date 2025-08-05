@@ -112,13 +112,7 @@ const decodeUnicodeString = (str: string): string => {
   }
 };
 
-// API响应处理辅助函数
-const handleApiResponse = async (response: Response) => {
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
-  }
-  return await response.json();
-};
+// API响应处理辅助函数 - 不再需要，因为omind_*函数已经处理了响应
 
 const TasksManagement: React.FC = () => {
   const { isDark } = useTheme();
@@ -155,8 +149,7 @@ const TasksManagement: React.FC = () => {
   const fetchScheduledTasks = async () => {
     setScheduledTasksLoading(true);
     try {
-      const response = await omind_get('/api/v1/scheduled-tasks');
-      const result = await response.json();
+      const result = await omind_get('/api/v1/scheduled-tasks');
       if (result.status === 'ok' && result.data && result.data.items) {
         setScheduledTasks(result.data.items);
       } else {
@@ -176,8 +169,7 @@ const TasksManagement: React.FC = () => {
   const fetchCeleryTasks = async () => {
     setCeleryTasksLoading(true);
     try {
-      const response = await omind_get('/api/v1/scheduled-tasks/records');
-      const result = await response.json();
+      const result = await omind_get('/api/v1/scheduled-tasks/records');
       if (result.status === 'ok' && result.data && result.data.items) {
         setCeleryTasks(result.data.items);
       } else {
@@ -197,9 +189,13 @@ const TasksManagement: React.FC = () => {
   // 获取智能体列表
   const fetchAgents = async () => {
     try {
-      const response = await omind_get('/api/v1/agents/');
-      const data = await response.json();
-      setAgents(Array.isArray(data) ? data : []);
+      const data = await omind_get('/api/v1/agents/');
+      if (data.status === 'ok' && data.data) {
+        const agents = data.data.items || [];
+        setAgents(agents);
+      } else {
+        setAgents([]);
+      }
     } catch (error) {
       console.error('Failed to fetch agents:', error);
       setAgents([]);
@@ -210,14 +206,13 @@ const TasksManagement: React.FC = () => {
   const fetchTaskLogs = async (taskId: number) => {
     setTaskLogsLoading(true);
     try {
-      const response = await omind_get(`/api/v1/scheduled-tasks/${taskId}/logs`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await omind_get(`/api/v1/scheduled-tasks/${taskId}/logs`);
+      if (data.status === 'ok' && data.data) {
+        setTaskLogs(Array.isArray(data.data) ? data.data : []);
+      } else {
+        setTaskLogs([]);
+        message.error(data.msg || '获取任务执行日志失败');
       }
-      
-      const data = await response.json();
-      setTaskLogs(Array.isArray(data) ? data : []);
     } catch (error) {
       message.error('获取任务执行日志失败');
       console.error('Failed to fetch task logs:', error);

@@ -52,8 +52,8 @@ const SOPManagement: React.FC = () => {
       const queryParams = {
         ...searchParams,
         ...params,
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize
+        page: currentPage,
+        size: pageSize
       };
       
       const response = await SOPApi.getSOPs(queryParams);
