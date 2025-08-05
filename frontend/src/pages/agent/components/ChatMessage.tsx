@@ -853,11 +853,12 @@ export function ChatMessages({
       
       {/* 头部工具栏 - 固定高度 */}
       <div className={cn(
-        "flex-shrink-0 flex items-center justify-between px-4 pt-1 pb-0 border-b transition-colors duration-200",
+        "flex-shrink-0 flex items-center justify-between px-4 border-b transition-colors duration-200",
         isDark 
           ? "bg-gray-800 border-gray-700" 
           : "bg-white border-gray-200"
-      )}>
+      )}
+      style={{ paddingTop: '5px', paddingBottom: '5px' }}>
         <div className="flex items-center gap-2">
           <Bot className={cn("h-5 w-5", isDark ? "text-cyan-400" : "text-blue-600")} />
           <span className={cn("font-semibold", isDark ? "text-white" : "text-gray-900")}>
@@ -1142,10 +1143,10 @@ export function ChatMessages({
             : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
         )}
       >
-        <form onSubmit={handleSubmit} className="px-2 sm:px-4 pt-1 pb-0">
+        <form onSubmit={handleSubmit} style={{ paddingLeft: '5px', paddingRight: '5px', paddingTop: '5px', paddingBottom: '5px' }}>
           {/* 地址栏样式的输入容器 */}
           <div className={cn(
-            "flex items-center border-2 rounded-lg overflow-hidden shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-400",
+            "flex items-center border-2 rounded-md overflow-hidden shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-400",
             isDark 
               ? "bg-gray-800 border-gray-600" 
               : "bg-white border-gray-300"

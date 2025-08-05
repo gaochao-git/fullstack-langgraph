@@ -587,10 +587,10 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
               paddingLeft: isMobile ? 12 : 24,
               paddingRight: isMobile ? 12 : 24,
               paddingTop: 5,
-              paddingBottom: 0,
+              paddingBottom: 5,
               margin: isMobile ? 0 : 24,
               marginTop: 5,
-              marginBottom: 0,
+              marginBottom: 5,
               background: colorBgContainer,
               borderRadius: isMobile ? 0 : borderRadiusLG,
               overflow: 'auto'
