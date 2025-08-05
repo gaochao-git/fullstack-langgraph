@@ -54,16 +54,12 @@ class AuthApi {
    */
   async login(data: LoginRequest): Promise<LoginResponse> {
     // 直接调用后端API，不使用mock
-    const response = await omind_post(`${this.baseUrl}/login`, data);
-    const result = await response.json();
+    // omind_post 现在默认返回解析后的数据
+    const result = await omind_post(`${this.baseUrl}/login`, data);
     
-    // 检查是否有错误
-    if (result.status === 'error') {
-      throw new Error(result.msg || '登录失败');
-    }
-    
-    // 如果成功，返回数据
-    return result.data || result;
+    // 如果返回的是统一格式，数据已经被自动提取
+    // 如果不是统一格式，返回整个结果
+    return result;
   }
 
   /**
@@ -78,24 +74,22 @@ class AuthApi {
    */
   async getCurrentUser(): Promise<LoginResponse['user']> {
     // 直接调用后端API，不使用mock
-    const response = await omind_get(`${this.baseUrl}/me`, {
+    return await omind_get(`${this.baseUrl}/me`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     });
-    return response.json();
   }
 
   /**
    * 刷新token
    */
   async refreshToken(): Promise<{ token: string }> {
-    const response = await omind_post(`${this.baseUrl}/refresh`, {}, {
+    return await omind_post(`${this.baseUrl}/refresh`, {}, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     });
-    return response.json();
   }
 
   /**
@@ -107,16 +101,14 @@ class AuthApi {
       return mockAuthApi.getSSOUrl();
     }
     
-    const response = await omind_get(`${this.baseUrl}/sso/url`);
-    return response.json();
+    return await omind_get(`${this.baseUrl}/sso/url`);
   }
 
   /**
    * SSO回调处理
    */
   async ssoCallback(data: SSOCallbackRequest): Promise<LoginResponse> {
-    const response = await omind_post(`${this.baseUrl}/sso/callback`, data);
-    return response.json();
+    return await omind_post(`${this.baseUrl}/sso/callback`, data);
   }
 
   /**
@@ -124,12 +116,12 @@ class AuthApi {
    */
   async verifyToken(token: string): Promise<boolean> {
     try {
-      const response = await omind_get(`${this.baseUrl}/verify`, {
+      const result = await omind_get(`${this.baseUrl}/verify`, {
         headers: {
           'Authorization': `Bearer ${token}`
-        }
+        },
+        showError: false  // 验证失败不显示错误消息
       });
-      const result = await response.json();
       return result.valid;
     } catch {
       return false;
@@ -141,8 +133,7 @@ class AuthApi {
    */
   async register(data: RegisterRequest): Promise<RegisterResponse> {
     // 直接调用后端API，不使用mock
-    const response = await omind_post(`${this.baseUrl}/register`, data);
-    return response.json();
+    return await omind_post(`${this.baseUrl}/register`, data);
   }
 }
 

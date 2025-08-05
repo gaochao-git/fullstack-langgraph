@@ -110,8 +110,7 @@ export class MCPApi {
       if (params.team_name) queryParams.append('team_name', params.team_name);
 
       const url = `/api/v1/mcp/servers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await omind_get(url);
-      const responseData = await response.json();
+      const responseData = await omind_get(url);
       
       // 处理分页响应格式
       const result = handleUnifiedResponse(responseData);
@@ -136,8 +135,7 @@ export class MCPApi {
   // 获取单个MCP服务器
   static async getMCPServerById(serverId: string) {
     try {
-      const response = await omind_get(`/api/v1/mcp/servers/${serverId}`);
-      const responseData = await response.json();
+      const responseData = await omind_get(`/api/v1/mcp/servers/${serverId}`);
       const result = handleUnifiedResponse<MCPServer>(responseData);
       return {
         success: true,
@@ -155,8 +153,7 @@ export class MCPApi {
   // 创建MCP服务器
   static async createMCPServer(serverData: MCPServerCreateRequest) {
     try {
-      const response = await omind_post('/api/v1/mcp/servers', serverData);
-      const responseData = await response.json();
+      const responseData = await omind_post('/api/v1/mcp/servers', serverData);
       const result = handleUnifiedResponse<MCPServer>(responseData);
       return {
         success: true,
@@ -174,8 +171,7 @@ export class MCPApi {
   // 更新MCP服务器
   static async updateMCPServer(serverId: string, serverData: MCPServerUpdateRequest) {
     try {
-      const response = await omind_put(`/api/v1/mcp/servers/${serverId}`, serverData);
-      const responseData = await response.json();
+      const responseData = await omind_put(`/api/v1/mcp/servers/${serverId}`, serverData);
       const result = handleUnifiedResponse<MCPServer>(responseData);
       return {
         success: true,
@@ -193,8 +189,7 @@ export class MCPApi {
   // 删除MCP服务器
   static async deleteMCPServer(serverId: string) {
     try {
-      const response = await omind_del(`/api/v1/mcp/servers/${serverId}`);
-      const responseData = await response.json();
+      const responseData = await omind_del(`/api/v1/mcp/servers/${serverId}`);
       handleUnifiedResponse(responseData);
       return {
         success: true,
@@ -212,8 +207,7 @@ export class MCPApi {
   // 测试MCP服务器连接
   static async testMCPServer(serverId: string) {
     try {
-      const response = await omind_post(`/api/v1/mcp/servers/${serverId}/test`, {});
-      const responseData = await response.json();
+      const responseData = await omind_post(`/api/v1/mcp/servers/${serverId}/test`, {});
       const result = handleUnifiedResponse<MCPTestResponse>(responseData);
       return {
         success: true,
@@ -231,8 +225,7 @@ export class MCPApi {
   // 通用连接测试
   static async testConnection(testData: MCPTestRequest) {
     try {
-      const response = await omind_post('/api/v1/mcp/test', testData);
-      const responseData = await response.json();
+      const responseData = await omind_post('/api/v1/mcp/test', testData);
       const result = handleUnifiedResponse<MCPTestResponse>(responseData);
       return {
         success: true,
@@ -250,8 +243,7 @@ export class MCPApi {
   // 更新服务器状态
   static async updateServerStatus(serverId: string, status: 'connected' | 'disconnected' | 'error') {
     try {
-      const response = await omind_patch(`/api/v1/mcp/servers/${serverId}/status`, { status });
-      const responseData = await response.json();
+      const responseData = await omind_patch(`/api/v1/mcp/servers/${serverId}/status`, { status });
       const result = handleUnifiedResponse<MCPServer>(responseData);
       return {
         success: true,
@@ -269,8 +261,7 @@ export class MCPApi {
   // 启用/禁用服务器
   static async toggleServerEnable(serverId: string, enabled: 'on' | 'off') {
     try {
-      const response = await omind_patch(`/api/v1/mcp/servers/${serverId}/enable`, { enabled });
-      const responseData = await response.json();
+      const responseData = await omind_patch(`/api/v1/mcp/servers/${serverId}/enable`, { enabled });
       const result = handleUnifiedResponse<MCPServer>(responseData);
       return {
         success: true,
@@ -288,8 +279,7 @@ export class MCPApi {
   // 获取团队列表
   static async getTeams() {
     try {
-      const response = await omind_get('/api/v1/mcp/servers/meta/teams');
-      const responseData = await response.json();
+      const responseData = await omind_get('/api/v1/mcp/servers/meta/teams');
       const result = handleUnifiedResponse<string[]>(responseData);
       return {
         success: true,
@@ -307,8 +297,7 @@ export class MCPApi {
   // 获取统计信息
   static async getStatistics() {
     try {
-      const response = await omind_get('/api/v1/mcp/servers/meta/statistics');
-      const responseData = await response.json();
+      const responseData = await omind_get('/api/v1/mcp/servers/meta/statistics');
       const result = handleUnifiedResponse<Array<{status: string, count: number}>>(responseData);
       return {
         success: true,

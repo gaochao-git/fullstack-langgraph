@@ -17,8 +17,7 @@ export class MenuApiService {
         ? `/api/v1/auth/admin/menus/user/${userId}`
         : `/api/v1/auth/me/menus`;
         
-      const response = await omind_get(url);
-      const result = await response.json();
+      const result = await omind_get(url);
       
       console.log('🔍 getUserMenus 原始响应:', result);
       
@@ -73,8 +72,7 @@ export class MenuApiService {
    */
   static async getAllMenus(): Promise<MenuInfo[]> {
     try {
-      const response = await omind_get('/api/v1/auth/admin/menus');
-      const result: MenuApiResponse = await response.json();
+      const result: MenuApiResponse = await omind_get('/api/v1/auth/admin/menus');
       
       if (!result.success) {
         throw new Error(result.message || 'Failed to get all menus');

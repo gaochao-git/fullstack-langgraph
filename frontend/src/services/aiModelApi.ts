@@ -103,8 +103,7 @@ export class AIModelApi {
       if (params.model_type) queryParams.append('model_type', params.model_type);
 
       const url = `/api/v1/ai-models${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await omind_get(url);
-      const responseData = await response.json();
+      const responseData = await omind_get(url);
       
       // 处理分页响应格式
       const result = handleUnifiedResponse(responseData);
@@ -129,8 +128,7 @@ export class AIModelApi {
   // 获取单个AI模型
   static async getAIModelById(modelId: string) {
     try {
-      const response = await omind_get(`/api/v1/ai-models/${modelId}`);
-      const responseData = await response.json();
+      const responseData = await omind_get(`/api/v1/ai-models/${modelId}`);
       const result = handleUnifiedResponse<AIModel>(responseData);
       return {
         success: true,
@@ -148,8 +146,7 @@ export class AIModelApi {
   // 创建AI模型
   static async createAIModel(modelData: AIModelCreateRequest) {
     try {
-      const response = await omind_post('/api/v1/ai-models', modelData);
-      const responseData = await response.json();
+      const responseData = await omind_post('/api/v1/ai-models', modelData);
       const result = handleUnifiedResponse<AIModel>(responseData);
       return {
         success: true,
@@ -167,8 +164,7 @@ export class AIModelApi {
   // 更新AI模型
   static async updateAIModel(modelId: string, modelData: AIModelUpdateRequest) {
     try {
-      const response = await omind_put(`/api/v1/ai-models/${modelId}`, modelData);
-      const responseData = await response.json();
+      const responseData = await omind_put(`/api/v1/ai-models/${modelId}`, modelData);
       const result = handleUnifiedResponse<AIModel>(responseData);
       return {
         success: true,
@@ -186,8 +182,7 @@ export class AIModelApi {
   // 删除AI模型
   static async deleteAIModel(modelId: string) {
     try {
-      const response = await omind_del(`/api/v1/ai-models/${modelId}`);
-      const responseData = await response.json();
+      const responseData = await omind_del(`/api/v1/ai-models/${modelId}`);
       handleUnifiedResponse(responseData);
       return {
         success: true,
@@ -205,8 +200,7 @@ export class AIModelApi {
   // 测试AI模型连接
   static async testAIModel(testData: AIModelTestRequest) {
     try {
-      const response = await omind_post('/api/v1/ai-models/test-connection', testData);
-      const responseData = await response.json();
+      const responseData = await omind_post('/api/v1/ai-models/test-connection', testData);
       const result = handleUnifiedResponse<AIModelTestResponse>(responseData);
       return {
         success: true,
@@ -224,8 +218,7 @@ export class AIModelApi {
   // 发现Ollama模型
   static async discoverOllamaModels(discoverData: OllamaDiscoverRequest) {
     try {
-      const response = await omind_post('/api/v1/ai-models/discover-ollama', discoverData);
-      const responseData = await response.json();
+      const responseData = await omind_post('/api/v1/ai-models/discover-ollama', discoverData);
       const result = handleUnifiedResponse<OllamaDiscoverResponse>(responseData);
       return {
         success: true,
@@ -243,8 +236,7 @@ export class AIModelApi {
   // 更新模型状态
   static async updateModelStatus(modelId: string, status: 'active' | 'inactive' | 'error') {
     try {
-      const response = await omind_patch(`/api/v1/ai-models/${modelId}/status`, { status });
-      const responseData = await response.json();
+      const responseData = await omind_patch(`/api/v1/ai-models/${modelId}/status`, { status });
       const result = handleUnifiedResponse<AIModel>(responseData);
       return {
         success: true,
@@ -262,8 +254,7 @@ export class AIModelApi {
   // 获取提供商列表
   static async getProviders() {
     try {
-      const response = await omind_get('/api/v1/ai-models/meta/providers');
-      const responseData = await response.json();
+      const responseData = await omind_get('/api/v1/ai-models/meta/providers');
       const result = handleUnifiedResponse<string[]>(responseData);
       return {
         success: true,
@@ -281,8 +272,7 @@ export class AIModelApi {
   // 获取模型类型列表
   static async getModelTypes() {
     try {
-      const response = await omind_get('/api/v1/ai-models/meta/types');
-      const responseData = await response.json();
+      const responseData = await omind_get('/api/v1/ai-models/meta/types');
       const result = handleUnifiedResponse<string[]>(responseData);
       return {
         success: true,
@@ -300,8 +290,7 @@ export class AIModelApi {
   // 获取统计信息
   static async getStatistics() {
     try {
-      const response = await omind_get('/api/v1/ai-models/meta/statistics');
-      const responseData = await response.json();
+      const responseData = await omind_get('/api/v1/ai-models/meta/statistics');
       const result = handleUnifiedResponse<{
         status_statistics: Array<{status: string, count: number}>;
         provider_statistics: Array<{provider: string, count: number}>;

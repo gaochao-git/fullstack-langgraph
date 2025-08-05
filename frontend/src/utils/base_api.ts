@@ -4,6 +4,8 @@
  * 2. omind_fetch_stream - 流式请求，主要与大模型通信
  */
 
+import { message } from 'antd';
+
 // 获取基础URL
 const getBaseUrl = (): string => {
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -15,6 +17,16 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   body?: any;
   timeout?: number;
+  // 新增：是否返回原始Response（默认false，返回解析后的数据）
+  returnRaw?: boolean;
+  // 新增：显示成功消息
+  showSuccess?: boolean;
+  // 新增：自定义成功消息
+  successMessage?: string;
+  // 新增：显示错误消息（默认true，当autoHandle为true时）
+  showError?: boolean;
+  // 新增：自定义错误消息
+  errorMessage?: string;
 }
 
 // 流式请求配置接口
@@ -28,14 +40,19 @@ export interface StreamConfig extends RequestConfig {
  * 普通HTTP请求
  * @param url 请求URL
  * @param config 请求配置
- * @returns Promise<Response>
+ * @returns Promise<any> 默认返回解析后的数据，如果returnRaw为true则返回Response
  */
-export async function omind_fetch(url: string, config: RequestConfig = {}): Promise<Response> {
+export async function omind_fetch(url: string, config: RequestConfig = {}): Promise<any> {
   const {
     method = 'GET',
     headers = {},
     body,
-    timeout = 30000
+    timeout = 30000,
+    returnRaw = false,
+    showSuccess = false,
+    successMessage,
+    showError = true,
+    errorMessage
   } = config;
 
   // 构建完整URL
@@ -67,17 +84,75 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     const response = await fetch(fullUrl, fetchConfig);
     clearTimeout(timeoutId);
     
-    // 不在这里检查响应状态，让调用方处理
-    // if (!response.ok) {
-    //   throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    // }
+    // 如果需要原始Response，直接返回
+    if (returnRaw) {
+      return response;
+    }
     
-    return response;
+    // === 默认自动处理逻辑 ===
+    
+    // 处理非2xx响应
+    if (!response.ok) {
+      let errorMsg = errorMessage || `请求失败 (${response.status})`;
+      
+      try {
+        const errorData = await response.json();
+        // 优先使用后端返回的错误消息
+        errorMsg = errorData.msg || errorData.message || errorData.error || errorMsg;
+      } catch {
+        // 如果解析JSON失败，使用默认错误消息
+      }
+
+      if (showError) {
+        message.error(errorMsg);
+      }
+      
+      throw new Error(errorMsg);
+    }
+
+    // 解析响应
+    const responseData = await response.json();
+
+    // 处理统一响应格式
+    if ('status' in responseData && responseData.status === 'error') {
+      const errorMsg = errorMessage || responseData.msg || responseData.error || '请求失败';
+      if (showError) {
+        message.error(errorMsg);
+      }
+      throw new Error(errorMsg);
+    }
+
+    // 成功处理
+    if (showSuccess) {
+      message.success(successMessage || responseData.msg || '操作成功');
+    }
+
+    // 返回数据
+    if ('status' in responseData && responseData.status === 'ok') {
+      return responseData.data;
+    }
+    
+    // 兼容没有统一格式的响应
+    return responseData;
+    
   } catch (error) {
     clearTimeout(timeoutId);
+    
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`请求超时 (${timeout}ms)`);
+      const timeoutError = new Error(`请求超时 (${timeout}ms)`);
+      if (showError) {
+        message.error(timeoutError.message);
+      }
+      throw timeoutError;
     }
+    
+    // 显示错误消息
+    if (showError && error instanceof Error) {
+      if (!error.message.includes('请求失败')) {
+        message.error(error.message);
+      }
+    }
+    
     throw error;
   }
 }

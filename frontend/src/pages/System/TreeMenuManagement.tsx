@@ -9,6 +9,7 @@ import {
   HomeOutlined, MenuOutlined
 } from '@ant-design/icons';
 import { authApi } from '../../services/authApi';
+import { omind_get, omind_put, omind_post, omind_del } from '../../utils/base_api';
 
 interface MenuNode {
   key: string;
@@ -167,8 +168,7 @@ const TreeMenuManagement: React.FC = () => {
   const loadMenuTree = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/auth/admin/menus');
-      const data = await response.json();
+      const data = await omind_get('/api/v1/auth/admin/menus');
       console.log('Menu data:', data);
       const treeData = buildTreeData(data.menus || []);
       setTreeData(treeData);
@@ -257,23 +257,11 @@ const TreeMenuManagement: React.FC = () => {
   // 切换显示/隐藏
   const handleToggleVisible = async (menu: RawMenuData) => {
     try {
-      const response = await fetch(`/api/v1/auth/admin/menus/${menu.menu_id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          show_menu: menu.show_menu === 1 ? 0 : 1
-        })
+      await omind_put(`/api/v1/auth/admin/menus/${menu.menu_id}`, {
+        show_menu: menu.show_menu === 1 ? 0 : 1
       });
-
-      if (response.ok) {
-        message.success('状态更新成功');
-        loadMenuTree();
-      } else {
-        const errorData = await response.json();
-        message.error(errorData.msg || '状态更新失败');
-      }
+      message.success('状态更新成功');
+      loadMenuTree();
     } catch (error) {
       console.error('Toggle visibility error:', error);
       message.error('状态更新失败');
@@ -289,20 +277,12 @@ const TreeMenuManagement: React.FC = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await fetch(`/api/v1/auth/admin/menus/${menu.menu_id}`, {
-            method: 'DELETE'
-          });
-
-          if (response.ok) {
-            message.success('删除成功');
-            loadMenuTree();
-            if (selectedMenu?.menu_id === menu.menu_id) {
-              setSelectedMenu(null);
-              form.resetFields();
-            }
-          } else {
-            const errorData = await response.json();
-            message.error(errorData.msg || '删除失败');
+          await omind_del(`/api/v1/auth/admin/menus/${menu.menu_id}`);
+          message.success('删除成功');
+          loadMenuTree();
+          if (selectedMenu?.menu_id === menu.menu_id) {
+            setSelectedMenu(null);
+            form.resetFields();
           }
         } catch (error) {
           console.error('Delete menu error:', error);
@@ -316,32 +296,21 @@ const TreeMenuManagement: React.FC = () => {
   const handleSave = async (values: any) => {
     try {
       const isEdit = selectedMenu !== null;
-      const url = isEdit 
-        ? `/api/v1/auth/admin/menus/${selectedMenu.menu_id}`
-        : '/api/v1/auth/admin/menus';
       
-      const method = isEdit ? 'PUT' : 'POST';
-
       // 如果是新增菜单，添加父菜单ID
       const payload = isEdit ? values : { ...values, parent_id: parentMenuId };
 
-      const response = await fetch(url, {
-        method,
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (response.ok) {
-        message.success(isEdit ? '更新成功' : '创建成功');
-        setEditMode(false);
-        setParentMenuId(-1);
-        loadMenuTree();
+      if (isEdit) {
+        await omind_put(`/api/v1/auth/admin/menus/${selectedMenu.menu_id}`, payload);
+        message.success('更新成功');
       } else {
-        const errorData = await response.json();
-        message.error(errorData.msg || '保存失败');
+        await omind_post('/api/v1/auth/admin/menus', payload);
+        message.success('创建成功');
       }
+      
+      setEditMode(false);
+      setParentMenuId(-1);
+      loadMenuTree();
     } catch (error) {
       console.error('Save menu error:', error);
       message.error('保存失败');

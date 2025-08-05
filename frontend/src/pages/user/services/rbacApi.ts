@@ -26,15 +26,13 @@ function handleUnifiedResponse<T>(response: any): T {
 export const userApi = {
   // 创建用户
   createUser: async (data: UserCreateRequest): Promise<RbacUser> => {
-    const response = await omind_post(`${API_PREFIX}/users`, data);
-    const result = await response.json();
+    const result = await omind_post(`${API_PREFIX}/users`, data);
     return handleUnifiedResponse<RbacUser>(result);
   },
 
   // 获取用户详情
   getUser: async (userId: string): Promise<RbacUser> => {
-    const response = await omind_get(`${API_PREFIX}/users/${userId}`);
-    const result = await response.json();
+    const result = await omind_get(`${API_PREFIX}/users/${userId}`);
     return handleUnifiedResponse<RbacUser>(result);
   },
 
@@ -47,22 +45,19 @@ export const userApi = {
       }
     });
     const url = `${API_PREFIX}/users?${searchParams.toString()}`;
-    const response = await omind_get(url);
-    const result = await response.json();
+    const result = await omind_get(url);
     return handleUnifiedResponse<PaginatedResponse<RbacUser>>(result);
   },
 
   // 更新用户
   updateUser: async (userId: string, data: UserUpdateRequest): Promise<RbacUser> => {
-    const response = await omind_put(`${API_PREFIX}/users/${userId}`, data);
-    const result = await response.json();
+    const result = await omind_put(`${API_PREFIX}/users/${userId}`, data);
     return handleUnifiedResponse<RbacUser>(result);
   },
 
   // 删除用户
   deleteUser: async (userId: string): Promise<{ deleted_user_id: string }> => {
-    const response = await omind_del(`${API_PREFIX}/users/${userId}`);
-    const result = await response.json();
+    const result = await omind_del(`${API_PREFIX}/users/${userId}`);
     return handleUnifiedResponse<{ deleted_user_id: string }>(result);
   },
 };
@@ -72,15 +67,13 @@ export const userApi = {
 export const roleApi = {
   // 创建角色
   createRole: async (data: RoleCreateRequest): Promise<RbacRole> => {
-    const response = await omind_post(`${API_PREFIX}/roles`, data);
-    const result = await response.json();
+    const result = await omind_post(`${API_PREFIX}/roles`, data);
     return handleUnifiedResponse<RbacRole>(result);
   },
 
   // 获取角色详情
   getRole: async (roleId: number): Promise<RbacRole> => {
-    const response = await omind_get(`${API_PREFIX}/roles/${roleId}`);
-    const result = await response.json();
+    const result = await omind_get(`${API_PREFIX}/roles/${roleId}`);
     return handleUnifiedResponse<RbacRole>(result);
   },
 
@@ -93,29 +86,25 @@ export const roleApi = {
       }
     });
     const url = `${API_PREFIX}/roles?${searchParams.toString()}`;
-    const response = await omind_get(url);
-    const result = await response.json();
+    const result = await omind_get(url);
     return handleUnifiedResponse<PaginatedResponse<RbacRole>>(result);
   },
 
   // 更新角色
   updateRole: async (roleId: number, data: RoleUpdateRequest): Promise<RbacRole> => {
-    const response = await omind_put(`${API_PREFIX}/roles/${roleId}`, data);
-    const result = await response.json();
+    const result = await omind_put(`${API_PREFIX}/roles/${roleId}`, data);
     return handleUnifiedResponse<RbacRole>(result);
   },
 
   // 删除角色
   deleteRole: async (roleId: number): Promise<{ deleted_role_id: number }> => {
-    const response = await omind_del(`${API_PREFIX}/roles/${roleId}`);
-    const result = await response.json();
+    const result = await omind_del(`${API_PREFIX}/roles/${roleId}`);
     return handleUnifiedResponse<{ deleted_role_id: number }>(result);
   },
 
   // 获取角色权限
   getRolePermissions: async (roleId: number): Promise<{ api_permission_ids: number[], menu_ids: number[] }> => {
-    const response = await omind_get(`${API_PREFIX}/roles/${roleId}/permissions`);
-    const result = await response.json();
+    const result = await omind_get(`${API_PREFIX}/roles/${roleId}/permissions`);
     return handleUnifiedResponse<{ api_permission_ids: number[], menu_ids: number[] }>(result);
   },
 };
@@ -125,15 +114,13 @@ export const roleApi = {
 export const permissionApi = {
   // 创建权限
   createPermission: async (data: PermissionCreateRequest): Promise<RbacPermission> => {
-    const response = await omind_post(`${API_PREFIX}/permissions`, data);
-    const result = await response.json();
+    const result = await omind_post(`${API_PREFIX}/permissions`, data);
     return handleUnifiedResponse<RbacPermission>(result);
   },
 
   // 获取权限详情
   getPermission: async (permissionId: number): Promise<RbacPermission> => {
-    const response = await omind_get(`${API_PREFIX}/permissions/${permissionId}`);
-    const result = await response.json();
+    const result = await omind_get(`${API_PREFIX}/permissions/${permissionId}`);
     return handleUnifiedResponse<RbacPermission>(result);
   },
 
@@ -146,22 +133,19 @@ export const permissionApi = {
       }
     });
     const url = `${API_PREFIX}/permissions?${searchParams.toString()}`;
-    const response = await omind_get(url);
-    const result = await response.json();
+    const result = await omind_get(url);
     return handleUnifiedResponse<PaginatedResponse<RbacPermission>>(result);
   },
 
   // 更新权限
   updatePermission: async (permissionId: number, data: PermissionUpdateRequest): Promise<RbacPermission> => {
-    const response = await omind_put(`${API_PREFIX}/permissions/${permissionId}`, data);
-    const result = await response.json();
+    const result = await omind_put(`${API_PREFIX}/permissions/${permissionId}`, data);
     return handleUnifiedResponse<RbacPermission>(result);
   },
 
   // 删除权限
   deletePermission: async (permissionId: number): Promise<{ deleted_permission_id: number }> => {
-    const response = await omind_del(`${API_PREFIX}/permissions/${permissionId}`);
-    const result = await response.json();
+    const result = await omind_del(`${API_PREFIX}/permissions/${permissionId}`);
     return handleUnifiedResponse<{ deleted_permission_id: number }>(result);
   },
 };
@@ -171,15 +155,13 @@ export const permissionApi = {
 export const menuApi = {
   // 创建菜单
   createMenu: async (data: MenuCreateRequest): Promise<RbacMenu> => {
-    const response = await omind_post(`${API_PREFIX}/menus`, data);
-    const result = await response.json();
+    const result = await omind_post(`${API_PREFIX}/menus`, data);
     return handleUnifiedResponse<RbacMenu>(result);
   },
 
   // 获取菜单详情
   getMenu: async (menuId: number): Promise<RbacMenu> => {
-    const response = await omind_get(`${API_PREFIX}/menus/${menuId}`);
-    const result = await response.json();
+    const result = await omind_get(`${API_PREFIX}/menus/${menuId}`);
     return handleUnifiedResponse<RbacMenu>(result);
   },
 
@@ -192,22 +174,19 @@ export const menuApi = {
       }
     });
     const url = `${API_PREFIX}/menus?${searchParams.toString()}`;
-    const response = await omind_get(url);
-    const result = await response.json();
+    const result = await omind_get(url);
     return handleUnifiedResponse<PaginatedResponse<RbacMenu>>(result);
   },
 
   // 更新菜单
   updateMenu: async (menuId: number, data: MenuUpdateRequest): Promise<RbacMenu> => {
-    const response = await omind_put(`${API_PREFIX}/menus/${menuId}`, data);
-    const result = await response.json();
+    const result = await omind_put(`${API_PREFIX}/menus/${menuId}`, data);
     return handleUnifiedResponse<RbacMenu>(result);
   },
 
   // 删除菜单
   deleteMenu: async (menuId: number): Promise<{ deleted_menu_id: number }> => {
-    const response = await omind_del(`${API_PREFIX}/menus/${menuId}`);
-    const result = await response.json();
+    const result = await omind_del(`${API_PREFIX}/menus/${menuId}`);
     return handleUnifiedResponse<{ deleted_menu_id: number }>(result);
   },
 };
