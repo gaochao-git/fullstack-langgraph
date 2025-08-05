@@ -44,62 +44,86 @@ export function UserManagement() {
       title: '用户ID',
       dataIndex: 'user_id',
       key: 'user_id',
-      width: 120,
+      width: 150,
+      fixed: 'left',
+      ellipsis: false,
+      render: (text: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+      ),
     },
     {
       title: '用户名',
       dataIndex: 'user_name',
       key: 'user_name',
-      width: 120,
+      ellipsis: true,
+      render: (text: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+      ),
     },
     {
       title: '显示名称',
       dataIndex: 'display_name',
       key: 'display_name',
-      width: 120,
+      ellipsis: true,
+      render: (text: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+      ),
     },
     {
       title: '邮箱',
       dataIndex: 'email',
       key: 'email',
-      width: 200,
       ellipsis: true,
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+        </Tooltip>
+      ),
     },
     {
       title: '手机号',
       dataIndex: 'mobile',
       key: 'mobile',
-      width: 130,
+      ellipsis: true,
+      render: (text: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+      ),
     },
     {
       title: '部门',
       dataIndex: 'department_name',
       key: 'department_name',
-      width: 120,
       ellipsis: true,
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+        </Tooltip>
+      ),
     },
     {
       title: '组',
       dataIndex: 'group_name',
       key: 'group_name',
-      width: 100,
       ellipsis: true,
+      render: (text: string) => (
+        <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+      ),
     },
     {
       title: '分配角色',
       dataIndex: 'roles',
       key: 'roles',
-      width: 200,
+      ellipsis: true,
       render: (roles: RbacRole[]) => (
-        <div>
+        <div style={{ display: 'flex', flexWrap: 'nowrap', overflow: 'hidden' }}>
           {roles && roles.length > 0 ? (
             roles.map(role => (
-              <Tag key={role.role_id} color="blue" style={{ marginBottom: 2 }}>
+              <Tag key={role.role_id} color="blue" style={{ marginRight: 4, marginBottom: 0, whiteSpace: 'nowrap' }}>
                 {role.role_name}
               </Tag>
             ))
           ) : (
-            <Tag color="default">未分配角色</Tag>
+            <Tag color="default" style={{ whiteSpace: 'nowrap' }}>未分配角色</Tag>
           )}
         </div>
       ),
@@ -110,7 +134,7 @@ export function UserManagement() {
       key: 'is_active',
       width: 80,
       render: (isActive: number) => (
-        <Tag color={isActive === 1 ? 'green' : 'red'}>
+        <Tag color={isActive === 1 ? 'green' : 'red'} style={{ whiteSpace: 'nowrap' }}>
           {isActive === 1 ? '启用' : '禁用'}
         </Tag>
       ),
@@ -126,23 +150,27 @@ export function UserManagement() {
           2: 'LDAP',
           3: '手动'
         };
-        return sourceMap[source] || '未知';
+        return <span style={{ whiteSpace: 'nowrap' }}>{sourceMap[source] || '未知'}</span>;
       },
     },
     {
       title: '创建时间',
       dataIndex: 'create_time',
       key: 'create_time',
-      width: 150,
       ellipsis: true,
+      render: (text: string) => (
+        <Tooltip title={text}>
+          <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
+        </Tooltip>
+      ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 100,
       fixed: 'right',
       render: (_: any, record: RbacUser) => (
-        <Space size="small">
+        <Space size="small" style={{ whiteSpace: 'nowrap' }}>
           <Tooltip title="编辑">
             <Button
               type="link"
