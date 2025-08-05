@@ -112,6 +112,27 @@ class RbacUserService:
         result = await db.execute(query)
         users = list(result.scalars().all())
         
+        # 为每个用户加载角色信息
+        for user in users:
+            # 查询用户的角色关联
+            user_roles_result = await db.execute(
+                select(RbacUsersRoles).where(RbacUsersRoles.user_id == user.user_id)
+            )
+            user_roles = list(user_roles_result.scalars().all())
+            
+            # 获取角色详细信息
+            roles = []
+            for user_role in user_roles:
+                role_result = await db.execute(
+                    select(RbacRole).where(RbacRole.role_id == user_role.role_id)
+                )
+                role = role_result.scalar_one_or_none()
+                if role:
+                    roles.append(role)
+            
+            # 动态添加角色信息到用户对象
+            user.roles = roles
+        
         # 计算总数
         count_query = select(func.count(RbacUser.id))
         if conditions:
@@ -302,6 +323,29 @@ class RbacRoleService:
         query = query.offset((params.page - 1) * params.page_size).limit(params.page_size)
         result = await db.execute(query)
         roles = list(result.scalars().all())
+        
+        # 为每个角色计算统计信息
+        for role in roles:
+            # 计算权限数量 - 使用与get_role_permissions_and_menus相同的逻辑
+            role_perms_result = await db.execute(
+                select(RbacRolesPermissions).where(RbacRolesPermissions.role_id == role.role_id)
+            )
+            role_permissions = list(role_perms_result.scalars().all())
+            
+            # 计算API权限数量
+            permission_count = sum(1 for rp in role_permissions 
+                                 if rp.permission_type == 2 and rp.back_permission_id != -1)
+            
+            # 计算用户数量
+            user_count_result = await db.execute(
+                select(func.count(RbacUsersRoles.id))
+                .where(RbacUsersRoles.role_id == role.role_id)
+            )
+            user_count = user_count_result.scalar() or 0
+            
+            # 动态添加统计属性
+            role.permission_count = permission_count
+            role.user_count = user_count
         
         # 计算总数
         count_query = select(func.count(RbacRole.id))

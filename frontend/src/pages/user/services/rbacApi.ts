@@ -111,6 +111,13 @@ export const roleApi = {
     const result = await response.json();
     return handleUnifiedResponse<{ deleted_role_id: number }>(result);
   },
+
+  // 获取角色权限
+  getRolePermissions: async (roleId: number): Promise<{ api_permission_ids: number[], menu_ids: number[] }> => {
+    const response = await omind_get(`${API_PREFIX}/roles/${roleId}/permissions`);
+    const result = await response.json();
+    return handleUnifiedResponse<{ api_permission_ids: number[], menu_ids: number[] }>(result);
+  },
 };
 
 // ============ 权限管理API ============

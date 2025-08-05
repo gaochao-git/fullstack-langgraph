@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Card, Table, Button, Space, Input, Modal, Form, message, 
-  Select, Tag, Tooltip, Row, Col 
+  Select, Tag, Tooltip, Row, Col, App 
 } from 'antd';
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, 
@@ -17,7 +17,9 @@ const { Search } = Input;
 const { Option } = Select;
 
 export function UserManagement() {
+  const { modal } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [users, setUsers] = useState<RbacUser[]>([]);
   const [availableRoles, setAvailableRoles] = useState<RbacRole[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -82,6 +84,25 @@ export function UserManagement() {
       key: 'group_name',
       width: 100,
       ellipsis: true,
+    },
+    {
+      title: '分配角色',
+      dataIndex: 'roles',
+      key: 'roles',
+      width: 200,
+      render: (roles: RbacRole[]) => (
+        <div>
+          {roles && roles.length > 0 ? (
+            roles.map(role => (
+              <Tag key={role.role_id} color="blue" style={{ marginBottom: 2 }}>
+                {role.role_name}
+              </Tag>
+            ))
+          ) : (
+            <Tag color="default">未分配角色</Tag>
+          )}
+        </div>
+      ),
     },
     {
       title: '状态',
@@ -205,23 +226,26 @@ export function UserManagement() {
   };
 
   const handleDelete = (user: RbacUser) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
-      content: `确定要删除用户 "${user.display_name}(${user.user_name})" 吗？`,
+      content: (
+        <div>
+          <p>确定要删除用户 <strong>"{user.display_name}({user.user_name})"</strong> 吗？</p>
+          <p className="text-gray-500">删除后，该用户的所有数据将被清除。</p>
+        </div>
+      ),
       okText: '确定',
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await userApi.deleteUser(user.user_id);
-          if (response.success) {
-            message.success('删除成功');
-            fetchUsers();
-          } else {
-            message.error(response.message || '删除失败');
-          }
+          await userApi.deleteUser(user.user_id);
+          // API成功时直接返回数据，失败时抛出异常
+          message.success(`用户"${user.display_name}"删除成功`);
+          fetchUsers();
         } catch (error) {
-          message.error('删除失败');
           console.error('删除用户失败:', error);
+          const errorMessage = error instanceof Error ? error.message : '删除操作失败，请重试';
+          message.error(errorMessage);
         }
       },
     });
@@ -229,6 +253,7 @@ export function UserManagement() {
 
   const handleSubmit = async () => {
     try {
+      setSubmitting(true);
       const values = await form.validateFields();
       
       if (editingUser) {
@@ -245,15 +270,12 @@ export function UserManagement() {
           role_ids: values.role_ids || [],
         };
         
-        const response = await userApi.updateUser(editingUser.user_id, updateData);
-        if (response.success) {
-          message.success('更新成功');
-          setModalVisible(false);
-          form.resetFields();
-          fetchUsers();
-        } else {
-          message.error(response.message || '更新失败');
-        }
+        await userApi.updateUser(editingUser.user_id, updateData);
+        // API成功时直接返回数据，失败时抛出异常
+        message.success(`用户"${values.display_name}"更新成功`);
+        setModalVisible(false);
+        form.resetFields();
+        fetchUsers();
       } else {
         // 创建用户
         const createData: UserCreateRequest = {
@@ -271,18 +293,19 @@ export function UserManagement() {
           auth_type: values.auth_type || 'jwt',
         };
         
-        const response = await userApi.createUser(createData);
-        if (response.success) {
-          message.success('创建成功');
-          setModalVisible(false);
-          form.resetFields();
-          fetchUsers();
-        } else {
-          message.error(response.message || '创建失败');
-        }
+        await userApi.createUser(createData);
+        // API成功时直接返回数据，失败时抛出异常
+        message.success(`用户"${values.display_name}"创建成功`);
+        setModalVisible(false);
+        form.resetFields();
+        fetchUsers();
       }
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('操作失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '操作失败，请重试';
+      message.error(errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -362,7 +385,7 @@ export function UserManagement() {
           dataSource={users}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1600 }}
           pagination={{
             ...pagination,
             showSizeChanger: true,
@@ -386,6 +409,10 @@ export function UserManagement() {
         cancelText="取消"
         width={720}
         destroyOnClose
+        confirmLoading={submitting}
+        okButtonProps={{
+          disabled: submitting
+        }}
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>

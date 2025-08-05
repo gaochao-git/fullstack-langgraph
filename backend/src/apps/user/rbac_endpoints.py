@@ -16,6 +16,7 @@ from src.apps.user.rbac_schema import (
 from src.apps.user.service.rbac_service import (
     rbac_user_service, rbac_role_service, rbac_permission_service, rbac_menu_service
 )
+from src.apps.user.rbac_models import RbacRolesPermissions, RbacUsersRoles
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException
@@ -64,7 +65,7 @@ async def get_user(
 @user_router.get("", response_model=UnifiedResponse)
 async def list_users(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页大小"),
+    page_size: int = Query(20, ge=1, le=1000, description="每页大小"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
     is_active: Optional[int] = Query(None, description="激活状态: 1激活 0禁用"),
     department_name: Optional[str] = Query(None, description="部门筛选"),
@@ -166,7 +167,7 @@ async def get_role(
 @role_router.get("", response_model=UnifiedResponse)
 async def list_roles(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页大小"),
+    page_size: int = Query(20, ge=1, le=1000, description="每页大小"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
     role_id: Optional[int] = Query(None, description="角色ID筛选"),
     db: AsyncSession = Depends(get_async_db)
@@ -225,6 +226,25 @@ async def delete_role(
         data={"deleted_role_id": role_id},
         msg="角色删除成功"
     )
+
+
+@role_router.get("/{role_id}/permissions", response_model=UnifiedResponse)
+async def get_role_permissions(
+    role_id: int = Path(..., description="角色ID"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取角色的权限和菜单"""
+    role = await rbac_role_service.get_role_by_id(db, role_id)
+    if not role:
+        raise BusinessException(f"角色 {role_id} 不存在", ResponseCode.NOT_FOUND)
+    
+    permissions_data = await rbac_role_service.get_role_permissions_and_menus(db, role_id)
+    
+    return success_response(
+        data=permissions_data,
+        msg="获取角色权限成功"
+    )
+
 
 
 # ============ 权限管理接口 ============
@@ -360,7 +380,7 @@ async def get_menu(
 @menu_router.get("", response_model=UnifiedResponse)
 async def list_menus(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页大小"),
+    page_size: int = Query(20, ge=1, le=1000, description="每页大小"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
     parent_id: Optional[int] = Query(None, description="父菜单筛选"),
     show_menu: Optional[int] = Query(None, description="显示状态筛选: 1显示 0隐藏"),

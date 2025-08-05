@@ -13,7 +13,7 @@ from datetime import datetime
 class PaginationParams(BaseModel):
     """分页参数"""
     page: int = Field(1, ge=1, description="页码")
-    page_size: int = Field(20, ge=1, le=100, description="每页大小")
+    page_size: int = Field(20, ge=1, le=1000, description="每页大小")
     search: Optional[str] = Field(None, description="搜索关键词", max_length=200)
 
 

@@ -18,6 +18,7 @@ const { Option } = Select;
 export function PermissionManagement() {
   const { modal } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPermission, setEditingPermission] = useState<RbacPermission | null>(null);
@@ -283,14 +284,14 @@ export function PermissionManagement() {
       onOk: async () => {
         try {
           console.log('开始删除权限，ID:', permission.permission_id);
-          const result = await permissionApi.deletePermission(permission.permission_id);
-          console.log('删除权限API响应:', result);
-          message.success('删除成功');
+          await permissionApi.deletePermission(permission.permission_id);
+          // API成功时直接返回数据，失败时抛出异常
+          message.success(`权限"${permission.permission_name}"删除成功`);
           fetchPermissions();
         } catch (error) {
           console.error('删除权限失败，详细错误:', error);
-          const errorMessage = error instanceof Error ? error.message : '删除失败';
-          message.error(`删除失败: ${errorMessage}`);
+          const errorMessage = error instanceof Error ? error.message : '删除操作失败，请重试';
+          message.error(errorMessage);
         }
       },
       onCancel: () => {
@@ -302,6 +303,7 @@ export function PermissionManagement() {
 
   const handleSubmit = async () => {
     try {
+      setSubmitting(true);
       const values = await form.validateFields();
       
       if (editingPermission) {
@@ -315,7 +317,8 @@ export function PermissionManagement() {
         };
         
         await permissionApi.updatePermission(editingPermission.permission_id, updateData);
-        message.success('更新成功');
+        // API成功时直接返回数据，失败时抛出异常
+        message.success(`权限"${values.permission_name}"更新成功`);
         setModalVisible(false);
         form.resetFields();
         fetchPermissions();
@@ -331,13 +334,18 @@ export function PermissionManagement() {
         };
         
         await permissionApi.createPermission(createData);
-        message.success('创建成功');
+        // API成功时直接返回数据，失败时抛出异常
+        message.success(`权限"${values.permission_name}"创建成功`);
         setModalVisible(false);
         form.resetFields();
         fetchPermissions();
       }
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('操作失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '操作失败，请重试';
+      message.error(errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -419,6 +427,10 @@ export function PermissionManagement() {
         cancelText="取消"
         width={800}
         destroyOnClose
+        confirmLoading={submitting}
+        okButtonProps={{
+          disabled: submitting
+        }}
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>

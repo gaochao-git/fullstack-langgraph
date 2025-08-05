@@ -24,6 +24,7 @@ interface TransferItem {
 
 export function RoleManagement() {
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [roles, setRoles] = useState<RbacRole[]>([]);
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [menus, setMenus] = useState<RbacMenu[]>([]);
@@ -161,7 +162,7 @@ export function RoleManagement() {
   // 获取权限列表
   const fetchPermissions = async () => {
     try {
-      const response = await permissionApi.listPermissions({ page: 1, page_size: 100 });
+      const response = await permissionApi.listPermissions({ page: 1, page_size: 1000 });
       setPermissions(response.items || []);
     } catch (error) {
       console.error('获取权限列表失败:', error);
@@ -171,7 +172,7 @@ export function RoleManagement() {
   // 获取菜单列表
   const fetchMenus = async () => {
     try {
-      const response = await menuApi.listMenus({ page: 1, page_size: 100 });
+      const response = await menuApi.listMenus({ page: 1, page_size: 1000 });
       setMenus(response.items || []);
     } catch (error) {
       console.error('获取菜单列表失败:', error);
@@ -192,15 +193,26 @@ export function RoleManagement() {
     setModalVisible(true);
   };
 
-  const handleEdit = (role: RbacRole) => {
+  const handleEdit = async (role: RbacRole) => {
     setEditingRole(role);
     form.setFieldsValue({
       role_id: role.role_id,
       role_name: role.role_name,
       description: role.description,
     });
-    // 设置已选中的权限（这里需要从后端获取角色的权限列表）
-    setSelectedPermissions([]);
+    
+    try {
+      // 获取角色的现有权限
+      const rolePermissions = await roleApi.getRolePermissions(role.role_id);
+      setSelectedPermissions(rolePermissions.api_permission_ids.map(id => id.toString()));
+      setSelectedMenus(rolePermissions.menu_ids.map(id => id.toString()));
+    } catch (error) {
+      console.error('获取角色权限失败:', error);
+      // 如果获取失败，设置为空数组
+      setSelectedPermissions([]);
+      setSelectedMenus([]);
+    }
+    
     setModalVisible(true);
   };
 
@@ -228,16 +240,14 @@ export function RoleManagement() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await roleApi.deleteRole(role.role_id);
-          if (response.success) {
-            message.success('删除成功');
-            fetchRoles();
-          } else {
-            message.error(response.message || '删除失败');
-          }
+          await roleApi.deleteRole(role.role_id);
+          // API成功时直接返回数据，失败时抛出异常
+          message.success(`角色"${role.role_name}"删除成功`);
+          fetchRoles();
         } catch (error) {
-          message.error('删除失败');
           console.error('删除角色失败:', error);
+          const errorMessage = error instanceof Error ? error.message : '删除操作失败，请重试';
+          message.error(errorMessage);
         }
       },
     });
@@ -245,6 +255,7 @@ export function RoleManagement() {
 
   const handleSubmit = async () => {
     try {
+      setSubmitting(true);
       const values = await form.validateFields();
       
       if (editingRole) {
@@ -256,17 +267,14 @@ export function RoleManagement() {
           menu_ids: selectedMenus.map(id => parseInt(id)),
         };
         
-        const response = await roleApi.updateRole(editingRole.role_id, updateData);
-        if (response.success) {
-          message.success('更新成功');
-          setModalVisible(false);
-          form.resetFields();
-          setSelectedPermissions([]);
-          setSelectedMenus([]);
-          fetchRoles();
-        } else {
-          message.error(response.message || '更新失败');
-        }
+        await roleApi.updateRole(editingRole.role_id, updateData);
+        // API成功时直接返回数据，失败时抛出异常
+        message.success(`角色"${values.role_name}"更新成功`);
+        setModalVisible(false);
+        form.resetFields();
+        setSelectedPermissions([]);
+        setSelectedMenus([]);
+        fetchRoles();
       } else {
         // 创建角色
         const createData: RoleCreateRequest = {
@@ -277,20 +285,21 @@ export function RoleManagement() {
           menu_ids: selectedMenus.map(id => parseInt(id)),
         };
         
-        const response = await roleApi.createRole(createData);
-        if (response.success) {
-          message.success('创建成功');
-          setModalVisible(false);
-          form.resetFields();
-          setSelectedPermissions([]);
-          setSelectedMenus([]);
-          fetchRoles();
-        } else {
-          message.error(response.message || '创建失败');
-        }
+        await roleApi.createRole(createData);
+        // API成功时直接返回数据，失败时抛出异常
+        message.success(`角色"${values.role_name}"创建成功`);
+        setModalVisible(false);
+        form.resetFields();
+        setSelectedPermissions([]);
+        setSelectedMenus([]);
+        fetchRoles();
       }
     } catch (error) {
-      console.error('表单验证失败:', error);
+      console.error('操作失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '操作失败，请重试';
+      message.error(errorMessage);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -409,6 +418,10 @@ export function RoleManagement() {
         cancelText="取消"
         width={800}
         destroyOnClose
+        confirmLoading={submitting}
+        okButtonProps={{
+          disabled: submitting
+        }}
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>

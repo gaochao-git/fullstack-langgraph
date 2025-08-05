@@ -33,8 +33,11 @@ class RbacUser(BaseModel):
         result = super().to_dict(exclude_fields=exclude_fields)
         
         if include_relations:
-            # 获取用户角色
-            result['roles'] = []
+            # 添加动态角色信息（如果存在）
+            if hasattr(self, 'roles'):
+                result['roles'] = [role.to_dict(include_relations=False) for role in self.roles]
+            else:
+                result['roles'] = []
             
         return result
 
@@ -56,9 +59,16 @@ class RbacRole(BaseModel):
         """重写to_dict方法，添加统计信息"""
         result = super().to_dict(exclude_fields=exclude_fields)
         
-        # 添加统计信息
-        result['permission_count'] = 0
-        result['user_count'] = 0
+        # 添加动态统计属性（如果存在）
+        if hasattr(self, 'permission_count'):
+            result['permission_count'] = self.permission_count
+        else:
+            result['permission_count'] = 0
+            
+        if hasattr(self, 'user_count'):
+            result['user_count'] = self.user_count
+        else:
+            result['user_count'] = 0
         
         return result
 
@@ -81,8 +91,15 @@ class RbacPermission(BaseModel):
     update_by = Column(String(50), nullable=False, comment="更新人")
 
     def to_dict(self, exclude_fields=None, include_relations=False):
-        """重写to_dict方法"""
+        """重写to_dict方法，添加统计信息"""
         result = super().to_dict(exclude_fields=exclude_fields)
+        
+        # 添加动态统计属性（如果存在）
+        if hasattr(self, 'permission_count'):
+            result['permission_count'] = self.permission_count
+        if hasattr(self, 'user_count'):
+            result['user_count'] = self.user_count
+            
         return result
 
 
@@ -113,6 +130,7 @@ class RbacUsersRoles(BaseModel):
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, index=True, autoincrement=True)
     user_id = Column(String(64), nullable=False, index=True, comment="用户ID")
     role_id = Column(Integer, default=-1, nullable=False, comment="角色ID")
+    is_deleted = Column(Integer, default=0, nullable=False, comment="是否删除:0未删除,1已删除")
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
     create_by = Column(String(50), nullable=False, comment="创建人")
