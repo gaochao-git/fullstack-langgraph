@@ -174,7 +174,8 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           <div style={{ 
             flex: 1,
             display: 'flex',
-            justifyContent: 'center'
+            justifyContent: 'flex-start',
+            paddingLeft: '24px'
           }}>
             {menuLoading ? (
               <Spin size="small" />
