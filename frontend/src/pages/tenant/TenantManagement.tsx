@@ -6,7 +6,7 @@ import { useTheme } from '../../hooks/ThemeContext';
 
 const { Option } = Select;
 
-const TenantManagement: React.FC = () => {
+export const TenantManagement: React.FC = () => {
   const { isDark } = useTheme();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -304,4 +304,3 @@ const TenantManagement: React.FC = () => {
   );
 };
 
-export default TenantManagement;

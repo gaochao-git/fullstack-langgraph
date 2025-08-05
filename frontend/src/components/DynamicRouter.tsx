@@ -5,9 +5,16 @@ import { MenuTreeNode } from '../types/menu';
 import { useMenus } from '../hooks/useMenus';
 
 // 动态导入组件的辅助函数
-// 统一从模块的 index 文件导入，所有模块都应该有 index.ts/tsx 文件
 const loadComponent = (componentPath: string): React.LazyExoticComponent<React.FC> => {
-  const [, module, componentName] = componentPath.split('/');
+  // 如果路径不是 pages/xxx/ComponentName 格式，直接返回错误组件
+  if (!componentPath.startsWith('pages/') || componentPath.split('/').length !== 3) {
+    return lazy(() => Promise.resolve({ 
+      default: () => <div>无效的组件路径: {componentPath}</div> 
+    }));
+  }
+  
+  const pathParts = componentPath.trim().split('/');
+  const [, module, componentName] = pathParts.map(part => part.trim());
   
   return lazy(() => 
     import(`../pages/${module}`)
