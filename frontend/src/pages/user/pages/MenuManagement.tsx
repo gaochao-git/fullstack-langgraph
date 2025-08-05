@@ -6,12 +6,13 @@ import {
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, 
   EyeOutlined, EyeInvisibleOutlined, MoreOutlined,
-  HomeOutlined, MenuOutlined
+  HomeOutlined, MenuOutlined, HolderOutlined
 } from '@ant-design/icons';
+import type { DataNode, TreeProps } from 'antd/es/tree';
 import iconConfig from '../../../icons/icon-config.json';
 import { renderIcon } from '../../agent/components/AgentIconSystem';
 
-interface MenuNode {
+interface MenuNode extends DataNode {
   key: string;
   title: React.ReactNode;
   menu_id: number;
@@ -128,6 +129,133 @@ export function MenuManagement() {
   const [contextMenuData, setContextMenuData] = useState<RawMenuData | null>(null);
   const [treeSelectedKeys, setTreeSelectedKeys] = useState<React.Key[]>([]);
 
+  // 加载菜单树
+  const loadMenuTree = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/v1/auth/admin/menus');
+      const data = await response.json();
+      console.log('Menu data:', data);
+      
+      // 确保所有菜单都有合理的sort_order值
+      const normalizeMenuData = (menus: RawMenuData[]): RawMenuData[] => {
+        // 按父节点分组
+        const menusByParent = new Map<number, RawMenuData[]>();
+        
+        const processMenus = (menuList: RawMenuData[], parentId: number = -1) => {
+          const siblings = menuList.filter(m => m.parent_id === parentId);
+          siblings.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+          
+          // 为没有sort_order或sort_order重复的菜单重新分配
+          siblings.forEach((menu, index) => {
+            if (!menu.sort_order || siblings.filter(m => m.sort_order === menu.sort_order).length > 1) {
+              menu.sort_order = (index + 1) * 10;
+            }
+            
+            // 递归处理子菜单
+            if (menu.children && menu.children.length > 0) {
+              processMenus(menu.children, menu.menu_id);
+            }
+          });
+        };
+        
+        processMenus(menus);
+        return menus;
+      };
+      
+      const normalizedMenus = normalizeMenuData(data.menus || []);
+      setRawMenuData(normalizedMenus);
+      const treeData = buildTreeData(normalizedMenus);
+      setTreeData(treeData);
+      // 设置默认全部展开
+      const allKeys = getAllNodeKeys(treeData);
+      setExpandedKeys(allKeys);
+    } catch (error) {
+      console.error('Load menu error:', error);
+      message.error('加载菜单失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 处理上移
+  const handleMoveUp = async (menu: RawMenuData) => {
+    const siblings = rawMenuData
+      .filter(m => m.parent_id === menu.parent_id)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    
+    const currentIndex = siblings.findIndex(m => m.menu_id === menu.menu_id);
+    if (currentIndex <= 0) {
+      message.warning('已经是第一个了');
+      return;
+    }
+
+    const prevMenu = siblings[currentIndex - 1];
+    const currentSortOrder = menu.sort_order || 0;
+    const prevSortOrder = prevMenu.sort_order || 0;
+
+    try {
+      // 交换两个菜单的排序值
+      await Promise.all([
+        fetch(`/api/v1/auth/admin/menus/${menu.menu_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sort_order: prevSortOrder }),
+        }),
+        fetch(`/api/v1/auth/admin/menus/${prevMenu.menu_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sort_order: currentSortOrder }),
+        })
+      ]);
+
+      message.success('移动成功');
+      loadMenuTree();
+    } catch (error) {
+      console.error('Move up error:', error);
+      message.error('移动失败');
+    }
+  };
+
+  // 处理下移
+  const handleMoveDown = async (menu: RawMenuData) => {
+    const siblings = rawMenuData
+      .filter(m => m.parent_id === menu.parent_id)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    
+    const currentIndex = siblings.findIndex(m => m.menu_id === menu.menu_id);
+    if (currentIndex >= siblings.length - 1) {
+      message.warning('已经是最后一个了');
+      return;
+    }
+
+    const nextMenu = siblings[currentIndex + 1];
+    const currentSortOrder = menu.sort_order || 0;
+    const nextSortOrder = nextMenu.sort_order || 0;
+
+    try {
+      // 交换两个菜单的排序值
+      await Promise.all([
+        fetch(`/api/v1/auth/admin/menus/${menu.menu_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sort_order: nextSortOrder }),
+        }),
+        fetch(`/api/v1/auth/admin/menus/${nextMenu.menu_id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sort_order: currentSortOrder }),
+        })
+      ]);
+
+      message.success('移动成功');
+      loadMenuTree();
+    } catch (error) {
+      console.error('Move down error:', error);
+      message.error('移动失败');
+    }
+  };
+
   // 获取所有节点的key用于默认展开
   const getAllNodeKeys = (nodes: MenuNode[]): React.Key[] => {
     const keys: React.Key[] = [];
@@ -158,15 +286,13 @@ export function MenuManagement() {
             }}
             onContextMenu={(e) => handleContextMenu(e, menu)}
           >
-            <span style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ marginRight: 8 }}>
-                <IconDisplay iconKey={menu.menu_icon} size={16} />
-              </span>
-              <span>{menu.menu_name}</span>
-              {menu.show_menu === 0 && (
-                <EyeInvisibleOutlined style={{ marginLeft: 8, color: '#999' }} />
-              )}
+            <span style={{ marginRight: 8 }}>
+              <IconDisplay iconKey={menu.menu_icon} size={16} />
             </span>
+            <span>{menu.menu_name}</span>
+            {menu.show_menu === 0 && (
+              <EyeInvisibleOutlined style={{ marginLeft: 8, color: '#999' }} />
+            )}
           </div>
         ),
         menu_id: menu.menu_id,
@@ -178,7 +304,7 @@ export function MenuManagement() {
         parent_id: menu.parent_id,
         redirect_path: menu.redirect_path,
         sort_order: menu.sort_order,
-        children: menu.children ? menu.children.map(child => buildNode(child, menus)) : []
+        children: menu.children ? menu.children.map(child => buildNode(child, allMenus)) : []
       };
     };
 
@@ -226,28 +352,6 @@ export function MenuManagement() {
     return calculateDepth(menuData, menuId, 1);
   };
 
-
-  // 加载菜单树
-  const loadMenuTree = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch('/api/v1/auth/admin/menus');
-      const data = await response.json();
-      console.log('Menu data:', data);
-      setRawMenuData(data.menus || []);
-      const treeData = buildTreeData(data.menus || []);
-      setTreeData(treeData);
-      // 设置默认全部展开
-      const allKeys = getAllNodeKeys(treeData);
-      setExpandedKeys(allKeys);
-    } catch (error) {
-      console.error('Load menu error:', error);
-      message.error('加载菜单失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // 处理右键菜单
   const handleContextMenu = (e: React.MouseEvent, menu: RawMenuData) => {
     e.preventDefault();
@@ -269,8 +373,8 @@ export function MenuManagement() {
     const currentDepth = getMenuDepthWithData(menu.menu_id, rawMenuData);
     const menuActions = [];
 
-    // 只有层级小于4级才能添加子菜单
-    if (currentDepth < 4) {
+    // 只有层级小于5级才能添加子菜单
+    if (currentDepth < 5) {
       menuActions.push({
         key: 'addChild',
         icon: <PlusOutlined />,
@@ -370,7 +474,7 @@ export function MenuManagement() {
         menu_component: component,
         menu_icon: 'lucide:folder-open',
         show_menu: 1,
-        sort_order: 0,
+        sort_order: (Math.max(...rawMenuData.filter(m => m.parent_id === -1).map(m => m.sort_order || 0)) || 0) + 10,
         parent_id: -1
       };
 
@@ -479,8 +583,8 @@ export function MenuManagement() {
     // 检查父菜单层级
     const parentDepth = getMenuDepthWithData(parentMenu.menu_id, rawMenuData);
 
-    if (parentDepth >= 4) {
-      message.warning('菜单层级最多支持4级，不能继续添加子菜单');
+    if (parentDepth >= 5) {
+      message.warning('菜单层级最多支持5级，不能继续添加子菜单');
       return;
     }
 
@@ -495,7 +599,7 @@ export function MenuManagement() {
         menu_component: component,
         menu_icon: 'lucide:file-text',
         show_menu: 1,
-        sort_order: 0,
+        sort_order: (Math.max(...(parentMenu.children || []).map(m => m.sort_order || 0)) || 0) + 10,
         parent_id: parentMenu.menu_id
       };
 
@@ -720,6 +824,197 @@ export function MenuManagement() {
     }
   }, [rawMenuData, editMode]);
 
+
+  // 处理拖拽
+  const handleDrop: TreeProps['onDrop'] = async (info) => {
+    console.log('Drop info:', info);
+    console.log('开始处理拖拽...');
+    const dropKey = info.node.key as string;
+    const dragKey = info.dragNode.key as string;
+    const dropPos = info.node.pos.split('-');
+    const dropPosition = info.dropPosition - Number(dropPos[dropPos.length - 1]);
+
+    console.log('拖拽信息:', {
+      dragKey,
+      dropKey,
+      dropPosition,
+      dropToGap: info.dropToGap
+    });
+
+    // 找到拖拽的节点和目标节点
+    const draggedNode = findNodeByKey(treeData, dragKey);
+    const dropNode = findNodeByKey(treeData, dropKey);
+    
+    console.log('找到的节点:', {
+      draggedNode: draggedNode ? draggedNode.menu_name : 'null',
+      dropNode: dropNode ? dropNode.menu_name : 'null'
+    });
+    
+    if (!draggedNode || !dropNode) {
+      console.log('节点未找到，退出');
+      return;
+    }
+
+    // 检查是否拖拽到自己的子节点
+    const isDescendant = (parent: MenuNode, childKey: string): boolean => {
+      if (parent.key === childKey) return true;
+      if (parent.children) {
+        return parent.children.some(child => isDescendant(child, childKey));
+      }
+      return false;
+    };
+
+    if (!info.dropToGap && isDescendant(draggedNode, dropKey)) {
+      console.log('检测到拖拽到子节点，阻止操作');
+      message.error('不能将菜单拖拽到其子菜单下');
+      return;
+    }
+
+    const draggedMenuId = parseInt(dragKey);
+    let newParentId: number;
+    let newSortOrder: number = 0;
+
+    if (!info.dropToGap) {
+      // 拖拽到节点内部（成为子节点）
+      // 检查目标节点的层级
+      const targetDepth = getMenuDepthWithData(dropNode.menu_id, rawMenuData);
+      console.log('目标节点深度:', targetDepth);
+      if (targetDepth >= 4) {
+        console.log('层级超过限制，阻止操作');
+        message.error('菜单层级不能超过5级');
+        return;
+      }
+      
+      newParentId = dropNode.menu_id;
+      // 获取目标节点下的子菜单并计算新的排序值
+      const targetChildren = rawMenuData.filter(m => m.parent_id === newParentId);
+      if (targetChildren.length > 0) {
+        const maxSortOrder = Math.max(...targetChildren.map(child => child.sort_order || 0));
+        newSortOrder = maxSortOrder + 10; // 使用更大的间隔
+      } else {
+        newSortOrder = 10; // 第一个子节点
+      }
+    } else {
+      // 拖拽到节点前后（同级排序）
+      newParentId = dropNode.parent_id;
+      
+      // 获取同级所有菜单（包括当前拖拽的菜单）
+      const siblings = rawMenuData
+        .filter(menu => menu.parent_id === newParentId)
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      
+      // 找到目标节点在同级中的索引
+      const dropIndex = siblings.findIndex(s => s.menu_id === dropNode.menu_id);
+      
+      if (dropPosition === -1) {
+        // 拖拽到目标节点前面
+        if (dropIndex === 0) {
+          // 拖到第一个位置
+          newSortOrder = (siblings[0].sort_order || 0) - 10;
+        } else {
+          // 拖到中间位置
+          const prevOrder = siblings[dropIndex - 1].sort_order || 0;
+          const currentOrder = siblings[dropIndex].sort_order || 0;
+          newSortOrder = (prevOrder + currentOrder) / 2;
+        }
+      } else {
+        // 拖拽到目标节点后面
+        if (dropIndex === siblings.length - 1) {
+          // 拖到最后一个位置
+          newSortOrder = (siblings[dropIndex].sort_order || 0) + 10;
+        } else {
+          // 拖到中间位置
+          const currentOrder = siblings[dropIndex].sort_order || 0;
+          const nextOrder = siblings[dropIndex + 1].sort_order || 0;
+          newSortOrder = (currentOrder + nextOrder) / 2;
+        }
+      }
+    }
+
+    console.log('准备更新数据:', {
+      newParentId,
+      newSortOrder
+    });
+
+    try {
+      // 先更新parent_id和sort_order
+      const updateData: any = {
+        parent_id: newParentId,
+        sort_order: newSortOrder
+      };
+
+      // 如果parent_id发生变化，需要更新路径
+      if (draggedNode.parent_id !== newParentId) {
+        // 根据新的父节点计算新路径
+        let newPath = '';
+        if (newParentId === -1) {
+          // 移动到根级别
+          const pathParts = draggedNode.route_path.split('/').filter(Boolean);
+          newPath = '/' + pathParts[pathParts.length - 1];
+        } else {
+          // 移动到其他父节点下
+          const newParentNode = findNodeByKey(treeData, newParentId.toString());
+          if (newParentNode) {
+            const parentPath = newParentNode.route_path;
+            const currentPathParts = draggedNode.route_path.split('/').filter(Boolean);
+            const lastPart = currentPathParts[currentPathParts.length - 1];
+            newPath = `${parentPath}/${lastPart}`.replace(/\/+/g, '/');
+          }
+        }
+        if (newPath) {
+          updateData.route_path = newPath;
+        }
+      }
+
+      console.log('发送更新请求:', {
+        menuId: draggedMenuId,
+        updateData
+      });
+      
+      const response = await fetch(`/api/v1/auth/admin/menus/${draggedMenuId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        message.success('菜单调整成功');
+        await loadMenuTree();
+        // 保持展开状态
+        setExpandedKeys(prev => {
+          const newKeys = new Set(prev);
+          // 确保新父节点展开
+          if (newParentId !== -1) {
+            newKeys.add(newParentId.toString());
+          }
+          return Array.from(newKeys);
+        });
+      } else {
+        const errorData = await response.json();
+        message.error(errorData.msg || '调整菜单失败');
+      }
+    } catch (error) {
+      console.error('Drag drop error:', error);
+      message.error('调整菜单失败');
+    }
+  };
+
+  // 辅助函数：根据key查找节点
+  const findNodeByKey = (nodes: MenuNode[], key: string): MenuNode | null => {
+    for (const node of nodes) {
+      if (node.key === key) {
+        return node;
+      }
+      if (node.children) {
+        const found = findNodeByKey(node.children, key);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   // 点击其他地方时关闭右键菜单
   useEffect(() => {
     const handleClickOutside = () => {
@@ -751,9 +1046,15 @@ export function MenuManagement() {
       {/* 左侧：菜单树 */}
       <Card 
         title={
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <HomeOutlined style={{ marginRight: 8 }} />
-            菜单树
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <HomeOutlined style={{ marginRight: 8 }} />
+              菜单树
+            </div>
+            <div style={{ fontSize: 12, color: '#999' }}>
+              <HolderOutlined style={{ marginRight: 4 }} />
+              可拖拽调整菜单顺序和层级
+            </div>
           </div>
         }
         style={{ width: '45%', overflow: 'hidden' }}
@@ -770,6 +1071,16 @@ export function MenuManagement() {
               showIcon={false}
               height={500}
               selectedKeys={treeSelectedKeys}
+              draggable={{
+                icon: false,
+                nodeDraggable: () => true // 允许所有节点拖拽
+              }}
+              blockNode
+              onDrop={handleDrop}
+              allowDrop={(options) => {
+                // 允许所有拖放操作，具体验证在handleDrop中处理
+                return true;
+              }}
             />
           ) : (
             <div style={{ 
