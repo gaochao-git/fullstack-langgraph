@@ -26,14 +26,12 @@ export const getAntdIcon = (iconName: string) => {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join('');
     
-    console.log(`尝试加载 Lucide 图标: ${iconName} -> ${pascalCaseName}`);
     
     // 检查图标是否在配置文件中定义
     if (iconConfig.icons[iconName]) {
       const LucideIconComponent = (LucideIcons as any)[pascalCaseName];
       
       if (LucideIconComponent) {
-        console.log(`✅ 成功加载 Lucide 图标: ${pascalCaseName}`);
         return createElement(LucideIconComponent, { size: 16 });
       }
     }

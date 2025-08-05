@@ -144,11 +144,20 @@ export function MenuManagement() {
         
         const processMenus = (menuList: RawMenuData[], parentId: number = -1) => {
           const siblings = menuList.filter(m => m.parent_id === parentId);
-          siblings.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+          // 排序规则：先按 sort_order 排序，如果相同则按 menu_name 排序
+          siblings.sort((a, b) => {
+            const orderA = a.sort_order || 0;
+            const orderB = b.sort_order || 0;
+            if (orderA === orderB) {
+              // sort_order 相同时，按菜单名称排序
+              return a.menu_name.localeCompare(b.menu_name, 'zh-CN');
+            }
+            return orderA - orderB;
+          });
           
-          // 为没有sort_order或sort_order重复的菜单重新分配
+          // 只为没有sort_order的菜单分配默认值
           siblings.forEach((menu, index) => {
-            if (!menu.sort_order || siblings.filter(m => m.sort_order === menu.sort_order).length > 1) {
+            if (!menu.sort_order) {
               menu.sort_order = (index + 1) * 10;
             }
             
@@ -181,7 +190,14 @@ export function MenuManagement() {
   const handleMoveUp = async (menu: RawMenuData) => {
     const siblings = rawMenuData
       .filter(m => m.parent_id === menu.parent_id)
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      .sort((a, b) => {
+        const orderA = a.sort_order || 0;
+        const orderB = b.sort_order || 0;
+        if (orderA === orderB) {
+          return a.menu_name.localeCompare(b.menu_name, 'zh-CN');
+        }
+        return orderA - orderB;
+      });
     
     const currentIndex = siblings.findIndex(m => m.menu_id === menu.menu_id);
     if (currentIndex <= 0) {
@@ -220,7 +236,14 @@ export function MenuManagement() {
   const handleMoveDown = async (menu: RawMenuData) => {
     const siblings = rawMenuData
       .filter(m => m.parent_id === menu.parent_id)
-      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+      .sort((a, b) => {
+        const orderA = a.sort_order || 0;
+        const orderB = b.sort_order || 0;
+        if (orderA === orderB) {
+          return a.menu_name.localeCompare(b.menu_name, 'zh-CN');
+        }
+        return orderA - orderB;
+      });
     
     const currentIndex = siblings.findIndex(m => m.menu_id === menu.menu_id);
     if (currentIndex >= siblings.length - 1) {
@@ -760,8 +783,14 @@ export function MenuManagement() {
       
       const method = isEdit ? 'PUT' : 'POST';
 
+      // 确保 sort_order 是数字类型
+      const processedValues = {
+        ...values,
+        sort_order: values.sort_order ? parseInt(values.sort_order, 10) : 0
+      };
+
       // 如果是新增菜单，添加父菜单ID
-      const payload = isEdit ? values : { ...values, parent_id: parentMenuId };
+      const payload = isEdit ? processedValues : { ...processedValues, parent_id: parentMenuId };
 
       const response = await fetch(url, {
         method,
@@ -896,7 +925,14 @@ export function MenuManagement() {
       // 获取同级所有菜单（包括当前拖拽的菜单）
       const siblings = rawMenuData
         .filter(menu => menu.parent_id === newParentId)
-        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        .sort((a, b) => {
+          const orderA = a.sort_order || 0;
+          const orderB = b.sort_order || 0;
+          if (orderA === orderB) {
+            return a.menu_name.localeCompare(b.menu_name, 'zh-CN');
+          }
+          return orderA - orderB;
+        });
       
       // 找到目标节点在同级中的索引
       const dropIndex = siblings.findIndex(s => s.menu_id === dropNode.menu_id);
@@ -958,14 +994,37 @@ export function MenuManagement() {
         }
         if (newPath) {
           updateData.route_path = newPath;
+          
+          // 递归更新所有子菜单的路径
+          const updateChildrenPaths = async (parentId: number, parentPath: string) => {
+            const children = rawMenuData.filter(m => m.parent_id === parentId);
+            for (const child of children) {
+              const childPathParts = child.route_path.split('/').filter(Boolean);
+              const childLastPart = childPathParts[childPathParts.length - 1];
+              const childNewPath = `${parentPath}/${childLastPart}`.replace(/\/+/g, '/');
+              
+              await fetch(`/api/v1/auth/admin/menus/${child.menu_id}`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  route_path: childNewPath
+                }),
+              });
+              
+              // 递归更新子菜单的子菜单
+              if (child.children && child.children.length > 0) {
+                await updateChildrenPaths(child.menu_id, childNewPath);
+              }
+            }
+          };
+          
+          // 更新所有子菜单路径
+          await updateChildrenPaths(draggedMenuId, newPath);
         }
       }
 
-      console.log('发送更新请求:', {
-        menuId: draggedMenuId,
-        updateData
-      });
-      
       const response = await fetch(`/api/v1/auth/admin/menus/${draggedMenuId}`, {
         method: 'PUT',
         headers: {

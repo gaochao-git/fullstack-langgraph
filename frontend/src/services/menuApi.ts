@@ -29,7 +29,6 @@ export class MenuApiService {
       if (Array.isArray(menusData)) {
         // 扁平化嵌套的菜单数据
         const flattenedMenus = this.flattenNestedMenus(menusData);
-        console.log('🔍 扁平化后的菜单:', flattenedMenus);
         
         // 转换为菜单权限格式
         return this.transformToUserMenuPermission(flattenedMenus);

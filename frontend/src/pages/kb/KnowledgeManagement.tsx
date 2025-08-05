@@ -94,4 +94,4 @@ const KnowledgeManagement = () => {
   );
 };
 
-export default KnowledgeManagement; 
+export default KnowledgeManagement;

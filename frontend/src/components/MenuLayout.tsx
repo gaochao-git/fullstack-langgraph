@@ -11,7 +11,7 @@ import { useTheme } from '../hooks/ThemeContext';
 
 const { Header, Content, Sider } = Layout;
 
-const MenuLayout: React.FC = () => {
+const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { menus, loading: menuLoading, breadcrumb } = useMenus();
@@ -192,8 +192,14 @@ const MenuLayout: React.FC = () => {
                     );
                   }
                   
-                  if (targetMenu?.children?.[0]?.route_path) {
-                    navigate(targetMenu.children[0].route_path);
+                  if (targetMenu) {
+                    // 优先使用重定向路径
+                    if (targetMenu.redirect_path) {
+                      navigate(targetMenu.redirect_path);
+                    } else if (targetMenu.children?.[0]?.route_path) {
+                      // 如果没有重定向路径，使用第一个子菜单
+                      navigate(targetMenu.children[0].route_path);
+                    }
                   }
                 }}
               />
@@ -374,9 +380,16 @@ const MenuLayout: React.FC = () => {
                       );
                     }
                     
-                    if (targetMenu?.children?.[0]?.route_path) {
-                      navigate(targetMenu.children[0].route_path);
-                      setMobileMenuVisible(false);
+                    if (targetMenu) {
+                      // 优先使用重定向路径
+                      if (targetMenu.redirect_path) {
+                        navigate(targetMenu.redirect_path);
+                        setMobileMenuVisible(false);
+                      } else if (targetMenu.children?.[0]?.route_path) {
+                        // 如果没有重定向路径，使用第一个子菜单
+                        navigate(targetMenu.children[0].route_path);
+                        setMobileMenuVisible(false);
+                      }
                     }
                   }}
                   style={{
@@ -552,7 +565,7 @@ const MenuLayout: React.FC = () => {
               overflow: 'auto'
             }}
           >
-            <Outlet />
+            {children || <Outlet />}
           </Content>
         </Layout>
       </Layout>
