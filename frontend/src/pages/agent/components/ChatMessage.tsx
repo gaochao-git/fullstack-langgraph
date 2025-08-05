@@ -902,12 +902,12 @@ export function ChatMessages({
       <div
         ref={messagesContainerRef}
         className={cn(
-          "flex-1 overflow-y-auto overflow-x-hidden px-4 pt-1 pb-0 relative transition-colors duration-200",
+          "flex-1 overflow-y-auto overflow-x-hidden pt-1 pb-0 relative transition-colors duration-200",
           isDark 
             ? "bg-gradient-to-b from-gray-900 to-gray-800" 
             : "bg-gradient-to-b from-white to-gray-50"
         )}
-        style={{ minHeight: 0 }}
+        style={{ minHeight: 0, paddingLeft: '5px', paddingRight: '5px' }}
         onScroll={handleScroll}
       >
         <div className="flex flex-col overflow-x-hidden">
