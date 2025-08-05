@@ -74,6 +74,7 @@ class RbacPermission(BaseModel):
     http_method = Column(String(10), default='*', nullable=False, comment="HTTP方法: GET,POST,PUT,DELETE,*")
     release_disable = Column(String(10), default='off', nullable=False, comment="发布禁用")
     permission_allow_client = Column(Text, nullable=True, comment="允许的客户端")
+    is_deleted = Column(Integer, default=0, nullable=False, comment="是否删除:0未删除,1已删除")
     create_time = Column(DateTime, default=now_shanghai, nullable=False, index=True)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
     create_by = Column(String(50), nullable=False, comment="创建人")

@@ -40,6 +40,7 @@ export interface RbacPermission {
   http_method: string;
   release_disable: string;
   permission_allow_client?: string;
+  is_deleted: number;
   create_time: string;
   update_time: string;
   create_by: string;

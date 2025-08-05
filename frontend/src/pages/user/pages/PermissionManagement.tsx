@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react';
 import { 
   Card, Table, Button, Space, Input, Modal, Form, message, 
-  Tag, Tooltip, Row, Col, InputNumber, Select, Statistic, Tabs
+  Tag, Tooltip, Row, Col, InputNumber, Select, App
 } from 'antd';
 import { 
-  PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, 
-  KeyOutlined, ReloadOutlined, SettingOutlined, ApiOutlined
+  PlusOutlined, EditOutlined, DeleteOutlined, 
+  KeyOutlined, ReloadOutlined, SearchOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import type { TabsProps } from 'antd';
 import { permissionApi } from '../services/rbacApi';
 import type { 
   RbacPermission, PermissionCreateRequest, PermissionUpdateRequest, PermissionQueryParams 
 } from '../types/rbac';
 
-const { Search } = Input;
 const { Option } = Select;
 
 export function PermissionManagement() {
+  const { modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -27,15 +26,10 @@ export function PermissionManagement() {
   // 分页和搜索状态
   const [pagination, setPagination] = useState({
     current: 1,
-    pageSize: 20,
+    pageSize: 100,
     total: 0,
   });
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [filters, setFilters] = useState({
-    release_disable: undefined as string | undefined,
-    http_method: undefined as string | undefined,
-  });
-  const [activeTab, setActiveTab] = useState('all');
+  const [searchText, setSearchText] = useState('');
 
   const columns: ColumnsType<RbacPermission> = [
     {
@@ -43,42 +37,62 @@ export function PermissionManagement() {
       dataIndex: 'permission_id',
       key: 'permission_id',
       width: 100,
-    },
-    {
-      title: '权限名称',
-      dataIndex: 'permission_name',
-      key: 'permission_name',
-      width: 150,
-      ellipsis: true,
-    },
-    {
-      title: '权限描述',
-      dataIndex: 'permission_description',
-      key: 'permission_description',
-      width: 200,
-      ellipsis: true,
+      sorter: (a, b) => a.permission_id - b.permission_id,
     },
     {
       title: 'HTTP方法',
       dataIndex: 'http_method',
       key: 'http_method',
-      width: 100,
+      filters: [
+        { text: 'GET', value: 'GET' },
+        { text: 'POST', value: 'POST' },
+        { text: 'PUT', value: 'PUT' },
+        { text: 'DELETE', value: 'DELETE' },
+        { text: 'PATCH', value: 'PATCH' },
+        { text: '全部(*)', value: '*' },
+      ],
+      onFilter: (value, record) => record.http_method === value,
+      sorter: (a, b) => a.http_method.localeCompare(b.http_method),
       render: (method: string) => (
         <Tag color={
           method === 'GET' ? 'blue' :
           method === 'POST' ? 'green' :
           method === 'PUT' ? 'orange' :
-          method === 'DELETE' ? 'red' : 'default'
+          method === 'DELETE' ? 'red' :
+          method === 'PATCH' ? 'purple' : 'default'
         }>
           {method}
         </Tag>
       ),
     },
     {
+      title: '权限名称',
+      dataIndex: 'permission_name',
+      key: 'permission_name',
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => a.permission_name.localeCompare(b.permission_name),
+    },
+    {
+      title: '权限描述',
+      dataIndex: 'permission_description',
+      key: 'permission_description',
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => a.permission_description.localeCompare(b.permission_description),
+    },
+    {
       title: '发布状态',
       dataIndex: 'release_disable',
       key: 'release_disable',
-      width: 100,
+      filters: [
+        { text: '启用', value: 'off' },
+        { text: '禁用', value: 'on' },
+      ],
+      onFilter: (value, record) => record.release_disable === value,
+      sorter: (a, b) => a.release_disable.localeCompare(b.release_disable),
       render: (status: string) => (
         <Tag color={status === 'off' ? 'green' : 'red'}>
           {status === 'off' ? '启用' : '禁用'}
@@ -86,31 +100,70 @@ export function PermissionManagement() {
       ),
     },
     {
+      title: '删除状态',
+      dataIndex: 'is_deleted',
+      key: 'is_deleted',
+      filters: [
+        { text: '正常', value: 0 },
+        { text: '已删除', value: 1 },
+      ],
+      onFilter: (value, record) => record.is_deleted === value,
+      sorter: (a, b) => a.is_deleted - b.is_deleted,
+      render: (status: number) => (
+        <Tag color={status === 0 ? 'green' : 'volcano'}>
+          {status === 0 ? '正常' : '已删除'}
+        </Tag>
+      ),
+    },
+    {
       title: '允许客户端',
       dataIndex: 'permission_allow_client',
       key: 'permission_allow_client',
-      width: 150,
-      ellipsis: true,
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => (a.permission_allow_client || '').localeCompare(b.permission_allow_client || ''),
       render: (text: string) => text || '-',
     },
     {
       title: '创建时间',
       dataIndex: 'create_time',
       key: 'create_time',
-      width: 150,
-      ellipsis: true,
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => new Date(a.create_time).getTime() - new Date(b.create_time).getTime(),
+    },
+    {
+      title: '修改时间',
+      dataIndex: 'update_time',
+      key: 'update_time',
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => new Date(a.update_time).getTime() - new Date(b.update_time).getTime(),
     },
     {
       title: '创建人',
       dataIndex: 'create_by',
       key: 'create_by',
-      width: 100,
-      ellipsis: true,
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => a.create_by.localeCompare(b.create_by),
+    },
+    {
+      title: '修改人',
+      dataIndex: 'update_by',
+      key: 'update_by',
+      ellipsis: {
+        showTitle: true,
+      },
+      sorter: (a, b) => a.update_by.localeCompare(b.update_by),
     },
     {
       title: '操作',
       key: 'action',
-      width: 120,
       fixed: 'right',
       render: (_: any, record: RbacPermission) => (
         <Space size="small">
@@ -120,17 +173,23 @@ export function PermissionManagement() {
               size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              disabled={record.is_deleted === 1}
             />
           </Tooltip>
-          <Tooltip title="删除">
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDelete(record)}
-            />
-          </Tooltip>
+          {record.is_deleted === 0 && (
+            <Tooltip title="删除">
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  console.log('删除按钮被点击，record:', record);
+                  handleDelete(record);
+                }}
+              />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -143,9 +202,7 @@ export function PermissionManagement() {
       const params: PermissionQueryParams = {
         page: pagination.current,
         page_size: pagination.pageSize,
-        search: searchKeyword || undefined,
-        release_disable: filters.release_disable,
-        http_method: filters.http_method,
+        search: searchText || undefined,
       };
       
       const response = await permissionApi.listPermissions(params);
@@ -167,11 +224,24 @@ export function PermissionManagement() {
 
   useEffect(() => {
     fetchPermissions();
-  }, [pagination.current, pagination.pageSize, searchKeyword, filters]);
+  }, [pagination.current, pagination.pageSize]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     setEditingPermission(null);
     form.resetFields();
+    
+    // 自动生成权限ID（基于当前最大权限ID + 1）
+    const maxPermissionId = permissions.reduce((max, perm) => 
+      Math.max(max, perm.permission_id), 0
+    );
+    const nextPermissionId = maxPermissionId + 1;
+    
+    form.setFieldsValue({
+      permission_id: nextPermissionId,
+      http_method: 'GET', // 默认选择GET
+      release_disable: 'off' // 默认启用
+    });
+    
     setModalVisible(true);
   };
 
@@ -189,28 +259,46 @@ export function PermissionManagement() {
   };
 
   const handleDelete = (permission: RbacPermission) => {
-    Modal.confirm({
+    console.log('handleDelete函数被调用，权限:', permission);
+    
+    if (!permission) {
+      console.error('权限数据为空');
+      message.error('权限数据错误');
+      return;
+    }
+    
+    console.log('准备显示删除确认弹窗');
+    
+    modal.confirm({
       title: '确认删除',
       content: (
         <div>
           <p>确定要删除权限 <strong>"{permission.permission_name}"</strong> 吗？</p>
-          <p className="text-gray-500">删除后，关联该权限的所有角色将失去此权限。</p>
+          <p style={{ color: '#999', fontSize: '12px' }}>删除后，关联该权限的所有角色将失去此权限。</p>
         </div>
       ),
       okText: '确定',
       cancelText: '取消',
+      centered: true,
       onOk: async () => {
         try {
-          await permissionApi.deletePermission(permission.permission_id);
+          console.log('开始删除权限，ID:', permission.permission_id);
+          const result = await permissionApi.deletePermission(permission.permission_id);
+          console.log('删除权限API响应:', result);
           message.success('删除成功');
           fetchPermissions();
         } catch (error) {
-          message.error('删除失败');
-          console.error('删除权限失败:', error);
+          console.error('删除权限失败，详细错误:', error);
+          const errorMessage = error instanceof Error ? error.message : '删除失败';
+          message.error(`删除失败: ${errorMessage}`);
         }
       },
+      onCancel: () => {
+        console.log('用户取消删除');
+      }
     });
   };
+
 
   const handleSubmit = async () => {
     try {
@@ -253,10 +341,6 @@ export function PermissionManagement() {
     }
   };
 
-  const handleSearch = (value: string) => {
-    setSearchKeyword(value);
-    setPagination(prev => ({ ...prev, current: 1 }));
-  };
 
   const handleTableChange = (paginationConfig: any) => {
     setPagination({
@@ -266,33 +350,6 @@ export function PermissionManagement() {
     });
   };
 
-  // 筛选数据
-  const filteredPermissions = permissions.filter(permission => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'enabled') return permission.release_disable === 'off';
-    if (activeTab === 'disabled') return permission.release_disable !== 'off';
-    return true;
-  });
-
-  // 统计信息
-  const totalPermissions = pagination.total;
-  const enabledCount = permissions.filter(p => p.release_disable === 'off').length;
-  const disabledCount = permissions.filter(p => p.release_disable !== 'off').length;
-
-  const tabItems: TabsProps['items'] = [
-    {
-      key: 'all',
-      label: `全部权限 (${totalPermissions})`,
-    },
-    {
-      key: 'enabled',
-      label: `启用 (${enabledCount})`,
-    },
-    {
-      key: 'disabled',
-      label: `禁用 (${disabledCount})`,
-    },
-  ];
 
   return (
     <div>
@@ -305,12 +362,22 @@ export function PermissionManagement() {
         }
         extra={
           <Space>
-            <Search
-              placeholder="搜索权限名称、描述"
-              allowClear
-              style={{ width: 240 }}
-              onSearch={handleSearch}
+            <Input
+              placeholder="搜索权限名称"
               prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              onPressEnter={() => {
+                setPagination(prev => ({ ...prev, current: 1 }));
+                fetchPermissions();
+              }}
+              onClear={() => {
+                setSearchText('');
+                setPagination(prev => ({ ...prev, current: 1 }));
+                fetchPermissions();
+              }}
+              style={{ width: 200 }}
+              allowClear
             />
             <Button 
               icon={<ReloadOutlined />} 
@@ -323,81 +390,18 @@ export function PermissionManagement() {
           </Space>
         }
       >
-        {/* 统计信息 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Statistic
-              title="总权限数"
-              value={totalPermissions}
-              prefix={<KeyOutlined />}
-            />
-          </Col>
-          <Col span={6}>
-            <Statistic
-              title="启用权限"
-              value={enabledCount}
-              prefix={<SettingOutlined />}
-              valueStyle={{ color: '#3f8600' }}
-            />
-          </Col>
-          <Col span={6}>
-            <Statistic
-              title="禁用权限"
-              value={disabledCount}
-              prefix={<ApiOutlined />}
-              valueStyle={{ color: '#cf1322' }}
-            />
-          </Col>
-        </Row>
-
-        {/* 筛选器 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Select
-              placeholder="选择发布状态"
-              allowClear
-              style={{ width: '100%' }}
-              onChange={(value) => setFilters(prev => ({ ...prev, release_disable: value }))}
-            >
-              <Option value="off">启用</Option>
-              <Option value="on">禁用</Option>
-            </Select>
-          </Col>
-          <Col span={6}>
-            <Select
-              placeholder="选择HTTP方法"
-              allowClear
-              style={{ width: '100%' }}
-              onChange={(value) => setFilters(prev => ({ ...prev, http_method: value }))}
-            >
-              <Option value="*">全部(*)</Option>
-              <Option value="GET">GET</Option>
-              <Option value="POST">POST</Option>
-              <Option value="PUT">PUT</Option>
-              <Option value="DELETE">DELETE</Option>
-            </Select>
-          </Col>
-        </Row>
-
-        <Tabs 
-          activeKey={activeTab} 
-          onChange={setActiveTab} 
-          items={tabItems}
-          style={{ marginBottom: 16 }}
-        />
-
         <Table
           columns={columns}
-          dataSource={filteredPermissions}
+          dataSource={permissions}
           loading={loading}
-          rowKey="id"
-          scroll={{ x: 1200 }}
+          rowKey="permission_id"
+          scroll={{ x: 'max-content' }}
           pagination={{
             ...pagination,
             showSizeChanger: true,
             showQuickJumper: true,
             showTotal: (total) => `共 ${total} 条记录`,
-            pageSizeOptions: ['10', '20', '50', '100'],
+            pageSizeOptions: ['20', '50', '100', '200'],
           }}
           onChange={handleTableChange}
         />
@@ -425,9 +429,9 @@ export function PermissionManagement() {
                 rules={[{ required: true, message: '请输入权限ID' }]}
               >
                 <InputNumber 
-                  placeholder="请输入权限ID" 
+                  placeholder="自动生成" 
                   style={{ width: '100%' }}
-                  disabled={!!editingPermission}
+                  disabled={true}
                   min={1}
                 />
               </Form.Item>
@@ -445,15 +449,15 @@ export function PermissionManagement() {
               <Form.Item
                 name="http_method"
                 label="HTTP方法"
-                initialValue="*"
                 rules={[{ required: true, message: '请选择HTTP方法' }]}
               >
                 <Select placeholder="选择HTTP方法">
-                  <Option value="*">全部(*)</Option>
                   <Option value="GET">GET</Option>
                   <Option value="POST">POST</Option>
                   <Option value="PUT">PUT</Option>
                   <Option value="DELETE">DELETE</Option>
+                  <Option value="PATCH">PATCH</Option>
+                  <Option value="*">全部(*)</Option>
                 </Select>
               </Form.Item>
             </Col>

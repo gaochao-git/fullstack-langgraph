@@ -262,7 +262,7 @@ async def get_permission(
 @permission_router.get("", response_model=UnifiedResponse)
 async def list_permissions(
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页大小"),
+    page_size: int = Query(20, ge=1, le=1000, description="每页大小"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
     permission_id: Optional[int] = Query(None, description="权限ID筛选"),
     release_disable: Optional[str] = Query(None, description="发布状态筛选"),

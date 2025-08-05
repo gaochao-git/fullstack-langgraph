@@ -522,7 +522,7 @@ class RbacPermissionService:
         db: AsyncSession, 
         params: PermissionQueryParams
     ) -> Tuple[List[RbacPermission], int]:
-        """权限列表查询"""
+        """权限列表查询 - 显示所有权限（包括已删除的）"""
         # 构建查询条件
         query = select(RbacPermission)
         conditions = []
@@ -593,25 +593,35 @@ class RbacPermissionService:
     async def delete_permission(
         self, 
         db: AsyncSession, 
-        permission_id: int
+        permission_id: int,
+        delete_by: str = 'system'
     ) -> bool:
-        """删除权限"""
+        """逻辑删除权限"""
         async with db.begin():
-            # 先删除角色权限关联
-            await db.execute(
-                delete(RbacRolesPermissions).where(
-                    or_(
-                        RbacRolesPermissions.back_permission_id == permission_id,
-                        RbacRolesPermissions.front_permission_id == permission_id
+            # 检查权限是否存在且未删除
+            result = await db.execute(
+                select(RbacPermission).where(
+                    and_(
+                        RbacPermission.permission_id == permission_id,
+                        RbacPermission.is_deleted == 0
                     )
                 )
             )
+            existing = result.scalar_one_or_none()
+            if not existing:
+                return False
             
-            # 删除权限
-            result = await db.execute(
-                delete(RbacPermission).where(RbacPermission.permission_id == permission_id)
+            # 逻辑删除权限（设置is_deleted=1）
+            await db.execute(
+                update(RbacPermission)
+                .where(RbacPermission.permission_id == permission_id)
+                .values(
+                    is_deleted=1,
+                    update_by=delete_by,
+                    update_time=now_shanghai()
+                )
             )
-            return result.rowcount > 0
+            return True
 
 
 class RbacMenuService:
