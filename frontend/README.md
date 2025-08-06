@@ -11,7 +11,7 @@ React 19 + TypeScript + Vite + Ant Design + TailwindCSS + React Router v7
 ## 项目结构
 - `src/components/` - 公共组件(UI组件、布局、路由保护等)
 - `src/hooks/` - 自定义Hooks(认证、菜单、主题等)
-- `src/icons/` - 图标组件
+- `src/icons/` - 图标组件,主要用来挂里菜单栏和智能体图标的,通过icon-config.json配置图标，使用脚本scripts/generate-icons.js生成index.js
 - `src/pages/` - 页面组件，按功能模块组织(auth/user/agent/kb等，每个组件里面必须要有index.js负责导出组件)
 - `src/services/` - API服务层，所有的API文件放在这里便于统一管理和互相调用
 - `src/types/` - 类型定义(接口、枚举等)
