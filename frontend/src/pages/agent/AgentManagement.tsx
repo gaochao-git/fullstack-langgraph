@@ -10,8 +10,7 @@ import {
   Row,
   Col,
   Switch,
-  Modal,
-  message
+  Modal
 } from 'antd';
 import { 
   RobotOutlined,
@@ -22,7 +21,7 @@ import {
 } from '@ant-design/icons';
 import AgentDetailModal from './components/AgentDetailModal';
 import AgentEditModal from './components/AgentEditModal';
-import { agentApi, type Agent, type MCPServer, type MCPTool, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/agentApi';
+import { agentApi, type Agent, type MCPServer, type CreateAgentRequest, type UpdateAgentRequest } from '../../services/agentApi';
 import { renderIcon, getIconBackgroundColor } from './components/AgentIconSystem';
 
 const { Search } = Input;
@@ -67,7 +66,7 @@ interface LocalMCPServer extends MCPServer {
 // 数据转换工具函数
 const transformAgentToLocal = (agent: Agent): LocalAgent => {
   // 从 tools_info 中提取 MCP 配置，后端BaseModel会自动解析JSON字段为对象
-  const toolsInfo = agent.tools_info || {};
+  const toolsInfo = agent.tools_info || { mcp_tools: [], system_tools: [] };
   const mcpTools = toolsInfo.mcp_tools || [];
   const systemTools = toolsInfo.system_tools || [];
   
@@ -85,10 +84,11 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => {
   return {
     ...agent,
     displayName: agent.agent_name,
-    lastUsed: agent.last_used,
-    totalRuns: agent.total_runs,
-    successRate: agent.success_rate,
-    avgResponseTime: agent.avg_response_time,
+    lastUsed: agent.last_used_at || '',
+    totalRuns: agent.total_queries || 0,
+    successRate: agent.success_queries && agent.total_queries ? 
+      Number((agent.success_queries / agent.total_queries * 100).toFixed(1)) : 0,
+    avgResponseTime: 0, // 这个字段在 Agent 接口中不存在
     mcpConfig: {
       enabledServers,
       selectedTools,
@@ -131,7 +131,7 @@ const AgentManagement: React.FC = () => {
   
   
   
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
 
   // 加载可用模型
   const loadAvailableModels = async () => {
@@ -222,7 +222,13 @@ const AgentManagement: React.FC = () => {
   // 切换智能体启用状态
   const toggleAgentEnabled = async (agentId: string) => {
     try {
-      await agentApi.toggleAgentStatus(agentId);
+      // 找到当前智能体
+      const agent = agents.find(a => a.agent_id === agentId);
+      if (agent) {
+        // 切换状态
+        const newStatus = agent.agent_enabled === 'yes' ? 'no' : 'yes';
+        await agentApi.updateAgent(agentId, { agent_enabled: newStatus });
+      }
       
       // 重新从后端获取最新数据
       await loadData();

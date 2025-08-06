@@ -4,28 +4,7 @@ import { Spin, Alert } from 'antd';
 import { Button } from '@/components/ui/button';
 import ChatEngine from './components/ChatEngine';
 import GenericAgentWelcome from './components/GenericAgentWelcome';
-import { useTheme } from '@/hooks/ThemeContext';
-import { cn } from '@/utils/lib-utils';
-import { agentApi } from '@/services/agentApi';
-
-interface Agent {
-  id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_description: string;
-  agent_capabilities: string[];
-  agent_status: string;
-  agent_enabled: string;
-  is_builtin: string;
-  llm_info?: {
-    available_models?: string[];
-    model_name?: string;
-    temperature?: number;
-    max_tokens?: number;
-  };
-  tools_info?: any;
-  prompt_info?: any;
-}
+import { agentApi, type Agent } from '@/services/agentApi';
 
 const AgentChat: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -33,7 +12,6 @@ const AgentChat: React.FC = () => {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { isDark } = useTheme();
   
   // 新开会话功能 - 通过重新挂载组件完全重置所有状态
   const handleNewSession = useCallback(() => {

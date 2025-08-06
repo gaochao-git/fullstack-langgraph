@@ -3,18 +3,7 @@ import { Tag } from 'antd';
 import { RobotOutlined } from '@ant-design/icons';
 import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
-
-// 智能体信息类型
-interface Agent {
-  id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_description: string;
-  agent_capabilities: string[];
-  agent_status: string;
-  agent_enabled: string;
-  is_builtin: string;
-}
+import { type Agent } from '../../../services/agentApi';
 
 // 欢迎页面组件属性
 interface GenericAgentWelcomeProps {

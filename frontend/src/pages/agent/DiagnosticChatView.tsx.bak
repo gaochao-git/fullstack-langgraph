@@ -197,7 +197,7 @@ interface SOPExecutionApprovalProps {
         </p>
       </div>
       
-      // SOP信息
+      {/* SOP信息 */}
       <div className="mb-4 p-3 bg-white border border-orange-200 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
           <span className="font-medium text-orange-800">SOP ID: {sopInfo.sop_id || '未知'}</span>
@@ -225,7 +225,7 @@ interface SOPExecutionApprovalProps {
         )}
       </div>
       
-      // 操作按钮
+      {/* 操作按钮 */}
       <div className="flex justify-end gap-2">
         <Button
           variant="outline"
@@ -457,7 +457,7 @@ interface BatchToolApprovalProps {
         </div>
       </div>
       
-      // 已自动批准的工具
+      {/* 已自动批准的工具 */}
       {approvedToolsFromBackend.length > 0 && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
@@ -476,7 +476,7 @@ interface BatchToolApprovalProps {
         </div>
       )}
       
-      // 已提交的工具
+      {/* 已提交的工具 */}
       {submittedTools.size > 0 && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
@@ -497,7 +497,7 @@ interface BatchToolApprovalProps {
         </div>
       )}
       
-      // 待确认的工具列表
+      {/* 待确认的工具列表 */}
       <div className="space-y-3">
         {remainingTools.map((tool: any) => (
           <div key={tool.tool_call_id} className="border border-orange-200 rounded-lg p-3 bg-white">
@@ -542,7 +542,7 @@ interface BatchToolApprovalProps {
         ))}
       </div>
       
-      // 操作按钮
+      {/* 操作按钮 */}
       <div className="flex justify-between items-center mt-4 pt-4 border-t border-orange-200">
         <div className="text-sm text-gray-600">
           已选择 {approvedTools.size} / {remainingTools.length} 个工具
@@ -619,7 +619,7 @@ interface SingleToolApprovalProps {
         </p>
       </div>
       
-      // 工具信息
+      {/* 工具信息 */}
       <div className="mb-4 p-3 bg-white border border-orange-200 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
           <span className="font-medium text-orange-800">{toolInfo.tool_name}</span>
@@ -642,7 +642,7 @@ interface SingleToolApprovalProps {
         </pre>
       </div>
       
-      // 操作按钮
+      {/* 操作按钮 */}
       <div className="flex justify-end gap-2">
         <Button
           variant="outline"

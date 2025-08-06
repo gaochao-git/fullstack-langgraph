@@ -7,6 +7,7 @@ import { Drawer } from "antd";
 import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";
 import { omind_get } from "../../../utils/base_api";
+import { type Agent } from "../../../services/agentApi";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -22,26 +23,6 @@ interface ModelInfo {
   name: string;
   provider: string;
   type: string;
-}
-
-// 智能体信息类型
-interface Agent {
-  id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_description: string;
-  agent_capabilities: string[];
-  agent_status: string;
-  agent_enabled: string;
-  is_builtin: string;
-  llm_info?: {
-    available_models?: string[];
-    model_name?: string;
-    temperature?: number;
-    max_tokens?: number;
-  };
-  tools_info?: any;
-  prompt_info?: any;
 }
 
 // 欢迎页面组件接口
