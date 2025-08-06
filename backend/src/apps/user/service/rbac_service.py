@@ -253,13 +253,22 @@ class RbacRoleService:
     ) -> RbacRole:
         """创建角色"""
         async with db.begin():
-            # 检查角色是否存在
-            result = await db.execute(
-                select(RbacRole).where(RbacRole.role_id == role_data.role_id)
-            )
-            existing = result.scalar_one_or_none()
-            if existing:
-                raise BusinessException("角色ID已存在", ResponseCode.CONFLICT)
+            # 如果没有提供 role_id，自动生成
+            if role_data.role_id is None:
+                # 获取当前最大的 role_id
+                result = await db.execute(
+                    select(func.max(RbacRole.role_id))
+                )
+                max_role_id = result.scalar() or 0
+                role_data.role_id = max_role_id + 1
+            else:
+                # 检查角色是否存在
+                result = await db.execute(
+                    select(RbacRole).where(RbacRole.role_id == role_data.role_id)
+                )
+                existing = result.scalar_one_or_none()
+                if existing:
+                    raise BusinessException("角色ID已存在", ResponseCode.CONFLICT)
             
             # 创建角色
             data = role_data.dict(exclude={'permission_ids', 'menu_ids'})

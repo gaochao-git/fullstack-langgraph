@@ -106,7 +106,7 @@ class UserListResponse(BaseModel):
 
 class RoleCreateRequest(BaseModel):
     """创建角色请求 - 对应rbac_roles表"""
-    role_id: int = Field(..., description="角色ID")
+    role_id: Optional[int] = Field(None, description="角色ID，不填则自动生成")
     role_name: str = Field(..., min_length=1, max_length=50, description="角色名称")
     description: str = Field(..., min_length=1, max_length=200, description="角色描述")
     permission_ids: Optional[List[int]] = Field([], description="后端API权限ID列表")

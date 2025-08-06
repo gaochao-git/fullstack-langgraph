@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Card, Table, Button, Space, Input, Modal, Form, message, 
-  Tag, Tooltip, Row, Col, InputNumber, Transfer, Statistic, Tabs
+  Tag, Tooltip, Row, Col, InputNumber, Transfer, Tabs, App
 } from 'antd';
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, 
@@ -23,6 +23,7 @@ interface TransferItem {
 }
 
 export function RoleManagement() {
+  const { modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [roles, setRoles] = useState<RbacRole[]>([]);
@@ -98,19 +99,11 @@ export function RoleManagement() {
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 100,
       fixed: 'right',
       render: (_: any, record: RbacRole) => (
         <Space size="small">
-          <Tooltip title="编辑">
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          <Tooltip title="权限管理">
+          <Tooltip title="配置">
             <Button
               type="link"
               size="small"
@@ -216,19 +209,29 @@ export function RoleManagement() {
     setModalVisible(true);
   };
 
-  const handleManagePermissions = (role: RbacRole) => {
+  const handleManagePermissions = async (role: RbacRole) => {
     setEditingRole(role);
     form.setFieldsValue({
       role_id: role.role_id,
       role_name: role.role_name,
       description: role.description,
     });
-    // 这里可以专门打开权限管理的模态框
-    message.info('权限管理功能开发中...');
+    
+    try {
+      // 获取角色的现有权限
+      const rolePermissions = await roleApi.getRolePermissions(role.role_id);
+      setSelectedPermissions(rolePermissions.api_permission_ids.map(id => id.toString()));
+      setSelectedMenus(rolePermissions.menu_ids.map(id => id.toString()));
+    } catch (error) {
+      console.error('获取角色权限失败:', error);
+      message.error('获取角色权限失败');
+    }
+    
+    setModalVisible(true);
   };
 
   const handleDelete = (role: RbacRole) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: (
         <div>
@@ -276,9 +279,8 @@ export function RoleManagement() {
         setSelectedMenus([]);
         fetchRoles();
       } else {
-        // 创建角色
+        // 创建角色（不包含role_id，由后端自动生成）
         const createData: RoleCreateRequest = {
-          role_id: values.role_id,
           role_name: values.role_name,
           description: values.description,
           permission_ids: selectedPermissions.map(id => parseInt(id)),
@@ -338,8 +340,7 @@ export function RoleManagement() {
   };
 
   // 统计信息
-  const totalRoles = pagination.total;
-  const totalPermissions = permissions.length;
+  // 统计信息已移除，节省空间
 
   return (
     <div>
@@ -370,24 +371,6 @@ export function RoleManagement() {
           </Space>
         }
       >
-        {/* 统计信息 */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Statistic
-              title="总角色数"
-              value={totalRoles}
-              prefix={<TeamOutlined />}
-            />
-          </Col>
-          <Col span={6}>
-            <Statistic
-              title="总权限数"
-              value={totalPermissions}
-              prefix={<SettingOutlined />}
-            />
-          </Col>
-        </Row>
-
         <Table
           columns={columns}
           dataSource={roles}
@@ -425,21 +408,20 @@ export function RoleManagement() {
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="role_id"
-                label="角色ID"
-                rules={[{ required: true, message: '请输入角色ID' }]}
-              >
-                <InputNumber 
-                  placeholder="请输入角色ID" 
-                  style={{ width: '100%' }}
-                  disabled={!!editingRole}
-                  min={1}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
+            {editingRole && (
+              <Col span={12}>
+                <Form.Item
+                  name="role_id"
+                  label="角色ID"
+                >
+                  <InputNumber 
+                    style={{ width: '100%' }}
+                    disabled
+                  />
+                </Form.Item>
+              </Col>
+            )}
+            <Col span={editingRole ? 12 : 24}>
               <Form.Item
                 name="role_name"
                 label="角色名称"

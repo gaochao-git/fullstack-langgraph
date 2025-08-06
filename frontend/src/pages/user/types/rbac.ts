@@ -91,7 +91,6 @@ export interface UserUpdateRequest {
 }
 
 export interface RoleCreateRequest {
-  role_id: number;
   role_name: string;
   description: string;
   permission_ids?: number[];
