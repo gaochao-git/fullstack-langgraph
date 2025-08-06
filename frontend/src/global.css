@@ -132,6 +132,7 @@
     color: inherit !important;
     text-decoration: none !important;
   }
+  
   html {
     /* Prevent scroll bounce on the entire page */
     overscroll-behavior: none;

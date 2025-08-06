@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, Spin, message, Radio } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, Spin, message, Tabs } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
@@ -288,26 +288,15 @@ const AgentMarketplace = () => {
     <div>
       <div style={{ marginBottom: 24 }}>
         {/* 分类选择器 */}
-        <Radio.Group 
-          value={selectedType} 
-          onChange={(e) => setSelectedType(e.target.value)}
-          buttonStyle="solid"
+        <Tabs 
+          activeKey={selectedType}
+          onChange={setSelectedType}
           size="large"
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
-        >
-          {AGENT_TYPES.map(type => (
-            <Radio.Button 
-              key={type.value} 
-              value={type.value}
-              style={{ 
-                borderRadius: 8,
-                fontWeight: selectedType === type.value ? 600 : 400
-              }}
-            >
-              {type.label}
-            </Radio.Button>
-          ))}
-        </Radio.Group>
+          items={AGENT_TYPES.map(type => ({
+            key: type.value,
+            label: type.label
+          }))}
+        />
       </div>
       
       {filteredAgents.length === 0 ? (
