@@ -487,6 +487,18 @@
     "lucide:refresh-cw": {
       "label": "刷新",
       "category": "工具"
+    },
+    "lucide:plus": {
+      "label": "添加",
+      "category": "基础"
+    },
+    "lucide:menu": {
+      "label": "菜单",
+      "category": "基础"
+    },
+    "lucide:grip-vertical": {
+      "label": "拖拽",
+      "category": "基础"
     }
   },
   "categories": {

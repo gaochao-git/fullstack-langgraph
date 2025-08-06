@@ -416,7 +416,7 @@ export function MenuManagement() {
     menuActions.push(
       {
         key: 'delete',
-        icon: <Icons.Trash2 size={16} />,
+        icon: <Icons.Trash size={16} />,
         label: '删除',
         danger: true,
         onClick: () => {

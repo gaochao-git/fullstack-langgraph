@@ -13,17 +13,27 @@ import { Icons as GlobalIcons, type IconName } from '../icons';
 export const getAntdIcon = (iconName: string) => {
   if (!iconName) return null;
   
+  // 处理 lucide: 前缀
+  let cleanIconName = iconName;
+  if (iconName.startsWith('lucide:')) {
+    // 移除 lucide: 前缀并转换为 PascalCase
+    const name = iconName.substring(7);
+    cleanIconName = name.split('-').map(part => 
+      part.charAt(0).toUpperCase() + part.slice(1)
+    ).join('');
+  }
+  
   // 直接使用图标名称
-  if (iconName in GlobalIcons) {
-    const IconComponent = GlobalIcons[iconName as IconName];
+  if (cleanIconName in GlobalIcons) {
+    const IconComponent = GlobalIcons[cleanIconName as IconName];
     // 为菜单栏设置一致的图标大小
     return createElement(IconComponent as any, {
       size: 16
     });
   }
   
-  // 默认图标
-  return createElement(GlobalIcons.Appstore as any, {
+  // 默认图标 - 使用 AppWindow 而不是 Appstore
+  return createElement(GlobalIcons.AppWindow as any, {
     size: 16
   });
 };
