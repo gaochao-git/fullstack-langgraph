@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Statistic, Space, Spin, message } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, Spin, message, Radio } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
@@ -9,7 +9,8 @@ import {
   HeartOutlined,
   BookOutlined,
   CodeOutlined,
-  CustomerServiceOutlined
+  CustomerServiceOutlined,
+  ToolOutlined
 } from "@ant-design/icons";
 import { 
   categoryColors,
@@ -26,11 +27,28 @@ import { Agent as ApiAgent } from '../../services/agentApi';
 
 type Agent = ApiAgent;
 
+// 智能体分类选项
+const AGENT_TYPES = [
+  { value: 'all', label: '全部', color: 'default' },
+  { value: '办公', label: '办公', color: 'blue' },
+  { value: '研发', label: '研发', color: 'green' },
+  { value: '运维', label: '运维', color: 'orange' },
+  { value: '安全', label: '安全', color: 'red' },
+  { value: '审计', label: '审计', color: 'purple' },
+  { value: '运营', label: '运营', color: 'cyan' },
+];
+
 const AgentMarketplace = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState<string>('all');
+  
+  // 根据类型过滤智能体
+  const filteredAgents = selectedType === 'all' 
+    ? agents 
+    : agents.filter(agent => agent.agent_type === selectedType);
 
   // 获取智能体数据
   const loadAgents = async () => {
@@ -153,68 +171,102 @@ const AgentMarketplace = () => {
     <Card
       key={agent.id}
       hoverable
-      style={{ height: "100%", cursor: "pointer" }}
+      style={{ 
+        height: "100%", 
+        cursor: "pointer",
+        borderRadius: 12,
+        overflow: 'hidden'
+      }}
       onClick={() => handleAgentClick(agent.agent_id)}
+      bodyStyle={{ padding: 20 }}
     >
       <Card.Meta
         title={
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
               <Avatar 
-                size={36} 
-                style={{ backgroundColor: getAgentBackgroundColor(agent) }} 
+                size={42} 
+                style={{ 
+                  backgroundColor: getAgentBackgroundColor(agent),
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                }} 
                 icon={getAgentIcon(agent)} 
               />
-              <span style={{ fontWeight: 600, fontSize: 18, color: isDark ? '#ffffff' : '#262626' }}>
-                {agent.agent_name}
-              </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ 
+                  fontWeight: 600, 
+                  fontSize: 18, 
+                  color: isDark ? '#ffffff' : '#262626',
+                  marginBottom: 4
+                }}>
+                  {agent.agent_name}
+                </div>
+                <Tag 
+                  color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'}
+                  style={{ fontSize: 12 }}
+                >
+                  {agent.agent_type || '未分类'}
+                </Tag>
+              </div>
             </div>
           </div>
         }
         description={
           <div>
-            <Paragraph ellipsis={{ rows: 2, expandable: false }} style={{ marginBottom: 12 }}>
+            <Paragraph 
+              ellipsis={{ rows: 2, expandable: false }} 
+              style={{ 
+                marginBottom: 12,
+                fontSize: 14,
+                lineHeight: 1.6,
+                color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)'
+              }}
+            >
               {agent.agent_description || '智能助手，能够帮助您完成各种任务'}
             </Paragraph>
-            <div style={{ marginBottom: 8 }}>
-              {getAgentTags(agent).map((tag: string) => (
-                <Tag key={tag} color="blue" style={{ marginBottom: 4 }}>
+            <div style={{ marginBottom: 12 }}>
+              {getAgentTags(agent).slice(0, 3).map((tag: string) => (
+                <Tag 
+                  key={tag} 
+                  style={{ 
+                    marginBottom: 4,
+                    marginRight: 4,
+                    fontSize: 12,
+                    borderRadius: 4
+                  }}
+                >
                   {tag}
                 </Tag>
               ))}
+              {getAgentTags(agent).length > 3 && (
+                <Tag style={{ fontSize: 12, borderRadius: 4 }}>+{getAgentTags(agent).length - 3}</Tag>
+              )}
             </div>
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 8,
+                paddingTop: 12,
+                borderTop: '1px solid rgba(0,0,0,0.06)',
               }}
             >
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                模型: {agent.llm_info?.model_name || '默认模型'}
-              </Text>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {agent.is_builtin === 'yes' ? '内置智能体' : '自定义'}
-              </Text>
+              <Space size={16}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  <ToolOutlined style={{ marginRight: 4 }} />
+                  {agent.mcp_config?.total_tools || 0} 个工具
+                </Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {agent.llm_info?.model_name || '默认模型'}
+                </Text>
+              </Space>
+              <Tag 
+                color={agent.is_builtin === 'yes' ? 'gold' : 'default'} 
+                style={{ fontSize: 11, margin: 0 }}
+              >
+                {agent.is_builtin === 'yes' ? '内置' : '自定义'}
+              </Tag>
             </div>
-            <Row gutter={16}>
-              <Col span={12}>
-                <Statistic 
-                  title="工具数量" 
-                  value={agent.mcp_config?.total_tools || 0} 
-                  valueStyle={{ fontSize: 14 }} 
-                />
-              </Col>
-              <Col span={12}>
-                <Statistic 
-                  title="温度" 
-                  value={agent.llm_info?.temperature || 0} 
-                  precision={1}
-                  valueStyle={{ fontSize: 14 }} 
-                />
-              </Col>
-            </Row>
           </div>
         }
       />
@@ -234,35 +286,51 @@ const AgentMarketplace = () => {
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 24,
-        }}
-      >
-        <div>
-          <Title level={3} style={{ margin: 0 }}>
-            智能体广场
-          </Title>
-          <Text type="secondary">发现和使用各种智能助手 ({agents.length} 个可用)</Text>
-        </div>
+      <div style={{ marginBottom: 24 }}>
+        {/* 分类选择器 */}
+        <Radio.Group 
+          value={selectedType} 
+          onChange={(e) => setSelectedType(e.target.value)}
+          buttonStyle="solid"
+          size="large"
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
+        >
+          {AGENT_TYPES.map(type => (
+            <Radio.Button 
+              key={type.value} 
+              value={type.value}
+              style={{ 
+                borderRadius: 8,
+                fontWeight: selectedType === type.value ? 600 : 400
+              }}
+            >
+              {type.label}
+            </Radio.Button>
+          ))}
+        </Radio.Group>
       </div>
       
-      {agents.length === 0 ? (
+      {filteredAgents.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>
           <RobotOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
           <div style={{ marginTop: 16 }}>
-            <Text type="secondary">暂无可用的智能体</Text>
+            <Text type="secondary">
+              {selectedType === 'all' 
+                ? '暂无可用的智能体' 
+                : `暂无${selectedType}类型的智能体`}
+            </Text>
           </div>
           <div style={{ marginTop: 8 }}>
-            <Text type="secondary">请在智能体管理中创建并启用智能体</Text>
+            <Text type="secondary">
+              {selectedType === 'all'
+                ? '请在智能体管理中创建并启用智能体'
+                : '请尝试查看其他分类或创建新的智能体'}
+            </Text>
           </div>
         </div>
       ) : (
         <Row gutter={[24, 24]}>
-          {agents.map((agent) => (
+          {filteredAgents.map((agent) => (
             <Col key={agent.id} xs={24} sm={12} lg={8} xl={6}>
               {renderAgentCard(agent)}
             </Col>

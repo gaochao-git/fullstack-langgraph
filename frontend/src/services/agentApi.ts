@@ -26,6 +26,7 @@ export interface Agent {
   id: number;
   agent_id: string;
   agent_name: string;
+  agent_type: string; // 智能体分类：办公、研发、运维、安全、审计、运营等
   agent_description: string;
   agent_capabilities: string[];
   agent_version: string;
@@ -62,6 +63,7 @@ export interface Agent {
 
 export interface CreateAgentRequest {
   agent_name: string;
+  agent_type: string;
   agent_description: string;
   agent_capabilities: string[];
   agent_version?: string;

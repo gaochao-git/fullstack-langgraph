@@ -13,6 +13,7 @@ class AgentConfig(BaseModel):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     agent_id = Column(String(100), unique=True, index=True, nullable=False)
     agent_name = Column(String(200), nullable=False)
+    agent_type = Column(String(32), nullable=False, default='办公')      # 智能体分类
     agent_description = Column(Text, nullable=True)                      # 智能体描述
     agent_capabilities = Column(JSONType, nullable=True, default=list)   # 能力列表
     agent_version = Column(String(20), default='1.0.0', nullable=False) # 智能体版本

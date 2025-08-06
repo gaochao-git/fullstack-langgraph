@@ -47,33 +47,33 @@ CREATE TABLE `mcp_servers` (
 -- 3. 智能体配置表 (Agent Configurations)
 -- 用于存储智能体的完整配置信息
 CREATE TABLE `agent_configs` (
-    `id` BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，自增',
-    `agent_id` VARCHAR(100) NOT NULL UNIQUE COMMENT '智能体唯一标识符',
-    `agent_name` VARCHAR(200) NOT NULL COMMENT '智能体显示名称',
-    `agent_description` TEXT COMMENT '智能体功能描述',
-    `agent_capabilities` JSON COMMENT '智能体能力列表，JSON数组格式',
-    `agent_version` VARCHAR(20) NOT NULL DEFAULT '1.0.0' COMMENT '智能体版本号',
-    `agent_status` VARCHAR(20) NOT NULL DEFAULT 'stopped' COMMENT '运行状态（running/stopped/error）',
-    `agent_enabled` VARCHAR(10) NOT NULL DEFAULT 'yes' COMMENT '是否启用（yes/no）',
-    `is_builtin` VARCHAR(10) NOT NULL DEFAULT 'no' COMMENT '是否为内置智能体（yes/no）',
-    `tools_info` JSON COMMENT '工具配置信息，包含系统工具和MCP工具',
-    `llm_info` JSON COMMENT '大语言模型配置信息',
-    `prompt_info` JSON COMMENT '提示词配置信息',
-    
-    -- 运行统计字段
-    `total_runs` INT NOT NULL DEFAULT 0 COMMENT '总运行次数统计',
-    `success_rate` FLOAT NOT NULL DEFAULT 0.0 COMMENT '成功率（0.0-1.0）',
-    `avg_response_time` FLOAT NOT NULL DEFAULT 0.0 COMMENT '平均响应时间（毫秒）',
-    `last_used` DATETIME COMMENT '最后使用时间',
-    
-    -- 系统管理字段
-    `config_version` VARCHAR(20) NOT NULL DEFAULT '1.0' COMMENT '配置版本号',
-    `is_active` BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否处于活跃状态',
-    `create_by` VARCHAR(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
-    `update_by` VARCHAR(100) COMMENT '最后更新人用户名',
-    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能体配置表';
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `agent_id` varchar(100) NOT NULL COMMENT '智能体唯一标识符',
+  `agent_name` varchar(200) NOT NULL COMMENT '智能体显示名称',
+  `agent_type` varchar(32) NOT NULL DEFAULT '办公' COMMENT '智能体分类',
+  `agent_description` text COMMENT '智能体功能描述',
+  `agent_icon` varchar(50) DEFAULT 'Bot' COMMENT '智能体图标',
+  `agent_capabilities` json DEFAULT NULL COMMENT '智能体能力列表，JSON数组格式',
+  `agent_version` varchar(20) NOT NULL DEFAULT '1.0.0' COMMENT '智能体版本号',
+  `agent_status` varchar(20) NOT NULL DEFAULT 'stopped' COMMENT '运行状态（running/stopped/error）',
+  `agent_enabled` varchar(10) NOT NULL DEFAULT 'yes' COMMENT '是否启用（yes/no）',
+  `is_builtin` varchar(10) NOT NULL DEFAULT 'no' COMMENT '是否为内置智能体（yes/no）',
+  `tools_info` json DEFAULT NULL COMMENT '工具配置信息，包含系统工具和MCP工具',
+  `llm_info` json DEFAULT NULL COMMENT '大语言模型配置信息',
+  `prompt_info` json DEFAULT NULL COMMENT '提示词配置信息',
+  `total_runs` int(11) NOT NULL DEFAULT '0' COMMENT '总运行次数统计',
+  `success_rate` float NOT NULL DEFAULT '0' COMMENT '成功率（0.0-1.0）',
+  `avg_response_time` float NOT NULL DEFAULT '0' COMMENT '平均响应时间（毫秒）',
+  `last_used` datetime DEFAULT NULL COMMENT '最后使用时间',
+  `config_version` varchar(20) NOT NULL DEFAULT '1.0' COMMENT '配置版本号',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否处于活跃状态',
+  `create_by` varchar(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `agent_id` (`agent_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COMMENT='智能体配置表'
 
 -- 4. AI模型配置表 (AI Model Configurations)  
 -- 用于存储AI模型的配置信息

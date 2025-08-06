@@ -10,6 +10,7 @@ from datetime import datetime
 class AgentBase(BaseModel):
     """Agent基础模型"""
     agent_name: str = Field(..., min_length=1, max_length=100, description="智能体名称")
+    agent_type: Optional[str] = Field(default="办公", max_length=32, description="智能体分类")
     description: Optional[str] = Field(None, max_length=500, description="智能体描述")
     agent_capabilities: Optional[List[str]] = Field(default_factory=list, description="智能体能力列表")
     agent_status: Optional[str] = Field(default="stopped", pattern=r'^(running|stopped|error)$', description="智能体状态")
@@ -38,6 +39,7 @@ class AgentCreate(AgentBase):
 class AgentUpdate(BaseModel):
     """更新Agent请求模型"""
     agent_name: Optional[str] = Field(None, min_length=1, max_length=100, description="智能体名称")
+    agent_type: Optional[str] = Field(None, max_length=32, description="智能体分类")
     description: Optional[str] = Field(None, max_length=500, description="智能体描述")
     agent_capabilities: Optional[List[str]] = Field(None, description="智能体能力列表")
     agent_status: Optional[str] = Field(None, pattern=r'^(running|stopped|error)$', description="智能体状态")
@@ -132,6 +134,7 @@ class AgentResponse(BaseModel):
     """Agent响应模型"""
     id: str = Field(..., description="智能体ID")
     name: str = Field(..., description="智能体名称")
+    agent_type: Optional[str] = Field(default="办公", description="智能体分类")
     display_name: Optional[str] = Field(None, description="显示名称")
     description: Optional[str] = Field(None, description="描述")
     status: str = Field(..., description="状态")

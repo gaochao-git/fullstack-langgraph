@@ -42,6 +42,16 @@ const { Option } = Select;
 const { TabPane } = Tabs;
 const { TextArea } = Input;
 
+// 智能体分类选项
+const AGENT_TYPES = [
+  { value: '办公', label: '办公' },
+  { value: '研发', label: '研发' },
+  { value: '运维', label: '运维' },
+  { value: '安全', label: '安全' },
+  { value: '审计', label: '审计' },
+  { value: '运营', label: '运营' },
+];
+
 interface LocalAgent {
   id: number;
   agent_id: string;
@@ -349,6 +359,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         setEditExpandedKeys([]);
         
         form.setFieldsValue({
+          agent_type: '办公',
           agent_capabilities: [],
           agent_icon: 'Bot',
           available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
@@ -400,6 +411,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         form.setFieldsValue({
           agent_id: fullAgent.agent_id,
           agent_name: fullAgent.agent_name,
+          agent_type: fullAgent.agent_type || '办公',
           agent_description: fullAgent.agent_description,
           agent_capabilities: fullAgent.agent_capabilities,
           agent_icon: fullAgent.agent_icon || 'Bot',
@@ -496,6 +508,18 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
               rules={[{ required: true, message: '请输入智能体名称' }]}
             >
               <Input placeholder="例如: 我的自定义智能体" />
+            </Form.Item>
+
+            <Form.Item
+              label="智能体分类"
+              name="agent_type"
+              rules={[{ required: true, message: '请选择智能体分类' }]}
+            >
+              <Select placeholder="请选择分类">
+                {AGENT_TYPES.map(type => (
+                  <Option key={type.value} value={type.value}>{type.label}</Option>
+                ))}
+              </Select>
             </Form.Item>
             <Form.Item
               label="描述"

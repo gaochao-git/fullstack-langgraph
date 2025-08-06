@@ -29,6 +29,16 @@ const { Search } = Input;
 const { Option } = Select;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+// 智能体分类选项
+const AGENT_TYPES = [
+  { value: '办公', label: '办公', color: 'blue' },
+  { value: '研发', label: '研发', color: 'green' },
+  { value: '运维', label: '运维', color: 'orange' },
+  { value: '安全', label: '安全', color: 'red' },
+  { value: '审计', label: '审计', color: 'purple' },
+  { value: '运营', label: '运营', color: 'cyan' },
+];
+
 
 // 本地状态类型（为了向前兼容，保持一些驼峰命名）
 interface LocalAgent extends Agent {
@@ -98,6 +108,7 @@ const AgentManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   
   // 模态框状态
   const [agentDetailModal, setAgentDetailModal] = useState(false);
@@ -191,7 +202,10 @@ const AgentManagement: React.FC = () => {
       let matchStatus = true;
       if (statusFilter === 'enabled') matchStatus = agent.agent_enabled === 'yes';
       if (statusFilter === 'disabled') matchStatus = agent.agent_enabled === 'no';
-      return matchSearch && matchStatus;
+      // 分类筛选
+      let matchType = true;
+      if (typeFilter) matchType = agent.agent_type === typeFilter;
+      return matchSearch && matchStatus && matchType;
     })
     // 内置智能体排前面
     .sort((a, b) => {
@@ -265,6 +279,7 @@ const AgentManagement: React.FC = () => {
         // 新建智能体
         const newAgentData: CreateAgentRequest = {
           agent_name: values.agent_name,
+          agent_type: values.agent_type,
           agent_description: values.agent_description || '',
           agent_capabilities: values.agent_capabilities || [],
           agent_icon: values.agent_icon || 'Bot',
@@ -280,6 +295,7 @@ const AgentManagement: React.FC = () => {
         // 编辑智能体
         const updateData: UpdateAgentRequest = {
           agent_name: values.agent_name,
+          agent_type: values.agent_type,
           agent_description: values.agent_description,
           agent_capabilities: values.agent_capabilities,
           agent_icon: values.agent_icon,
@@ -321,6 +337,17 @@ const AgentManagement: React.FC = () => {
               onChange={(e) => setSearchText(e.target.value)}
               style={{ width: 240 }}
             />
+            <Select
+              placeholder="分类筛选"
+              allowClear
+              style={{ width: 120 }}
+              value={typeFilter}
+              onChange={setTypeFilter}
+            >
+              {AGENT_TYPES.map(type => (
+                <Option key={type.value} value={type.value}>{type.label}</Option>
+              ))}
+            </Select>
             <Select
               placeholder="状态筛选"
               allowClear
@@ -419,6 +446,16 @@ const AgentManagement: React.FC = () => {
                   }
                   description={
                     <div className="space-y-2 mt-1">
+                      {/* 分类标签 */}
+                      <div>
+                        <Tag 
+                          color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'} 
+                          className="text-xs"
+                        >
+                          {agent.agent_type || '未分类'}
+                        </Tag>
+                      </div>
+
                       {/* 运行统计和MCP工具统计合并 */}
                       <div className="text-sm space-y-1">
                         <div><span className="text-gray-500">运行次数: </span><span className="font-semibold text-gray-800">{agent.totalRuns}</span></div>
