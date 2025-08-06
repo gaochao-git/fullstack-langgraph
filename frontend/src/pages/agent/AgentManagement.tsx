@@ -310,53 +310,44 @@ const AgentManagement: React.FC = () => {
 
   return (
     <div>
-
-      {/* 智能体管理 */}
-      <Card title="智能体管理">
-        <div className="mb-4">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索智能体名称、描述"
-                allowClear
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={12} sm={6} md={4}>
-              <Select
-                placeholder="状态筛选"
-                allowClear
-                style={{ width: '100%' }}
-                value={statusFilter}
-                onChange={setStatusFilter}
-              >
-                <Option value="enabled">已启用</Option>
-                <Option value="disabled">已禁用</Option>
-              </Select>
-            </Col>
-            <Col xs={24} sm={12} md={12}>
-              <Space>
-                <Button 
-                  type="primary"
-                  icon={<RobotOutlined />}
-                  onClick={handleCreateAgent}
-                >
-                  新建智能体
-                </Button>
-                <Button 
-                  icon={<ReloadOutlined />}
-                  loading={loading}
-                  onClick={loadData}
-                >
-                  刷新
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
-
+      <Card 
+        title="智能体管理"
+        extra={
+          <Space>
+            <Search
+              placeholder="搜索智能体名称、描述"
+              allowClear
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              style={{ width: 240 }}
+            />
+            <Select
+              placeholder="状态筛选"
+              allowClear
+              style={{ width: 120 }}
+              value={statusFilter}
+              onChange={setStatusFilter}
+            >
+              <Option value="enabled">已启用</Option>
+              <Option value="disabled">已禁用</Option>
+            </Select>
+            <Button 
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={loadData}
+            >
+              刷新
+            </Button>
+            <Button 
+              type="primary"
+              icon={<RobotOutlined />}
+              onClick={handleCreateAgent}
+            >
+              新建智能体
+            </Button>
+          </Space>
+        }
+      >
         {/* 智能体卡片列表 */}
         <Row gutter={[16, 16]}>
           {filteredAgents.map(agent => (

@@ -9,14 +9,12 @@ import {
   Tag, 
   App, 
   Popconfirm,
-  Row,
-  Col
+  Tooltip
 } from 'antd';
 import { 
   PlusOutlined, 
   EditOutlined, 
   DeleteOutlined, 
-  SearchOutlined,
   ReloadOutlined,
   EyeOutlined
 } from '@ant-design/icons';
@@ -52,8 +50,8 @@ const SOPList: React.FC = () => {
       const queryParams = {
         ...searchParams,
         ...params,
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize
+        page: currentPage,
+        size: pageSize
       };
       
       const response = await SOPApi.getSOPs(queryParams);
@@ -116,12 +114,6 @@ const SOPList: React.FC = () => {
     setDetailModalVisible(true);
   };
 
-  // 表单提交成功
-  const handleFormSuccess = () => {
-    setFormModalVisible(false);
-    fetchSOPs();
-  };
-
   // 删除SOP
   const handleDelete = async (sopId: string) => {
     try {
@@ -135,6 +127,12 @@ const SOPList: React.FC = () => {
     } catch (error) {
       message.error('删除失败');
     }
+  };
+
+  // 表单提交成功
+  const handleFormSuccess = () => {
+    setFormModalVisible(false);
+    fetchSOPs();
   };
 
   // 严重性颜色映射
@@ -223,31 +221,37 @@ const SOPList: React.FC = () => {
       width: 130,
       render: (_, record) => (
         <Space size="small">
-          <Button 
-            type="text" 
-            size="small" 
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-          />
-          <Button 
-            type="text" 
-            size="small" 
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="确定要删除这个SOP吗？"
-            onConfirm={() => handleDelete(record.sop_id)}
-            okText="确定"
-            cancelText="取消"
-          >
+          <Tooltip title="查看详情">
             <Button 
               type="text" 
               size="small" 
-              danger
-              icon={<DeleteOutlined />}
+              icon={<EyeOutlined />}
+              onClick={() => handleView(record)}
             />
-          </Popconfirm>
+          </Tooltip>
+          <Tooltip title="编辑">
+            <Button 
+              type="text" 
+              size="small" 
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="删除">
+            <Popconfirm
+              title="确定要删除这个SOP吗？"
+              onConfirm={() => handleDelete(record.sop_id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button 
+                type="text" 
+                size="small" 
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </Popconfirm>
+          </Tooltip>
         </Space>
       )
     }
@@ -255,68 +259,59 @@ const SOPList: React.FC = () => {
 
   return (
     <div>
-      <Card>
-        <div className="mb-4">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索SOP标题、描述、ID"
-                allowClear
-                onSearch={handleSearch}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={12} sm={6} md={4}>
-              <Select
-                placeholder="分类"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={(value) => handleFilter('category', value)}
-                value={searchParams.category}
-              >
-                <Option value="database">数据库</Option>
-                <Option value="system">系统</Option>
-                <Option value="network">网络</Option>
-                <Option value="application">应用</Option>
-              </Select>
-            </Col>
-            <Col xs={12} sm={6} md={4}>
-              <Select
-                placeholder="严重性"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={(value) => handleFilter('severity', value)}
-                value={searchParams.severity}
-              >
-                <Option value="low">低</Option>
-                <Option value="medium">中</Option>
-                <Option value="high">高</Option>
-                <Option value="critical">紧急</Option>
-              </Select>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Space>
-                <Button onClick={handleReset}>
-                  重置
-                </Button>
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={() => fetchSOPs()}
-                >
-                  刷新
-                </Button>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />}
-                  onClick={handleCreate}
-                >
-                  新建SOP
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
-
+      <Card
+        title="知识管理"
+        extra={
+          <Space>
+            <Search
+              placeholder="搜索SOP标题、描述、ID"
+              allowClear
+              onSearch={handleSearch}
+              style={{ width: 240 }}
+            />
+            <Select
+              placeholder="分类"
+              allowClear
+              style={{ width: 100 }}
+              onChange={(value) => handleFilter('category', value)}
+              value={searchParams.category}
+            >
+              <Option value="database">数据库</Option>
+              <Option value="system">系统</Option>
+              <Option value="network">网络</Option>
+              <Option value="application">应用</Option>
+            </Select>
+            <Select
+              placeholder="严重性"
+              allowClear
+              style={{ width: 80 }}
+              onChange={(value) => handleFilter('severity', value)}
+              value={searchParams.severity}
+            >
+              <Option value="low">低</Option>
+              <Option value="medium">中</Option>
+              <Option value="high">高</Option>
+              <Option value="critical">紧急</Option>
+            </Select>
+            <Button onClick={handleReset}>
+              重置
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={() => fetchSOPs()}
+            >
+              刷新
+            </Button>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+            >
+              新建SOP
+            </Button>
+          </Space>
+        }
+      >
         <Table
           columns={columns}
           dataSource={sops}

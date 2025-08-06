@@ -43,7 +43,7 @@ import { omind_get, omind_post, omind_put, omind_del } from '../../../utils/base
 const { Option } = Select;
 const { TextArea } = Input;
 const { TabPane } = Tabs;
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 // 类型定义
 interface ScheduledTask {
@@ -782,193 +782,168 @@ const TasksManagement: React.FC = () => {
   ];
 
   return (
-    <div className="p-4">
-      <Title level={2}>任务管理</Title>
-      
-      
-      {/* 任务概览 */}
-      <Row gutter={16} className="mb-4">
-        <Col span={8}>
-          <Card size="small">
-            <Statistic
-              title="定时任务总数"
-              value={Array.isArray(scheduledTasks) ? scheduledTasks.length : 0}
-              valueStyle={{ color: '#1890ff', fontSize: '16px' }}
-              prefix={<ClockCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card size="small">
-            <Statistic
-              title="启用任务"
-              value={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => t.task_enabled).length : 0}
-              valueStyle={{ color: '#52c41a', fontSize: '16px' }}
-              prefix={<CheckCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col span={8}>
-          <Card size="small">
-            <Statistic
-              title="禁用任务"
-              value={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => !t.task_enabled).length : 0}
-              valueStyle={{ color: '#ff4d4f', fontSize: '16px' }}
-              prefix={<ExclamationCircleOutlined />}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      <Card>
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
-          <TabPane 
-            tab={
-              <span>
-                <ClockCircleOutlined />
-                定时任务
-                <Badge count={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => t.task_enabled).length : 0} showZero style={{ marginLeft: 8 }} />
-              </span>
-            } 
-            key="scheduled"
-          >
-            <div className="mb-4">
-              <Space>
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => {
-                    setCreateModalVisible(true);
-                    setSelectedTaskType('http'); // 设置默认类型
-                  }}
-                >
-                  新建定时任务
-                </Button>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={fetchScheduledTasks}
-                  loading={scheduledTasksLoading}
-                >
-                  刷新
-                </Button>
-                <Select 
-                  value={scheduledTaskStatusFilter} 
-                  style={{ width: 120 }} 
-                  onChange={(value) => setScheduledTaskStatusFilter(value)}
-                >
-                  <Option value="">所有状态</Option>
-                  <Option value="enabled">启用</Option>
-                  <Option value="disabled">禁用</Option>
-                </Select>
-                <Select 
-                  value={scheduledTaskTypeFilter} 
-                  style={{ width: 120 }} 
-                  onChange={(value) => setScheduledTaskTypeFilter(value)}
-                >
-                  <Option value="">所有类型</Option>
-                  <Option value="system">系统任务</Option>
-                  <Option value="agent">智能体</Option>
-                  <Option value="http">HTTP任务</Option>
-                </Select>
-                <Button
-                  type="default"
-                  icon={enableAllLoading ? <LoadingOutlined /> : <PlayCircleOutlined />}
-                  onClick={handleEnableAllTasks}
-                  loading={enableAllLoading}
-                  disabled={enableAllLoading || scheduledTasks.filter(t => !t.task_enabled).length === 0}
-                  style={{ 
-                    color: '#52c41a',
-                    borderColor: '#52c41a'
-                  }}
-                >
-                  一键启用
-                </Button>
-                <Button
-                  type="default"
-                  icon={disableAllLoading ? <LoadingOutlined /> : <PauseCircleOutlined />}
-                  onClick={handleDisableAllTasks}
-                  loading={disableAllLoading}
-                  disabled={disableAllLoading || scheduledTasks.filter(t => t.task_enabled).length === 0}
-                  style={{ 
-                    color: '#ff4d4f',
-                    borderColor: '#ff4d4f'
-                  }}
-                >
-                  一键禁用
-                </Button>
-              </Space>
-            </div>
-            
-            <Table
-              columns={scheduledTaskColumns}
-              dataSource={Array.isArray(scheduledTasks) ? 
-                scheduledTasks.filter(task => {
-                  // 状态筛选
-                  if (scheduledTaskStatusFilter === 'enabled' && !task.task_enabled) return false;
-                  if (scheduledTaskStatusFilter === 'disabled' && task.task_enabled) return false;
-                  
-                  // 类型筛选
-                  if (scheduledTaskTypeFilter !== '' && task.task_type !== scheduledTaskTypeFilter) return false;
-                  
-                  return true;
-                }) : []
+    <>
+      <Tabs 
+        activeKey={activeTab} 
+        onChange={setActiveTab}
+        items={[
+          {
+          key: 'scheduled',
+          label: (
+            <span>
+              <ClockCircleOutlined />
+              定时任务
+              <Badge count={Array.isArray(scheduledTasks) ? scheduledTasks.filter(t => t.task_enabled).length : 0} showZero style={{ marginLeft: 8 }} />
+            </span>
+          ),
+          children: (
+            <Card 
+              title="定时任务管理"
+              extra={
+                <Space>
+                  <Select 
+                    value={scheduledTaskStatusFilter} 
+                    style={{ width: 120 }} 
+                    onChange={(value) => setScheduledTaskStatusFilter(value)}
+                    placeholder="所有状态"
+                  >
+                    <Option value="">所有状态</Option>
+                    <Option value="enabled">启用</Option>
+                    <Option value="disabled">禁用</Option>
+                  </Select>
+                  <Select 
+                    value={scheduledTaskTypeFilter} 
+                    style={{ width: 120 }} 
+                    onChange={(value) => setScheduledTaskTypeFilter(value)}
+                    placeholder="所有类型"
+                  >
+                    <Option value="">所有类型</Option>
+                    <Option value="system">系统任务</Option>
+                    <Option value="agent">智能体</Option>
+                    <Option value="http">HTTP任务</Option>
+                  </Select>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchScheduledTasks}
+                    loading={scheduledTasksLoading}
+                  >
+                    刷新
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={enableAllLoading ? <LoadingOutlined /> : <PlayCircleOutlined />}
+                    onClick={handleEnableAllTasks}
+                    loading={enableAllLoading}
+                    disabled={enableAllLoading || scheduledTasks.filter(t => !t.task_enabled).length === 0}
+                    style={{ 
+                      color: '#52c41a',
+                      borderColor: '#52c41a'
+                    }}
+                  >
+                    一键启用
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={disableAllLoading ? <LoadingOutlined /> : <PauseCircleOutlined />}
+                    onClick={handleDisableAllTasks}
+                    loading={disableAllLoading}
+                    disabled={disableAllLoading || scheduledTasks.filter(t => t.task_enabled).length === 0}
+                    style={{ 
+                      color: '#ff4d4f',
+                      borderColor: '#ff4d4f'
+                    }}
+                  >
+                    一键禁用
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      setCreateModalVisible(true);
+                      setSelectedTaskType('http'); // 设置默认类型
+                    }}
+                  >
+                    新建定时任务
+                  </Button>
+                </Space>
               }
-              rowKey="id"
-              loading={scheduledTasksLoading}
-              scroll={{ x: 1200 }}
-              size="small"
-            />
-          </TabPane>
-          
-          <TabPane 
-            tab={
-              <span>
-                <HistoryOutlined />
-                执行记录
-                <Badge count={Array.isArray(celeryTasks) ? celeryTasks.length : 0} showZero style={{ marginLeft: 8 }} />
-              </span>
-            } 
-            key="celery"
-          >
-            <div className="mb-4">
-              <Space>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={fetchCeleryTasks}
-                  loading={celeryTasksLoading}
-                >
-                  刷新
-                </Button>
-                <Select 
-                  value={statusFilter} 
-                  style={{ width: 120 }} 
-                  onChange={(value) => setStatusFilter(value)}
-                >
-                  <Option value="">所有状态</Option>
-                  <Option value="PENDING">等待中</Option>
-                  <Option value="STARTED">执行中</Option>
-                  <Option value="SUCCESS">成功</Option>
-                  <Option value="FAILURE">失败</Option>
-                </Select>
-              </Space>
-            </div>
-            
-            <Table
-              columns={celeryTaskColumns}
-              dataSource={Array.isArray(celeryTasks) ? 
-                celeryTasks.filter(task => statusFilter === '' || task.task_status === statusFilter) : []
+            >
+              <Table
+                columns={scheduledTaskColumns}
+                dataSource={Array.isArray(scheduledTasks) ? 
+                  scheduledTasks.filter(task => {
+                    // 状态筛选
+                    if (scheduledTaskStatusFilter === 'enabled' && !task.task_enabled) return false;
+                    if (scheduledTaskStatusFilter === 'disabled' && task.task_enabled) return false;
+                    
+                    // 类型筛选
+                    if (scheduledTaskTypeFilter !== '' && task.task_type !== scheduledTaskTypeFilter) return false;
+                    
+                    return true;
+                  }) : []
+                }
+                rowKey="id"
+                loading={scheduledTasksLoading}
+                scroll={{ x: 1200 }}
+                size="small"
+              />
+            </Card>
+          )
+        },
+        {
+          key: 'celery',
+          label: (
+            <span>
+              <HistoryOutlined />
+              执行记录
+              <Badge count={Array.isArray(celeryTasks) ? celeryTasks.length : 0} showZero style={{ marginLeft: 8 }} />
+            </span>
+          ),
+          children: (
+            <Card 
+              title="执行记录"
+              extra={
+                <Space>
+                  <Select 
+                    value={statusFilter} 
+                    style={{ width: 120 }} 
+                    onChange={(value) => setStatusFilter(value)}
+                    placeholder="所有状态"
+                  >
+                    <Option value="">所有状态</Option>
+                    <Option value="PENDING">等待中</Option>
+                    <Option value="STARTED">执行中</Option>
+                    <Option value="SUCCESS">成功</Option>
+                    <Option value="FAILURE">失败</Option>
+                  </Select>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={fetchCeleryTasks}
+                    loading={celeryTasksLoading}
+                  >
+                    刷新
+                  </Button>
+                </Space>
               }
-              rowKey="id"
-              loading={celeryTasksLoading}
-              scroll={{ x: 1200 }}
-              size="small"
-            />
-          </TabPane>
-        </Tabs>
-      </Card>
+            >
+              <Table
+                columns={celeryTaskColumns}
+                dataSource={Array.isArray(celeryTasks) ? 
+                  celeryTasks.filter(task => statusFilter === '' || task.task_status === statusFilter) : []
+                }
+                rowKey="id"
+                loading={celeryTasksLoading}
+                scroll={{ x: 1200 }}
+                size="small"
+              />
+            </Card>
+          )
+        }
+      ]}
+    />
 
-      {/* 创建/编辑定时任务弹窗 */}
-      <Modal
+    {/* 创建/编辑定时任务弹窗 */}
+    <Modal
         title={currentTask ? "编辑定时任务" : "新建定时任务"}
         open={createModalVisible || editModalVisible}
         onCancel={() => {
@@ -1408,7 +1383,7 @@ const TasksManagement: React.FC = () => {
           </div>
         )}
       </Modal>
-    </div>
+    </>
   );
 };
 

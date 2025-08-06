@@ -723,66 +723,59 @@ const MCPManagement: React.FC = () => {
               </Space>
             ),
             children: (
-              <Card title="MCP服务器管理">
-        <div className="mb-4">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索服务器名称、描述"
-                allowClear
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={12} sm={6} md={4}>
-              <Select
-                placeholder="状态筛选"
-                allowClear
-                style={{ width: '100%' }}
-                value={statusFilter}
-                onChange={setStatusFilter}
+              <Card 
+                title="MCP服务器管理"
+                extra={
+                  <Space>
+                    <Search
+                      placeholder="搜索服务器名称、描述"
+                      allowClear
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      style={{ width: 240 }}
+                    />
+                    <Select
+                      placeholder="状态筛选"
+                      allowClear
+                      style={{ width: 120 }}
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                    >
+                      <Option value="connected">已连接</Option>
+                      <Option value="disconnected">已断开</Option>
+                      <Option value="error">连接错误</Option>
+                    </Select>
+                    <Button 
+                      icon={<ReloadOutlined />}
+                      onClick={fetchServers}
+                      loading={loading}
+                    >
+                      刷新
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      icon={<PlusOutlined />}
+                      onClick={handleAddServer}
+                    >
+                      添加服务器
+                    </Button>
+                  </Space>
+                }
               >
-                <Option value="connected">已连接</Option>
-                <Option value="disconnected">已断开</Option>
-                <Option value="error">连接错误</Option>
-              </Select>
-            </Col>
-            <Col xs={24} sm={12} md={12}>
-              <Space>
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={fetchServers}
+                <Table
+                  columns={columns}
+                  dataSource={filteredServers}
+                  rowKey="id"
                   loading={loading}
-                >
-                  刷新
-                </Button>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />}
-                  onClick={handleAddServer}
-                >
-                  添加服务器
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
-
-        <Table
-          columns={columns}
-          dataSource={filteredServers}
-          rowKey="id"
-          loading={loading}
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 个服务器`,
-            pageSizeOptions: ['10', '20', '50'],
-            defaultPageSize: 10
-          }}
-        />
+                  scroll={{ x: 'max-content' }}
+                  pagination={{
+                    showSizeChanger: true,
+                    showQuickJumper: true,
+                    showTotal: (total) => `共 ${total} 个服务器`,
+                    pageSizeOptions: ['10', '20', '50'],
+                    defaultPageSize: 10
+                  }}
+                />
               </Card>
             )
           },
@@ -800,8 +793,6 @@ const MCPManagement: React.FC = () => {
           }
         ]}
       />
-
-      {/* 服务器详情模态框 */}
       <Modal
         title="MCP服务器详情"
         open={serverDetailModal}

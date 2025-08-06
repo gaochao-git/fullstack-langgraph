@@ -7,20 +7,17 @@ import {
   Select, 
   Space, 
   Tag, 
-  Modal, 
   message, 
   Popconfirm,
-  Tooltip,
-  Row,
-  Col
+  Tooltip
 } from 'antd';
 import { 
   PlusOutlined, 
   EditOutlined, 
   DeleteOutlined, 
-  SearchOutlined,
   ReloadOutlined,
-  EyeOutlined
+  EyeOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
@@ -260,69 +257,65 @@ const SOPManagement: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 md:p-6">
-      <Card>
-        <div className="mb-4">
-          <Row gutter={[16, 16]} align="middle">
-            <Col xs={24} sm={12} md={8}>
-              <Search
-                placeholder="搜索SOP标题、描述、ID"
-                allowClear
-                onSearch={handleSearch}
-                style={{ width: '100%' }}
-              />
-            </Col>
-            <Col xs={12} sm={6} md={4}>
-              <Select
-                placeholder="分类"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={(value) => handleFilter('category', value)}
-                value={searchParams.category}
-              >
-                <Option value="database">数据库</Option>
-                <Option value="system">系统</Option>
-                <Option value="network">网络</Option>
-                <Option value="application">应用</Option>
-              </Select>
-            </Col>
-            <Col xs={12} sm={6} md={4}>
-              <Select
-                placeholder="严重性"
-                allowClear
-                style={{ width: '100%' }}
-                onChange={(value) => handleFilter('severity', value)}
-                value={searchParams.severity}
-              >
-                <Option value="low">低</Option>
-                <Option value="medium">中</Option>
-                <Option value="high">高</Option>
-                <Option value="critical">紧急</Option>
-              </Select>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Space>
-                <Button onClick={handleReset}>
-                  重置
-                </Button>
-                <Button 
-                  icon={<ReloadOutlined />}
-                  onClick={() => fetchSOPs()}
-                >
-                  刷新
-                </Button>
-                <Button 
-                  type="primary" 
-                  icon={<PlusOutlined />}
-                  onClick={handleCreate}
-                >
-                  新建SOP
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </div>
-
+    <div>
+      <Card
+        title={
+          <Space>
+            <BookOutlined />
+            知识管理
+          </Space>
+        }
+        extra={
+          <Space>
+            <Search
+              placeholder="搜索SOP标题、描述、ID"
+              allowClear
+              onSearch={handleSearch}
+              style={{ width: 240 }}
+            />
+            <Select
+              placeholder="分类"
+              allowClear
+              style={{ width: 100 }}
+              onChange={(value) => handleFilter('category', value)}
+              value={searchParams.category}
+            >
+              <Option value="database">数据库</Option>
+              <Option value="system">系统</Option>
+              <Option value="network">网络</Option>
+              <Option value="application">应用</Option>
+            </Select>
+            <Select
+              placeholder="严重性"
+              allowClear
+              style={{ width: 80 }}
+              onChange={(value) => handleFilter('severity', value)}
+              value={searchParams.severity}
+            >
+              <Option value="low">低</Option>
+              <Option value="medium">中</Option>
+              <Option value="high">高</Option>
+              <Option value="critical">紧急</Option>
+            </Select>
+            <Button onClick={handleReset}>
+              重置
+            </Button>
+            <Button 
+              icon={<ReloadOutlined />}
+              onClick={() => fetchSOPs()}
+            >
+              刷新
+            </Button>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              onClick={handleCreate}
+            >
+              新建SOP
+            </Button>
+          </Space>
+        }
+      >
         <Table
           columns={columns}
           dataSource={sops}

@@ -32,7 +32,7 @@ import {
   PauseCircleOutlined
 } from "@ant-design/icons";
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 // 模型类型配置
@@ -586,29 +586,18 @@ const ModelsManagement = () => {
 
   return (
     <div>
-      <div style={{ 
-        marginBottom: 24, 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: window.innerWidth < 768 ? 'flex-start' : 'center',
-        flexDirection: window.innerWidth < 768 ? 'column' : 'row',
-        gap: window.innerWidth < 768 ? 12 : 0
-      }}>
-        <div>
-          <Title level={3} style={{ margin: 0 }}>模型管理</Title>
-          <Text type="secondary">配置和管理AI模型服务</Text>
-        </div>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={handleAddModel}
-          style={window.innerWidth < 768 ? { alignSelf: 'flex-end' } : {}}
-        >
-          添加模型
-        </Button>
-      </div>
-
-      <Card>
+      <Card 
+        title="模型管理"
+        extra={
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            onClick={handleAddModel}
+          >
+            添加模型
+          </Button>
+        }
+      >
         <Table
           columns={columns}
           dataSource={models}
