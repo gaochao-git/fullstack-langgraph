@@ -31,12 +31,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000
 
 // 智能体分类选项
 const AGENT_TYPES = [
-  { value: '办公', label: '办公', color: 'blue' },
-  { value: '研发', label: '研发', color: 'green' },
-  { value: '运维', label: '运维', color: 'orange' },
-  { value: '安全', label: '安全', color: 'red' },
-  { value: '审计', label: '审计', color: 'purple' },
-  { value: '运营', label: '运营', color: 'cyan' },
+  { value: '日志分析', label: '日志分析', color: 'blue' },
+  { value: '监控告警', label: '监控告警', color: 'orange' },
+  { value: '故障诊断', label: '故障诊断', color: 'red' },
+  { value: '性能优化', label: '性能优化', color: 'green' },
+  { value: '资源管理', label: '资源管理', color: 'purple' },
+  { value: '运维部署', label: '运维部署', color: 'cyan' },
+  { value: '安全防护', label: '安全防护', color: 'volcano' },
+  { value: '合规审计', label: '合规审计', color: 'magenta' },
+  { value: '合同履约', label: '合同履约', color: 'gold' },
+  { value: '变更管理', label: '变更管理', color: 'lime' },
+  { value: '其他', label: '其他', color: 'default' },
 ];
 
 

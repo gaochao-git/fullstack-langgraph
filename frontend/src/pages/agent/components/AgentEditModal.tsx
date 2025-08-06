@@ -44,12 +44,17 @@ const { TextArea } = Input;
 
 // 智能体分类选项
 const AGENT_TYPES = [
-  { value: '办公', label: '办公' },
-  { value: '研发', label: '研发' },
-  { value: '运维', label: '运维' },
-  { value: '安全', label: '安全' },
-  { value: '审计', label: '审计' },
-  { value: '运营', label: '运营' },
+  { value: '日志分析', label: '日志分析' },
+  { value: '监控告警', label: '监控告警' },
+  { value: '故障诊断', label: '故障诊断' },
+  { value: '性能优化', label: '性能优化' },
+  { value: '资源管理', label: '资源管理' },
+  { value: '运维部署', label: '运维部署' },
+  { value: '安全防护', label: '安全防护' },
+  { value: '合规审计', label: '合规审计' },
+  { value: '合同履约', label: '合同履约' },
+  { value: '变更管理', label: '变更管理' },
+  { value: '其他', label: '其他' },
 ];
 
 interface LocalAgent {
@@ -359,7 +364,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         setEditExpandedKeys([]);
         
         form.setFieldsValue({
-          agent_type: '办公',
+          agent_type: '故障诊断',
           agent_capabilities: [],
           agent_icon: 'Bot',
           available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],

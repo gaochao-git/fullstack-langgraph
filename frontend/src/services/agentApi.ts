@@ -26,7 +26,7 @@ export interface Agent {
   id: number;
   agent_id: string;
   agent_name: string;
-  agent_type: string; // 智能体分类：办公、研发、运维、安全、审计、运营等
+  agent_type: string; // 智能体分类：日志分析、监控告警、故障诊断、性能优化、资源管理、运维部署、安全防护、合规审计、合同履约、变更管理、其他
   agent_description: string;
   agent_capabilities: string[];
   agent_version: string;
