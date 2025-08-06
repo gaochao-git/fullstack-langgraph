@@ -247,16 +247,14 @@ export default function ChatEngine({
   const loadHistoryThreads = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const response = await omind_get('/api/chat/users/zhangsan123/threads?limit=20&offset=0');
+      const data = await omind_get('/api/chat/users/zhangsan123/threads?limit=20&offset=0');
       
-      if (response.ok) {
-        const data = await response.json();
-        const threads = data.threads || [];
-        setHistoryThreads(threads);
-      } else {
-        setError('获取历史线程失败');
-      }
+      // omind_get 直接返回解析后的数据
+      const threads = data.threads || [];
+      setHistoryThreads(threads);
+      setError(null); // 清除错误状态
     } catch (error) {
+      console.error('获取历史线程出错:', error);
       setError('获取历史线程出错');
     } finally {
       setLoadingHistory(false);
