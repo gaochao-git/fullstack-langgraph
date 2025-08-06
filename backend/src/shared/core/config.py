@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     LOG_DIR: str = "logs"
 
     AUTH_MOCK: str = False
-    
+    NO_PROXY: str = ""  # 结局claude 本地开proxy影响httpx调用其他接口
     class Config:
         env_file = ".env"
         case_sensitive = True

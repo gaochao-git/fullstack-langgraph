@@ -314,4 +314,4 @@ async def get_es_indices() -> str:
 
 if __name__ == "__main__":
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="streamable-http", host="localhost", port=3003)
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=3003)
