@@ -329,10 +329,12 @@ class AuthService:
                 )
             
             # 检查数据库中的令牌状态
-            token_record = self.db.query(AuthToken).filter(
+            stmt = select(AuthToken).where(
                 AuthToken.token_jti == jti,
                 AuthToken.revoked == False
-            ).first()
+            )
+            result = await self.db.execute(stmt)
+            token_record = result.scalar_one_or_none()
             
             if not token_record:
                 raise HTTPException(
@@ -391,10 +393,12 @@ class AuthService:
         try:
             if everywhere:
                 # 撤销用户的所有令牌
-                tokens = self.db.query(AuthToken).filter(
+                stmt = select(AuthToken).where(
                     AuthToken.user_id == user_id,
                     AuthToken.revoked == False
-                ).all()
+                )
+                result = await self.db.execute(stmt)
+                tokens = result.scalars().all()
                 
                 for token in tokens:
                     token.revoked = True
@@ -403,9 +407,11 @@ class AuthService:
                     TokenBlacklist.add(token.token_jti)
             else:
                 # 只撤销当前令牌
-                token = self.db.query(AuthToken).filter(
+                stmt = select(AuthToken).where(
                     AuthToken.token_jti == current_jti
-                ).first()
+                )
+                result = await self.db.execute(stmt)
+                token = result.scalar_one_or_none()
                 
                 if token:
                     token.revoked = True
@@ -425,9 +431,11 @@ class AuthService:
         """获取用户资料"""
         try:
             # 获取RBAC用户信息
-            rbac_user = self.db.query(RbacUser).filter(
+            stmt = select(RbacUser).where(
                 RbacUser.user_id == user_id
-            ).first()
+            )
+            result = await self.db.execute(stmt)
+            rbac_user = result.scalar_one_or_none()
             
             if not rbac_user:
                 raise HTTPException(
@@ -436,12 +444,14 @@ class AuthService:
                 )
             
             # 获取认证信息
-            auth_user = self.db.query(AuthUser).filter(
+            stmt = select(AuthUser).where(
                 AuthUser.user_id == user_id
-            ).first()
+            )
+            result = await self.db.execute(stmt)
+            auth_user = result.scalar_one_or_none()
             
             # 获取角色
-            roles = self._get_user_roles(user_id)
+            roles = await self._get_user_roles(user_id)
             
             # 获取权限（这里简化处理，实际应该通过角色获取权限）
             permissions = []
@@ -473,9 +483,11 @@ class AuthService:
         """修改密码"""
         try:
             # 获取认证信息
-            auth_user = self.db.query(AuthUser).filter(
+            stmt = select(AuthUser).where(
                 AuthUser.user_id == user_id
-            ).first()
+            )
+            result = await self.db.execute(stmt)
+            auth_user = result.scalar_one_or_none()
             
             if not auth_user:
                 raise HTTPException(

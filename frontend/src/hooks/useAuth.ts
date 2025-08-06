@@ -40,12 +40,12 @@ export const useAuth = create<AuthState>((set) => ({
   login: async (username: string, password: string) => {
     try {
       const response = await authApi.login({ username, password });
-      const { token, user } = response;
+      const { access_token, user } = response;
       
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', access_token);
       set({ 
         user, 
-        token, 
+        token: access_token, 
         isAuthenticated: true,
         loading: false 
       });

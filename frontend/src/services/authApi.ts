@@ -10,13 +10,17 @@ interface LoginRequest {
 }
 
 interface LoginResponse {
-  token: string;
+  access_token: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
   user: {
     id: string;
+    user_id?: string;
     username: string;
     display_name: string;
     email: string;
-    roles?: string[];
+    roles?: any[];
   };
 }
 
@@ -74,22 +78,14 @@ class AuthApi {
    */
   async getCurrentUser(): Promise<LoginResponse['user']> {
     // 直接调用后端API，不使用mock
-    return await omind_get(`${this.baseUrl}/me`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    return await omind_get(`${this.baseUrl}/me`);
   }
 
   /**
    * 刷新token
    */
   async refreshToken(): Promise<{ token: string }> {
-    return await omind_post(`${this.baseUrl}/refresh`, {}, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    return await omind_post(`${this.baseUrl}/refresh`);
   }
 
   /**
