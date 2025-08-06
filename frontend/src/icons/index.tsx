@@ -23,6 +23,13 @@ import {
   BookOpen,
   Library,
   Bookmark,
+  Upload,
+  Share,
+  Link,
+  Copy,
+  Folder,
+  FolderPlus,
+  RefreshCw,
   
   // 智能体与AI
   Bot,
@@ -65,29 +72,23 @@ import {
   Plus,
   Edit,
   Trash2,
+  Trash,
   Eye,
   EyeOff,
   GripVertical,
 } from 'lucide-react';
 
-// 创建代理对象，为所有图标组件添加默认 size
-const createIconProxy = (IconComponent: any) => {
-  return React.forwardRef((props: any, ref: any) => {
-    return <IconComponent size={16} {...props} ref={ref} />;
-  });
-};
-
 // 导出所有图标，使用时可以直接 Icons.Bot
 export const Icons = {
   // 基础
-  Home: createIconProxy(Home),
-  User: createIconProxy(User),
-  Users: createIconProxy(Users),
-  Settings: createIconProxy(Settings),
-  Setting: createIconProxy(Settings),  // 别名兼容
-  Menu: createIconProxy(Menu),
-  Appstore: createIconProxy(Grid3x3),  // 用 Grid3x3 替代 AppstoreOutlined
-  AppWindow: createIconProxy(AppWindow),
+  Home,
+  User,
+  Users,
+  Settings,
+  Setting: Settings,  // 别名兼容
+  Menu,
+  Appstore: Grid3x3,  // 用 Grid3x3 替代 AppstoreOutlined
+  AppWindow,
   
   // 数据与文件
   Database,
@@ -98,6 +99,13 @@ export const Icons = {
   BookOpen,
   Library,
   Bookmark,
+  Upload,
+  Share,
+  Link,
+  Copy,
+  Folder,
+  FolderPlus,
+  RefreshCw,
   
   // 智能体与AI
   Bot,
@@ -146,6 +154,7 @@ export const Icons = {
   Plus,
   Edit,
   Trash2,
+  Trash,
   Eye,
   EyeOff,
   GripVertical,
