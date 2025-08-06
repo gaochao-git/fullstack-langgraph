@@ -6,6 +6,11 @@ import { useMenus } from '../hooks/useMenus';
 
 // 动态导入组件的辅助函数
 const loadComponent = (componentPath: string): React.LazyExoticComponent<React.FC> => {
+  // 使用缓存避免重复创建
+  if (componentCache[componentPath]) {
+    return componentCache[componentPath];
+  }
+
   // 如果路径不是 pages/xxx/ComponentName 格式，直接返回错误组件
   if (!componentPath.startsWith('pages/') || componentPath.split('/').length !== 3) {
     return lazy(() => Promise.resolve({ 
@@ -16,7 +21,7 @@ const loadComponent = (componentPath: string): React.LazyExoticComponent<React.F
   const pathParts = componentPath.trim().split('/');
   const [, module, componentName] = pathParts.map(part => part.trim());
   
-  return lazy(() => 
+  const component = lazy(() => 
     import(`../pages/${module}`)
       .then(m => {
         // 直接使用命名导出
@@ -30,36 +35,14 @@ const loadComponent = (componentPath: string): React.LazyExoticComponent<React.F
         return { default: () => <div>组件加载失败: {componentPath}</div> };
       })
   );
+
+  // 缓存组件
+  componentCache[componentPath] = component;
+  return component;
 };
 
-// 组件映射表 - 使用动态加载函数
-const componentMap: Record<string, React.LazyExoticComponent<React.FC>> = {
-  // Agent模块
-  'pages/agent/AgentManagement': loadComponent('pages/agent/AgentManagement'),
-  'pages/agent/AgentMarketplace': loadComponent('pages/agent/AgentMarketplace'),
-  'pages/agent/AgentChat': loadComponent('pages/agent/AgentChat'),
-  
-  // User模块
-  'pages/user/UserManagement': loadComponent('pages/user/UserManagement'),
-  'pages/user/RoleManagement': loadComponent('pages/user/RoleManagement'),
-  'pages/user/PermissionManagement': loadComponent('pages/user/PermissionManagement'),
-  'pages/user/MenuManagement': loadComponent('pages/user/MenuManagement'),
-  
-  // KB模块
-  'pages/kb/KnowledgeManagement': loadComponent('pages/kb/KnowledgeManagement'),
-  
-  // SOP模块
-  'pages/sop/SOPList': loadComponent('pages/sop/SOPList'),
-  
-  // MCP模块
-  'pages/mcp/MCPManagement': loadComponent('pages/mcp/MCPManagement'),
-  
-  // AI模型模块
-  'pages/ai_model/ModelsManagement': loadComponent('pages/ai_model/ModelsManagement'),
-  
-  // 任务调度模块
-  'pages/scheduled_task/TasksManagement': loadComponent('pages/scheduled_task/TasksManagement'),
-};
+// 组件缓存，避免重复创建相同的懒加载组件
+const componentCache: Record<string, React.LazyExoticComponent<React.FC>> = {};
 
 // 加载中组件
 const LoadingComponent = () => (
@@ -84,13 +67,8 @@ const generateRoutes = (menus: MenuTreeNode[]): React.ReactElement[] => {
       
       // 如果有组件路径，尝试加载组件
       if (menu.menu_component && menu.route_path) {
-        // 优先使用预定义的组件映射，如果没有则动态加载
-        let Component = componentMap[menu.menu_component];
-        
-        if (!Component) {
-          // 动态加载未预定义的组件
-          Component = loadComponent(menu.menu_component);
-        }
+        // 直接使用动态加载
+        const Component = loadComponent(menu.menu_component);
         
         if (Component) {
           // 为动态路由（如 /service/agents/:agentId）生成额外的路由
@@ -102,7 +80,7 @@ const generateRoutes = (menus: MenuTreeNode[]): React.ReactElement[] => {
                 path={`${menu.route_path}/:agentId`}
                 element={
                   <Suspense fallback={<LoadingComponent />}>
-                    {React.createElement(componentMap['pages/agent/AgentChat'])}
+                    {React.createElement(loadComponent('pages/agent/AgentChat'))}
                   </Suspense>
                 }
               />
