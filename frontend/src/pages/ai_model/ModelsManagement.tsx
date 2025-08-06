@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTheme } from '../../../hooks/ThemeContext';
+import { useTheme } from '../../hooks/ThemeContext';
 import { 
   Card, 
   Row, 
