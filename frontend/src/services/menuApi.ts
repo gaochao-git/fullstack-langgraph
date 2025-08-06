@@ -39,6 +39,7 @@ export class MenuApiService {
       // 返回空菜单
       return {
         menus: [],
+        routes: [],
         permissions: []
       };
     }

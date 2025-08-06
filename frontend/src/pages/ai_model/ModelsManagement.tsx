@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from '../../hooks/ThemeContext';
 import { 
   Card, 
@@ -6,10 +6,8 @@ import {
   Col, 
   Typography, 
   Tag, 
-  Avatar, 
   Button, 
   Space, 
-  Statistic, 
   Modal, 
   Form, 
   Input, 
@@ -21,7 +19,6 @@ import {
   Tooltip
 } from "antd";
 import { 
-  ApiOutlined, 
   PlusOutlined, 
   EditOutlined, 
   DeleteOutlined,
@@ -398,7 +395,7 @@ const ModelsManagement = () => {
   // 表单中的测试连接
   const handleFormTestConnection = async () => {
     try {
-      const values = await form.validateFields(['endpoint', 'provider', 'model']);
+      await form.validateFields(['endpoint', 'provider', 'model']);
       // 获取完整的表单值包括apiKey
       const allValues = form.getFieldsValue();
       setFormTestStatus('testing');
@@ -536,7 +533,7 @@ const ModelsManagement = () => {
       key: 'actions',
       width: 180,
       fixed: window.innerWidth >= 768 ? 'right' as const : undefined,
-      render: (_, record: ModelConfig) => (
+      render: (_: any, record: ModelConfig) => (
         <Space size={window.innerWidth < 768 ? 4 : 8}>
           <Tooltip title="测试连接">
             <Button 
