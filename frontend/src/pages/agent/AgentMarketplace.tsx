@@ -5,16 +5,10 @@ import {
   RobotOutlined, 
   SettingOutlined, 
   UserOutlined,
-  BulbOutlined,
-  HeartOutlined,
-  BookOutlined,
-  CodeOutlined,
-  CustomerServiceOutlined,
   ToolOutlined
 } from "@ant-design/icons";
 import { 
   categoryColors,
-  iconCategoryMap,
   renderIcon,
   getIconBackgroundColor
 } from './components/AgentIconSystem';
