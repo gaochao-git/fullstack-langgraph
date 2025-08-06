@@ -24,5 +24,3 @@ export type {
   ScheduledTaskListParams
 } from '../../services/scheduledTaskApi';
 
-// === 默认导出 ===
-export { default } from './pages/TasksManagement';

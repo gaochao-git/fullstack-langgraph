@@ -22,5 +22,3 @@ export type {
   MCPTestResponse
 } from '../../services/mcpApi';
 
-// === 默认导出 ===
-export { default } from './pages/MCPManagement';

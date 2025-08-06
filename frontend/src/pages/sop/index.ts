@@ -26,5 +26,3 @@ export { SOPApi, SOPUtils } from '../../services/sopApi';
 // === 类型定义 ===
 export * from './types/sop';
 
-// === 默认导出 ===
-export { default } from './pages/SOPList';
