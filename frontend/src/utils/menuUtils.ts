@@ -4,50 +4,28 @@
  */
 
 import { MenuTreeNode } from '../types/menu';
-import * as Icons from '@ant-design/icons';
-import * as LucideIcons from 'lucide-react';
 import { createElement } from 'react';
-import iconConfig from '../icons/icon-config.json';
+import { Icons as GlobalIcons, type IconName } from '../icons';
 
 /**
- * 根据图标名称获取图标组件（支持 Ant Design 和 Lucide 图标）
+ * 根据图标名称获取图标组件
  */
 export const getAntdIcon = (iconName: string) => {
   if (!iconName) return null;
   
-  // 处理 lucide: 前缀的图标
-  if (iconName.startsWith('lucide:')) {
-    const lucideIconName = iconName.replace('lucide:', '');
-    
-    // 将 kebab-case 转换为 PascalCase
-    const pascalCaseName = lucideIconName
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join('');
-    
-    
-    // 检查图标是否在配置文件中定义
-    if (iconConfig.icons[iconName]) {
-      const LucideIconComponent = (LucideIcons as any)[pascalCaseName];
-      
-      if (LucideIconComponent) {
-        return createElement(LucideIconComponent, { 
-          size: 16,
-          style: { color: 'currentColor' } 
-        });
-      }
-    }
-    
-    return createElement(Icons.AppstoreOutlined);
+  // 直接使用图标名称
+  if (iconName in GlobalIcons) {
+    const IconComponent = GlobalIcons[iconName as IconName];
+    // 为菜单栏设置一致的图标大小
+    return createElement(IconComponent as any, {
+      size: 16
+    });
   }
   
-  // 处理 Ant Design 图标
-  const IconComponent = (Icons as any)[iconName];
-  
-  if (IconComponent) {
-    return createElement(IconComponent);
-  }
-  return createElement(Icons.AppstoreOutlined);
+  // 默认图标
+  return createElement(GlobalIcons.Appstore as any, {
+    size: 16
+  });
 };
 
 /**

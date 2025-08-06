@@ -3,14 +3,9 @@ import {
   Tree, Card, Form, Input, Select, Button, Space, 
   message, Modal, Spin
 } from 'antd';
-import { 
-  PlusOutlined, EditOutlined, DeleteOutlined, 
-  EyeOutlined, EyeInvisibleOutlined,
-  HomeOutlined, MenuOutlined, HolderOutlined
-} from '@ant-design/icons';
+import { Icons } from '@/icons';
 import type { DataNode, TreeProps } from 'antd/es/tree';
 import iconConfig from '../../../icons/icon-config.json';
-import { renderIcon } from '../../agent/components/AgentIconSystem';
 
 interface MenuNode extends DataNode {
   key: string;
@@ -87,29 +82,27 @@ const IconSelector: React.FC<{
 
 // 图标显示组件
 const IconDisplay: React.FC<{ iconKey: string; size?: number }> = ({ iconKey, size = 16 }) => {
-  // 检查是否是新格式的图标键（lucide:xxx）
-  if (iconKey && iconKey.includes(':')) {
-    const [provider, iconName] = iconKey.split(':');
-    if (provider === 'lucide') {
-      // 转换短横线命名为帕斯卡命名 (kebab-case to PascalCase)
-      const pascalCaseName = iconName
-        .split('-')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join('');
-      
-      try {
-        // 使用 AgentIconSystem 渲染图标
-        return <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {renderIcon(pascalCaseName, size)}
-        </div>;
-      } catch (error) {
-        // Icon not found, will fall back to default
-      }
-    }
+  if (!iconKey) return null;
+  
+  // 直接使用图标名称，如果是 lucide: 前缀的，提取图标名
+  const iconName = iconKey.startsWith('lucide:') ? iconKey.substring(7) : iconKey;
+  
+  // 转换图标名称格式（kebab-case to PascalCase）
+  const iconComponentName = iconName
+    .split('-')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+  
+  // 获取对应的图标组件
+  const IconComponent = Icons[iconComponentName as keyof typeof Icons];
+  
+  if (!IconComponent) {
+    // 如果找不到图标，使用默认图标
+    return <Icons.Menu size={size} />;
   }
   
-  // 兼容旧格式或显示默认图标
-  return <MenuOutlined style={{ fontSize: size, color: '#999' }} />;
+  // 渲染图标
+  return <IconComponent size={size} />;
 };
 
 export function MenuManagement() {
@@ -313,7 +306,7 @@ export function MenuManagement() {
             </span>
             <span>{menu.menu_name}</span>
             {menu.show_menu === 0 && (
-              <EyeInvisibleOutlined style={{ marginLeft: 8, color: '#999' }} />
+              <Icons.EyeOff size={14} style={{ marginLeft: 8, color: '#999' }} />
             )}
           </div>
         ),
@@ -399,7 +392,7 @@ export function MenuManagement() {
     if (currentDepth < 5) {
       menuActions.push({
         key: 'addChild',
-        icon: <PlusOutlined />,
+        icon: <Icons.Plus size={16} />,
         label: '添加子菜单',
         onClick: () => {
           hideContextMenu();
@@ -411,7 +404,7 @@ export function MenuManagement() {
     // 所有菜单都可以编辑
     menuActions.push({
       key: 'edit',
-      icon: <EditOutlined />,
+      icon: <Icons.Edit size={16} />,
       label: '编辑菜单',
       onClick: () => {
         hideContextMenu();
@@ -423,7 +416,7 @@ export function MenuManagement() {
     menuActions.push(
       {
         key: 'delete',
-        icon: <DeleteOutlined />,
+        icon: <Icons.Trash2 size={16} />,
         label: '删除',
         danger: true,
         onClick: () => {
@@ -442,7 +435,7 @@ export function MenuManagement() {
       menuActions.splice(-1, 0, 
         {
           key: 'toggle',
-          icon: menu.show_menu ? <EyeInvisibleOutlined /> : <EyeOutlined />,
+          icon: menu.show_menu ? <Icons.EyeOff size={16} /> : <Icons.Eye size={16} />,
           label: menu.show_menu ? '隐藏' : '显示',
           onClick: () => {
             hideContextMenu();
@@ -1101,11 +1094,10 @@ export function MenuManagement() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <HomeOutlined style={{ marginRight: 8 }} />
+              <Icons.Home size={16} style={{ marginRight: 8 }} />
               菜单树
             </div>
             <div style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>
-              <HolderOutlined style={{ marginRight: 4 }} />
               可拖拽调整菜单顺序和层级
             </div>
           </div>
@@ -1159,7 +1151,6 @@ export function MenuManagement() {
           !editMode && selectedMenu && (
             <Button 
               type="primary" 
-              icon={<EditOutlined />}
               onClick={() => handleEdit({
                 menu_id: selectedMenu.menu_id,
                 menu_name: selectedMenu.menu_name,
@@ -1290,7 +1281,6 @@ export function MenuManagement() {
             background: '#fafafa',
             borderRadius: 6
           }}>
-            <HomeOutlined style={{ fontSize: 48, marginBottom: 16 }} />
             <div>请在左侧选择一个菜单项进行查看或编辑</div>
           </div>
         )}
