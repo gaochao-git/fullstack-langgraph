@@ -2,7 +2,7 @@ import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { ChatMessages, type ProcessedEvent } from "./ChatMessage";
+import ChatMessages, { type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
 import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";

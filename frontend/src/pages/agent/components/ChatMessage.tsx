@@ -7,7 +7,7 @@ import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/utils/lib-utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
-import { DiagnosticAgentWelcome } from "./DiagnosticAgentWelcome";
+import DiagnosticAgentWelcome from "./DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 
@@ -728,7 +728,7 @@ interface ChatMessagesProps {
 }
 
 // 诊断聊天视图组件
-export function ChatMessages({
+function ChatMessages({
   messages,
   isLoading,
   onSubmit,
@@ -1272,3 +1272,5 @@ export function ChatMessages({
     </div>
   );
 }
+
+export default ChatMessages;

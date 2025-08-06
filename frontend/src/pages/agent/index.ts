@@ -1,15 +1,13 @@
-// Agent module exports
-// Remove agentApi export to avoid circular dependencies
-import AgentManagement from './AgentManagement';
-import AgentMarketplace from './AgentMarketplace';
-import AgentChat from './AgentChat';
-import ChatEngine from './components/ChatEngine';
-import GenericAgentWelcome from './components/GenericAgentWelcome';
+// 页面组件导出
+export { default as AgentManagement } from './AgentManagement';
+export { default as AgentMarketplace } from './AgentMarketplace';
+export { default as AgentChat } from './AgentChat';
 
-export {AgentManagement,AgentMarketplace,AgentChat,ChatEngine,GenericAgentWelcome};
-// Chat component exports
-export { ChatMessages } from './components/ChatMessage';
-export { DiagnosticAgentWelcome } from './components/DiagnosticAgentWelcome';
+// 聊天相关组件导出
+export { default as ChatEngine } from './components/ChatEngine';
+export { default as GenericAgentWelcome } from './components/GenericAgentWelcome';
+export { default as DiagnosticAgentWelcome } from './components/DiagnosticAgentWelcome';
+export { default as ChatMessages } from './components/ChatMessage';
+
+// 类型导出
 export type { ProcessedEvent } from './components/ChatMessage';
-// 默认导出以保持兼容性
-export default AgentManagement;
