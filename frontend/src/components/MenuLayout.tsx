@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link, Outlet, useNavigate } from 'react-router-dom';
-import { Layout, Menu, theme, Breadcrumb, Spin, Drawer, Dropdown, Avatar, Space } from 'antd';
-import { HomeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, UserOutlined } from '@ant-design/icons';
+import { Layout, Menu, theme, Breadcrumb, Spin, Drawer, Dropdown, Avatar, Space, Select } from 'antd';
+import { HomeOutlined, MenuFoldOutlined, MenuUnfoldOutlined, LogoutOutlined, UserOutlined, SwapOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { useMenus } from '../hooks/useMenus';
 import { transformMenusForAntd } from '../utils/menuUtils';
@@ -15,7 +15,7 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { menus, loading: menuLoading, breadcrumb } = useMenus();
-  const { user, logout } = useAuth();
+  const { user, logout, switchRole } = useAuth();
   const { isDark } = useTheme();
   const {
     token: { colorBgContainer, borderRadiusLG },
@@ -239,10 +239,49 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                   {
                     key: 'userInfo',
                     label: (
-                      <Space>
-                        <UserOutlined />
-                        <span>{user?.display_name || user?.username}</span>
-                      </Space>
+                      <div style={{ padding: '4px 0' }}>
+                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <UserOutlined />
+                            <span style={{ fontWeight: 500 }}>{user?.display_name || user?.username || '未获取'}</span>
+                          </div>
+                          <div style={{ paddingLeft: 24, fontSize: 12, color: '#666' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>角色：</span>
+                              {user?.roles && Array.isArray(user.roles) && user.roles.length > 1 ? (
+                                <Select
+                                  size="small"
+                                  style={{ fontSize: 12, minWidth: 100 }}
+                                  value={user.current_role ? (typeof user.current_role === 'string' ? user.current_role : user.current_role.role_id) : undefined}
+                                  onChange={(roleId) => switchRole(roleId)}
+                                  placeholder="选择角色"
+                                  suffixIcon={<SwapOutlined />}
+                                >
+                                  {user.roles.map(role => {
+                                    const roleId = typeof role === 'string' ? role : role.role_id;
+                                    const roleName = typeof role === 'string' ? role : role.role_name;
+                                    return (
+                                      <Select.Option key={roleId} value={roleId}>
+                                        {roleName}
+                                      </Select.Option>
+                                    );
+                                  })}
+                                </Select>
+                              ) : (
+                                <span>
+                                  {user?.roles ? (
+                                    Array.isArray(user.roles) ? 
+                                      user.roles.map(r => typeof r === 'string' ? r : r.role_name).join(', ') : 
+                                      user.roles
+                                  ) : '未获取'}
+                                </span>
+                              )}
+                            </div>
+                            <div>部门：{user?.department || '未获取'}</div>
+                            <div>团队：{user?.team || '未获取'}</div>
+                          </div>
+                        </Space>
+                      </div>
                     ),
                     disabled: true,
                     style: { cursor: 'default' }
@@ -466,8 +505,15 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
             borderTop: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.06)',
             background: isDark ? '#141414' : '#fff'
           }}>
-            <div style={{ marginBottom: 12, fontSize: 14, color: isDark ? '#fff' : '#000' }}>
-              {user?.display_name || user?.username}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8, fontSize: 16, fontWeight: 500, color: isDark ? '#fff' : '#000' }}>
+                {user?.display_name || user?.username || '未获取'}
+              </div>
+              <div style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)', lineHeight: 1.6 }}>
+                <div>角色：{user?.roles ? (Array.isArray(user.roles) ? user.roles.map(r => typeof r === 'string' ? r : r.role_name).join(', ') : user.roles) : '未获取'}</div>
+                <div>部门：{user?.department || '未获取'}</div>
+                <div>团队：{user?.team || '未获取'}</div>
+              </div>
             </div>
             <button
               onClick={() => {

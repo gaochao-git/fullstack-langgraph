@@ -1,12 +1,22 @@
 import { create } from 'zustand';
 import { authApi } from '../services/authApi';
 
+interface Role {
+  role_id: string;
+  role_name: string;
+  role_code?: string;
+  is_active?: boolean;
+}
+
 interface User {
   id: string;
   username: string;
   display_name: string;
   email: string;
-  roles?: string[];
+  roles?: Role[] | string[];
+  current_role?: Role | string;
+  department?: string;
+  team?: string;
 }
 
 interface AuthState {
@@ -18,6 +28,7 @@ interface AuthState {
   ssoLogin: () => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
+  switchRole: (roleId: string) => Promise<void>;
 }
 
 export const useAuth = create<AuthState>((set) => ({
@@ -90,5 +101,15 @@ export const useAuth = create<AuthState>((set) => ({
         loading: false 
       });
     }
+  },
+
+  switchRole: async (roleId: string) => {
+    // 将来实现角色切换功能
+    // 预期流程：
+    // 1. 调用后端API切换角色
+    // 2. 获取新的token和权限
+    // 3. 更新用户状态和当前角色
+    // 4. 刷新菜单和权限
+    console.log('角色切换功能待实现', roleId);
   }
 }));
