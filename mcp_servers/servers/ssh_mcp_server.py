@@ -437,4 +437,4 @@ async def execute_system_command(
 
 if __name__ == "__main__":
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="sse", host="0.0.0.0", port=3002)
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=3002)

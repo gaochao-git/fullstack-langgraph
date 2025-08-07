@@ -22,26 +22,7 @@ SERVERS=("db_query" "ssh_exec" "es_search" "zabbix_monitor")
 PORTS=(3001 3002 3003 3004)
 PID_DIR="pids"
 LOG_DIR="logs"
-CONFIG_FILE="config.yaml"
 
-# 获取服务器配置
-get_server_config() {
-    local server=$1
-    case $server in
-        db_query)
-            echo "port: 3001"
-            ;;
-        ssh_exec)
-            echo "port: 3002"
-            ;;
-        es_search)
-            echo "port: 3003"
-            ;;
-        zabbix_monitor)
-            echo "port: 3004"
-            ;;
-    esac
-}
 
 # 获取Python命令
 get_mcp_python() {
@@ -81,30 +62,6 @@ init() {
     fi
     log_done "Python环境检查通过"
     
-    log_step "检查配置文件..."
-    if [ ! -f "$CONFIG_FILE" ]; then
-        log_warning "配置文件不存在: $CONFIG_FILE"
-        log_info "创建默认配置..."
-        cat > "$CONFIG_FILE" << 'EOF'
-# MCP Servers 配置文件
-servers:
-  db_query:
-    port: 3001
-    enabled: true
-  ssh_exec:
-    port: 3002
-    enabled: true
-  es_search:
-    port: 3003
-    enabled: true
-  zabbix_monitor:
-    port: 3004
-    enabled: true
-EOF
-        log_done "默认配置已创建"
-    else
-        log_done "配置文件就绪"
-    fi
     
     log_step "安装依赖包..."
     if [ -f "requirements.txt" ]; then
@@ -149,7 +106,24 @@ start_server() {
     export MCP_SERVER_NAME="$server"
     export MCP_SERVER_PORT="$port"
     
-    nohup $python_cmd "${server}_server.py" > "$log_file" 2>&1 &
+    # 根据服务器名称确定实际的Python文件
+    local py_file=""
+    case $server in
+        db_query)
+            py_file="servers/db_mcp_server.py"
+            ;;
+        ssh_exec)
+            py_file="servers/ssh_mcp_server.py"
+            ;;
+        es_search)
+            py_file="servers/es_mcp_server.py"
+            ;;
+        zabbix_monitor)
+            py_file="servers/zabbix_mcp_server.py"
+            ;;
+    esac
+    
+    nohup $python_cmd "$py_file" > "$log_file" 2>&1 &
     local pid=$!
     echo $pid > "$pid_file"
     

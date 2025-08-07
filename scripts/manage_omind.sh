@@ -544,10 +544,10 @@ show_access_info() {
     log_info "  MCP Gateway: http://localhost:5235"
     echo
     log_info "MCP服务器:"
-    log_info "  数据库查询: http://localhost:3001/sse/"
-    log_info "  SSH执行: http://localhost:3002/sse/"
-    log_info "  ES搜索: http://localhost:3003/sse/"
-    log_info "  Zabbix监控: http://localhost:3004/sse/"
+    log_info "  数据库查询: http://localhost:3001/mcp"
+    log_info "  SSH执行: http://localhost:3002/mcp"
+    log_info "  ES搜索: http://localhost:3003/mcp"
+    log_info "  Zabbix监控: http://localhost:3004/mcp"
     print_separator
 }
 
