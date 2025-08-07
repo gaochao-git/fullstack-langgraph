@@ -155,14 +155,25 @@ else
     log_warning "未找到mcp_servers目录，跳过MCP服务器"
 fi
 
-# 4. 复制部署脚本
+# 4. 复制部署脚本和管理脚本
 log_info "📝 准备部署脚本..."
+# 复制scripts目录（包含manage_omind.sh和公共函数库）
 if [ -d "scripts" ]; then
-    # 复制所有脚本到scripts目录
     cp -r scripts "$TEMP_BUILD_DIR/$PACKAGE_NAME/scripts"
     chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/scripts"/*.sh
-    log_info "  ✅ 所有管理脚本"
+    chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/scripts/common"/*.sh 2>/dev/null || true
+    log_info "  ✅ manage_omind.sh 统一管理脚本"
+    log_info "  ✅ 公共函数库"
 fi
+
+# 复制组件管理脚本
+for component in backend mcp_servers mcp_gateway; do
+    if [ -f "$component/manage.sh" ]; then
+        cp "$component/manage.sh" "$TEMP_BUILD_DIR/$PACKAGE_NAME/$component/manage.sh"
+        chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/$component/manage.sh"
+        log_info "  ✅ $component/manage.sh"
+    fi
+done
 
 # 5. 创建统一启动脚本
 log_info "📝 创建统一管理脚本..."
@@ -427,7 +438,7 @@ echo ""
 log_info "部署信息:"
 log_info "  平台名称: OMind 智能运维平台"
 log_info "  部署路径: $DEPLOY_PATH"
-log_info "  前端地址: http://localhost/"
+log_info "  前端地址: http://localhost:3000"
 log_info "  后端API: http://localhost:8000/api/"
 
 echo ""
@@ -811,18 +822,25 @@ log_info "🚀 部署步骤:"
 log_info "1. 传输到目标服务器:"
 log_info "   make trans"
 log_info ""
-log_info "2. 在目标服务器上使用 manage_omind.sh 进行运维:"
+log_info "2. 在目标服务器上解压并部署:"
+log_info "   tar -xzf ${PACKAGE_NAME}.tar.gz"
+log_info "   cd ${PACKAGE_NAME}"
+log_info ""
+log_info "3. 使用 manage_omind.sh 进行运维:"
 log_info "   初始化项目:"
-log_info "   ./manage_omind.sh init --deploy-path=/data --python-path=/usr/bin/python3 --package=/tmp/${PACKAGE_NAME}.tar.gz"
+log_info "   ./scripts/manage_omind.sh init --deploy-path=/data/omind --package=/tmp/${PACKAGE_NAME}.tar.gz"
 log_info ""
 log_info "   启动所有服务:"
-log_info "   ./manage_omind.sh start"
+log_info "   ./scripts/manage_omind.sh start"
 log_info ""
-log_info "   关闭所有服务:"
-log_info "   ./manage_omind.sh stop"
+log_info "   查看服务状态:"
+log_info "   ./scripts/manage_omind.sh status"
+log_info ""
+log_info "   停止所有服务:"
+log_info "   ./scripts/manage_omind.sh stop"
 log_info ""
 log_info "   升级版本:"
-log_info "   ./manage_omind.sh upgrade --package=/tmp/${PACKAGE_NAME}.tar.gz"
+log_info "   ./scripts/manage_omind.sh upgrade --package=/tmp/omind-new-version.tar.gz"
 
 echo ""
 log_info "🌐 部署后访问地址:"

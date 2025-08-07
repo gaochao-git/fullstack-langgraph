@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# 颜色定义库
+# 为所有管理脚本提供统一的颜色输出
+
+# 基础颜色
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+NC='\033[0m' # No Color
+
+# 加粗颜色
+BOLD_RED='\033[1;31m'
+BOLD_GREEN='\033[1;32m'
+BOLD_YELLOW='\033[1;33m'
+BOLD_BLUE='\033[1;34m'
+
+# 背景颜色
+BG_RED='\033[41m'
+BG_GREEN='\033[42m'
+BG_YELLOW='\033[43m'
+BG_BLUE='\033[44m'
+
+# 特殊效果
+BOLD='\033[1m'
+UNDERLINE='\033[4m'
+BLINK='\033[5m'
+REVERSE='\033[7m'
+
+# 导出所有颜色变量
+export RED GREEN YELLOW BLUE PURPLE CYAN WHITE NC
+export BOLD_RED BOLD_GREEN BOLD_YELLOW BOLD_BLUE
+export BG_RED BG_GREEN BG_YELLOW BG_BLUE
+export BOLD UNDERLINE BLINK REVERSE

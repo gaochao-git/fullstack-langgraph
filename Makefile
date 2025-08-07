@@ -1,16 +1,22 @@
-.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev-mcp dev prod test clean build trans
+.PHONY: help install install-frontend install-backend dev-frontend dev-backend dev-mcp dev prod test clean build trans start stop restart status
 
 help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "🚀 Development:"
 	@echo "  make install         - Install all dependencies (frontend + backend)"
-	@echo "  make dev             - Start local development servers (frontend + backend)"
+	@echo "  make dev             - Start all services + frontend dev server"
 	@echo "  make dev-frontend    - Start frontend development server only"
 	@echo "  make dev-backend     - Start backend development server only"
+	@echo "  make dev-mcp         - Start MCP servers only"
+	@echo ""
+	@echo "🎮 Service Management:"
+	@echo "  make start           - Start all services (backend + MCP)"
+	@echo "  make stop            - Stop all services"
+	@echo "  make restart         - Restart all services"
+	@echo "  make status          - Check service status"
 	@echo ""
 	@echo "🏭 Production:"
-	@echo "  make prod            - Start production server"
 	@echo "  make build           - Build production deployment package"
 	@echo "  make trans           - Transfer package to remote server"
 	@echo ""
@@ -43,12 +49,14 @@ dev-backend:
 # Development MCP servers
 dev-mcp:
 	@echo "🔧 Starting MCP servers..."
-	@cd scripts && ./start_mcp.sh
+	@cd mcp_servers && ./manage.sh start
 
 # Run all development servers concurrently
 dev:
-	@echo "🚀 Starting frontend, backend and MCP servers..."
-	@make dev-mcp && make dev-frontend & make dev-backend
+	@echo "🚀 Starting all development servers..."
+	@./scripts/manage_omind.sh start
+	@echo "🖥️  Starting frontend development server..."
+	@cd frontend && npm run dev
 
 # Production server
 prod:
@@ -78,10 +86,10 @@ trans:
 	fi; \
 	echo "📦 Transferring $$LATEST_PACKAGE..."; \
 	echo "📡 Copying to root@82.156.146.51:/tmp/"; \
-	scp "$$LATEST_PACKAGE" manage_omind.sh root@82.156.146.51:/tmp/ && \
+	scp "$$LATEST_PACKAGE" root@82.156.146.51:/tmp/ && \
 	echo "✅ Successfully transferred:" && \
 	echo "   - Package: /tmp/$$(basename $$LATEST_PACKAGE)" && \
-	echo "   - Script:  /tmp/manage_omind.sh"
+	echo "   - 解压后使用: ./scripts/manage_omind.sh init"
 
 
 # Clean build artifacts
@@ -91,3 +99,20 @@ clean:
 	@cd backend && find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@cd backend && find . -name "*.pyc" -delete 2>/dev/null || true
 	@rm -rf dist
+
+# Service management commands
+start:
+	@echo "🚀 Starting all services..."
+	@./scripts/manage_omind.sh start
+
+stop:
+	@echo "🛑 Stopping all services..."
+	@./scripts/manage_omind.sh stop
+
+restart:
+	@echo "🔄 Restarting all services..."
+	@./scripts/manage_omind.sh restart
+
+status:
+	@echo "📊 Checking service status..."
+	@./scripts/manage_omind.sh status

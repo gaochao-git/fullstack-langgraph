@@ -8,6 +8,25 @@ OMind (Operational Mind) 是一个基于AI的智能运维平台，集成了故�
 
 ## 常用开发命令
 
+### 服务管理（标准化）
+
+从2025年1月开始，所有组件使用标准化的 `manage.sh` 脚本管理：
+
+```bash
+# 统一管理所有服务（推荐）
+./scripts/manage_omind.sh init      # 初始化所有组件
+./scripts/manage_omind.sh start     # 启动所有服务
+./scripts/manage_omind.sh status    # 查看服务状态
+./scripts/manage_omind.sh stop      # 停止所有服务
+./scripts/manage_omind.sh restart   # 重启所有服务
+./scripts/manage_omind.sh cleanup   # 清理临时文件
+
+# 单独管理各组件
+cd backend && ./manage.sh {init|start|stop|restart|status|cleanup}
+cd mcp_servers && ./manage.sh {init|start|stop|restart|status|cleanup}
+cd mcp_gateway && ./manage.sh {init|start|stop|restart|status|cleanup}
+```
+
 ### 本地开发
 
 ```bash
@@ -19,11 +38,8 @@ make install              # 安装所有依赖（前后端）
 make install-backend      # 仅安装后端依赖
 make install-frontend     # 仅安装前端依赖
 
-# 启动开发环境
-make dev                  # 同时启动前端、后端和MCP服务器
-make dev-frontend         # 仅启动前端开发服务器
-make dev-backend          # 仅启动后端开发服务器
-make dev-mcp             # 仅启动MCP服务器
+# 前端开发服务器
+cd frontend && npm run dev
 
 # 测试
 make test                 # 运行后端测试
@@ -97,9 +113,15 @@ fullstack-langgraph/
 │   └── cmd/mcp-gateway/     # MCP网关入口
 │
 ├── celery_task/             # 异步任务模块
-├── scripts/                 # 部署和管理脚本
+├── scripts/                 # 统一管理脚本
+│   ├── manage_omind.sh      # 统一管理入口
+│   └── common/              # 公共函数库
+│       ├── colors.sh        # 颜色定义
+│       ├── logger.sh        # 日志函数
+│       └── utils.sh         # 工具函数
+│
 ├── Makefile                 # 构建和开发命令
-└── manage_omind.sh          # 生产环境管理脚本
+└── build_omind.sh           # 打包部署脚本
 ```
 
 ### 核心业务流程
@@ -141,6 +163,31 @@ fullstack-langgraph/
 
 ### 部署流程
 
-1. 本地打包: `make build` 生成omind-xxx.tar.gz
+1. 本地打包: `make build` 或 `./build_omind.sh` 生成omind-xxx.tar.gz
 2. 传输到服务器: `make trans`
-3. 远程部署: 使用manage_omind.sh脚本进行部署管理
+3. 远程部署:
+   ```bash
+   # 初次部署
+   tar -xzf omind-xxx.tar.gz
+   cd omind-xxx
+   ./scripts/manage_omind.sh init --deploy-path=/data/omind
+   ./scripts/manage_omind.sh start
+   
+   # 后续管理
+   cd /data/omind
+   ./scripts/manage_omind.sh status
+   ./scripts/manage_omind.sh restart
+   
+   # 升级
+   ./scripts/manage_omind.sh upgrade --package=/tmp/omind-new.tar.gz
+   ```
+
+### 管理脚本标准
+
+所有组件的 `manage.sh` 脚本都支持以下标准命令：
+- `init`: 初始化组件（创建目录、安装依赖等）
+- `start`: 启动服务
+- `stop`: 停止服务
+- `restart`: 重启服务
+- `status`: 查看服务状态
+- `cleanup`: 清理临时文件和日志
