@@ -24,23 +24,8 @@ PID_DIR="pids"
 LOG_DIR="logs"
 
 
-# 获取Python命令
-get_mcp_python() {
-    # 1. 优先使用conda环境
-    if command_exists conda; then
-        echo "conda run -n ${CONDA_ENV:-py312} python"
-        return
-    fi
-    
-    # 2. 使用虚拟环境
-    if [ -d "../venv" ] && [ -f "../venv/bin/python" ]; then
-        echo "../venv/bin/python"
-        return
-    fi
-    
-    # 3. 使用系统Python
-    get_python_cmd
-}
+# 直接使用当前环境的 python
+# 假设用户已经 source ../venv/bin/activate
 
 # 初始化组件
 init() {
@@ -53,19 +38,13 @@ init() {
     log_done "目录创建完成"
     
     log_step "检查Python环境..."
-    local python_cmd=$(get_mcp_python)
-    log_info "Python命令: $python_cmd"
-    
-    if ! check_python_version 3.11; then
-        log_error "Python版本不满足要求"
-        return 1
-    fi
-    log_done "Python环境检查通过"
+    log_info "Python版本: $(python --version)"
+    log_done "使用当前激活的Python环境"
     
     
     log_step "安装依赖包..."
     if [ -f "requirements.txt" ]; then
-        $python_cmd -m pip install -r requirements.txt
+        pip install -r requirements.txt
         log_done "依赖包安装完成"
     else
         log_warning "未找到requirements.txt文件"
@@ -95,8 +74,7 @@ start_server() {
         return 1
     fi
     
-    # 获取Python命令
-    local python_cmd=$(get_mcp_python)
+    # 使用当前环境的Python
     
     # 启动服务器
     log_info "启动 $server (端口: $port)..."
@@ -123,7 +101,7 @@ start_server() {
             ;;
     esac
     
-    nohup $python_cmd "$py_file" > "$log_file" 2>&1 &
+    nohup python "$py_file" > "$log_file" 2>&1 &
     local pid=$!
     echo $pid > "$pid_file"
     

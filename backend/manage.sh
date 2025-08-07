@@ -22,25 +22,9 @@ PORT=8000
 PID_FILE="pids/backend.pid"
 LOG_DIR="logs"
 LOG_FILE="$LOG_DIR/backend.log"
-VENV_DIR="../venv"
 
-# 获取Python命令
-get_backend_python() {
-    # 1. 优先使用虚拟环境
-    if [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/python" ]; then
-        echo "$VENV_DIR/bin/python"
-        return
-    fi
-    
-    # 2. 使用conda环境
-    if command_exists conda; then
-        echo "conda run -n ${CONDA_ENV:-py312} python"
-        return
-    fi
-    
-    # 3. 使用系统Python
-    get_python_cmd
-}
+# 直接使用当前环境的 python 和 pip
+# 假设用户已经 source venv/bin/activate
 
 # 初始化组件
 init() {
@@ -54,29 +38,15 @@ init() {
     log_done "目录创建完成"
     
     log_step "检查Python环境..."
-    local python_cmd=$(get_backend_python)
-    log_info "Python命令: $python_cmd"
-    
-    if ! check_python_version 3.11; then
-        log_error "Python版本不满足要求"
-        return 1
-    fi
-    log_done "Python环境检查通过"
+    log_info "Python版本: $(python --version)"
+    log_done "使用当前激活的Python环境"
     
     log_step "安装依赖包..."
     if [ -f "requirements.txt" ]; then
-        $python_cmd -m pip install -r requirements.txt
+        pip install -r requirements.txt
         log_done "依赖包安装完成"
     else
         log_warning "未找到requirements.txt文件"
-    fi
-    
-    log_step "初始化数据库..."
-    if [ -f "alembic.ini" ]; then
-        $python_cmd -m alembic upgrade head
-        log_done "数据库初始化完成"
-    else
-        log_warning "未找到alembic配置，跳过数据库初始化"
     fi
     
     log_success "$COMPONENT_NAME 初始化完成"
@@ -104,11 +74,7 @@ start() {
     ensure_dir "$LOG_DIR"
     ensure_dir "$(dirname "$PID_FILE")"
     
-    # 获取Python命令
-    local python_cmd=$(get_backend_python)
-    
     log_info "启动参数:"
-    log_info "  Python: $python_cmd"
     log_info "  端口: $PORT"
     log_info "  PID文件: $PID_FILE"
     
@@ -116,7 +82,7 @@ start() {
     export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
     
     # 启动服务
-    nohup $python_cmd -m uvicorn src.main:app \
+    nohup python -m uvicorn src.main:app \
         --host 0.0.0.0 \
         --port $PORT \
         --workers 1 \
