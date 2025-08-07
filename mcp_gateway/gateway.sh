@@ -16,7 +16,6 @@ cd "$SCRIPT_DIR"
 # 配置文件路径
 CONFIG_FILE="config/mcp-gateway.yaml"
 ENV_FILE=".env"
-PID_FILE="data/mcp-gateway.pid"
 
 # 检测操作系统和架构
 detect_platform() {
@@ -58,19 +57,24 @@ detect_platform() {
     fi
 }
 
-# 加载环境变量
-load_env() {
+# 从 .env 文件获取配置值
+get_env_value() {
+    local key=$1
+    local default=$2
     if [ -f "$ENV_FILE" ]; then
-        echo -e "${GREEN}加载环境变量...${NC}"
-        # 使用更安全的方式加载环境变量，处理包含空格和特殊字符的值
-        set -a  # 自动导出后续定义的变量
-        source "$ENV_FILE"
-        set +a  # 关闭自动导出
+        # 从文件中提取值，处理注释和空格
+        local value=$(grep "^${key}=" "$ENV_FILE" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's/^"//;s/"$//')
+        echo "${value:-$default}"
+    else
+        echo "$default"
     fi
 }
 
 # 启动服务
 start() {
+    # 从 .env 文件获取 PID 文件路径
+    PID_FILE=$(get_env_value "MCP_GATEWAY_PID" "data/mcp-gateway.pid")
+    
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
         if ps -p $PID > /dev/null 2>&1; then
@@ -96,7 +100,9 @@ start() {
     if ps -p $PID > /dev/null 2>&1; then
         echo -e "${GREEN}✓ MCP Gateway 启动成功 (PID: $PID)${NC}"
         echo -e "日志文件: logs/mcp-gateway.log"
-        echo -e "访问地址: http://localhost:${GATEWAY_PORT:-8200}"
+        PORT=$(get_env_value "MCP_GATEWAY_PORT" "5235")
+        echo -e "访问地址: http://localhost:${PORT}"
+        echo -e "健康检测: curl -s http://localhost:${PORT}/health_check"
     else
         echo -e "${RED}✗ MCP Gateway 启动失败${NC}"
         echo -e "请查看日志: tail -f logs/mcp-gateway.log"
@@ -106,6 +112,9 @@ start() {
 
 # 停止服务
 stop() {
+    # 从 .env 文件获取 PID 文件路径
+    PID_FILE=$(get_env_value "MCP_GATEWAY_PID" "data/mcp-gateway.pid")
+    
     if [ ! -f "$PID_FILE" ]; then
         echo -e "${YELLOW}MCP Gateway 未运行${NC}"
         return
@@ -132,13 +141,17 @@ restart() {
 
 # 查看状态
 status() {
+    # 从 .env 文件获取 PID 文件路径
+    PID_FILE=$(get_env_value "MCP_GATEWAY_PID" "data/mcp-gateway.pid")
+    
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
         if ps -p $PID > /dev/null 2>&1; then
             echo -e "${GREEN}● MCP Gateway 运行中 (PID: $PID)${NC}"
             echo -e "  平台: $PLATFORM-$ARCH"
             echo -e "  配置: $CONFIG_FILE"
-            echo -e "  端口: ${GATEWAY_PORT:-8200}"
+            PORT=$(get_env_value "MCP_GATEWAY_PORT" "5235")
+            echo -e "  端口: ${PORT}"
         else
             echo -e "${RED}● MCP Gateway 未运行${NC}"
             echo -e "  PID 文件存在但进程不存在"
@@ -159,6 +172,9 @@ logs() {
 
 # 重新加载配置
 reload() {
+    # 从 .env 文件获取 PID 文件路径
+    PID_FILE=$(get_env_value "MCP_GATEWAY_PID" "data/mcp-gateway.pid")
+    
     if [ ! -f "$PID_FILE" ]; then
         echo -e "${RED}MCP Gateway 未运行${NC}"
         return
@@ -177,7 +193,6 @@ reload() {
 # 主函数
 main() {
     detect_platform
-    load_env
     
     case "$1" in
         start)
