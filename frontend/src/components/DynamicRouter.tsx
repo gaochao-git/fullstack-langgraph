@@ -22,7 +22,7 @@ const loadComponent = (componentPath: string): React.LazyExoticComponent<React.F
   const [, module, componentName] = pathParts.map(part => part.trim());
   
   const component = lazy(() => 
-    import(`../pages/${module}`)
+    import(/* @vite-ignore */ `../pages/${module}`)
       .then(m => {
         // 直接使用命名导出
         if (m[componentName]) {
