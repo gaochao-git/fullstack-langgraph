@@ -25,11 +25,10 @@ mcp_gateway/
 
 ```bash
 # 主要配置项
-GATEWAY_HOST=0.0.0.0          # 监听地址
-GATEWAY_PORT=5235             # 监听端口
 GATEWAY_STORAGE_TYPE=disk     # 存储类型：disk/db/api
 GATEWAY_STORAGE_DISK_PATH=./data  # 磁盘存储路径
-LOG_LEVEL=info                # 日志级别
+#GATEWAY_STORAGE_API_URL=http://172.20.10.2:8000/api/v1/mcp/gateway/configs/all # API 模式下的配置 URL
+TZ=Asia/Shanghai              # 时区
 ```
 
 ### 2. 启动服务
@@ -57,42 +56,6 @@ LOG_LEVEL=info                # 日志级别
 # 重新加载配置（热更新）
 ./gateway.sh reload
 ```
-
-## 配置说明
-
-### 存储模式
-
-1. **磁盘模式** (默认)
-   ```
-   GATEWAY_STORAGE_TYPE=disk
-   GATEWAY_STORAGE_DISK_PATH=./data
-   ```
-
-2. **数据库模式**
-   ```
-   GATEWAY_STORAGE_TYPE=db
-   GATEWAY_DB_TYPE=sqlite
-   GATEWAY_DB_NAME=./data/unla.db
-   ```
-
-3. **API模式** (连接到后端API)
-   ```
-   GATEWAY_STORAGE_TYPE=api
-   GATEWAY_STORAGE_API_URL=http://localhost:8000/api/v1/mcp/gateway/configs
-   ```
-
-### 会话存储
-
-1. **内存模式** (单实例部署)
-   ```
-   SESSION_STORAGE_TYPE=memory
-   ```
-
-2. **Redis模式** (集群部署)
-   ```
-   SESSION_STORAGE_TYPE=redis
-   SESSION_REDIS_ADDR=localhost:6379
-   ```
 
 ## 跨平台支持
 
@@ -125,4 +88,4 @@ MCP Gateway 可以独立运行，也可以与 OMind 平台集成：
 - 独立运行：使用磁盘或数据库存储配置
 - 集成运行：使用 API 模式连接到 OMind 后端
 
-默认访问地址：http://localhost:8200
+默认访问地址：http://localhost:5235
