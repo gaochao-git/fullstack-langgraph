@@ -67,9 +67,6 @@ pytest-asyncio==0.23.2
 pytest-mock==3.12.0
 coverage==7.4.0
 
-# 额外AI provider (注释掉避免numpy依赖)
-# langchain-google-genai==2.1.6
-# langchain-tavily==0.2.4
 
 # 基础依赖
 typing_extensions==4.14.1
