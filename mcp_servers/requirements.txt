@@ -1,4 +1,0 @@
-# OpenAPI MCP服务器依赖
-# MCP相关
-fastmcp==2.10.6
-python-multipart==0.0.20
