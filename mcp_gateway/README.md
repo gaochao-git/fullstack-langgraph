@@ -26,7 +26,7 @@ mcp_gateway/
 ```bash
 # 主要配置项
 GATEWAY_HOST=0.0.0.0          # 监听地址
-GATEWAY_PORT=8200             # 监听端口
+GATEWAY_PORT=5235             # 监听端口
 GATEWAY_STORAGE_TYPE=disk     # 存储类型：disk/db/api
 GATEWAY_STORAGE_DISK_PATH=./data  # 磁盘存储路径
 LOG_LEVEL=info                # 日志级别
