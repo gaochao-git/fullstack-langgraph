@@ -155,7 +155,19 @@ else
     log_warning "未找到mcp_servers目录，跳过MCP服务器"
 fi
 
-# 4. 复制部署脚本和管理脚本
+# 4. 准备MCP Gateway
+log_info "📦 准备MCP Gateway..."
+if [ -d "mcp_gateway" ]; then
+    # 复制MCP Gateway文件
+    rsync -av --exclude='logs/' --exclude='data/' --exclude='*.log' --exclude='*.pid' \
+        mcp_gateway/ "$TEMP_BUILD_DIR/$PACKAGE_NAME/mcp_gateway/"
+    
+    log_success "MCP Gateway文件复制完成"
+else
+    log_warning "未找到mcp_gateway目录，跳过MCP Gateway"
+fi
+
+# 5. 复制部署脚本和管理脚本
 log_info "📝 准备部署脚本..."
 # 复制scripts目录（包含manage_omind.sh和公共函数库）
 if [ -d "scripts" ]; then
@@ -175,7 +187,7 @@ for component in backend mcp_servers mcp_gateway; do
     fi
 done
 
-# 5. 创建统一启动脚本
+# 6. 创建统一启动脚本
 log_info "📝 创建统一管理脚本..."
 cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind_deploy.sh" << 'EOF'
 #!/bin/bash
@@ -458,7 +470,7 @@ EOF
 
 chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind_deploy.sh"
 
-# 6. 创建nginx配置
+# 7. 创建nginx配置
 log_info "📝 创建nginx配置..."
 cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/nginx.conf" << 'EOF'
 server {
@@ -509,7 +521,7 @@ server {
 }
 EOF
 
-# 7. 创建systemd服务文件
+# 8. 创建systemd服务文件
 log_info "📝 创建systemd服务配置..."
 cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind.service" << 'EOF'
 [Unit]
@@ -546,7 +558,7 @@ SyslogIdentifier=omind
 WantedBy=multi-user.target
 EOF
 
-# 8. 创建安装说明
+# 9. 创建安装说明
 log_info "📝 创建安装文档..."
 cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/INSTALL.md" << 'EOF'
 # OMind 智能运维平台安装指南
@@ -761,7 +773,7 @@ df -h
 - 系统资源: `free -h && df -h`
 EOF
 
-# 9. 创建版本信息
+# 10. 创建版本信息
 cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/VERSION" << EOF
 OMind 智能运维平台
 ========================
@@ -788,13 +800,13 @@ Git提交: $(cd "$SCRIPT_DIR" && git rev-parse HEAD 2>/dev/null || echo "N/A")
 - Zabbix工具: 3004
 EOF
 
-# 10. 创建打包清单
+# 11. 创建打包清单
 log_info "📝 生成打包清单..."
 find "$TEMP_BUILD_DIR/$PACKAGE_NAME" -type f | sed "s|$TEMP_BUILD_DIR/$PACKAGE_NAME/||" | sort > "$TEMP_BUILD_DIR/$PACKAGE_NAME/MANIFEST"
 MANIFEST_COUNT=$(wc -l < "$TEMP_BUILD_DIR/$PACKAGE_NAME/MANIFEST")
 log_info "  ✅ MANIFEST ($MANIFEST_COUNT 个文件)"
 
-# 11. 创建压缩包
+# 12. 创建压缩包
 log_info "📦 创建部署包..."
 cd "$TEMP_BUILD_DIR"
 tar -czf "../${PACKAGE_NAME}.tar.gz" "$PACKAGE_NAME"
