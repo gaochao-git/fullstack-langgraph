@@ -87,7 +87,7 @@ cd "Python-${PYTHON_VERSION}"
 
 # 配置编译选项
 echo "⚙️  配置编译选项..."
-CONFIGURE_OPTS="--prefix=$INSTALL_PREFIX --enable-optimizations --enable-shared"
+CONFIGURE_OPTS="--prefix=$INSTALL_PREFIX --enable-optimizations"
 
 # 如果有自定义OpenSSL，使用它
 if [ -n "$OPENSSL_PREFIX" ] && [ -d "$OPENSSL_PREFIX" ]; then
