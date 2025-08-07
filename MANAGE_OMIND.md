@@ -65,7 +65,7 @@ SAVED_PYTHON_PATH="/usr/bin/python3.12"
 ### 1. 首次部署
 ```bash
 # 初始化环境（保存配置）
-./manage_omind.sh init --deploy-path=/data --python-path=/usr/bin/python3.12
+./manage_omind.sh init --deploy-path=/data --python-path=/usr/local/python312/bin/python3
 
 # 启动服务
 ./manage_omind.sh start
