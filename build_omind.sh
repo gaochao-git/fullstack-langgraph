@@ -96,7 +96,8 @@ log_info "生产环境: $([ "$PRODUCTION" = true ] && echo "是" || echo "否")"
 # 创建构建目录
 mkdir -p "$BUILD_DIR"
 rm -rf "$TEMP_BUILD_DIR"
-mkdir -p "$TEMP_BUILD_DIR/$PACKAGE_NAME"
+# 解压后的目录名固定为 omind，便于通用命令部署
+mkdir -p "$TEMP_BUILD_DIR/omind"
 
 # 1. 构建前端
 log_info "📦 构建前端静态文件..."
@@ -117,7 +118,7 @@ if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
     cd ..
     
     # 复制前端构建结果
-    cp -r frontend/dist "$TEMP_BUILD_DIR/$PACKAGE_NAME/frontend_dist"
+    cp -r frontend/dist "$TEMP_BUILD_DIR/omind/frontend_dist"
     log_success "前端构建完成"
 else
     log_warning "未找到frontend目录，跳过前端构建"
@@ -128,7 +129,7 @@ log_info "📦 准备后端文件..."
 if [ -d "backend" ]; then
     # 复制后端源码，排除不必要的文件
     rsync -av --exclude='logs/' --exclude='__pycache__/' --exclude='*.pyc' \
-        --exclude='*.log' --exclude='.git' backend/ "$TEMP_BUILD_DIR/$PACKAGE_NAME/backend/"
+        --exclude='*.log' --exclude='.git' backend/ "$TEMP_BUILD_DIR/omind/backend/"
     log_success "后端文件复制完成"
 else
     log_error "未找到backend目录"
@@ -141,12 +142,12 @@ if [ -d "mcp_servers" ]; then
     # 复制MCP服务器文件
     rsync -av --exclude='logs/' --exclude='pids/' --exclude='__pycache__/' \
         --exclude='*.pyc' --exclude='*.log' --exclude='*.pid' \
-        mcp_servers/ "$TEMP_BUILD_DIR/$PACKAGE_NAME/mcp_servers/"
+        mcp_servers/ "$TEMP_BUILD_DIR/omind/mcp_servers/"
     
     # 选择合适的配置文件
-    if [ "$PRODUCTION" = true ] && [ -f "$TEMP_BUILD_DIR/$PACKAGE_NAME/mcp_servers/config.production.yaml" ]; then
-        cp "$TEMP_BUILD_DIR/$PACKAGE_NAME/mcp_servers/config.production.yaml" \
-           "$TEMP_BUILD_DIR/$PACKAGE_NAME/mcp_servers/config.yaml"
+    if [ "$PRODUCTION" = true ] && [ -f "$TEMP_BUILD_DIR/omind/mcp_servers/config.production.yaml" ]; then
+        cp "$TEMP_BUILD_DIR/omind/mcp_servers/config.production.yaml" \
+           "$TEMP_BUILD_DIR/omind/mcp_servers/config.yaml"
         log_info "  ✅ 使用生产环境MCP配置"
     fi
     
@@ -160,7 +161,7 @@ log_info "📦 准备MCP Gateway..."
 if [ -d "mcp_gateway" ]; then
     # 复制MCP Gateway文件
     rsync -av --exclude='logs/' --exclude='data/' --exclude='*.log' --exclude='*.pid' \
-        mcp_gateway/ "$TEMP_BUILD_DIR/$PACKAGE_NAME/mcp_gateway/"
+        mcp_gateway/ "$TEMP_BUILD_DIR/omind/mcp_gateway/"
     
     log_success "MCP Gateway文件复制完成"
 else
@@ -171,9 +172,9 @@ fi
 log_info "📝 准备部署脚本..."
 # 复制scripts目录（包含manage_omind.sh和公共函数库）
 if [ -d "scripts" ]; then
-    cp -r scripts "$TEMP_BUILD_DIR/$PACKAGE_NAME/scripts"
-    chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/scripts"/*.sh
-    chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/scripts/common"/*.sh 2>/dev/null || true
+    cp -r scripts "$TEMP_BUILD_DIR/omind/scripts"
+    chmod +x "$TEMP_BUILD_DIR/omind/scripts"/*.sh
+    chmod +x "$TEMP_BUILD_DIR/omind/scripts/common"/*.sh 2>/dev/null || true
     log_info "  ✅ manage_omind.sh 统一管理脚本"
     log_info "  ✅ 公共函数库"
 fi
@@ -181,15 +182,15 @@ fi
 # 复制组件管理脚本
 for component in backend mcp_servers mcp_gateway; do
     if [ -f "$component/manage.sh" ]; then
-        cp "$component/manage.sh" "$TEMP_BUILD_DIR/$PACKAGE_NAME/$component/manage.sh"
-        chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/$component/manage.sh"
+        cp "$component/manage.sh" "$TEMP_BUILD_DIR/omind/$component/manage.sh"
+        chmod +x "$TEMP_BUILD_DIR/omind/$component/manage.sh"
         log_info "  ✅ $component/manage.sh"
     fi
 done
 
 # 6. 创建统一启动脚本
 log_info "📝 创建统一管理脚本..."
-cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind_deploy.sh" << 'EOF'
+cat > "$TEMP_BUILD_DIR/omind/omind_deploy.sh" << 'EOF'
 #!/bin/bash
 
 # OMind 智能运维平台部署脚本
@@ -468,11 +469,11 @@ log_info "  查看MCP日志: tail -f $DEPLOY_PATH/mcp_servers/logs/*.log"
 log_info "  停止所有服务: cd $DEPLOY_PATH/scripts && ./stop_backend.sh && ./stop_mcp.sh"
 EOF
 
-chmod +x "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind_deploy.sh"
+chmod +x "$TEMP_BUILD_DIR/omind/omind_deploy.sh"
 
 # 7. 创建nginx配置
 log_info "📝 创建nginx配置..."
-cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/nginx.conf" << 'EOF'
+cat > "$TEMP_BUILD_DIR/omind/nginx.conf" << 'EOF'
 server {
     listen 80;
     server_name localhost;  # 替换为你的域名
@@ -523,7 +524,7 @@ EOF
 
 # 8. 创建systemd服务文件
 log_info "📝 创建systemd服务配置..."
-cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/omind.service" << 'EOF'
+cat > "$TEMP_BUILD_DIR/omind/omind.service" << 'EOF'
 [Unit]
 Description=OMind 智能运维平台
 Documentation=https://github.com/your-org/omind
@@ -560,7 +561,7 @@ EOF
 
 # 9. 创建安装说明
 log_info "📝 创建安装文档..."
-cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/INSTALL.md" << 'EOF'
+cat > "$TEMP_BUILD_DIR/omind/INSTALL.md" << 'EOF'
 # OMind 智能运维平台安装指南
 
 ## 🎯 平台简介
@@ -572,7 +573,7 @@ cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/INSTALL.md" << 'EOF'
 ### 1. 解压部署包
 ```bash
 tar -xzf omind-*.tar.gz
-cd omind-*/
+cd omind/
 ```
 
 ### 2. 执行一键部署
@@ -774,7 +775,7 @@ df -h
 EOF
 
 # 10. 创建版本信息
-cat > "$TEMP_BUILD_DIR/$PACKAGE_NAME/VERSION" << EOF
+cat > "$TEMP_BUILD_DIR/omind/VERSION" << EOF
 OMind 智能运维平台
 ========================
 
@@ -802,14 +803,14 @@ EOF
 
 # 11. 创建打包清单
 log_info "📝 生成打包清单..."
-find "$TEMP_BUILD_DIR/$PACKAGE_NAME" -type f | sed "s|$TEMP_BUILD_DIR/$PACKAGE_NAME/||" | sort > "$TEMP_BUILD_DIR/$PACKAGE_NAME/MANIFEST"
-MANIFEST_COUNT=$(wc -l < "$TEMP_BUILD_DIR/$PACKAGE_NAME/MANIFEST")
+find "$TEMP_BUILD_DIR/omind" -type f | sed "s|$TEMP_BUILD_DIR/omind/||" | sort > "$TEMP_BUILD_DIR/omind/MANIFEST"
+MANIFEST_COUNT=$(wc -l < "$TEMP_BUILD_DIR/omind/MANIFEST")
 log_info "  ✅ MANIFEST ($MANIFEST_COUNT 个文件)"
 
 # 12. 创建压缩包
 log_info "📦 创建部署包..."
 cd "$TEMP_BUILD_DIR"
-tar -czf "../${PACKAGE_NAME}.tar.gz" "$PACKAGE_NAME"
+tar -czf "../${PACKAGE_NAME}.tar.gz" "omind"
 cd "$SCRIPT_DIR"
 
 # 清理临时目录
@@ -836,7 +837,7 @@ log_info "   make trans"
 log_info ""
 log_info "2. 在目标服务器上解压并部署:"
 log_info "   tar -xzf ${PACKAGE_NAME}.tar.gz"
-log_info "   cd ${PACKAGE_NAME}"
+log_info "   cd omind"
 log_info ""
 log_info "3. 使用 manage_omind.sh 进行运维:"
 log_info "   初始化项目:"

@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/utils/lib-utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
-import { DiagnosticAgentWelcome } from "./components/DiagnosticAgentWelcome";
+import DiagnosticAgentWelcome from "./components/DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./components/ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 
