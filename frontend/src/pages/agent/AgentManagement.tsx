@@ -101,7 +101,7 @@ const transformMCPServerToLocal = (server: any): LocalMCPServer => ({
   ...server,
   id: server.server_id,
   name: server.server_name,
-  status: server.connection_status === 'connected' ? 'connected' : 'disconnected',
+  status: 'connected', // 默认所有服务器都是连接状态，让用户可以勾选
   // 后端返回的是 server_tools，需要映射到 tools
   tools: Array.isArray(server.server_tools) ? server.server_tools : []
 });

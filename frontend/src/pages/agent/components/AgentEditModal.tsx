@@ -268,14 +268,14 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       return {
         title: `${server.name} - ${server.tools?.length || 0}工具`,
         key: `server-${server.id}`,
-        disabled: server.status !== 'connected',
+        disabled: false, // 移除状态判断，所有服务器都可用
         children: (server.tools || []).map(tool => {
           const { summary, args, returns } = formatToolDescription(tool.description);
           
           return {
             title: tool.name,
             key: `tool-${tool.name}`,
-            disabled: server.status !== 'connected',
+            disabled: false, // 移除状态判断，所有工具都可勾选
             children: [
               {
                 title: (
@@ -441,7 +441,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     const toolsConfig = {
       system_tools: editSystemTools,
       mcp_tools: mcpServers
-        .filter(server => server.status === 'connected')
+        // 移除状态过滤，包含所有服务器
         .map(server => ({
           server_id: server.id,
           server_name: server.name,
@@ -661,18 +661,18 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
                           setEditSystemTools(allSystemToolNames);
                           setEditSystemCheckedKeys(allSystemToolNames.map(name => `system-${name}`));
                           
-                          const allConnectedMCPKeys: string[] = [];
+                          const allMCPKeys: string[] = [];
                           const allMCPToolNames: string[] = [];
                           mcpServers
-                            .filter(s => s.status === 'connected')
+                            // 移除状态过滤，选择所有服务器
                             .forEach(server => {
-                              allConnectedMCPKeys.push(`server-${server.id}`);
+                              allMCPKeys.push(`server-${server.id}`);
                               (server.tools || []).forEach(tool => {
-                                allConnectedMCPKeys.push(`tool-${tool.name}`);
+                                allMCPKeys.push(`tool-${tool.name}`);
                                 allMCPToolNames.push(tool.name);
                               });
                             });
-                          setEditCheckedKeys(allConnectedMCPKeys);
+                          setEditCheckedKeys(allMCPKeys);
                           setEditMCPTools(allMCPToolNames);
                         }}
                       >
@@ -712,7 +712,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
                   <Col span={12} className="text-right">
                     <Space>
                       <span className="text-sm text-gray-600">
-                        可用服务器: {mcpServers.filter(s => s.status === 'connected').length}/{mcpServers.length}
+                        服务器总数: {mcpServers.length}
                       </span>
                       <span className="text-sm text-gray-600">
                         总工具数: {systemTools.length + mcpServers.reduce((sum, s) => sum + (s.tools?.length || 0), 0)}
