@@ -204,3 +204,6 @@ production_build
 *.pid
 software/
 Unla
+
+# MCP配置文件
+mcp_servers/config.yaml

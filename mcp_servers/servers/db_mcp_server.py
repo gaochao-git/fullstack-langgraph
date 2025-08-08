@@ -7,9 +7,15 @@ Database Tools MCP Server
 import json
 import logging
 from typing import Dict, Any, Optional
+import sys
+import os
+
+# 添加父目录到系统路径
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from fastmcp import FastMCP
 import pymysql
+from load_config import get_mysql_config
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -20,34 +26,27 @@ mcp = FastMCP("Database Tools Server")
 
 def _create_mysql_connection():
     """创建新的MySQL连接，每次调用都重新连接"""
-    # 默认连接参数，按优先级排序
-    default_configs = [
-        {"host": "82.156.146.51", "username": "gaochao", "password": "fffjjj"},
-        {"host": "82.156.146.51", "username": "root", "password": "123456"},
-        {"host": "82.156.146.51", "username": "mysql", "password": "mysql"}
-    ]
+    # 从统一配置获取MySQL配置
+    mysql_config = get_mysql_config()
     
-    for config in default_configs:
-        try:
-            connection_config = {
-                'host': config["host"],
-                'port': 3306,
-                'user': config["username"],
-                'password': config["password"],
-                'charset': 'utf8mb4',
-                'autocommit': True,
-                'database': 'information_schema'
-            }
-            
-            connection = pymysql.connect(**connection_config)
-            logger.info(f"MySQL连接成功，用户: {config['username']}")
-            return connection
-            
-        except Exception as e:
-            logger.debug(f"尝试用户 {config['username']} 失败: {e}")
-            continue
-    
-    raise Exception("无法建立MySQL连接，请检查数据库服务状态和凭据")
+    try:
+        connection_config = {
+            'host': mysql_config['host'],
+            'port': mysql_config['port'],
+            'user': mysql_config['username'],
+            'password': mysql_config['password'],
+            'charset': 'utf8mb4',
+            'autocommit': True,
+            'database': mysql_config.get('database', 'information_schema')
+        }
+        
+        connection = pymysql.connect(**connection_config)
+        logger.info(f"MySQL连接成功，主机: {mysql_config['host']}, 用户: {mysql_config['username']}")
+        return connection
+        
+    except Exception as e:
+        logger.error(f"MySQL连接失败: {e}")
+        raise Exception(f"无法建立MySQL连接: {str(e)}")
 
 @mcp.tool()
 async def execute_mysql_query(

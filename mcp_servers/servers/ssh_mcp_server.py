@@ -10,8 +10,14 @@ import time
 from typing import Dict, Any, List, Optional
 import logging
 from io import StringIO
+import sys
+import os
+
+# 添加父目录到系统路径
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from fastmcp import FastMCP
+from load_config import get_ssh_config
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -22,27 +28,46 @@ mcp = FastMCP("SSH Tools Server")
 
 def _create_ssh_client():
     """创建新的SSH连接，每次调用都重新连接"""
-    # 默认连接参数，按优先级排序
-    default_configs = [
-        {"hostname": "82.156.146.51", "username": "root", "password": "123456"},
-        {"hostname": "82.156.146.51", "username": "gaochao", "password": "fffjjj"},
-        {"hostname": "82.156.146.51", "username": "admin", "password": "admin"}
-    ]
+    # 从统一配置获取SSH配置
+    ssh_config = get_ssh_config()
     
-    for config in default_configs:
+    for config in ssh_config['configs']:
         try:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
-            client.connect(
-                hostname=config["hostname"],
-                port=22,
-                username=config["username"],
-                password=config["password"],
-                timeout=10
-            )
+            # 判断是密钥认证还是密码认证
+            if 'key_file' in config:
+                # 密钥认证
+                key_path = os.path.expanduser(config['key_file'])
+                if not os.path.exists(key_path):
+                    logger.debug(f"私钥文件不存在: {key_path}")
+                    continue
+                
+                try:
+                    key = paramiko.RSAKey.from_private_key_file(key_path)
+                    client.connect(
+                        hostname=ssh_config['host'],
+                        port=ssh_config['port'],
+                        username=config["username"],
+                        pkey=key,
+                        timeout=10
+                    )
+                    logger.info(f"SSH密钥连接成功，主机: {ssh_config['host']}, 用户: {config['username']}, 密钥: {key_path}")
+                except Exception as key_error:
+                    logger.debug(f"密钥认证失败: {key_error}")
+                    continue
+            else:
+                # 密码认证
+                client.connect(
+                    hostname=ssh_config['host'],
+                    port=ssh_config['port'],
+                    username=config["username"],
+                    password=config.get("password", ""),
+                    timeout=10
+                )
+                logger.info(f"SSH密码连接成功，主机: {ssh_config['host']}, 用户: {config['username']}")
             
-            logger.info(f"SSH连接成功，用户: {config['username']}")
             return client
             
         except Exception as e:

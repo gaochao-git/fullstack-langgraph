@@ -9,8 +9,14 @@ import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
+import sys
+import os
+
+# 添加父目录到系统路径
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from fastmcp import FastMCP
+from load_config import get_zabbix_config
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -21,45 +27,39 @@ mcp = FastMCP("Zabbix Tools Server")
 
 def _create_zabbix_session():
     """创建新的Zabbix会话，每次调用都重新认证"""
-    # 默认配置，按优先级排序
-    default_configs = [
-        {"url": "http://82.156.146.51/zabbix", "username": "Admin", "password": "zabbix"},
-        {"url": "http://82.156.146.51/zabbix", "username": "admin", "password": "zabbix"},
-        {"url": "http://82.156.146.51:8080/zabbix", "username": "Admin", "password": "zabbix"}
-    ]
+    # 从统一配置获取Zabbix配置
+    zabbix_config = get_zabbix_config()
     
-    for config in default_configs:
-        try:
-            session = requests.Session()
-            url = config["url"].rstrip('/')
+    try:
+        session = requests.Session()
+        url = zabbix_config["url"].rstrip('/')
+        
+        # 认证获取token
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "user.login",
+            "params": {
+                "user": zabbix_config["username"],
+                "password": zabbix_config["password"]
+            },
+            "id": 1
+        }
+        
+        response = session.post(
+            url,
+            json=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if "result" in result:
+                auth_token = result["result"]
+                logger.info(f"Zabbix连接成功，URL: {url}")
+                return {"session": session, "url": url, "auth_token": auth_token}
             
-            # 认证获取token
-            payload = {
-                "jsonrpc": "2.0",
-                "method": "user.login",
-                "params": {
-                    "user": config["username"],
-                    "password": config["password"]
-                },
-                "id": 1
-            }
-            
-            response = session.post(
-                f"{url}/api_jsonrpc.php",
-                json=payload,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if "result" in result:
-                    auth_token = result["result"]
-                    logger.info(f"Zabbix连接成功，URL: {url}")
-                    return {"session": session, "url": url, "auth_token": auth_token}
-                
-        except Exception as e:
-            logger.debug(f"尝试配置 {config['url']} 失败: {e}")
-            continue
+    except Exception as e:
+        logger.error(f"Zabbix连接失败: {e}")
     
     raise Exception("无法建立Zabbix连接，请检查Zabbix服务状态和配置")
 
@@ -93,7 +93,7 @@ def _zabbix_api_call(method: str, params: Dict[str, Any]) -> Dict[str, Any]:
 
 @mcp.tool()
 async def get_zabbix_metric_data(
-    ip: str = "127.0.0.1",
+    ip: str = None,
     metric_key: str = "system.cpu.util",
     start_time: str = "",
     end_time: str = ""
@@ -125,10 +125,11 @@ async def get_zabbix_metric_data(
         time_from = int(start_dt.timestamp())
         time_till = int(end_dt.timestamp())
         
-        # 通过IP地址查找主机（强制使用127.0.0.1）
+        # 通过IP地址查找主机
+        actual_ip = ip or get_zabbix_config()['default_host_ip']
         host_interface_result = _zabbix_api_call('hostinterface.get', {
             'output': ['hostid'],
-            'filter': {'ip': '127.0.0.1'}
+            'filter': {'ip': actual_ip}
         })
         
         if "error" in host_interface_result:
@@ -136,7 +137,7 @@ async def get_zabbix_metric_data(
         
         interfaces = host_interface_result.get("result", [])
         if not interfaces:
-            return json.dumps({"error": f"No host found with IP 127.0.0.1 (input: {ip})"})
+            return json.dumps({"error": f"No host found with IP {actual_ip} (input: {ip})"})
         
         host_id = interfaces[0]["hostid"]
         
@@ -228,7 +229,7 @@ async def get_zabbix_metric_data(
         return json.dumps({"error": f"Failed to get zabbix metric data: {str(e)}"})
 
 @mcp.tool()
-async def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
+async def get_zabbix_metrics(hostname: str = None) -> str:
     """获取指定主机的所有可用监控指标。用于查看主机支持哪些监控指标。
     
     Args:
@@ -238,10 +239,11 @@ async def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
         包含可用指标列表的JSON字符串
     """
     try:
-        # 通过IP地址查找主机（强制使用127.0.0.1）
+        # 通过IP地址查找主机
+        actual_hostname = hostname or get_zabbix_config()['default_host_ip']
         host_interface_result = _zabbix_api_call('hostinterface.get', {
             'output': ['hostid'],
-            'filter': {'ip': '127.0.0.1'}
+            'filter': {'ip': actual_hostname}
         })
         
         if "error" in host_interface_result:
@@ -249,7 +251,7 @@ async def get_zabbix_metrics(hostname: str = "127.0.0.1") -> str:
         
         interfaces = host_interface_result.get("result", [])
         if not interfaces:
-            return json.dumps({"error": f"No host found with IP 127.0.0.1 (input: {hostname})"})
+            return json.dumps({"error": f"No host found with IP {actual_hostname} (input: {hostname})"})
         
         host_id = interfaces[0]["hostid"]
         

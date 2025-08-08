@@ -1,0 +1,28 @@
+# MCP服务器配置示例
+# 此示例展示如何只启用部分服务
+
+# 服务启用开关
+services:
+  mysql: true         # 启用MySQL服务
+  ssh: true           # 启用SSH服务
+  elasticsearch: false # 禁用Elasticsearch服务
+  zabbix: false       # 禁用Zabbix服务
+
+# MySQL配置
+mysql:
+  host: 82.156.146.51
+  port: 3306
+  configs:
+    - username: gaochao
+      password: fffjjj
+
+# SSH配置
+ssh:
+  host: localhost
+  port: 22
+  configs:
+    - username: root
+      password: mypassword
+
+# 注意：由于 elasticsearch 和 zabbix 服务已禁用，
+# 这些配置段可以省略或保留（不会被使用）

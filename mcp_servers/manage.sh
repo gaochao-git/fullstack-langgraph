@@ -5,13 +5,17 @@
 
 set -e
 
-# 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 获取脚本所在目录（保存原始路径）
+MCP_SERVERS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$MCP_SERVERS_DIR"
 cd "$SCRIPT_DIR"
 
 # 加载公共函数库
 source "../scripts/common/logger.sh"
 source "../scripts/common/utils.sh"
+
+# 恢复正确的脚本目录
+SCRIPT_DIR="$MCP_SERVERS_DIR"
 
 # 组件名称
 COMPONENT_NAME="MCP Servers"
@@ -19,6 +23,7 @@ COMPONENT_ID="mcp_servers"
 
 # 配置
 SERVERS=("db_query" "ssh_exec" "es_search" "zabbix_monitor")
+SERVICE_NAMES=("mysql" "ssh" "elasticsearch" "zabbix")
 PORTS=(3001 3002 3003 3004)
 PID_DIR="pids"
 LOG_DIR="logs"
@@ -26,6 +31,43 @@ LOG_DIR="logs"
 
 # 直接使用当前环境的 python
 # 假设用户已经 source ../venv/bin/activate
+
+# 检查配置文件是否存在
+check_config_file() {
+    local config_file="$SCRIPT_DIR/config.yaml"
+    
+    # 调试信息（如需要可以取消注释）
+    # echo "[DEBUG] 检查配置文件: $config_file"
+    # echo "[DEBUG] 当前目录: $(pwd)"
+    # echo "[DEBUG] SCRIPT_DIR: $SCRIPT_DIR"
+    # ls -la "$config_file" 2>/dev/null && echo "[DEBUG] 配置文件存在" || echo "[DEBUG] 配置文件不存在"
+    
+    if [ ! -f "$config_file" ]; then
+        log_error "配置文件不存在: $config_file"
+        echo "请执行以下命令创建配置文件："
+        echo "  cd $SCRIPT_DIR"
+        echo "  cp config.yaml.template config.yaml"
+        echo "  vim config.yaml  # 编辑配置文件"
+        exit 1
+    fi
+}
+
+# 检查服务是否启用
+# 简化版本：检查配置文件中的服务开关
+is_service_enabled() {
+    local service_name=$1
+    
+    # 使用 grep 检查服务是否启用
+    # 查找 services 部分下的服务配置
+    if grep -A 10 "^services:" "$SCRIPT_DIR/config.yaml" | grep -E "^[[:space:]]+${service_name}:[[:space:]]+(true|false)" | grep -q "true"; then
+        return 0
+    elif grep -A 10 "^services:" "$SCRIPT_DIR/config.yaml" | grep -E "^[[:space:]]+${service_name}:[[:space:]]+(true|false)" | grep -q "false"; then
+        return 1
+    else
+        # 如果没有找到配置，默认启用
+        return 0
+    fi
+}
 
 # 初始化组件
 init() {
@@ -59,6 +101,8 @@ start_server() {
     local port=$2
     local pid_file="$PID_DIR/${server}.pid"
     local log_file="$LOG_DIR/${server}.log"
+    
+    echo "--------------------------------------------------------------------------------"
     
     # 检查是否已经运行
     local pid=$(read_pid_file "$pid_file")
@@ -109,7 +153,8 @@ start_server() {
     sleep 2
     
     if is_process_running "$pid"; then
-        log_done "$server 启动成功 (PID: $pid, 端口: $port)"
+        log_done "$server 启动成功 (PID: $pid)"
+        log_info "MCP地址: http://localhost:$port/mcp"
         return 0
     else
         log_fail "$server 启动失败"
@@ -122,28 +167,47 @@ start_server() {
 start() {
     print_title "启动 $COMPONENT_NAME"
     
+    # 检查配置文件
+    check_config_file
+    
     # 确保目录存在
     ensure_dir "$LOG_DIR"
     ensure_dir "$PID_DIR"
     
     local failed=0
+    local started=0
+    local skipped=0
+    
     for i in ${!SERVERS[@]}; do
-        if ! start_server "${SERVERS[$i]}" "${PORTS[$i]}"; then
-            failed=$((failed + 1))
+        local service_name="${SERVICE_NAMES[$i]}"
+        
+        # 检查服务是否启用
+        if is_service_enabled "$service_name"; then
+            if start_server "${SERVERS[$i]}" "${PORTS[$i]}"; then
+                started=$((started + 1))
+            else
+                failed=$((failed + 1))
+            fi
+        else
+            log_info "跳过未启用的服务: ${SERVERS[$i]} ($service_name)"
+            skipped=$((skipped + 1))
         fi
     done
     
-    if [ $failed -eq 0 ]; then
-        log_success "所有MCP服务器启动成功"
-        echo
-        log_info "服务地址:"
-        for i in ${!SERVERS[@]}; do
-            log_info "  ${SERVERS[$i]}: http://localhost:${PORTS[$i]}/sse/"
-        done
-    else
-        log_error "$failed 个服务器启动失败"
-        return 1
+    echo "================================================================================"
+    echo
+    if [ $started -gt 0 ]; then
+        log_success "成功启动 $started 个服务"
     fi
+    if [ $skipped -gt 0 ]; then
+        log_info "跳过 $skipped 个未启用的服务"
+    fi
+    if [ $failed -gt 0 ]; then
+        log_error "$failed 个服务启动失败"
+    fi
+    echo "================================================================================"
+    
+    [ $failed -eq 0 ]
 }
 
 # 停止单个服务器
@@ -214,34 +278,45 @@ status() {
     print_title "$COMPONENT_NAME 状态"
     
     local running=0
-    local total=${#SERVERS[@]}
+    local enabled=0
+    local disabled=0
     
     echo
     for i in ${!SERVERS[@]}; do
         local server="${SERVERS[$i]}"
+        local service_name="${SERVICE_NAMES[$i]}"
         local port="${PORTS[$i]}"
         local pid_file="$PID_DIR/${server}.pid"
-        local pid=$(read_pid_file "$pid_file")
         
-        if [ -n "$pid" ] && is_process_running "$pid"; then
-            log_success "● $server 运行中"
-            log_info "    PID: $pid, 端口: $port"
-            running=$((running + 1))
-        else
-            log_error "● $server 未运行"
-            if [ -f "$pid_file" ]; then
-                log_warning "    PID文件存在但进程不存在"
+        if is_service_enabled "$service_name"; then
+            enabled=$((enabled + 1))
+            local pid=$(read_pid_file "$pid_file")
+            
+            if [ -n "$pid" ] && is_process_running "$pid"; then
+                log_success "● $server 运行中"
+                log_info "    PID: $pid, 端口: $port"
+                running=$((running + 1))
+            else
+                log_error "● $server 未运行"
+                if [ -f "$pid_file" ]; then
+                    log_warning "    PID文件存在但进程不存在"
+                fi
             fi
+        else
+            log_info "○ $server 未启用"
+            disabled=$((disabled + 1))
         fi
     done
     
     echo
-    if [ $running -eq $total ]; then
-        log_success "所有服务器运行正常 ($running/$total)"
+    if [ $enabled -eq 0 ]; then
+        log_warning "没有启用的服务"
+    elif [ $running -eq $enabled ]; then
+        log_success "所有已启用的服务运行正常 ($running/$enabled 启用, $disabled 禁用)"
     elif [ $running -eq 0 ]; then
-        log_error "所有服务器都未运行"
+        log_error "所有已启用的服务都未运行 ($enabled 启用, $disabled 禁用)"
     else
-        log_warning "部分服务器运行中 ($running/$total)"
+        log_warning "部分服务运行中 ($running/$enabled 运行, $disabled 禁用)"
     fi
     
     # 显示端口监听状态

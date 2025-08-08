@@ -9,8 +9,14 @@ import requests
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
+import sys
+import os
+
+# 添加父目录到系统路径
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from fastmcp import FastMCP
+from load_config import get_es_config
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -19,9 +25,10 @@ logger = logging.getLogger(__name__)
 # 创建MCP服务器实例
 mcp = FastMCP("Elasticsearch Tools Server")
 
-# ES服务器配置
-ES_BASE_URL = "http://82.156.146.51:9200"
-ES_TIMEOUT = 30
+# 从统一配置获取ES配置
+es_config = get_es_config()
+ES_BASE_URL = f"{es_config['protocol']}://{es_config['host']}:{es_config['port']}"
+ES_TIMEOUT = es_config['timeout']
 
 def _es_request(method: str, endpoint: str, data: Dict = None, params: Dict = None) -> Dict:
     """执行ES REST API请求"""

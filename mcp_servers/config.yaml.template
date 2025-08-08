@@ -1,0 +1,47 @@
+# MCP服务器配置文件模板
+# 复制此文件为 config.yaml 并修改相应的配置
+
+# 服务启用开关
+# 设置为 false 可以禁用对应的服务
+services:
+  mysql: true        # MySQL数据库服务
+  ssh: true          # SSH远程连接服务
+  elasticsearch: true # Elasticsearch搜索服务
+  zabbix: true       # Zabbix监控服务
+
+# MySQL配置（当 services.mysql = true 时需要）
+mysql:
+  host: 82.156.146.51
+  port: 3306
+  username: root
+  password: "123456"
+  database: information_schema  # 默认连接的数据库（可选）
+
+# SSH配置（当 services.ssh = true 时需要）
+ssh:
+  host: 82.156.146.51
+  port: 22
+  configs:
+    # 密码认证方式
+    - username: root
+      password: "123456"
+    # 密钥认证方式（无密码保护）
+    - username: gaochao
+      key_file: ~/.ssh/id_rsa      # 私钥文件路径
+    # 另一个密钥认证示例
+    - username: admin
+      key_file: /path/to/private/key
+
+# Elasticsearch配置（当 services.elasticsearch = true 时需要）
+elasticsearch:
+  host: 82.156.146.51
+  port: 9200
+  protocol: http
+  timeout: 30
+
+# Zabbix配置（当 services.zabbix = true 时需要）
+zabbix:
+  url: http://82.156.146.51/zabbix/api_jsonrpc.php
+  username: Admin
+  password: zabbix
+  default_host_ip: 127.0.0.1
