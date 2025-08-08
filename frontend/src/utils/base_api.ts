@@ -8,6 +8,11 @@ import { message } from 'antd';
 
 // 获取基础URL
 const getBaseUrl = (): string => {
+  // @ts-ignore
+  if (window._CONFIG && window._CONFIG.API_BASE_URL) {
+    // @ts-ignore
+    return window._CONFIG.API_BASE_URL;
+  }
   return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 };
 
