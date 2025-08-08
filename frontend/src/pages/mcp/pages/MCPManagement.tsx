@@ -366,6 +366,13 @@ const MCPManagement: React.FC = () => {
     setFormConnectionStatus('idle');
     setFormDiscoveredTools([]);
     form.resetFields();
+    // 设置新建时的默认值
+    form.setFieldsValue({
+      authType: 'none',
+      transportType: 'streamable-http',
+      readTimeoutSeconds: 5,
+      apiKeyHeader: 'X-API-Key'
+    });
     setServerFormModal(true);
   };
 
@@ -374,6 +381,17 @@ const MCPManagement: React.FC = () => {
     setEditingServer(server);
     setFormConnectionStatus('idle');
     setFormDiscoveredTools(server.tools);
+    // 重置表单并设置编辑的服务器数据
+    form.setFieldsValue({
+      name: server.name,
+      uri: server.uri,
+      transportType: server.transportType || 'streamable-http',
+      description: server.description,
+      readTimeoutSeconds: server.readTimeoutSeconds || 5,
+      authType: server.authType || 'none',
+      authToken: server.authToken || '',
+      apiKeyHeader: server.apiKeyHeader || 'X-API-Key'
+    });
     setServerFormModal(true);
   };
 
@@ -934,7 +952,13 @@ const MCPManagement: React.FC = () => {
       <Modal
         title={editingServer ? "编辑MCP服务器" : "添加MCP服务器"}
         open={serverFormModal}
-        onCancel={() => setServerFormModal(false)}
+        onCancel={() => {
+          setServerFormModal(false);
+          form.resetFields();
+          setEditingServer(null);
+          setFormConnectionStatus('idle');
+          setFormDiscoveredTools([]);
+        }}
         footer={null}
         width={600}
       >
@@ -942,21 +966,6 @@ const MCPManagement: React.FC = () => {
           form={form}
           layout="vertical"
           onFinish={handleSaveServer}
-          key={editingServer?.id || 'new'}
-          initialValues={editingServer ? {
-            name: editingServer.name,
-            uri: editingServer.uri,
-            transportType: editingServer.transportType || 'streamable-http',
-            description: editingServer.description,
-            readTimeoutSeconds: editingServer.readTimeoutSeconds || 5,
-            authType: editingServer.authType || 'none',
-            authToken: editingServer.authToken || '',
-            apiKeyHeader: editingServer.apiKeyHeader || 'X-API-Key'
-          } : {
-            authType: 'none',
-            transportType: 'streamable-http',
-            readTimeoutSeconds: 5
-          }}
         >
           <Form.Item
             label="服务器名称"
@@ -1001,7 +1010,6 @@ const MCPManagement: React.FC = () => {
           <Form.Item
             label="传输类型"
             name="transportType"
-            initialValue="streamable-http"
           >
             <Select size="middle">
               <Option value="streamable-http">streamable-http</Option>
@@ -1014,7 +1022,6 @@ const MCPManagement: React.FC = () => {
           <Form.Item
             label="认证类型"
             name="authType"
-            initialValue="none"
           >
             <Select size="middle">
               <Option value="none">无认证</Option>
@@ -1066,7 +1073,6 @@ const MCPManagement: React.FC = () => {
                       label="API Key Header"
                       name="apiKeyHeader"
                       rules={[{ required: true, message: '请输入 API Key Header 名称' }]}
-                      initialValue="X-API-Key"
                     >
                       <Input placeholder="例如: X-API-Key, Authorization, etc." />
                     </Form.Item>
@@ -1089,7 +1095,6 @@ const MCPManagement: React.FC = () => {
           <Form.Item
             label="连接超时时间"
             name="readTimeoutSeconds"
-            initialValue={5}
             rules={[
               { required: true, message: '请设置超时时间' },
               { type: 'number', min: 1, max: 300, message: '超时时间必须在1-300秒之间' }
@@ -1232,7 +1237,13 @@ const MCPManagement: React.FC = () => {
 
           <Form.Item>
             <div className="flex justify-end gap-2">
-              <Button onClick={() => setServerFormModal(false)}>
+              <Button onClick={() => {
+                setServerFormModal(false);
+                form.resetFields();
+                setEditingServer(null);
+                setFormConnectionStatus('idle');
+                setFormDiscoveredTools([]);
+              }}>
                 取消
               </Button>
               <Button type="primary" htmlType="submit">
