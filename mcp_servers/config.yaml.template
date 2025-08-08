@@ -11,7 +11,7 @@ services:
 
 # MySQL配置（当 services.mysql = true 时需要）
 mysql:
-  host: 82.156.146.51
+  host: 127.0.0.1
   port: 3306
   username: root
   password: "123456"
@@ -19,7 +19,7 @@ mysql:
 
 # SSH配置（当 services.ssh = true 时需要）
 ssh:
-  host: 82.156.146.51
+  host: 127.0.0.1
   port: 22
   configs:
     # 密码认证方式
@@ -28,20 +28,17 @@ ssh:
     # 密钥认证方式（无密码保护）
     - username: gaochao
       key_file: ~/.ssh/id_rsa      # 私钥文件路径
-    # 另一个密钥认证示例
-    - username: admin
-      key_file: /path/to/private/key
 
 # Elasticsearch配置（当 services.elasticsearch = true 时需要）
 elasticsearch:
-  host: 82.156.146.51
+  host: 127.0.0.1
   port: 9200
   protocol: http
   timeout: 30
 
 # Zabbix配置（当 services.zabbix = true 时需要）
 zabbix:
-  url: http://82.156.146.51/zabbix/api_jsonrpc.php
+  url: http://127.0.0.1/zabbix/api_jsonrpc.php
   username: Admin
   password: zabbix
   default_host_ip: 127.0.0.1
