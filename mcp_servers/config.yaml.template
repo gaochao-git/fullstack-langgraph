@@ -41,4 +41,8 @@ zabbix:
   url: http://127.0.0.1/zabbix/api_jsonrpc.php
   username: Admin
   password: zabbix
-  default_host_ip: 127.0.0.1
+  # default_host_ip: 强制覆盖查询IP的设置
+  # - 留空或设为 ""：正常使用用户指定的IP进行查询
+  # - 设置具体IP（如 "192.168.1.100"）：所有查询都使用这个IP，忽略用户输入
+  # - 使用场景：开发/测试环境中避免误查生产数据，或通过代理主机获取数据
+  default_host_ip: ""

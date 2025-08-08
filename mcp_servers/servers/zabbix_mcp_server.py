@@ -126,7 +126,12 @@ async def get_zabbix_metric_data(
         time_till = int(end_dt.timestamp())
         
         # 通过IP地址查找主机
-        actual_ip = ip or get_zabbix_config()['default_host_ip']
+        # 如果配置了 default_host_ip，强制使用它（忽略用户传入的IP）
+        config = get_zabbix_config()
+        if 'default_host_ip' in config and config['default_host_ip']:
+            actual_ip = config['default_host_ip']
+        else:
+            actual_ip = ip
         host_interface_result = _zabbix_api_call('hostinterface.get', {
             'output': ['hostid'],
             'filter': {'ip': actual_ip}
@@ -137,7 +142,7 @@ async def get_zabbix_metric_data(
         
         interfaces = host_interface_result.get("result", [])
         if not interfaces:
-            return json.dumps({"error": f"No host found with IP {actual_ip} (input: {ip})"})
+            return json.dumps({"error": f"No host found with IP {actual_ip}"})
         
         host_id = interfaces[0]["hostid"]
         
@@ -157,7 +162,7 @@ async def get_zabbix_metric_data(
         
         items = item_result.get("result", [])
         if not items:
-            return json.dumps({"error": f"Metric '{metric_key}' not found on host {ip}"})
+            return json.dumps({"error": f"Metric '{metric_key}' not found on host {actual_ip}"})
         
         item = items[0]
         
@@ -217,7 +222,7 @@ async def get_zabbix_metric_data(
         }
         
         return json.dumps({
-            "hostname": ip,
+            "hostname": actual_ip,
             "host_id": host_id,
             "metric_key": metric_key,
             "time_range": f"{start_time} to {end_time}",
@@ -240,7 +245,12 @@ async def get_zabbix_metrics(hostname: str = None) -> str:
     """
     try:
         # 通过IP地址查找主机
-        actual_hostname = hostname or get_zabbix_config()['default_host_ip']
+        # 如果配置了 default_host_ip，强制使用它（忽略用户传入的hostname）
+        config = get_zabbix_config()
+        if 'default_host_ip' in config and config['default_host_ip']:
+            actual_hostname = config['default_host_ip']
+        else:
+            actual_hostname = hostname
         host_interface_result = _zabbix_api_call('hostinterface.get', {
             'output': ['hostid'],
             'filter': {'ip': actual_hostname}
@@ -251,7 +261,7 @@ async def get_zabbix_metrics(hostname: str = None) -> str:
         
         interfaces = host_interface_result.get("result", [])
         if not interfaces:
-            return json.dumps({"error": f"No host found with IP {actual_hostname} (input: {hostname})"})
+            return json.dumps({"error": f"No host found with IP {actual_hostname}"})
         
         host_id = interfaces[0]["hostid"]
         
