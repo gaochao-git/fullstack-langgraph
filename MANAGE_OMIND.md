@@ -174,3 +174,26 @@ set +x
 - **调用关系**：manage_omind.sh → scripts/pre_env.sh, scripts/start_*.sh, scripts/stop_*.sh
 - **配置同步**：管理脚本的配置会自动同步到被调用的脚本中
 - **独立使用**：scripts目录下的脚本仍可独立使用，但推荐使用统一管理脚本
+
+
+
+
+
+scp dist/omind-20250807_181407.tar.gz root@49.233.132.162:/tmp
+scp software/offline_packages_final.tar.gz root@58.87.102.111:/tmp
+scp software/python312.tar.gz root@58.87.102.111:/tmp
+scp software/requirements_frozen.txt  root@58.87.102.111:/tmp
+mkdir -p /data/omind_deploy
+mkdir -p /data/appLogs/omind
+/data/omind_deploy/omind/backend/manage.sh stop
+/data/omind_deploy/omind/mcp_servers/manage.sh stop
+cd /data/omind_deploy && rm -rf omind
+tar -zxf /tmp/omind-20250808_093252.tar.gz -C /data/omind_deploy/
+cd /data/omind_deploy
+/usr/local/python312/bin/python3.12 -m venv venv
+/data/omind_deploy/venv/bin/pip3.12 install -r /tmp/requirements_frozen.txt --no-index --find-links /tmp/offline_packages
+
+cd /data/omind_deploy/omind
+source /data/omind_deploy/venv/bin/activate
+/data/omind_deploy/omind/backend/manage.sh start
+/data/omind_deploy/omind/mcp_servers/manage.sh start
