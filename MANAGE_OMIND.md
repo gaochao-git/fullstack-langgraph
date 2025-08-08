@@ -179,21 +179,29 @@ set +x
 
 
 
-scp dist/omind-20250807_181407.tar.gz root@49.233.132.162:/tmp
-scp software/offline_packages_final.tar.gz root@58.87.102.111:/tmp
-scp software/python312.tar.gz root@58.87.102.111:/tmp
-scp software/requirements_frozen.txt  root@58.87.102.111:/tmp
+scp dist/omind-20250808_114113.tar.gz root@42.193.126.150:/tmp
+scp software/offline_packages.tar.gz root@42.193.126.150:/tmp
+scp software/python312.tar.gz root@42.193.126.150:/tmp
+scp software/requirements_frozen.txt  root@42.193.126.150:/tmp
+
+
 mkdir -p /data/omind_deploy
 mkdir -p /data/appLogs/omind
 /data/omind_deploy/omind/backend/manage.sh stop
 /data/omind_deploy/omind/mcp_servers/manage.sh stop
 cd /data/omind_deploy && rm -rf omind
-tar -zxf /tmp/omind-20250808_093252.tar.gz -C /data/omind_deploy/
+tar -zxf /tmp/omind-20250808_114113.tar.gz -C /data/omind_deploy/
 cd /data/omind_deploy
+tar -zxf /tmp/python312.tar.gz -C /usr/local/
 /usr/local/python312/bin/python3.12 -m venv venv
+tar -zxf /tmp/offline_packages.tar.gz -C /tmp
 /data/omind_deploy/venv/bin/pip3.12 install -r /tmp/requirements_frozen.txt --no-index --find-links /tmp/offline_packages
 
 cd /data/omind_deploy/omind
 source /data/omind_deploy/venv/bin/activate
 /data/omind_deploy/omind/backend/manage.sh start
 /data/omind_deploy/omind/mcp_servers/manage.sh start
+nginx -t
+nginx -s reload
+
+

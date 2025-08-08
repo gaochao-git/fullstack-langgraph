@@ -88,7 +88,9 @@ export default function ChatEngine({
   const thread = useStream<{
     messages: Message[];
   }>({
-    apiUrl: `${import.meta.env.VITE_API_BASE_URL}/api/chat`,
+    apiUrl: import.meta.env.VITE_API_BASE_URL 
+      ? `${import.meta.env.VITE_API_BASE_URL}/api/chat`
+      : `${window.location.origin}/api/chat`,
     assistantId: getAgentId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),
