@@ -11,7 +11,8 @@ import {
   Tree, 
   Space, 
   Tooltip, 
-  message 
+  message,
+  App
 } from 'antd';
 import { 
   ToolOutlined, 
@@ -113,6 +114,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
   loading
 }) => {
   const [form] = Form.useForm();
+  const { message } = App.useApp();
   
   // 工具选择状态
   const [editSystemTools, setEditSystemTools] = useState<string[]>([]);
@@ -409,9 +411,12 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     
     try {
       // 使用具体的智能体ID接口，而不是获取全部后过滤
-      const fullAgent = await agentApi.getAgent(agent.agent_id);
+      const response = await agentApi.getAgent(agent.agent_id);
       
-      if (fullAgent) {
+      // 处理统一响应格式
+      if (response.status === 'ok' && response.data) {
+        const fullAgent = response.data;
+        
         // 直接设置表单值，不使用setTimeout避免覆盖用户正在编辑的内容
         form.setFieldsValue({
           agent_id: fullAgent.agent_id,
@@ -430,9 +435,31 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           user_prompt_template: fullAgent.prompt_info?.user_prompt_template || '',
           assistant_prompt_template: fullAgent.prompt_info?.assistant_prompt_template || ''
         });
+        
+        // 处理工具配置
+        if (fullAgent.tools_info) {
+          // 处理系统工具
+          const systemToolsFromAgent = fullAgent.tools_info.system_tools || [];
+          setEditSystemTools(systemToolsFromAgent);
+          setEditSystemCheckedKeys(systemToolsFromAgent.map(name => `system-${name}`));
+          
+          // 处理MCP工具
+          const mcpToolsFromAgent = fullAgent.tools_info.mcp_tools || [];
+          const mcpToolNames = mcpToolsFromAgent.flatMap(mcpTool => mcpTool.tools || []);
+          setEditMCPTools(mcpToolNames);
+          setEditCheckedKeys(mcpToolNames.map(name => `tool-${name}`));
+          
+          // 展开已选中工具的服务器
+          const selectedServerIds = mcpToolsFromAgent.map(mcpTool => `server-${mcpTool.server_id}`);
+          setEditExpandedKeys(selectedServerIds);
+        }
+      } else if (response.status === 'error') {
+        console.error('获取智能体详细配置失败:', response.msg);
+        message.error(response.msg || '获取智能体详细配置失败');
       }
     } catch (error) {
       console.error('获取智能体详细配置失败:', error);
+      message.error('获取智能体详细配置失败');
     }
   };
 
