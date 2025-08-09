@@ -3,6 +3,7 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+import traceback
 
 from src.shared.db.config import get_async_db
 from src.apps.ai_model.schema import (
@@ -131,7 +132,7 @@ async def test_ai_model_connection(
             msg="AI模型连接测试完成"
         )
     except Exception as e:
-        logger.error(f"AI模型连接测试失败: {e}")
+        logger.error(f"AI模型连接测试失败: {e}", exc_info=True)
         return success_response(
             data={
                 "status": "error",
@@ -161,7 +162,7 @@ async def discover_ollama_models(
             msg=f"发现 {len(models)} 个Ollama模型"
         )
     except Exception as e:
-        logger.error(f"发现Ollama模型失败: {e}")
+        logger.error(f"发现Ollama模型失败: {e}", exc_info=True)
         return success_response(
             data={
                 "models": [],

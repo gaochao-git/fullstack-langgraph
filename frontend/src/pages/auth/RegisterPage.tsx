@@ -16,7 +16,6 @@ interface RegisterFormValues {
 }
 
 export function RegisterPage() {
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [form] = Form.useForm();
@@ -54,8 +53,6 @@ export function RegisterPage() {
 
   const handleRegister = async (values: RegisterFormValues) => {
     try {
-      setLoading(true);
-      
       // 调用注册API
       const response = await authApi.register({
         username: values.username,
@@ -75,8 +72,6 @@ export function RegisterPage() {
     } catch (error: any) {
       // 处理网络错误等
       message.error(error.message || '注册失败，请稍后重试');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -230,7 +225,6 @@ export function RegisterPage() {
                 type="primary" 
                 htmlType="submit" 
                 className="login-button"
-                loading={loading}
                 block
               >
                 注册

@@ -8,6 +8,7 @@ import json
 import asyncio
 import aiohttp
 import logging
+import traceback
 from datetime import datetime
 
 from src.apps.ai_model.models import AIModelConfig
@@ -396,7 +397,7 @@ class AIModelService:
             logger.error(f"Ollama发现超时: {endpoint_url}")
             return []
         except Exception as e:
-            logger.error(f"Ollama发现错误: {str(e)}")
+            logger.error(f"Ollama发现错误: {str(e)}", exc_info=True)
             return []
 
 

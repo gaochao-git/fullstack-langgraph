@@ -60,17 +60,19 @@ export default function ChatEngine({
 
   // 获取agentId，用于LangGraph SDK的assistantId字段
   const getAgentId = () => {
+    // 如果agent不存在，使用传入的agentId参数
     if (!agent) {
-      throw new Error("Agent对象不存在，无法获取agent_id");
+      return agentId;
     }
     
     // 优先使用agent_id（来自API的agent对象），如果没有则使用id（硬编码的agent对象）
-    const agentId = agent.agent_id || agent.id;
-    if (!agentId) {
-      throw new Error("Agent对象中缺少agent_id或id字段");
+    const id = agent.agent_id || agent.id;
+    if (!id) {
+      // 如果agent对象中没有id，使用传入的agentId参数
+      return agentId;
     }
     
-    return agentId;
+    return id;
   };
 
   // 从URL参数中获取线程ID
@@ -85,6 +87,7 @@ export default function ChatEngine({
     return threadIdFromUrl ? { threadId: threadIdFromUrl } : {};
   };
 
+  // 如果agent不存在，使用占位的agent_id
   const thread = useStream<{
     messages: Message[];
   }>({
@@ -332,17 +335,16 @@ export default function ChatEngine({
         onClose={() => setShowHistoryDrawer(false)}
         open={showHistoryDrawer}
         width={400}
-        style={{ 
-          backgroundColor: isDark ? '#1F2937' : '#f9fafb',
-        }}
-        headerStyle={{
-          backgroundColor: isDark ? '#111827' : '#ffffff',
-          color: isDark ? '#ffffff' : '#111827',
-          borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
-        }}
-        bodyStyle={{
-          backgroundColor: isDark ? '#1F2937' : '#f9fafb',
-          padding: '16px'
+        styles={{
+          header: {
+            backgroundColor: isDark ? '#111827' : '#ffffff',
+            color: isDark ? '#ffffff' : '#111827',
+            borderBottom: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
+          },
+          body: {
+            backgroundColor: isDark ? '#1F2937' : '#f9fafb',
+            padding: '16px'
+          }
         }}
       >
         <div className="space-y-3">

@@ -123,7 +123,6 @@ const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'fr
 const MCPManagement: React.FC = () => {
   const { isDark } = useTheme();
   const [servers, setServers] = useState<MCPServer[]>([]);
-  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   
@@ -140,7 +139,6 @@ const MCPManagement: React.FC = () => {
 
   // API调用函数
   const fetchServers = async () => {
-    setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers?size=100`);
       if (response.ok) {
@@ -157,8 +155,6 @@ const MCPManagement: React.FC = () => {
     } catch (error) {
       console.error('获取服务器列表错误:', error);
       message.error('获取服务器列表失败');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -766,7 +762,6 @@ const MCPManagement: React.FC = () => {
                     <Button 
                       icon={<ReloadOutlined />}
                       onClick={fetchServers}
-                      loading={loading}
                     >
                       刷新
                     </Button>
@@ -784,7 +779,6 @@ const MCPManagement: React.FC = () => {
                   columns={columns}
                   dataSource={filteredServers}
                   rowKey="id"
-                  loading={loading}
                   scroll={{ x: 'max-content' }}
                   pagination={{
                     showSizeChanger: true,

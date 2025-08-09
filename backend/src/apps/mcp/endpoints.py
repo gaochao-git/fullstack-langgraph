@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import asyncio
 import aiohttp
 import logging
+import traceback
 
 from src.shared.db.config import get_async_db
 from src.apps.mcp.schema import (
@@ -56,7 +57,7 @@ async def _test_mcp_connection(server_uri: str) -> List[dict]:
             logger.info(f"成功连接MCP服务器 {server_uri}，发现 {len(tools)} 个工具")
             return tools
     except Exception as e:
-        logger.error(f"MCP连接测试失败: {e}")
+        logger.error(f"MCP连接测试失败: {e}", exc_info=True)
         raise Exception(f"无法连接到MCP服务器 {server_uri}: {str(e)}")
 
 @router.post("/v1/mcp/servers", response_model=UnifiedResponse)
@@ -279,7 +280,7 @@ async def get_system_info():
             msg="获取系统信息成功"
         )
     except Exception as e:
-        logger.error(f"获取系统信息失败: {str(e)}")
+        logger.error(f"获取系统信息失败: {str(e)}", exc_info=True)
         raise BusinessException("获取系统信息失败", ResponseCode.INTERNAL_ERROR)
 
 
@@ -324,7 +325,7 @@ async def execute_safe_command(
     except subprocess.TimeoutExpired:
         raise BusinessException("命令执行超时", ResponseCode.BAD_REQUEST)
     except Exception as e:
-        logger.error(f"命令执行失败: {str(e)}")
+        logger.error(f"命令执行失败: {str(e)}", exc_info=True)
         raise BusinessException(f"命令执行失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
@@ -367,7 +368,7 @@ async def list_files(
             msg="文件列表获取成功"
         )
     except Exception as e:
-        logger.error(f"获取文件列表失败: {str(e)}")
+        logger.error(f"获取文件列表失败: {str(e)}", exc_info=True)
         raise BusinessException(f"获取文件列表失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
@@ -421,7 +422,7 @@ async def get_real_gateway_configs(
     except BusinessException:
         raise
     except Exception as e:
-        logger.error(f"获取MCP Gateway配置失败: {str(e)}")
+        logger.error(f"获取MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException("获取配置失败", ResponseCode.INTERNAL_ERROR)
 
 def _detect_transport_type(server_uri: str) -> str:
@@ -469,7 +470,7 @@ async def get_all_gateway_configs(
         )
         
     except Exception as e:
-        logger.error(f"获取MCP Gateway配置失败: {str(e)}")
+        logger.error(f"获取MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException(f"获取配置失败: {str(e)}", ResponseCode.INTERNAL_SERVER_ERROR)
 
 
@@ -493,7 +494,7 @@ async def create_gateway_config(
     except BusinessException:
         raise
     except Exception as e:
-        logger.error(f"创建MCP Gateway配置失败: {str(e)}")
+        logger.error(f"创建MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException("创建配置失败", ResponseCode.INTERNAL_ERROR)
 
 
@@ -527,7 +528,7 @@ async def list_gateway_configs(
             msg="获取MCP Gateway配置列表成功"
         )
     except Exception as e:
-        logger.error(f"获取MCP Gateway配置列表失败: {str(e)}")
+        logger.error(f"获取MCP Gateway配置列表失败: {str(e)}", exc_info=True)
         raise BusinessException("获取配置列表失败", ResponseCode.INTERNAL_ERROR)
 
 
@@ -549,7 +550,7 @@ async def get_gateway_config(
     except BusinessException:
         raise
     except Exception as e:
-        logger.error(f"获取MCP Gateway配置失败: {str(e)}")
+        logger.error(f"获取MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException("获取配置失败", ResponseCode.INTERNAL_ERROR)
 
 
@@ -572,7 +573,7 @@ async def update_gateway_config(
     except BusinessException:
         raise
     except Exception as e:
-        logger.error(f"更新MCP Gateway配置失败: {str(e)}")
+        logger.error(f"更新MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException("更新配置失败", ResponseCode.INTERNAL_ERROR)
 
 
@@ -594,5 +595,5 @@ async def delete_gateway_config(
     except BusinessException:
         raise
     except Exception as e:
-        logger.error(f"删除MCP Gateway配置失败: {str(e)}")
+        logger.error(f"删除MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException("删除配置失败", ResponseCode.INTERNAL_ERROR)

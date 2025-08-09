@@ -141,7 +141,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
             if chunk_has_interrupt:
                 has_interrupt = True
         except Exception as e:
-            logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}")
+            logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
             event_id += 1
             yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
     
@@ -234,7 +234,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
         try:
             await ensure_user_thread_mapping(user_name, thread_id, request_body)
         except Exception as e:
-            logger.error(f"处理用户线程关联时出错: {e}")
+            logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
             # 不影响主流程，继续执行
     else:
         logger.warning(f"⚠️ 请求中没有提供用户名，跳过用户线程关联创建")

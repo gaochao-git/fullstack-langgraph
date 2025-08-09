@@ -31,8 +31,14 @@ const AgentChat: React.FC = () => {
 
       try {
         // 直接请求单个智能体，避免获取全部智能体列表
-        const agent = await agentApi.getAgent(agentId);
-        setAgent(agent);
+        const response = await agentApi.getAgent(agentId);
+        
+        // 处理统一响应格式
+        if (response.status === 'ok' && response.data) {
+          setAgent(response.data);
+        } else {
+          setError(response.msg || '加载智能体失败');
+        }
       } catch (err) {
         console.error('加载智能体失败:', err);
         setError('未找到指定的智能体或加载失败');

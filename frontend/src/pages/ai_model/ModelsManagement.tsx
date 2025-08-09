@@ -227,7 +227,6 @@ const discoverOllamaModels = async (endpoint: string): Promise<string[]> => {
 const ModelsManagement = () => {
   const { isDark } = useTheme();
   const [models, setModels] = useState<ModelConfig[]>([]);
-  const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [formTestStatus, setFormTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
@@ -239,7 +238,6 @@ const ModelsManagement = () => {
 
   // 加载模型列表
   const loadModels = async () => {
-    setLoading(true);
     try {
       const modelList = await fetchModels();
       setModels(modelList);
@@ -251,8 +249,6 @@ const ModelsManagement = () => {
       } else {
         message.error(`加载模型列表失败: ${error instanceof Error ? error.message : '未知错误'}`);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -599,12 +595,9 @@ const ModelsManagement = () => {
           columns={columns}
           dataSource={models}
           rowKey="id"
-          loading={loading}
           scroll={{ x: 1200 }}
           locale={{
-            emptyText: models.length === 0 && !loading ? 
-              '暂无模型数据，请检查后端服务连接状态' : 
-              '暂无数据'
+            emptyText: '暂无模型数据，请检查后端服务连接状态'
           }}
           pagination={{
             showSizeChanger: true,

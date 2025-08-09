@@ -110,7 +110,6 @@ const AgentManagement: React.FC = () => {
   const [agents, setAgents] = useState<LocalAgent[]>([]);
   const [mcpServers, setMcpServers] = useState<LocalMCPServer[]>([]);
   const [availableModels, setAvailableModels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
@@ -160,7 +159,6 @@ const AgentManagement: React.FC = () => {
 
   // 数据加载 - 只加载智能体列表
   const loadData = async () => {
-    setLoading(true);
     try {
       const response = await agentApi.getAllAgents();
       
@@ -178,8 +176,6 @@ const AgentManagement: React.FC = () => {
     } catch (error) {
       console.error('加载智能体数据失败:', error);
       message.error('加载智能体数据失败');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -419,7 +415,6 @@ const AgentManagement: React.FC = () => {
             </Select>
             <Button 
               icon={<ReloadOutlined />}
-              loading={loading}
               onClick={loadData}
             >
               刷新

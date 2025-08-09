@@ -8,6 +8,7 @@ from sqlalchemy import select, update, delete, func, or_, and_
 from sqlalchemy.exc import IntegrityError
 import json
 import uuid
+import traceback
 
 from src.apps.mcp.models import MCPConfig
 from src.apps.mcp.schema import (
@@ -68,11 +69,11 @@ class MCPGatewayConfigService:
 
         except IntegrityError as e:
             await db.rollback()
-            logger.error(f"创建MCP Gateway配置失败，数据完整性错误: {str(e)}")
+            logger.error(f"创建MCP Gateway配置失败，数据完整性错误: {str(e)}", exc_info=True)
             raise BusinessException("配置名称已存在", ResponseCode.BAD_REQUEST)
         except Exception as e:
             await db.rollback()
-            logger.error(f"创建MCP Gateway配置失败: {str(e)}")
+            logger.error(f"创建MCP Gateway配置失败: {str(e)}", exc_info=True)
             raise BusinessException("创建配置失败", ResponseCode.INTERNAL_ERROR)
 
     async def get_config_by_id(self, db: AsyncSession, config_id: int) -> Optional[MCPConfig]:
@@ -141,7 +142,7 @@ class MCPGatewayConfigService:
             return list(configs), total
 
         except Exception as e:
-            logger.error(f"获取MCP Gateway配置列表失败: {str(e)}")
+            logger.error(f"获取MCP Gateway配置列表失败: {str(e)}", exc_info=True)
             raise BusinessException("获取配置列表失败", ResponseCode.INTERNAL_ERROR)
 
     async def update_config(
@@ -218,7 +219,7 @@ class MCPGatewayConfigService:
             raise
         except Exception as e:
             await db.rollback()
-            logger.error(f"更新MCP Gateway配置失败: {str(e)}")
+            logger.error(f"更新MCP Gateway配置失败: {str(e)}", exc_info=True)
             raise BusinessException("更新配置失败", ResponseCode.INTERNAL_ERROR)
 
     async def delete_config(self, db: AsyncSession, config_id: int) -> bool:

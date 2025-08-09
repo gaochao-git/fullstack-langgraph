@@ -10,7 +10,6 @@ import './LoginPage.css';
 const { TabPane } = Tabs;
 
 export function LoginPage() {
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'jwt' | 'sso'>('jwt');
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,25 +21,20 @@ export function LoginPage() {
 
   const handleJWTLogin = async (values: { username: string; password: string }) => {
     try {
-      setLoading(true);
       await login(values.username, values.password);
       message.success('登录成功');
       navigate(from, { replace: true });
     } catch (error: any) {
       message.error(error.message || '登录失败，请检查用户名和密码');
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleSSOLogin = async () => {
     try {
-      setLoading(true);
       await ssoLogin();
       // SSO登录通常会重定向到SSO提供商页面
     } catch (error: any) {
       message.error(error.message || 'SSO登录失败');
-      setLoading(false);
     }
   };
 
@@ -92,7 +86,6 @@ export function LoginPage() {
                     type="primary" 
                     htmlType="submit" 
                     className="login-button"
-                    loading={loading}
                     block
                   >
                     登录
@@ -114,7 +107,6 @@ export function LoginPage() {
                   size="large"
                   icon={<GlobalOutlined />}
                   onClick={handleSSOLogin}
-                  loading={loading}
                   block
                   className="sso-button"
                 >
