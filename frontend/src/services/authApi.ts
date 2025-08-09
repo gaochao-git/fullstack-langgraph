@@ -52,23 +52,9 @@ class AuthApi {
   /**
    * JWT登录
    */
-  async login(data: LoginRequest): Promise<LoginResponse> {
-    // 直接调用后端API，不使用mock
-    // omind_post 现在默认返回解析后的数据
-    const result = await omind_post(`${this.baseUrl}/login`, data);
-    
-    // 检查业务逻辑错误
-    if (result.status === 'error') {
-      throw new Error(result.msg || '登录失败');
-    }
-    
-    // 如果是统一格式的成功响应，提取data
-    if (result.status === 'ok' && result.data) {
-      return result.data;
-    }
-    
-    // 如果不是统一格式，返回整个结果
-    return result;
+  async login(data: LoginRequest) {
+    // 直接透传，返回原始响应结构
+    return await omind_post(`${this.baseUrl}/login`, data);
   }
 
   /**
@@ -127,22 +113,9 @@ class AuthApi {
   /**
    * 用户注册
    */
-  async register(data: RegisterRequest): Promise<RegisterResponse> {
-    // 直接调用后端API，不使用mock
-    const result = await omind_post(`${this.baseUrl}/register`, data);
-    
-    // 检查业务逻辑错误
-    if (result.status === 'error') {
-      throw new Error(result.msg || '注册失败');
-    }
-    
-    // 如果是统一格式的成功响应，提取data
-    if (result.status === 'ok' && result.data) {
-      return result.data;
-    }
-    
-    // 如果不是统一格式，返回整个结果
-    return result;
+  async register(data: RegisterRequest) {
+    // 直接透传，返回原始响应结构
+    return await omind_post(`${this.baseUrl}/register`, data);
   }
 
   /**

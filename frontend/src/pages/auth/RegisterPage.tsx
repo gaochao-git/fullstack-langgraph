@@ -57,16 +57,23 @@ export function RegisterPage() {
       setLoading(true);
       
       // 调用注册API
-      await authApi.register({
+      const response = await authApi.register({
         username: values.username,
         password: values.password,
         email: values.email,
         display_name: values.display_name
       });
       
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        message.error(response.msg || '注册失败');
+        return;
+      }
+      
       message.success('注册成功！请登录');
       navigate('/login');
     } catch (error: any) {
+      // 处理网络错误等
       message.error(error.message || '注册失败，请稍后重试');
     } finally {
       setLoading(false);

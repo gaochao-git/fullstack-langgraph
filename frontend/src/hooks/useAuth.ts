@@ -40,7 +40,15 @@ export const useAuth = create<AuthState>((set) => ({
   login: async (username: string, password: string) => {
     try {
       const response = await authApi.login({ username, password });
-      const { access_token, user } = response;
+      
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        set({ loading: false });
+        throw new Error(response.msg || '登录失败');
+      }
+      
+      // 处理成功响应
+      const { access_token, user } = response.data || response;
       
       localStorage.setItem('token', access_token);
       set({ 
