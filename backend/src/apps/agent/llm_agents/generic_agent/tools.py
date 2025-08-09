@@ -8,6 +8,9 @@ from typing import List, Any
 from src.shared.core.logging import get_logger
 from src.shared.tools import sop_tool, general_tool
 from ..tools_utils import get_tools_config_from_db
+from src.apps.mcp.service.mcp_service import mcp_service
+from src.shared.db.config import get_sync_db
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 logger = get_logger(__name__)
 
@@ -43,10 +46,6 @@ async def get_generic_agent_tools(agent_id: str = "generic_agent") -> List[Any]:
         
         if allowed_mcp_tools:
             # 根据server_id从mcp_servers表构建服务器配置
-            from src.apps.mcp.service.mcp_service import mcp_service
-            from src.shared.db.config import get_sync_db
-            from langchain_mcp_adapters.client import MultiServerMCPClient
-            
             server_config = {}
             db_gen = get_sync_db()
             db = next(db_gen)

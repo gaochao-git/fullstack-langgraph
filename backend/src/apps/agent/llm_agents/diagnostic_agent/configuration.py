@@ -4,6 +4,8 @@ from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
 from src.apps.agent.service.agent_config_service import AgentConfigService
+from src.shared.db.config import get_sync_db
+from langchain_openai import ChatOpenAI
 
 
 class Configuration(BaseModel):
@@ -56,7 +58,6 @@ class Configuration(BaseModel):
 
     def create_llm(self, model_name: str = None, temperature: float = None) -> 'ChatOpenAI':
         """Create a ChatOpenAI instance with the configured settings."""
-        from langchain_openai import ChatOpenAI
         
         # 确定实际使用的模型和参数
         actual_model = model_name or self.query_generator_model
@@ -94,7 +95,6 @@ class Configuration(BaseModel):
             agent_name = "diagnostic_agent"
         
         selected_model = configurable.get("selected_model")
-        from src.shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
@@ -130,7 +130,6 @@ class Configuration(BaseModel):
     @classmethod
     def from_agent_config(cls, agent_name: str = "diagnostic_agent", selected_model: str = None) -> "Configuration":
         """Create a Configuration instance directly from agent database configuration."""
-        from src.shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:

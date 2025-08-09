@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 from typing import Any, Optional, List, Dict
 from langchain_core.runnables import RunnableConfig
 from src.apps.agent.service.agent_config_service import AgentConfigService
+from src.shared.db.config import get_sync_db
+from langchain_openai import ChatOpenAI
 
 
 class Configuration(BaseModel):
@@ -148,7 +150,6 @@ class Configuration(BaseModel):
         agent_id = configurable.get("agent_id", "generic_agent")
         
         # 从数据库加载配置
-        from src.shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
@@ -213,7 +214,6 @@ class Configuration(BaseModel):
 
     def create_llm(self, model_name: Optional[str] = None, temperature: Optional[float] = None):
         """创建LLM实例，参考diagnostic_agent的实现"""
-        from langchain_openai import ChatOpenAI
         
         # 使用传入的参数或配置中的默认值
         actual_model = model_name or self.model_name

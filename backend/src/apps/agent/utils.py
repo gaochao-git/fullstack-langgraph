@@ -9,6 +9,7 @@ from datetime import datetime
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.types import Command
 
 logger = get_logger(__name__)
 
@@ -64,7 +65,6 @@ def prepare_graph_config(request_body, thread_id):
     
     # Handle resume command for interrupted execution
     if request_body.command and "resume" in request_body.command:
-        from langgraph.types import Command
         graph_input = Command(resume=request_body.command["resume"])
         logger.info(f"Resuming execution with command: {request_body.command}")
         # Clear interrupt information when resuming

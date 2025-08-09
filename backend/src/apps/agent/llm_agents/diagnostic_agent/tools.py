@@ -9,6 +9,8 @@ from src.shared.core.logging import get_logger
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from src.shared.tools import sop_tool, general_tool
 from ..tools_utils import get_tools_config_from_db
+from src.apps.mcp.service.mcp_service import mcp_service
+from src.shared.db.config import get_sync_db
 
 logger = get_logger(__name__)
 
@@ -44,9 +46,6 @@ async def get_diagnostic_tools(agent_id: str = "diagnostic_agent"):
         
         if allowed_mcp_tools:
             # 根据server_id从mcp_servers表构建服务器配置
-            from src.apps.mcp.service.mcp_service import mcp_service
-            from src.shared.db.config import get_sync_db
-            
             server_config = {}
             db_gen = get_sync_db()
             db = next(db_gen)

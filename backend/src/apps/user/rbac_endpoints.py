@@ -20,6 +20,7 @@ from src.apps.user.rbac_models import RbacRolesPermissions, RbacUsersRoles
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException
+from src.shared.db.models import BaseModel
 
 logger = get_logger(__name__)
 
@@ -87,7 +88,6 @@ async def list_users(
     users, total = await rbac_user_service.list_users(db, params)
     
     # 转换为字典格式
-    from src.shared.db.models import BaseModel
     user_data = BaseModel.bulk_to_dict(users)
     
     return paginated_response(
@@ -183,7 +183,6 @@ async def list_roles(
     roles, total = await rbac_role_service.list_roles(db, params)
     
     # 转换为字典格式
-    from src.shared.db.models import BaseModel
     role_data = BaseModel.bulk_to_dict(roles)
     
     return paginated_response(
@@ -300,7 +299,6 @@ async def list_permissions(
     permissions, total = await rbac_permission_service.list_permissions(db, params)
     
     # 转换为字典格式
-    from src.shared.db.models import BaseModel
     permission_data = BaseModel.bulk_to_dict(permissions)
     
     return paginated_response(
@@ -400,7 +398,6 @@ async def list_menus(
     menus, total = await rbac_menu_service.list_menus(db, params)
     
     # 转换为字典格式
-    from src.shared.db.models import BaseModel
     menu_data = BaseModel.bulk_to_dict(menus)
     
     return paginated_response(
