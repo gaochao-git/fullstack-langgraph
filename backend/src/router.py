@@ -11,8 +11,8 @@ from .apps.agent import router as agents_router
 from .apps.mcp import router as mcp_router
 from .apps.ai_model import router as ai_models_router
 from .apps.scheduled_task import router as scheduled_tasks_router
-from .apps.user.rbac_endpoints import rbac_router
-from .apps.auth.router import router as auth_router
+from .apps.user import router as rbac_router
+from .apps.auth import router as auth_router
 
 # 创建主API路由器
 api_router = APIRouter()

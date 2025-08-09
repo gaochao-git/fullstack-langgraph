@@ -3,7 +3,7 @@ User Management Module
 用户管理模块
 """
 
-from .endpoints import router
+from .endpoints import rbac_router as router
 from .models import (
     User, UserThread, 
     RbacUser, RbacRole, RbacPermission, RbacMenu,

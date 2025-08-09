@@ -122,7 +122,7 @@ export function LoginPage() {
             <div className="login-tips">
               <p>提示：</p>
               <ul>
-                <li>JWT登录：使用系统内置账号密码</li>
+                <li>本地登录：使用用户名密码认证</li>
                 <li>SSO登录：使用企业统一身份认证</li>
               </ul>
             </div>
