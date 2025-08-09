@@ -8,9 +8,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.db.config import get_async_db
-from src.apps.auth.service import AuthService
-from src.apps.auth.sso_service import SSOService
-from src.apps.auth.schemas import (
+from src.apps.auth.service import AuthService, SSOService
+from src.apps.auth.schema import (
     LoginRequest, LoginResponse, RefreshTokenRequest, LogoutRequest,
     RegisterRequest, RegisterResponse,
     SSOLoginUrlResponse, SSOCallbackRequest,
@@ -18,13 +17,11 @@ from src.apps.auth.schemas import (
     EnableMFARequest, EnableMFAResponse, VerifyMFARequest, DisableMFARequest,
     CreateAPIKeyRequest, CreateAPIKeyResponse, APIKeyInfo,
     SessionInfo, TerminateSessionRequest,
-    TokenValidationResponse, PermissionCheckRequest
-)
-from src.apps.auth.menu_schemas import (
+    TokenValidationResponse, PermissionCheckRequest,
     MenuCreateRequest, MenuUpdateRequest, MenuResponse, 
     MenuTreeResponse, MenuListResponse, UserMenuResponse
 )
-from src.apps.auth.menu_service import menu_service
+from src.apps.auth.service import menu_service
 from src.apps.auth.dependencies import get_current_user, require_auth, require_roles
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
@@ -651,7 +648,7 @@ async def init_admin(
     """
     初始化管理员账户（仅在没有管理员时可用）
     """
-    from src.apps.user.rbac_models import RbacUser
+    from src.apps.user.models import RbacUser
     from src.apps.auth.models import AuthUser
     from src.apps.auth.utils import PasswordUtils
     

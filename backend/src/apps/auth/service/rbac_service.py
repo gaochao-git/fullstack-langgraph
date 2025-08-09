@@ -11,7 +11,7 @@ from functools import lru_cache
 import json
 import re
 
-from src.apps.user.rbac_models import (
+from src.apps.user.models import (
     RbacUser, RbacRole, RbacPermission, RbacMenu,
     RbacUsersRoles, RbacRolesPermissions
 )

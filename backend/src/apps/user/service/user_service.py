@@ -4,13 +4,13 @@ from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_, func, distinct
 
-from src.apps.user.rbac_models import (
+from src.apps.user.models import (
     RbacUser, RbacRole, RbacPermission, RbacMenu, 
     RbacUsersRoles, RbacRolesPermissions
 )
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
-from src.apps.user.rbac_schema import (
+from src.apps.user.schema import (
     UserCreateRequest, UserUpdateRequest, UserQueryParams,
     RoleCreateRequest, RoleUpdateRequest, RoleQueryParams,
     PermissionCreateRequest, PermissionUpdateRequest, PermissionQueryParams,

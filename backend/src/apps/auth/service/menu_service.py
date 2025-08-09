@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_
 from fastapi import HTTPException, status
 
-from src.apps.user.rbac_models import RbacMenu
+from src.apps.user.models import RbacMenu
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
 

@@ -16,12 +16,12 @@ from src.apps.auth.models import (
     AuthUser, AuthToken, AuthSession, AuthLoginHistory, 
     AuthApiKey, AuthSSOProvider
 )
-from src.apps.user.rbac_models import RbacUser, RbacUsersRoles, RbacRole
+from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.apps.auth.utils import (
     PasswordUtils, JWTUtils, MFAUtils, APIKeyUtils,
     TokenBlacklist, generate_state_token, mask_email
 )
-from src.apps.auth.schemas import (
+from src.apps.auth.schema import (
     LoginRequest, LoginResponse, UserProfile,
     CreateAPIKeyRequest, CreateAPIKeyResponse
 )
@@ -221,7 +221,7 @@ class AuthService:
     
     async def register_user(self, request, ip_address: str = None, user_agent: str = None):
         """用户注册"""
-        from src.apps.auth.schemas import RegisterRequest, RegisterResponse
+        from src.apps.auth.schema import RegisterRequest, RegisterResponse
         
         try:
             # 检查用户名是否已存在
@@ -596,7 +596,7 @@ class AuthService:
     
     async def _get_user_permissions(self, user_id: str) -> List[str]:
         """获取用户权限列表（用于JWT）"""
-        from src.apps.auth.rbac_service import RBACService
+        from .rbac_service import RBACService
         
         service = RBACService(self.db)
         permissions = await service.get_user_permissions(user_id)

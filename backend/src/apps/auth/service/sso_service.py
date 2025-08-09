@@ -18,9 +18,9 @@ from src.shared.schemas.response import ResponseCode
 from src.apps.auth.models import (
     AuthUser, AuthSession, AuthLoginHistory, AuthSSOProvider
 )
-from src.apps.user.rbac_models import RbacUser
+from src.apps.user.models import RbacUser
 from src.apps.auth.utils import JWTUtils, generate_state_token, generate_nonce
-from src.apps.auth.schemas import SSOLoginUrlResponse, LoginResponse
+from src.apps.auth.schema import SSOLoginUrlResponse, LoginResponse
 from src.shared.db.models import now_shanghai
 
 

@@ -3,7 +3,7 @@
 提供JWT和SSO两种认证方式
 """
 
-from src.apps.auth.router import router
+from src.apps.auth.endpoints import router
 from src.apps.auth.dependencies import (
     get_current_user,
     get_current_active_user,
@@ -25,8 +25,7 @@ from src.apps.auth.models import (
     AuthApiKey,
     AuthSSOProvider
 )
-from src.apps.auth.service import AuthService
-from src.apps.auth.sso_service import SSOService
+from src.apps.auth.service import AuthService, SSOService
 from src.apps.auth.utils import (
     PasswordUtils,
     JWTUtils,

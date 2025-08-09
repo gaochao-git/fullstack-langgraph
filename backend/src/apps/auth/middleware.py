@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.db.config import get_async_db, async_session_maker
 from src.apps.auth.utils import JWTUtils, TokenBlacklist
-from src.apps.auth.rbac_service import RBACService
+from src.apps.auth.service.rbac_service import RBACService
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 

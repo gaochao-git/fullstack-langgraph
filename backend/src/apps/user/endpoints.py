@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.db.config import get_async_db
-from src.apps.user.rbac_schema import (
+from src.apps.user.schema import (
     UserCreateRequest, UserUpdateRequest, UserQueryParams, UserResponse,
     RoleCreateRequest, RoleUpdateRequest, RoleQueryParams, RoleResponse,
     PermissionCreateRequest, PermissionUpdateRequest, PermissionQueryParams, PermissionResponse,
@@ -13,10 +13,10 @@ from src.apps.user.rbac_schema import (
     UserRoleCreateRequest, RolePermissionCreateRequest,
     ApiResponse
 )
-from src.apps.user.service.rbac_service import (
+from src.apps.user.service.user_service import (
     rbac_user_service, rbac_role_service, rbac_permission_service, rbac_menu_service
 )
-from src.apps.user.rbac_models import RbacRolesPermissions, RbacUsersRoles
+from src.apps.user.models import RbacRolesPermissions, RbacUsersRoles
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException

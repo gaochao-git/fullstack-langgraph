@@ -12,7 +12,7 @@ from sqlalchemy.future import select
 from src.shared.db.config import get_async_db
 from src.apps.auth.utils import JWTUtils, TokenBlacklist, APIKeyUtils
 from src.apps.auth.models import AuthToken, AuthApiKey
-from src.apps.user.rbac_models import RbacUser, RbacUsersRoles, RbacRole
+from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 
