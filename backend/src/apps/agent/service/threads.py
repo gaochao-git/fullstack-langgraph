@@ -2,15 +2,16 @@
 线程管理相关接口
 """
 import uuid
-import logging
 from datetime import datetime
+from src.shared.core.logging import get_logger
+from src.shared.db.models import now_shanghai
 from typing import Dict, Any, Optional, List
 from fastapi import HTTPException
 from pydantic import BaseModel
 
 from ..utils import recover_thread_from_postgres
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
@@ -27,7 +28,7 @@ async def create_thread(thread_create: ThreadCreate):
     thread_id = str(uuid.uuid4())
     thread_data = {
         "thread_id": thread_id,
-        "created_at": datetime.now().isoformat(),
+        "created_at": now_shanghai().isoformat(),
         "metadata": thread_create.metadata or {},
         "state": {}
     }

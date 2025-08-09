@@ -4,12 +4,12 @@
 """
 
 import asyncio
-import logging
 from typing import List, Any
+from src.shared.core.logging import get_logger
 from .....shared.tools import sop_tool, general_tool
 from ..tools_utils import get_tools_config_from_db
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def get_generic_agent_tools(agent_id: str = "generic_agent") -> List[Any]:
     """获取通用智能体的工具列表"""

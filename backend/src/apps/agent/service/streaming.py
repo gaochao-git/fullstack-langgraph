@@ -2,8 +2,8 @@
 流式处理相关接口和函数
 """
 import json
-import logging
 from typing import Dict, Any, List
+from src.shared.core.logging import get_logger
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -21,7 +21,7 @@ from .user_threads_db import (
     init_user_threads_db
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和相关操作
 # 智能体配置完全基于数据库，无需静态全局变量
@@ -36,9 +36,7 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     自动提取thread_title（取消息内容前20字）。
     """
     import asyncio
-    import logging
     from .user_threads_db import check_user_thread_exists, create_user_thread_mapping
-    logger = logging.getLogger(__name__)
     logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
     exists = await check_user_thread_exists(user_name, thread_id)
     logger.info(f"[ensure_user_thread_mapping] exists={exists}")

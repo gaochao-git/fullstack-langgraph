@@ -3,9 +3,9 @@
 """
 
 import os
-import logging
+from src.shared.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def save_graph_image(graph, filename="graph.png"):

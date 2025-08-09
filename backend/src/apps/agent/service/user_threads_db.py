@@ -2,24 +2,17 @@
 用户线程数据库操作模块
 使用MySQL数据库，与agents.py保持统一的代码风格
 """
-import logging
 from typing import Optional, List, Dict, Any
+from src.shared.core.logging import get_logger
 from datetime import datetime
-import pytz
-
-# 定义上海时区
-SHANGHAI_TZ = pytz.timezone('Asia/Shanghai')
-
-def now_shanghai():
-    """返回上海时区的当前时间"""
-    return datetime.now(SHANGHAI_TZ).replace(tzinfo=None)
 from sqlalchemy import select, insert, update, delete
 from sqlalchemy.exc import IntegrityError
 
 from src.shared.db.config import get_async_db_context
 from src.apps.user.models import User, UserThread
+from src.shared.db.models import now_shanghai
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 async def check_user_thread_exists(user_name: str, thread_id: str) -> bool:
@@ -52,7 +45,7 @@ async def create_user_thread_mapping(
     try:
         # 如果没有标题，使用时间戳生成默认标题
         if not thread_title:
-            thread_title = f"对话 {datetime.now().strftime('%m-%d %H:%M')}"
+            thread_title = f"对话 {now_shanghai().strftime('%m-%d %H:%M')}"
             logger.info(f"🏷️ 使用默认标题: {thread_title}")
         
         async with get_async_db_context() as session:

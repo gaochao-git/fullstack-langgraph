@@ -227,6 +227,7 @@ import platform
 import psutil
 import os
 from datetime import datetime
+from src.shared.db.models import now_shanghai
 from typing import Dict, Any, List as TypingList
 
 
@@ -270,7 +271,7 @@ async def get_system_info():
                 "percent": psutil.disk_usage('/').percent
             },
             
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now_shanghai().isoformat()
         }
         
         return success_response(
@@ -316,7 +317,7 @@ async def execute_safe_command(
                 "return_code": result.returncode,
                 "stdout": result.stdout,
                 "stderr": result.stderr,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": now_shanghai().isoformat()
             },
             msg="命令执行成功"
         )

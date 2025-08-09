@@ -3,13 +3,13 @@ API工具函数模块
 """
 import os
 import json
-import logging
 from typing import Dict, Any
+from src.shared.core.logging import get_logger
 from datetime import datetime
 from fastapi import HTTPException
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # 全局连接字符串配置 - 从环境变量读取
 from ...shared.core.config import get_checkpoint_uri

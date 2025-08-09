@@ -4,6 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
+from src.shared.db.models import now_shanghai
 
 from src.shared.db.config import get_async_db
 from src.apps.scheduled_task.schema import (
@@ -197,7 +198,7 @@ async def trigger_scheduled_task(
         data={
             "message": "任务触发请求已发送",
             "task_id": task_id,
-            "trigger_time": datetime.utcnow()
+            "trigger_time": now_shanghai()
         },
         msg="任务触发成功"
     )

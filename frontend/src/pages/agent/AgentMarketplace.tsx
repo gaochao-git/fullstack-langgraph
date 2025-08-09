@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, Spin, message, Tabs } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Tabs } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
@@ -41,7 +41,6 @@ const AgentMarketplace = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedType, setSelectedType] = useState<string>('all');
   
   // 根据类型过滤智能体
@@ -52,7 +51,6 @@ const AgentMarketplace = () => {
   // 获取智能体数据
   const loadAgents = async () => {
     try {
-      setLoading(true);
       const response = await agentApi.getAgents({ include_builtin: true });
       
       // 处理业务逻辑错误
@@ -71,8 +69,6 @@ const AgentMarketplace = () => {
     } catch (error) {
       console.error('加载智能体失败:', error);
       message.error('加载智能体列表失败');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -281,16 +277,6 @@ const AgentMarketplace = () => {
     </Card>
   );
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '50px' }}>
-        <Spin size="large" />
-        <div style={{ marginTop: 16 }}>
-          <Text type="secondary">加载智能体列表中...</Text>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>

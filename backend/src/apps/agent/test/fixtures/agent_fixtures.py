@@ -5,6 +5,7 @@ Agent模块测试数据和fixture
 import pytest
 from datetime import datetime
 from typing import Dict, Any, List
+from src.shared.db.models import now_shanghai
 
 
 @pytest.fixture
@@ -24,8 +25,8 @@ def sample_agent_config_data() -> Dict[str, Any]:
         "is_enabled": True,
         "team_name": "test_team",
         "create_by": "test_user",
-        "create_time": datetime.utcnow(),
-        "update_time": datetime.utcnow()
+        "create_time": now_shanghai(),
+        "update_time": now_shanghai()
     }
 
 

@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func, or_, and_
 from sqlalchemy.exc import IntegrityError
 import json
-import logging
 import uuid
 
 from src.apps.mcp.models import MCPConfig
@@ -16,8 +15,9 @@ from src.apps.mcp.schema import (
 )
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
+from src.shared.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class MCPGatewayConfigService:

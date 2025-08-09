@@ -4,13 +4,13 @@ MCP工具整合模块
 """
 
 import asyncio
-import logging
 from typing import List
+from src.shared.core.logging import get_logger
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from .....shared.tools import sop_tool, general_tool
 from ..tools_utils import get_tools_config_from_db
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 async def get_diagnostic_tools(agent_id: str = "diagnostic_agent"):
     """获取诊断工具列表"""
