@@ -120,7 +120,7 @@ class AuthApi {
    */
   async register(data: RegisterRequest): Promise<RegisterResponse> {
     // 直接调用后端API，不使用mock
-    return await omind_post(`${this.baseUrl}/register`, data);
+    return await omind_post(`${this.baseUrl}/register`, data, { showError: false });
   }
 
   /**
