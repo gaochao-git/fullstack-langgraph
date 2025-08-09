@@ -138,9 +138,18 @@ const AgentManagement: React.FC = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/v1/ai-models`);
       const data = await response.json();
-      if (data.code === 200) {
+      
+      // 处理统一响应格式
+      if (data.status === 'ok' && data.data && data.data.items) {
         const activeModels = data.data.items.filter((model: any) => model.status === 'active');
         setAvailableModels(activeModels);
+      } else if (data.code === 200 && data.data && data.data.items) {
+        // 兼容旧格式
+        const activeModels = data.data.items.filter((model: any) => model.status === 'active');
+        setAvailableModels(activeModels);
+      } else {
+        console.warn('加载可用模型响应格式异常:', data);
+        setAvailableModels([]);
       }
     } catch (error) {
       console.error('加载可用模型失败:', error);
