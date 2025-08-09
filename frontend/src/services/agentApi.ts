@@ -1,5 +1,5 @@
 /**
- * 智能体管理API服务 - 使用统一响应格式
+ * 智能体管理API服务 - API层透传，不处理业务逻辑
  */
 
 import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
@@ -129,25 +129,6 @@ export interface PaginatedResponse<T> {
   };
 }
 
-/**
- * 处理统一响应格式
- */
-function handleUnifiedResponse<T>(response: any): T {
-  // 如果响应已经是期望的格式，直接返回
-  if ('items' in response && 'pagination' in response) {
-    return response;
-  }
-  
-  // 如果是统一格式，提取数据
-  if (response.status === 'ok') {
-    return response.data;
-  } else if (response.status === 'error') {
-    throw new Error(response.msg || '请求失败');
-  }
-  
-  // 兼容其他格式
-  return response;
-}
 
 // 智能体API服务类
 class AgentApiService {
@@ -161,110 +142,67 @@ class AgentApiService {
     status?: string;
     enabled_only?: boolean;
     include_builtin?: boolean;
-  }): Promise<PaginatedResponse<Agent>> {
-    try {
-      const searchParams = new URLSearchParams();
-      if (params?.page) searchParams.set('page', params.page.toString());
-      if (params?.size) searchParams.set('size', params.size.toString());
-      if (params?.search) searchParams.set('search', params.search);
-      if (params?.status) searchParams.set('status', params.status);
-      if (params?.enabled_only) searchParams.set('enabled_only', params.enabled_only.toString());
-      if (params?.include_builtin !== undefined) searchParams.set('include_builtin', params.include_builtin.toString());
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.size) searchParams.set('size', params.size.toString());
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.enabled_only) searchParams.set('enabled_only', params.enabled_only.toString());
+    if (params?.include_builtin !== undefined) searchParams.set('include_builtin', params.include_builtin.toString());
 
-      const url = `/api/v1/agents${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
-      const result = await omind_get(url);
-      return handleUnifiedResponse<PaginatedResponse<Agent>>(result);
-    } catch (error) {
-      console.error('获取智能体列表失败:', error);
-      throw error;
-    }
+    const url = `/api/v1/agents${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    return await omind_get(url);
   }
 
   /**
    * 获取所有智能体（简化接口，兼容现有代码）
    */
-  async getAllAgents(): Promise<Agent[]> {
-    const result = await this.getAgents({ size: 100 });
-    return result.items;
+  async getAllAgents() {
+    return await this.getAgents({ size: 100 });
   }
 
   /**
    * 获取智能体详情
    */
-  async getAgent(agentId: string): Promise<Agent> {
-    try {
-      const url = `/api/v1/agents/${agentId}`;
-      const result = await omind_get(url);
-      return handleUnifiedResponse<Agent>(result);
-    } catch (error) {
-      console.error('获取智能体失败:', error);
-      throw error;
-    }
+  async getAgent(agentId: string) {
+    const url = `/api/v1/agents/${agentId}`;
+    return await omind_get(url);
   }
 
   /**
    * 创建智能体
    */
-  async createAgent(agentData: CreateAgentRequest): Promise<Agent> {
-    try {
-      const result = await omind_post('/api/v1/agents', agentData);
-      return handleUnifiedResponse<Agent>(result);
-    } catch (error) {
-      console.error('创建智能体失败:', error);
-      throw error;
-    }
+  async createAgent(agentData: CreateAgentRequest) {
+    return await omind_post('/api/v1/agents', agentData);
   }
 
   /**
    * 更新智能体
    */
-  async updateAgent(agentId: string, agentData: UpdateAgentRequest): Promise<Agent> {
-    try {
-      const result = await omind_put(`/api/v1/agents/${agentId}`, agentData);
-      return handleUnifiedResponse<Agent>(result);
-    } catch (error) {
-      console.error('更新智能体失败:', error);
-      throw error;
-    }
+  async updateAgent(agentId: string, agentData: UpdateAgentRequest) {
+    return await omind_put(`/api/v1/agents/${agentId}`, agentData);
   }
 
   /**
    * 删除智能体
    */
-  async deleteAgent(agentId: string): Promise<{ deleted_id: string }> {
-    try {
-      const result = await omind_del(`/api/v1/agents/${agentId}`);
-      return handleUnifiedResponse<{ deleted_id: string }>(result);
-    } catch (error) {
-      console.error('删除智能体失败:', error);
-      throw error;
-    }
+  async deleteAgent(agentId: string) {
+    return await omind_del(`/api/v1/agents/${agentId}`);
   }
 
   /**
    * 更新智能体MCP配置
    */
-  async updateAgentMCPConfig(agentId: string, config: UpdateMCPConfigRequest): Promise<Agent> {
-    try {
-      const result = await omind_put(`/api/v1/agents/${agentId}/mcp-config`, config);
-      return handleUnifiedResponse<Agent>(result);
-    } catch (error) {
-      console.error('更新MCP配置失败:', error);
-      throw error;
-    }
+  async updateAgentMCPConfig(agentId: string, config: UpdateMCPConfigRequest) {
+    return await omind_put(`/api/v1/agents/${agentId}/mcp-config`, config);
   }
 
   /**
    * 更新智能体状态
    */
-  async updateAgentStatus(agentId: string, status: string): Promise<Agent> {
-    try {
-      const result = await omind_put(`/api/v1/agents/${agentId}/status`, { status });
-      return handleUnifiedResponse<Agent>(result);
-    } catch (error) {
-      console.error('更新智能体状态失败:', error);
-      throw error;
-    }
+  async updateAgentStatus(agentId: string, status: string) {
+    return await omind_put(`/api/v1/agents/${agentId}/status`, { status });
   }
 
   /**
@@ -273,27 +211,15 @@ class AgentApiService {
   async updateAgentStatistics(
     agentId: string,
     stats: UpdateStatisticsRequest
-  ): Promise<Agent> {
-    try {
-      const result = await omind_put(`/api/v1/agents/${agentId}/statistics`, stats);
-      return handleUnifiedResponse<Agent>(result);
-    } catch (error) {
-      console.error('更新智能体统计信息失败:', error);
-      throw error;
-    }
+  ) {
+    return await omind_put(`/api/v1/agents/${agentId}/statistics`, stats);
   }
 
   /**
    * 获取智能体统计信息
    */
-  async getAgentStatistics(): Promise<AgentStatistics> {
-    try {
-      const result = await omind_get('/api/v1/agents/meta/statistics');
-      return handleUnifiedResponse<AgentStatistics>(result);
-    } catch (error) {
-      console.error('获取智能体统计信息失败:', error);
-      throw error;
-    }
+  async getAgentStatistics() {
+    return await omind_get('/api/v1/agents/meta/statistics');
   }
 
   /**
@@ -308,73 +234,45 @@ class AgentApiService {
       enabled?: boolean;
       builtin?: boolean;
     };
-  }): Promise<PaginatedResponse<Agent>> {
-    try {
-      const searchParams = new URLSearchParams({
-        q: params.query,
-        ...(params.page && { page: params.page.toString() }),
-        ...(params.size && { size: params.size.toString() }),
-        ...(params.filters?.status && { status: params.filters.status }),
-        ...(params.filters?.enabled !== undefined && { enabled: params.filters.enabled.toString() }),
-        ...(params.filters?.builtin !== undefined && { builtin: params.filters.builtin.toString() }),
-      });
+  }) {
+    const searchParams = new URLSearchParams({
+      q: params.query,
+      ...(params.page && { page: params.page.toString() }),
+      ...(params.size && { size: params.size.toString() }),
+      ...(params.filters?.status && { status: params.filters.status }),
+      ...(params.filters?.enabled !== undefined && { enabled: params.filters.enabled.toString() }),
+      ...(params.filters?.builtin !== undefined && { builtin: params.filters.builtin.toString() }),
+    });
 
-      const result = await omind_get(`/api/v1/agents/search?${searchParams}`);
-      return handleUnifiedResponse<PaginatedResponse<Agent>>(result);
-    } catch (error) {
-      console.error('搜索智能体失败:', error);
-      throw error;
-    }
+    return await omind_get(`/api/v1/agents/search?${searchParams}`);
   }
 
   /**
    * 刷新后端智能体配置（兼容接口）
    */
-  async refreshAssistants(): Promise<any> {
-    try {
-      return await omind_post('/api/admin/refresh-assistants');
-    } catch (error) {
-      console.error('刷新智能体配置失败:', error);
-      throw error;
-    }
+  async refreshAssistants() {
+    return await omind_post('/api/admin/refresh-assistants');
   }
 
   /**
    * 获取后端智能体状态（兼容接口）
    */
-  async getAssistantsStatus(): Promise<any> {
-    try {
-      return await omind_get('/api/admin/assistants-status');
-    } catch (error) {
-      console.error('获取智能体状态失败:', error);
-      throw error;
-    }
+  async getAssistantsStatus() {
+    return await omind_get('/api/admin/assistants-status');
   }
 
   /**
    * 获取MCP服务器信息（兼容接口）
    */
-  async getMCPServers(): Promise<MCPServer[]> {
-    try {
-      const result = await omind_get('/api/v1/mcp/servers?size=100');
-      const paginatedResult = handleUnifiedResponse<{items: MCPServer[], total: number}>(result);
-      return paginatedResult.items;
-    } catch (error) {
-      console.error('获取MCP服务器信息失败:', error);
-      return [];
-    }
+  async getMCPServers() {
+    return await omind_get('/api/v1/mcp/servers?size=100');
   }
 
   /**
    * 获取智能体可用模型（兼容接口）
    */
-  async getAgentAvailableModels(agentId: string): Promise<any[]> {
-    try {
-      return await omind_get(`/api/v1/agents/${agentId}/available-models`);
-    } catch (error) {
-      console.error('获取可用模型失败:', error);
-      return [];
-    }
+  async getAgentAvailableModels(agentId: string) {
+    return await omind_get(`/api/v1/agents/${agentId}/available-models`);
   }
 }
 

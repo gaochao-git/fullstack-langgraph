@@ -155,33 +155,3 @@ class MCPConfig(BaseModel):
             "mcpServers": self._process_mcp_servers(self.mcp_servers),
         }
 
-
-class OpenAPIMCPConfig(BaseModel):
-    """OpenAPI MCP配置模型 - 兼容旧功能"""
-    __tablename__ = "openapi_mcp_configs"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    mcp_server_prefix = Column(String(255), nullable=False, comment="MCP服务器前缀")
-    mcp_tool_name = Column(String(255), nullable=False, comment="工具名称")
-    mcp_tool_enabled = Column(TINYINT, nullable=False, default=0, comment="是否开启:0关闭,1开启")
-    openapi_schema = Column(Text, nullable=False, comment="原始OpenAPI规范JSON/YAML")
-    auth_config = Column(Text, nullable=True, default="", comment="认证配置JSON")
-    extra_config = Column(Text, nullable=True, default="", comment="其他配置JSON")
-    is_deleted = Column(TINYINT, nullable=False, default=0, comment="是否删除:0未删除,1已删除")
-    create_by = Column(String(100), nullable=False, comment="创建者")
-    update_by = Column(String(100), nullable=True, comment="更新者")
-    create_time = Column(DateTime, default=now_shanghai, nullable=False, comment="创建时间")
-    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False, comment="更新时间")
-
-    def _process_openapi_schema(self, value):
-        """自定义处理openapi_schema字段"""
-        return self._parse_json_field(value, default={})
-    
-    def _process_auth_config(self, value):
-        """自定义处理auth_config字段"""
-        return self._parse_json_field(value, default={})
-    
-    def _process_extra_config(self, value):
-        """自定义处理extra_config字段"""
-        return self._parse_json_field(value, default={})
-

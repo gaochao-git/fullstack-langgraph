@@ -195,3 +195,96 @@ fullstack-langgraph/
 - `restart`: 重启服务
 - `status`: 查看服务状态
 - `cleanup`: 清理临时文件和日志
+
+## 后端开发规范
+
+### 代码组织结构
+
+每个业务模块必须遵循以下目录结构：
+```
+apps/your_module/
+├── __init__.py       # 导出 router
+├── endpoints.py      # API路由定义（仅负责参数接收和响应返回）
+├── service/          # 业务逻辑层
+│   └── xxx_service.py
+├── models.py         # 数据库模型定义
+└── schema.py         # Pydantic模型（请求/响应格式）
+```
+
+### 请求处理流程
+
+1. **请求入口** → FastAPI Application (main.py)
+2. **中间件处理** → CORS、请求日志、性能监控、认证等
+3. **路由分发** → router.py → 具体模块的 endpoints.py
+4. **参数验证** → Pydantic Schema 自动验证
+5. **业务处理** → Service 层处理业务逻辑
+6. **数据操作** → 使用 SQLAlchemy ORM 操作数据库
+7. **统一响应** → 使用公共响应格式返回
+
+### 公共方法使用规范
+
+#### 1. 统一响应格式
+- 成功响应使用 `success_response()`
+- 分页响应使用 `paginated_response()` 
+- 错误响应通过抛出 `BusinessException` 自动处理
+- 不要自己构造响应JSON
+
+#### 2. 数据库操作
+- 使用依赖注入 `Depends(get_async_db)` 获取数据库会话
+- 写操作必须使用 `async with db.begin()` 自动管理事务
+- 不需要手动 commit 或 rollback
+- 查询使用 SQLAlchemy 的 select 语法
+
+#### 3. 日志记录
+- 使用 `get_logger(__name__)` 获取日志器
+- 重要操作（创建、更新、删除）必须记录日志
+- 日志自动包含 request_id 便于追踪
+
+#### 4. 异常处理
+- 业务错误使用 `BusinessException`，指定 ResponseCode
+- 不要使用 HTTPException
+- 异常信息要用户友好
+- 系统异常会自动处理
+
+#### 5. 时间处理
+- 使用 `now_shanghai()` 获取当前时间
+- 所有时间存储为上海时区
+- 模型的创建和更新时间会自动设置
+
+### 开发流程
+
+1. **设计数据模型** (models.py)
+2. **定义接口格式** (schema.py) 
+3. **实现业务逻辑** (service/)
+4. **暴露API接口** (endpoints.py)
+5. **注册到路由** (router.py)
+
+### API设计规范
+
+- 遵循 RESTful 风格
+- 路径使用复数形式
+- 版本号统一使用 /v1/
+- 标准操作：
+  - GET /v1/items - 列表
+  - GET /v1/items/:id - 详情
+  - POST /v1/items - 创建
+  - PUT /v1/items/:id - 更新
+  - DELETE /v1/items/:id - 删除
+
+### 命名规范
+
+- 文件名：小写下划线分隔 (user_service.py)
+- 类名：大驼峰 (UserService)
+- 函数名：小写下划线分隔 (get_user_by_id)
+- 变量名：小写下划线分隔
+- 常量：大写下划线分隔
+
+### 注意事项
+
+1. **不要在 endpoints.py 写业务逻辑**
+2. **Service 层不处理 HTTP 相关内容**
+3. **使用 BusinessException 而不是 HTTPException**
+4. **所有 API 返回统一响应格式**
+5. **数据库操作使用 async with db.begin()**
+6. **敏感信息不要记录到日志**
+7. **大量数据必须分页处理**

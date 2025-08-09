@@ -54,11 +54,18 @@ const SOPManagement: React.FC = () => {
       };
       
       const response = await SOPApi.getSOPs(queryParams);
-      if (response.success && response.data) {
-        setSOPs(response.data.data);
-        setTotal(response.data.total);
-      } else {
-        message.error(response.error || '获取SOP数据失败');
+      
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        message.error(response.msg || '获取SOP数据失败');
+        return;
+      }
+      
+      // 处理成功响应
+      const data = response.data || response;
+      if (data.items && data.pagination) {
+        setSOPs(data.items);
+        setTotal(data.pagination.total);
       }
     } catch (error) {
       message.error('获取SOP数据失败');
@@ -117,12 +124,15 @@ const SOPManagement: React.FC = () => {
   const handleDelete = async (sopId: string) => {
     try {
       const response = await SOPApi.deleteSOP(sopId);
-      if (response.success) {
-        message.success('删除成功');
-        fetchSOPs();
-      } else {
-        message.error(response.error || '删除失败');
+      
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        message.error(response.msg || '删除失败');
+        return;
       }
+      
+      message.success('删除成功');
+      fetchSOPs();
     } catch (error) {
       message.error('删除失败');
     }

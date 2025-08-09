@@ -11,11 +11,9 @@ from src.shared.db.config import get_async_db
 from src.apps.mcp.schema import (
     MCPServerCreate, MCPServerUpdate, MCPQueryParams,
     MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate,
-    OpenAPIMCPConfigCreate, OpenAPIMCPConfigUpdate,
     MCPGatewayConfigCreate, MCPGatewayConfigUpdate, MCPGatewayConfigQueryParams
 )
 from src.apps.mcp.service.mcp_service import mcp_service
-from src.apps.mcp.service.openapi_mcp_service import OpenAPIMCPConfigService
 from src.apps.mcp.service.mcp_gateway_service import mcp_gateway_service
 from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
@@ -25,9 +23,6 @@ from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["MCP Server Management"])
-
-# 服务实例
-openapi_mcp_service = OpenAPIMCPConfigService()
 
 
 async def _test_mcp_connection(server_uri: str) -> List[dict]:

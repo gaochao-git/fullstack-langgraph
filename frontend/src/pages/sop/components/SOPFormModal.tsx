@@ -141,12 +141,14 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
 
         const response = await SOPApi.updateSOP(editData.sop_id, updateData);
         
-        if (response.success) {
-          message.success('更新成功');
-          onSuccess();
-        } else {
-          message.error(response.error || '更新失败');
+        // 处理业务逻辑错误
+        if (response.status === 'error') {
+          message.error(response.msg || '更新失败');
+          return;
         }
+        
+        message.success('更新成功');
+        onSuccess();
       } else {
         // 创建模式 - 发送完整数据
         const requestData: SOPTemplateRequest = {
@@ -163,12 +165,14 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
 
         const response = await SOPApi.createSOP(requestData);
         
-        if (response.success) {
-          message.success('创建成功');
-          onSuccess();
-        } else {
-          message.error(response.error || '创建失败');
+        // 处理业务逻辑错误
+        if (response.status === 'error') {
+          message.error(response.msg || '创建失败');
+          return;
         }
+        
+        message.success('创建成功');
+        onSuccess();
       }
     } catch (error) {
       console.error('Form validation failed:', error);

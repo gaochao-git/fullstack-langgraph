@@ -1,5 +1,5 @@
 /**
- * 定时任务 API服务 - 真实API调用，适配统一响应格式
+ * 定时任务 API服务 - API层透传，不处理业务逻辑
  */
 
 import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
@@ -94,271 +94,88 @@ export interface CeleryTaskRecordListParams {
   task_status?: string;
 }
 
-/**
- * 处理统一响应格式
- */
-function handleUnifiedResponse<T>(response: any): T {
-  if (response.status === 'ok') {
-    return response.data;
-  } else {
-    throw new Error(response.msg || '请求失败');
-  }
-}
 
 // 定时任务 API接口类
 export class ScheduledTaskApi {
   // 获取定时任务列表
   static async getScheduledTasks(params: ScheduledTaskListParams = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.page) queryParams.append('page', params.page.toString());
-      if (params.size) queryParams.append('size', params.size.toString());
-      if (params.search) queryParams.append('search', params.search);
-      if (params.enabled_only !== undefined) queryParams.append('enabled_only', params.enabled_only.toString());
-      if (params.agent_id) queryParams.append('agent_id', params.agent_id);
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.size) queryParams.append('size', params.size.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.enabled_only !== undefined) queryParams.append('enabled_only', params.enabled_only.toString());
+    if (params.agent_id) queryParams.append('agent_id', params.agent_id);
 
-      const url = `/api/v1/scheduled-tasks${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await omind_get(url);
-      
-      // 处理分页响应格式
-      const result = handleUnifiedResponse(response);
-      
-      // 转换为前端期望的格式
-      return {
-        success: true,
-        data: {
-          data: result.items,
-          total: result.pagination.total
-        }
-      };
-    } catch (error) {
-      console.error('Failed to fetch scheduled tasks:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取定时任务列表失败'
-      };
-    }
+    const url = `/api/v1/scheduled-tasks${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
   }
 
   // 获取单个定时任务
   static async getScheduledTaskById(taskId: number) {
-    try {
-      const response = await omind_get(`/api/v1/scheduled-tasks/${taskId}`);
-      const result = handleUnifiedResponse<ScheduledTask>(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to fetch scheduled task ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '定时任务不存在'
-      };
-    }
+    return await omind_get(`/api/v1/scheduled-tasks/${taskId}`);
   }
 
   // 创建定时任务
   static async createScheduledTask(taskData: ScheduledTaskCreateRequest) {
-    try {
-      const response = await omind_post('/api/v1/scheduled-tasks', taskData);
-      const result = handleUnifiedResponse<ScheduledTask>(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to create scheduled task:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '创建定时任务失败'
-      };
-    }
+    return await omind_post('/api/v1/scheduled-tasks', taskData);
   }
 
   // 更新定时任务
   static async updateScheduledTask(taskId: number, taskData: ScheduledTaskUpdateRequest) {
-    try {
-      const response = await omind_put(`/api/v1/scheduled-tasks/${taskId}`, taskData);
-      const result = handleUnifiedResponse<ScheduledTask>(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to update scheduled task ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '更新定时任务失败'
-      };
-    }
+    return await omind_put(`/api/v1/scheduled-tasks/${taskId}`, taskData);
   }
 
   // 删除定时任务
   static async deleteScheduledTask(taskId: number) {
-    try {
-      const response = await omind_del(`/api/v1/scheduled-tasks/${taskId}`);
-      handleUnifiedResponse(response);
-      return {
-        success: true,
-        data: true
-      };
-    } catch (error) {
-      console.error(`Failed to delete scheduled task ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '删除定时任务失败'
-      };
-    }
+    return await omind_del(`/api/v1/scheduled-tasks/${taskId}`);
   }
 
   // 启用定时任务
   static async enableScheduledTask(taskId: number) {
-    try {
-      const response = await omind_post(`/api/v1/scheduled-tasks/${taskId}/enable`);
-      handleUnifiedResponse(response);
-      return {
-        success: true,
-        data: true
-      };
-    } catch (error) {
-      console.error(`Failed to enable scheduled task ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '启用任务失败'
-      };
-    }
+    return await omind_post(`/api/v1/scheduled-tasks/${taskId}/enable`);
   }
 
   // 禁用定时任务
   static async disableScheduledTask(taskId: number) {
-    try {
-      const response = await omind_post(`/api/v1/scheduled-tasks/${taskId}/disable`);
-      handleUnifiedResponse(response);
-      return {
-        success: true,
-        data: true
-      };
-    } catch (error) {
-      console.error(`Failed to disable scheduled task ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '禁用任务失败'
-      };
-    }
+    return await omind_post(`/api/v1/scheduled-tasks/${taskId}/disable`);
   }
 
   // 手动触发定时任务
   static async triggerScheduledTask(taskId: number) {
-    try {
-      const response = await omind_post(`/api/v1/scheduled-tasks/${taskId}/trigger`);
-      const result = handleUnifiedResponse(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to trigger scheduled task ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '触发任务失败'
-      };
-    }
+    return await omind_post(`/api/v1/scheduled-tasks/${taskId}/trigger`);
   }
 
   // 获取任务执行日志
   static async getTaskExecutionLogs(taskId: number, skip: number = 0, limit: number = 50) {
-    try {
-      const queryParams = new URLSearchParams();
-      queryParams.append('skip', skip.toString());
-      queryParams.append('limit', limit.toString());
+    const queryParams = new URLSearchParams();
+    queryParams.append('skip', skip.toString());
+    queryParams.append('limit', limit.toString());
 
-      const response = await omind_get(`/api/v1/scheduled-tasks/${taskId}/logs?${queryParams.toString()}`);
-      const result = handleUnifiedResponse<TaskExecutionLog[]>(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to fetch task execution logs ${taskId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取执行日志失败'
-      };
-    }
+    return await omind_get(`/api/v1/scheduled-tasks/${taskId}/logs?${queryParams.toString()}`);
   }
 
   // 获取Celery任务记录列表
   static async getCeleryTaskRecords(params: CeleryTaskRecordListParams = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.page) queryParams.append('page', params.page.toString());
-      if (params.size) queryParams.append('size', params.size.toString());
-      if (params.task_name) queryParams.append('task_name', params.task_name);
-      if (params.task_status) queryParams.append('task_status', params.task_status);
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.size) queryParams.append('size', params.size.toString());
+    if (params.task_name) queryParams.append('task_name', params.task_name);
+    if (params.task_status) queryParams.append('task_status', params.task_status);
 
-      const url = `/api/v1/scheduled-tasks/records${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const response = await omind_get(url);
-      
-      // 处理分页响应格式
-      const result = handleUnifiedResponse(response);
-      
-      // 转换为前端期望的格式
-      return {
-        success: true,
-        data: {
-          data: result.items,
-          total: result.pagination.total
-        }
-      };
-    } catch (error) {
-      console.error('Failed to fetch celery task records:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取任务记录失败'
-      };
-    }
+    const url = `/api/v1/scheduled-tasks/records${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
   }
 
   // 获取单个任务记录详情
   static async getCeleryTaskRecordById(recordId: number) {
-    try {
-      const response = await omind_get(`/api/v1/scheduled-tasks/records/${recordId}`);
-      const result = handleUnifiedResponse<CeleryTaskRecord>(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to fetch celery task record ${recordId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '任务记录不存在'
-      };
-    }
+    return await omind_get(`/api/v1/scheduled-tasks/records/${recordId}`);
   }
 
   // 获取统计信息
   static async getStatistics() {
-    try {
-      const response = await omind_get('/api/v1/scheduled-tasks/meta/statistics');
-      const result = handleUnifiedResponse<{
-        task_statistics: Array<{enabled: boolean, count: number}>;
-        record_statistics: Array<{status: string, count: number}>;
-      }>(response);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to fetch scheduled task statistics:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取统计信息失败'
-      };
-    }
+    return await omind_get('/api/v1/scheduled-tasks/meta/statistics');
   }
 }
 

@@ -1,5 +1,5 @@
 /**
- * MCP API服务 - 真实API调用，适配统一响应格式
+ * MCP API服务 - API层透传，不处理业务逻辑
  */
 
 import { omind_get, omind_post, omind_put, omind_del, omind_patch } from '../utils/base_api';
@@ -84,232 +84,72 @@ export interface MCPTestResponse {
   error?: string;
 }
 
-/**
- * 处理统一响应格式
- */
-function handleUnifiedResponse<T>(response: any): T {
-  if (response.status === 'ok') {
-    return response.data;
-  } else {
-    throw new Error(response.msg || '请求失败');
-  }
-}
 
 // MCP API接口类
 export class MCPApi {
   // 获取MCP服务器列表
   static async getMCPServers(params: MCPListParams = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.page) queryParams.append('page', params.page.toString());
-      if (params.size) queryParams.append('size', params.size.toString());
-      if (params.search) queryParams.append('search', params.search);
-      if (params.is_enabled) queryParams.append('is_enabled', params.is_enabled);
-      if (params.connection_status) queryParams.append('connection_status', params.connection_status);
-      if (params.team_name) queryParams.append('team_name', params.team_name);
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.size) queryParams.append('size', params.size.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.is_enabled) queryParams.append('is_enabled', params.is_enabled);
+    if (params.connection_status) queryParams.append('connection_status', params.connection_status);
+    if (params.team_name) queryParams.append('team_name', params.team_name);
 
-      const url = `/api/v1/mcp/servers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const responseData = await omind_get(url);
-      
-      // 处理分页响应格式
-      const result = handleUnifiedResponse(responseData);
-      
-      // 转换为前端期望的格式
-      return {
-        success: true,
-        data: {
-          data: result.items,
-          total: result.pagination.total
-        }
-      };
-    } catch (error) {
-      console.error('Failed to fetch MCP servers:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取MCP服务器列表失败'
-      };
-    }
+    const url = `/api/v1/mcp/servers${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
   }
 
   // 获取单个MCP服务器
   static async getMCPServerById(serverId: string) {
-    try {
-      const responseData = await omind_get(`/api/v1/mcp/servers/${serverId}`);
-      const result = handleUnifiedResponse<MCPServer>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to fetch MCP server ${serverId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'MCP服务器不存在'
-      };
-    }
+    return await omind_get(`/api/v1/mcp/servers/${serverId}`);
   }
 
   // 创建MCP服务器
   static async createMCPServer(serverData: MCPServerCreateRequest) {
-    try {
-      const responseData = await omind_post('/api/v1/mcp/servers', serverData);
-      const result = handleUnifiedResponse<MCPServer>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to create MCP server:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '创建MCP服务器失败'
-      };
-    }
+    return await omind_post('/api/v1/mcp/servers', serverData);
   }
 
   // 更新MCP服务器
   static async updateMCPServer(serverId: string, serverData: MCPServerUpdateRequest) {
-    try {
-      const responseData = await omind_put(`/api/v1/mcp/servers/${serverId}`, serverData);
-      const result = handleUnifiedResponse<MCPServer>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to update MCP server ${serverId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '更新MCP服务器失败'
-      };
-    }
+    return await omind_put(`/api/v1/mcp/servers/${serverId}`, serverData);
   }
 
   // 删除MCP服务器
   static async deleteMCPServer(serverId: string) {
-    try {
-      const responseData = await omind_del(`/api/v1/mcp/servers/${serverId}`);
-      handleUnifiedResponse(responseData);
-      return {
-        success: true,
-        data: true
-      };
-    } catch (error) {
-      console.error(`Failed to delete MCP server ${serverId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '删除MCP服务器失败'
-      };
-    }
+    return await omind_del(`/api/v1/mcp/servers/${serverId}`);
   }
 
   // 测试MCP服务器连接
   static async testMCPServer(serverId: string) {
-    try {
-      const responseData = await omind_post(`/api/v1/mcp/servers/${serverId}/test`, {});
-      const result = handleUnifiedResponse<MCPTestResponse>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to test MCP server ${serverId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'MCP服务器连接测试失败'
-      };
-    }
+    return await omind_post(`/api/v1/mcp/servers/${serverId}/test`, {});
   }
 
   // 通用连接测试
   static async testConnection(testData: MCPTestRequest) {
-    try {
-      const responseData = await omind_post('/api/v1/mcp/test', testData);
-      const result = handleUnifiedResponse<MCPTestResponse>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to test MCP connection:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'MCP连接测试失败'
-      };
-    }
+    return await omind_post('/api/v1/mcp/test', testData);
   }
 
   // 更新服务器状态
   static async updateServerStatus(serverId: string, status: 'connected' | 'disconnected' | 'error') {
-    try {
-      const responseData = await omind_patch(`/api/v1/mcp/servers/${serverId}/status`, { status });
-      const result = handleUnifiedResponse<MCPServer>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to update server status ${serverId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '更新服务器状态失败'
-      };
-    }
+    return await omind_patch(`/api/v1/mcp/servers/${serverId}/status`, { status });
   }
 
   // 启用/禁用服务器
   static async toggleServerEnable(serverId: string, enabled: 'on' | 'off') {
-    try {
-      const responseData = await omind_patch(`/api/v1/mcp/servers/${serverId}/enable`, { enabled });
-      const result = handleUnifiedResponse<MCPServer>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to toggle server enable ${serverId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '切换服务器状态失败'
-      };
-    }
+    return await omind_patch(`/api/v1/mcp/servers/${serverId}/enable`, { enabled });
   }
 
   // 获取团队列表
   static async getTeams() {
-    try {
-      const responseData = await omind_get('/api/v1/mcp/servers/meta/teams');
-      const result = handleUnifiedResponse<string[]>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to fetch MCP teams:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取团队列表失败'
-      };
-    }
+    return await omind_get('/api/v1/mcp/servers/meta/teams');
   }
 
   // 获取统计信息
   static async getStatistics() {
-    try {
-      const responseData = await omind_get('/api/v1/mcp/servers/meta/statistics');
-      const result = handleUnifiedResponse<Array<{status: string, count: number}>>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to fetch MCP statistics:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取统计信息失败'
-      };
-    }
+    return await omind_get('/api/v1/mcp/servers/meta/statistics');
   }
 }
 

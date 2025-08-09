@@ -153,9 +153,19 @@ const AgentManagement: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const agentsData = await agentApi.getAllAgents();
+      const response = await agentApi.getAllAgents();
+      
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        message.error(response.msg || '加载智能体数据失败');
+        return;
+      }
+      
+      // 处理成功响应
+      const data = response.data || response;
+      const agentsData = data.items || data;
       console.log('Agents data loaded:', agentsData);
-      setAgents(agentsData.map(transformAgentToLocal));
+      setAgents(Array.isArray(agentsData) ? agentsData.map(transformAgentToLocal) : []);
     } catch (error) {
       console.error('加载智能体数据失败:', error);
       message.error('加载智能体数据失败');
@@ -169,13 +179,20 @@ const AgentManagement: React.FC = () => {
     try {
       // 加载MCP服务器
       try {
-        const mcpServersData = await agentApi.getMCPServers();
-        console.log('MCP servers data loaded:', mcpServersData);
+        const response = await agentApi.getMCPServers();
+        console.log('MCP servers response:', response);
         
-        if (Array.isArray(mcpServersData)) {
+        // 处理统一响应格式
+        if (response.status === 'ok' && response.data && response.data.items) {
+          const mcpServersData = response.data.items;
+          console.log('MCP servers data:', mcpServersData);
           setMcpServers(mcpServersData.map(transformMCPServerToLocal));
+        } else if (response.status === 'error') {
+          console.error('加载MCP服务器失败:', response.msg);
+          message.error(response.msg || '加载MCP服务器失败');
+          setMcpServers([]);
         } else {
-          console.warn('MCP服务器数据不是数组格式:', mcpServersData);
+          console.warn('MCP服务器响应格式异常:', response);
           setMcpServers([]);
         }
       } catch (error) {
@@ -227,7 +244,13 @@ const AgentManagement: React.FC = () => {
       if (agent) {
         // 切换状态
         const newStatus = agent.agent_enabled === 'yes' ? 'no' : 'yes';
-        await agentApi.updateAgent(agentId, { agent_enabled: newStatus });
+        const response = await agentApi.updateAgent(agentId, { agent_enabled: newStatus });
+        
+        // 处理业务逻辑错误
+        if (response.status === 'error') {
+          message.error(response.msg || '更新智能体状态失败');
+          return;
+        }
       }
       
       // 重新从后端获取最新数据
@@ -299,7 +322,15 @@ const AgentManagement: React.FC = () => {
           prompt_info: values.prompt_info
         };
 
-        const newAgent = await agentApi.createAgent(newAgentData);
+        const response = await agentApi.createAgent(newAgentData);
+        
+        // 处理业务逻辑错误
+        if (response.status === 'error') {
+          message.error(response.msg || '创建智能体失败');
+          return;
+        }
+        
+        const newAgent = response.data || response;
         setAgents(prevAgents => [...prevAgents, transformAgentToLocal(newAgent)]);
         message.success('智能体创建成功');
       } else if (editingAgent) {
@@ -315,7 +346,15 @@ const AgentManagement: React.FC = () => {
           prompt_info: values.prompt_info
         };
 
-        const updatedAgent = await agentApi.updateAgent(editingAgent.agent_id, updateData);
+        const response = await agentApi.updateAgent(editingAgent.agent_id, updateData);
+        
+        // 处理业务逻辑错误
+        if (response.status === 'error') {
+          message.error(response.msg || '更新智能体失败');
+          return;
+        }
+        
+        const updatedAgent = response.data || response;
         setAgents(prevAgents =>
           prevAgents.map(agent => 
             agent.agent_id === editingAgent.agent_id ? transformAgentToLocal(updatedAgent) : agent
@@ -527,7 +566,14 @@ const AgentManagement: React.FC = () => {
         onOk={async () => {
           if (!agentToDelete) return;
           try {
-            await agentApi.deleteAgent(agentToDelete.agent_id);
+            const response = await agentApi.deleteAgent(agentToDelete.agent_id);
+            
+            // 处理业务逻辑错误
+            if (response.status === 'error') {
+              message.error(response.msg || '删除智能体失败');
+              return;
+            }
+            
             setAgents(prevAgents => prevAgents.filter(a => a.agent_id !== agentToDelete.agent_id));
             message.success('智能体已删除');
           } catch (error) {

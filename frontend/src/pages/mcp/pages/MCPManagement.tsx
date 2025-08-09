@@ -142,7 +142,7 @@ const MCPManagement: React.FC = () => {
   const fetchServers = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers`);
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers?size=100`);
       if (response.ok) {
         const result = await response.json();
         if (result.status === 'ok' && result.data && result.data.items) {

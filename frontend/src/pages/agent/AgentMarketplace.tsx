@@ -54,10 +54,19 @@ const AgentMarketplace = () => {
     try {
       setLoading(true);
       const response = await agentApi.getAgents({ include_builtin: true });
+      
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        message.error(response.msg || '加载智能体列表失败');
+        return;
+      }
+      
+      // 处理成功响应
+      const data = response.data || response;
       console.log('API Response:', response);
-      console.log('Items:', response.items);
+      console.log('Items:', data.items);
       // 显示所有智能体，不再过滤启用状态
-      const activeAgents = response.items;
+      const activeAgents = data.items || [];
       setAgents(activeAgents);
     } catch (error) {
       console.error('加载智能体失败:', error);

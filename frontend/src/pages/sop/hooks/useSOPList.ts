@@ -48,12 +48,20 @@ export const useSOPList = (initialParams: SOPListParams = {}): UseSOPListReturn 
     try {
       const result = await SOPApi.getSOPs(queryParams);
       
-      if (result.success && result.data) {
-        setSOPs(result.data.data);
-        setTotal(result.data.total);
+      // 处理业务逻辑错误
+      if (result.status === 'error') {
+        message.error(result.msg || '获取SOP列表失败');
+        setSOPs([]);
+        setTotal(0);
+        return;
+      }
+      
+      // 处理成功响应
+      const data = result.data || result;
+      if (data.items && data.pagination) {
+        setSOPs(data.items);
+        setTotal(data.pagination.total);
         setCurrentParams(queryParams);
-      } else {
-        throw new Error(result.error || '获取SOP列表失败');
       }
     } catch (error) {
       console.error('获取SOP列表失败:', error);
@@ -101,7 +109,14 @@ export const useSOPList = (initialParams: SOPListParams = {}): UseSOPListReturn 
    */
   const deleteSOP = useCallback(async (sopId: string) => {
     try {
-      await SOPApi.deleteSOP(sopId);
+      const response = await SOPApi.deleteSOP(sopId);
+      
+      // 处理业务逻辑错误
+      if (response.status === 'error') {
+        message.error(response.msg || '删除失败');
+        return;
+      }
+      
       message.success('SOP删除成功');
       
       // 如果当前页只有一个项目且不是第一页，则跳转到前一页

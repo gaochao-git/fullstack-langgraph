@@ -1,5 +1,5 @@
 /**
- * SOP API服务 - 真实API调用，适配统一响应格式
+ * SOP API服务 - API层透传，不处理业务逻辑
  */
 
 import {
@@ -63,160 +63,52 @@ export class SOPUtils {
   }
 }
 
-/**
- * 处理统一响应格式
- */
-function handleUnifiedResponse<T>(response: any): T {
-  if (response.status === 'ok') {
-    return response.data;
-  } else {
-    throw new Error(response.msg || '请求失败');
-  }
-}
 
 // SOP API接口类
 export class SOPApi {
   // 获取SOP列表 - 改为GET请求
   static async getSOPs(params: SOPListParams = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.page) queryParams.append('page', params.page.toString());
-      if (params.size) queryParams.append('size', params.size.toString());
-      if (params.search) queryParams.append('search', params.search);
-      if (params.category) queryParams.append('category', params.category);
-      if (params.severity && params.severity !== 'all') queryParams.append('severity', params.severity);
-      if (params.team_name) queryParams.append('team_name', params.team_name);
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.size) queryParams.append('size', params.size.toString());
+    if (params.search) queryParams.append('search', params.search);
+    if (params.category) queryParams.append('category', params.category);
+    if (params.severity && params.severity !== 'all') queryParams.append('severity', params.severity);
+    if (params.team_name) queryParams.append('team_name', params.team_name);
 
-      const url = `/api/v1/sops${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-      const responseData = await omind_get(url);
-      
-      // 处理分页响应格式
-      const result = handleUnifiedResponse<{items: any[], pagination: {total: number}}>(responseData);
-      
-      // 转换为前端期望的格式
-      return {
-        success: true,
-        data: {
-          data: result.items,
-          total: result.pagination.total
-        }
-      };
-    } catch (error) {
-      console.error('Failed to fetch SOPs:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取SOP数据失败'
-      };
-    }
+    const url = `/api/v1/sops${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
   }
 
   // 获取单个SOP
   static async getSOPById(sopId: string) {
-    try {
-      const responseData = await omind_get(`/api/v1/sops/${sopId}`);
-      const result = handleUnifiedResponse<SOPTemplate>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to fetch SOP ${sopId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'SOP不存在'
-      };
-    }
+    return await omind_get(`/api/v1/sops/${sopId}`);
   }
 
   // 创建SOP
   static async createSOP(sopData: SOPTemplateRequest) {
-    try {
-      const responseData = await omind_post('/api/v1/sops', sopData);
-      const result = handleUnifiedResponse<SOPTemplate>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to create SOP:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '创建SOP失败'
-      };
-    }
+    return await omind_post('/api/v1/sops', sopData);
   }
 
   // 更新SOP
   static async updateSOP(sopId: string, sopData: Partial<SOPTemplateRequest>) {
-    try {
-      const responseData = await omind_put(`/api/v1/sops/${sopId}`, sopData);
-      const result = handleUnifiedResponse<SOPTemplate>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error(`Failed to update SOP ${sopId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '更新SOP失败'
-      };
-    }
+    return await omind_put(`/api/v1/sops/${sopId}`, sopData);
   }
 
   // 删除SOP
   static async deleteSOP(sopId: string) {
-    try {
-      const responseData = await omind_del(`/api/v1/sops/${sopId}`);
-      handleUnifiedResponse(responseData);
-      return {
-        success: true,
-        data: true
-      };
-    } catch (error) {
-      console.error(`Failed to delete SOP ${sopId}:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '删除SOP失败'
-      };
-    }
+    return await omind_del(`/api/v1/sops/${sopId}`);
   }
 
   // 获取分类列表
   static async getCategories() {
-    try {
-      const responseData = await omind_get('/api/v1/sops/meta/categories');
-      const result = handleUnifiedResponse<string[]>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to fetch categories:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取分类列表失败'
-      };
-    }
+    return await omind_get('/api/v1/sops/meta/categories');
   }
 
   // 获取团队列表
   static async getTeams() {
-    try {
-      const responseData = await omind_get('/api/v1/sops/meta/teams');
-      const result = handleUnifiedResponse<string[]>(responseData);
-      return {
-        success: true,
-        data: result
-      };
-    } catch (error) {
-      console.error('Failed to fetch teams:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '获取团队列表失败'
-      };
-    }
+    return await omind_get('/api/v1/sops/meta/teams');
   }
 }
 
