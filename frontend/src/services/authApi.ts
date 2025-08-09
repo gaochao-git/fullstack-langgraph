@@ -57,7 +57,16 @@ class AuthApi {
     // omind_post 现在默认返回解析后的数据
     const result = await omind_post(`${this.baseUrl}/login`, data);
     
-    // 如果返回的是统一格式，数据已经被自动提取
+    // 检查业务逻辑错误
+    if (result.status === 'error') {
+      throw new Error(result.msg || '登录失败');
+    }
+    
+    // 如果是统一格式的成功响应，提取data
+    if (result.status === 'ok' && result.data) {
+      return result.data;
+    }
+    
     // 如果不是统一格式，返回整个结果
     return result;
   }
@@ -120,7 +129,20 @@ class AuthApi {
    */
   async register(data: RegisterRequest): Promise<RegisterResponse> {
     // 直接调用后端API，不使用mock
-    return await omind_post(`${this.baseUrl}/register`, data);
+    const result = await omind_post(`${this.baseUrl}/register`, data);
+    
+    // 检查业务逻辑错误
+    if (result.status === 'error') {
+      throw new Error(result.msg || '注册失败');
+    }
+    
+    // 如果是统一格式的成功响应，提取data
+    if (result.status === 'ok' && result.data) {
+      return result.data;
+    }
+    
+    // 如果不是统一格式，返回整个结果
+    return result;
   }
 
   /**
