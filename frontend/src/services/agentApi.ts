@@ -2,7 +2,7 @@
  * 智能体管理API服务 - API层透传，不处理业务逻辑
  */
 
-import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del } from '@/utils/base_api';
 
 // 类型定义
 export interface MCPTool {

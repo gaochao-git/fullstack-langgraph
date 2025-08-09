@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, Tabs, Divider, Space, App } from 'antd';
 import { UserOutlined, LockOutlined, GlobalOutlined } from '@ant-design/icons';
-import { useAuth } from '../../hooks/useAuth';
-import { useTheme } from '../../hooks/ThemeContext';
-import { DevLoginHint } from '../../components/DevLoginHint';
+import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/hooks/ThemeContext';
+import { DevLoginHint } from '@/components/DevLoginHint';
 import './LoginPage.css';
 
 const { TabPane } = Tabs;

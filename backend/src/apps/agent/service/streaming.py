@@ -4,7 +4,8 @@
 import json
 from typing import Dict, Any, List
 from src.shared.core.logging import get_logger
-from fastapi import HTTPException
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -217,7 +218,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
         db.close()
     
     if not agent_config:
-        raise HTTPException(status_code=400, detail=f"智能体不存在: {agent_id}")
+        raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
     
     # 移除验证逻辑，直接根据数据库配置处理智能体
     

@@ -1,4 +1,4 @@
-import { omind_fetch, omind_post, omind_get } from '../utils/base_api';
+import { omind_fetch, omind_post, omind_get } from '@/utils/base_api';
 
 interface LoginRequest {
   username: string;

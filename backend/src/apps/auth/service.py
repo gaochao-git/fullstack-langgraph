@@ -11,7 +11,6 @@ from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_
 from sqlalchemy.future import select
-from fastapi import HTTPException, status
 
 from src.apps.auth.models import (
     AuthUser, AuthToken, AuthSession, AuthLoginHistory, 
@@ -26,6 +25,8 @@ from src.apps.auth.schemas import (
     LoginRequest, LoginResponse, UserProfile,
     CreateAPIKeyRequest, CreateAPIKeyResponse
 )
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 
 class AuthService:
@@ -58,16 +59,16 @@ class AuthService:
             rbac_user = result.scalar_one_or_none()
             
             if not rbac_user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="用户名或密码错误"
+                raise BusinessException(
+                    "用户名或密码错误",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             # 检查用户是否激活
             if rbac_user.is_active != 1:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="账户已被禁用"
+                raise BusinessException(
+                    "账户已被禁用",
+                    ResponseCode.FORBIDDEN
                 )
             
             # 获取认证信息 (使用异步查询)
@@ -87,9 +88,9 @@ class AuthService:
             # 检查账户是否被锁定
             if auth_user.locked_until and auth_user.locked_until > datetime.now(timezone.utc):
                 remaining_minutes = (auth_user.locked_until - datetime.now(timezone.utc)).seconds // 60
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"账户已被锁定，请{remaining_minutes}分钟后再试"
+                raise BusinessException(
+                    f"账户已被锁定，请{remaining_minutes}分钟后再试",
+                    ResponseCode.FORBIDDEN
                 )
             
             # 验证密码
@@ -105,29 +106,29 @@ class AuthService:
                         minutes=self.lockout_duration
                     )
                     await self.db.commit()
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"登录失败次数过多，账户已被锁定{self.lockout_duration}分钟"
+                    raise BusinessException(
+                        f"登录失败次数过多，账户已被锁定{self.lockout_duration}分钟",
+                        ResponseCode.FORBIDDEN
                     )
                 
                 await self.db.commit()
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="用户名或密码错误"
+                raise BusinessException(
+                    "用户名或密码错误",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             # 检查MFA
             if auth_user.mfa_enabled:
                 if not request.mfa_code:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="需要MFA验证码"
+                    raise BusinessException(
+                        "需要MFA验证码",
+                        ResponseCode.FORBIDDEN
                     )
                 
                 if not MFAUtils.verify_totp(auth_user.mfa_secret, request.mfa_code):
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="MFA验证码错误"
+                    raise BusinessException(
+                        "MFA验证码错误",
+                        ResponseCode.UNAUTHORIZED
                     )
             
             # 登录成功，重置失败次数
@@ -213,9 +214,9 @@ class AuthService:
             login_history.failure_reason = str(e)
             self.db.add(login_history)
             await self.db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="登录处理失败"
+            raise BusinessException(
+                "登录处理失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def register_user(self, request, ip_address: str = None, user_agent: str = None):
@@ -235,14 +236,14 @@ class AuthService:
             
             if existing_user:
                 if existing_user.user_name == request.username:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="用户名已存在"
+                    raise BusinessException(
+                        "用户名已存在",
+                        ResponseCode.BAD_REQUEST
                     )
                 else:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="邮箱已被注册"
+                    raise BusinessException(
+                        "邮箱已被注册",
+                        ResponseCode.BAD_REQUEST
                     )
             
             # 生成用户ID
@@ -302,9 +303,9 @@ class AuthService:
             raise
         except Exception as e:
             await self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"注册失败: {str(e)}"
+            raise BusinessException(
+                f"注册失败: {str(e)}",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def refresh_access_token(self, refresh_token: str) -> Dict[str, str]:
@@ -315,17 +316,17 @@ class AuthService:
             
             # 验证令牌类型
             if payload.get("type") != "refresh":
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="无效的刷新令牌"
+                raise BusinessException(
+                    "无效的刷新令牌",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             # 检查令牌是否被撤销
             jti = payload.get("jti")
             if TokenBlacklist.is_blacklisted(jti):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="令牌已被撤销"
+                raise BusinessException(
+                    "令牌已被撤销",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             # 检查数据库中的令牌状态
@@ -337,9 +338,9 @@ class AuthService:
             token_record = result.scalar_one_or_none()
             
             if not token_record:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="令牌不存在或已失效"
+                raise BusinessException(
+                    "令牌不存在或已失效",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             # 生成新的访问令牌
@@ -383,9 +384,9 @@ class AuthService:
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="刷新令牌失败"
+            raise BusinessException(
+                "刷新令牌失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def logout(self, user_id: str, current_jti: str, everywhere: bool = False):
@@ -422,9 +423,9 @@ class AuthService:
             await self.db.commit()
             
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="登出失败"
+            raise BusinessException(
+                "登出失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def get_user_profile(self, user_id: str) -> UserProfile:
@@ -438,9 +439,9 @@ class AuthService:
             rbac_user = result.scalar_one_or_none()
             
             if not rbac_user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="用户不存在"
+                raise BusinessException(
+                    "用户不存在",
+                    ResponseCode.NOT_FOUND
                 )
             
             # 获取认证信息
@@ -474,9 +475,9 @@ class AuthService:
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="获取用户资料失败"
+            raise BusinessException(
+                "获取用户资料失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def change_password(self, user_id: str, old_password: str, new_password: str):
@@ -490,24 +491,24 @@ class AuthService:
             auth_user = result.scalar_one_or_none()
             
             if not auth_user:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="用户不存在"
+                raise BusinessException(
+                    "用户不存在",
+                    ResponseCode.NOT_FOUND
                 )
             
             # 验证旧密码
             if not PasswordUtils.verify_password(old_password, auth_user.password_hash):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="原密码错误"
+                raise BusinessException(
+                    "原密码错误",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             # 检查新密码强度
             is_strong, error_msg = PasswordUtils.is_strong_password(new_password)
             if not is_strong:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=error_msg
+                raise BusinessException(
+                    error_msg,
+                    ResponseCode.BAD_REQUEST
                 )
             
             # 更新密码
@@ -520,9 +521,9 @@ class AuthService:
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="修改密码失败"
+            raise BusinessException(
+                "修改密码失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def create_api_key(
@@ -563,9 +564,9 @@ class AuthService:
             )
             
         except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="创建API密钥失败"
+            raise BusinessException(
+                "创建API密钥失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def _get_user_roles(self, user_id: str) -> List[Dict[str, Any]]:

@@ -3,7 +3,7 @@
 """
 
 from typing import Annotated, Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +26,8 @@ from src.apps.auth.menu_schemas import (
 )
 from src.apps.auth.menu_service import menu_service
 from src.apps.auth.dependencies import get_current_user, require_auth, require_roles
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 
 router = APIRouter(prefix="/v1/auth", tags=["认证"])
@@ -403,9 +405,9 @@ async def revoke_api_key(
     ).first()
     
     if not key:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="API密钥不存在"
+        raise BusinessException(
+            "API密钥不存在",
+            ResponseCode.NOT_FOUND
         )
     
     key.is_active = False
@@ -471,9 +473,9 @@ async def terminate_session(
     ).all()
     
     if not tokens:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="会话不存在"
+        raise BusinessException(
+            "会话不存在",
+            ResponseCode.NOT_FOUND
         )
     
     for token in tokens:
@@ -578,9 +580,9 @@ async def get_menu(
     """获取指定菜单详情"""
     menu = await menu_service.get_menu_by_id(db, menu_id)
     if not menu:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"菜单 {menu_id} 不存在"
+        raise BusinessException(
+            f"菜单 {menu_id} 不存在",
+            ResponseCode.NOT_FOUND
         )
     return MenuResponse(**menu.to_dict())
 
@@ -659,9 +661,9 @@ async def init_admin(
     ).first()
     
     if admin_exists:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="管理员账户已存在"
+        raise BusinessException(
+            "管理员账户已存在",
+            ResponseCode.BAD_REQUEST
         )
     
     # 创建管理员用户

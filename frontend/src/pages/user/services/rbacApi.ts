@@ -1,6 +1,6 @@
 // RBAC API服务
 
-import { omind_get, omind_post, omind_put, omind_del } from '../../../utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del } from '@/utils/base_api';
 import type {
   RbacUser, RbacRole, RbacPermission, RbacMenu,
   UserCreateRequest, UserUpdateRequest, UserQueryParams,

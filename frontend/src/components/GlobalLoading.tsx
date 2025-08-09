@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Spin } from 'antd';
-import { globalLoadingController } from '../utils/base_api';
+import { globalLoadingController } from '@/utils/base_api';
 
 const GlobalLoading: React.FC = () => {
   const [loading, setLoading] = useState(false);

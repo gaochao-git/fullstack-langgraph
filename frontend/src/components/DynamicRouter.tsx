@@ -1,9 +1,9 @@
 import React, { Suspense, useMemo } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
-import { MenuTreeNode } from '../types/menu';
-import { useMenus } from '../hooks/useMenus';
-import { getComponent } from '../utils/componentRegistry';
+import { MenuTreeNode } from '@/types/menu';
+import { useMenus } from '@/hooks/useMenus';
+import { getComponent } from '@/utils/componentRegistry';
 
 // 加载中组件
 const LoadingComponent = () => (

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi } from '../services/authApi';
+import { authApi } from '@/services/authApi';
 
 interface Role {
   role_id: string;

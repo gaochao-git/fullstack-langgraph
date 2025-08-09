@@ -3,8 +3,8 @@
  * 处理菜单数据的获取和权限验证
  */
 
-import { MenuInfo, MenuApiResponse, UserMenuPermission } from '../types/menu';
-import { omind_get } from '../utils/base_api';
+import { MenuInfo, MenuApiResponse, UserMenuPermission } from '@/types/menu';
+import { omind_get } from '@/utils/base_api';
 
 export class MenuApiService {
   /**

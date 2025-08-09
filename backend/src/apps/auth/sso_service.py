@@ -12,7 +12,8 @@ from urllib.parse import urlencode, quote
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select, update
-from fastapi import HTTPException, status
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 from src.apps.auth.models import (
     AuthUser, AuthSession, AuthLoginHistory, AuthSSOProvider
@@ -44,9 +45,9 @@ class SSOService:
         provider = result.scalar_one_or_none()
         
         if not provider:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"SSO提供商 {provider_id} 不存在或未启用"
+            raise BusinessException(
+                f"SSO提供商 {provider_id} 不存在或未启用",
+                ResponseCode.NOT_FOUND
             )
         
         # 根据提供商类型生成登录URL
@@ -55,9 +56,9 @@ class SSOService:
         elif provider.provider_type == "saml":
             return await self._get_saml_login_url(provider)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"不支持的SSO类型: {provider.provider_type}"
+            raise BusinessException(
+                f"不支持的SSO类型: {provider.provider_type}",
+                ResponseCode.BAD_REQUEST
             )
     
     async def handle_callback(
@@ -79,18 +80,18 @@ class SSOService:
         provider = result.scalar_one_or_none()
         
         if not provider:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"SSO提供商 {provider_id} 不存在或未启用"
+            raise BusinessException(
+                f"SSO提供商 {provider_id} 不存在或未启用",
+                ResponseCode.NOT_FOUND
             )
         
         # 根据提供商类型处理回调
         if provider.provider_type == "oauth2":
             return await self._handle_oauth2_callback(provider, code, state)
         else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"不支持的SSO类型: {provider.provider_type}"
+            raise BusinessException(
+                f"不支持的SSO类型: {provider.provider_type}",
+                ResponseCode.BAD_REQUEST
             )
     
     async def _get_oauth2_login_url(self, provider: AuthSSOProvider) -> SSOLoginUrlResponse:
@@ -124,9 +125,9 @@ class SSOService:
     async def _get_saml_login_url(self, provider: AuthSSOProvider) -> SSOLoginUrlResponse:
         """生成SAML登录URL"""
         # SAML实现较复杂，这里只是示例
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="SAML SSO暂未实现"
+        raise BusinessException(
+            "SAML SSO暂未实现",
+            ResponseCode.NOT_IMPLEMENTED
         )
     
     async def _handle_oauth2_callback(
@@ -211,9 +212,9 @@ class SSOService:
                 self.db.add(login_history)
                 await self.db.flush()
             
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="SSO登录失败"
+            raise BusinessException(
+                "SSO登录失败",
+                ResponseCode.INTERNAL_ERROR
             )
     
     async def _exchange_code_for_token(

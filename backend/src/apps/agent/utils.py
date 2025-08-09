@@ -6,13 +6,14 @@ import json
 from typing import Dict, Any
 from src.shared.core.logging import get_logger
 from datetime import datetime
-from fastapi import HTTPException
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 logger = get_logger(__name__)
 
 # 全局连接字符串配置 - 从环境变量读取
-from ...shared.core.config import get_checkpoint_uri
+from src.shared.core.config import get_checkpoint_uri
 CHECK_POINT_URI = get_checkpoint_uri()
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
@@ -72,7 +73,7 @@ def prepare_graph_config(request_body, thread_id):
     elif request_body.input is not None:
         graph_input = request_body.input
     else:
-        raise HTTPException(status_code=400, detail="Either 'input' or 'command' must be provided")
+        raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
     
     # Use checkpoint from request if provided  
     checkpoint = request_body.checkpoint

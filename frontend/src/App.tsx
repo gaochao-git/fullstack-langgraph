@@ -1,16 +1,16 @@
 import { Routes, Route } from "react-router-dom";
 import { ConfigProvider, App as AntdApp } from "antd";
 import { useEffect } from "react";
-import { ThemeProvider, useTheme } from "./hooks/ThemeContext";
-import { LoginPage } from "./pages/auth/LoginPage";
-import { RegisterPage } from "./pages/auth/RegisterPage";
-import { SSOCallback } from "./pages/auth/SSOCallback";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { useAuth } from "./hooks/useAuth";
-import { configureAuthInterceptor } from "./utils/authInterceptor";
-import MenuLayout from "./components/MenuLayout";
-import { DynamicRouter } from "./components/DynamicRouter";
-import GlobalLoading from "./components/GlobalLoading";
+import { ThemeProvider, useTheme } from "@/hooks/ThemeContext";
+import { LoginPage } from "@/pages/auth/LoginPage";
+import { RegisterPage } from "@/pages/auth/RegisterPage";
+import { SSOCallback } from "@/pages/auth/SSOCallback";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useAuth } from "@/hooks/useAuth";
+import { configureAuthInterceptor } from "@/utils/authInterceptor";
+import MenuLayout from "@/components/MenuLayout";
+import { DynamicRouter } from "@/components/DynamicRouter";
+import GlobalLoading from "@/components/GlobalLoading";
 
 
 // 主应用组件（包装在主题提供者内部）

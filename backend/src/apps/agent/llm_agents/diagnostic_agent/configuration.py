@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
-from ....agent.service.agent_config_service import AgentConfigService
+from src.apps.agent.service.agent_config_service import AgentConfigService
 
 
 class Configuration(BaseModel):
@@ -94,7 +94,7 @@ class Configuration(BaseModel):
             agent_name = "diagnostic_agent"
         
         selected_model = configurable.get("selected_model")
-        from .....shared.db.config import get_sync_db
+        from src.shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
@@ -130,7 +130,7 @@ class Configuration(BaseModel):
     @classmethod
     def from_agent_config(cls, agent_name: str = "diagnostic_agent", selected_model: str = None) -> "Configuration":
         """Create a Configuration instance directly from agent database configuration."""
-        from .....shared.db.config import get_sync_db
+        from src.shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:

@@ -2,7 +2,7 @@ import os
 from pydantic import BaseModel, Field
 from typing import Any, Optional, List, Dict
 from langchain_core.runnables import RunnableConfig
-from ....agent.service.agent_config_service import AgentConfigService
+from src.apps.agent.service.agent_config_service import AgentConfigService
 
 
 class Configuration(BaseModel):
@@ -148,7 +148,7 @@ class Configuration(BaseModel):
         agent_id = configurable.get("agent_id", "generic_agent")
         
         # 从数据库加载配置
-        from .....shared.db.config import get_sync_db
+        from src.shared.db.config import get_sync_db
         db_gen = get_sync_db()
         db = next(db_gen)
         try:

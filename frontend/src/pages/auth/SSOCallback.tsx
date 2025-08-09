@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spin, message } from 'antd';
-import { useAuth } from '../../hooks/useAuth';
-import { authApi } from '../../services/authApi';
+import { useAuth } from '@/hooks/useAuth';
+import { authApi } from '@/services/authApi';
 
 export function SSOCallback() {
   const [searchParams] = useSearchParams();

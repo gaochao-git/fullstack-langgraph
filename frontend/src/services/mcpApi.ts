@@ -2,7 +2,7 @@
  * MCP API服务 - API层透传，不处理业务逻辑
  */
 
-import { omind_get, omind_post, omind_put, omind_del, omind_patch } from '../utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del, omind_patch } from '@/utils/base_api';
 
 // MCP服务器类型定义
 export interface MCPServer {

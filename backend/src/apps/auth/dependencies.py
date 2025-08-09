@@ -4,7 +4,7 @@
 """
 
 from typing import Optional, List, Annotated
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -13,6 +13,8 @@ from src.shared.db.config import get_async_db
 from src.apps.auth.utils import JWTUtils, TokenBlacklist, APIKeyUtils
 from src.apps.auth.models import AuthToken, AuthApiKey
 from src.apps.user.rbac_models import RbacUser, RbacUsersRoles, RbacRole
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 
 # Security schemes
@@ -103,10 +105,9 @@ async def get_current_user(
     
     # 原有的认证逻辑
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="未认证",
-            headers={"WWW-Authenticate": "Bearer"},
+        raise BusinessException(
+            "未认证",
+            ResponseCode.UNAUTHORIZED
         )
     
     return user
@@ -120,9 +121,9 @@ async def get_current_active_user(
     获取当前活跃用户的完整信息
     """
     # TODO: 实现异步查询
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="功能未实现"
+    raise BusinessException(
+        "功能未实现",
+        ResponseCode.NOT_IMPLEMENTED
     )
 
 

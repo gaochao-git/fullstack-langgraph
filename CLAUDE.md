@@ -279,6 +279,47 @@ apps/your_module/
 - 变量名：小写下划线分隔
 - 常量：大写下划线分隔
 
+### 导入规范
+
+1. **使用绝对导入进行跨模块引用**
+   - 正确：`from src.apps.auth.models import User`
+   - 错误：`from ...auth.models import User`
+
+2. **相对导入仅用于模块内部**
+   - 最多允许2级相对导入
+   - 正确：`from . import schema` (同级目录)
+   - 正确：`from ..service import user_service` (上一级目录)
+   - 错误：`from ...shared.tools import sop_tool` (3级或更多)
+
+3. **深层相对导入必须改为绝对导入**
+   - 错误：`from .....shared.tools import sop_tool, general_tool`
+   - 正确：`from src.shared.tools import sop_tool, general_tool`
+   
+4. **标准导入顺序**
+   ```python
+   # 1. 标准库
+   import os
+   import json
+   from typing import List, Dict
+   
+   # 2. 第三方库
+   from fastapi import Depends
+   from sqlalchemy import select
+   
+   # 3. 项目内绝对导入
+   from src.shared.core.logging import get_logger
+   from src.apps.auth.models import User
+   
+   # 4. 模块内相对导入（仅限1-2级）
+   from . import schema
+   from ..service import user_service
+   ```
+
+5. **禁止的导入模式**
+   - 禁止3级或更深的相对导入：`from ...xxx`
+   - 禁止循环导入
+   - 禁止在运行时动态导入（除非必要）
+
 ### 注意事项
 
 1. **不要在 endpoints.py 写业务逻辑**
@@ -288,3 +329,4 @@ apps/your_module/
 5. **数据库操作使用 async with db.begin()**
 6. **敏感信息不要记录到日志**
 7. **大量数据必须分页处理**
+8. **导入使用绝对路径，相对导入限制在2级以内**

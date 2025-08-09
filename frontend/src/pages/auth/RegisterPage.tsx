@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, Space, Checkbox, App } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
-import { useTheme } from '../../hooks/ThemeContext';
-import { authApi } from '../../services/authApi';
+import { useTheme } from '@/hooks/ThemeContext';
+import { authApi } from '@/services/authApi';
 import './LoginPage.css';
 
 interface RegisterFormValues {

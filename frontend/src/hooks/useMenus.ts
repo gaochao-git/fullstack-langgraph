@@ -5,8 +5,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MenuTreeNode, UserMenuPermission } from '../types/menu';
-import { MenuApiService } from '../services/menuApi';
+import { MenuTreeNode, UserMenuPermission } from '@/types/menu';
+import { MenuApiService } from '@/services/menuApi';
 
 interface UseMenusReturn {
   menus: MenuTreeNode[];

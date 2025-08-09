@@ -3,9 +3,9 @@
  * 处理菜单相关的辅助功能
  */
 
-import { MenuTreeNode } from '../types/menu';
+import { MenuTreeNode } from '@/types/menu';
 import { createElement } from 'react';
-import { Icons as GlobalIcons, type IconName } from '../icons';
+import { Icons as GlobalIcons, type IconName } from '@/icons';
 
 /**
  * 根据图标名称获取图标组件
