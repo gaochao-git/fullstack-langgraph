@@ -4,14 +4,16 @@
 """
 
 from typing import Callable, Optional, List
-from fastapi import Request, Response, HTTPException, status
+from fastapi import Request, Response
 from fastapi.security.utils import get_authorization_scheme_param
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.db.config import SessionLocal
+from src.shared.db.config import get_async_db, async_session_maker
 from src.apps.auth.utils import JWTUtils, TokenBlacklist
 from src.apps.auth.rbac_service import RBACService
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -44,20 +46,18 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # 检查API Key
             api_key = request.headers.get("X-API-Key")
             if not api_key:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="未提供认证凭据",
-                    headers={"WWW-Authenticate": "Bearer"},
+                raise BusinessException(
+                    "未提供认证凭据",
+                    ResponseCode.UNAUTHORIZED
                 )
         
         # 解析Bearer Token
         if authorization:
             scheme, token = get_authorization_scheme_param(authorization)
             if scheme.lower() != "bearer":
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="无效的认证方案",
-                    headers={"WWW-Authenticate": "Bearer"},
+                raise BusinessException(
+                    "无效的认证方案",
+                    ResponseCode.UNAUTHORIZED
                 )
             
             try:
@@ -67,22 +67,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 # 检查黑名单
                 jti = payload.get("jti")
                 if jti and TokenBlacklist.is_blacklisted(jti):
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="令牌已失效",
-                        headers={"WWW-Authenticate": "Bearer"},
+                    raise BusinessException(
+                        "令牌已失效",
+                        ResponseCode.UNAUTHORIZED
                     )
                 
                 # 将用户信息添加到请求状态
                 request.state.user = payload
                 
-            except HTTPException:
+            except BusinessException:
                 raise
             except Exception:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="令牌验证失败",
-                    headers={"WWW-Authenticate": "Bearer"},
+                raise BusinessException(
+                    "令牌验证失败",
+                    ResponseCode.UNAUTHORIZED
                 )
         
         # 继续处理请求
@@ -133,19 +131,16 @@ class RBACMiddleware(BaseHTTPMiddleware):
         method = request.method
         
         # 创建数据库会话
-        db = SessionLocal()
-        try:
+        async with async_session_maker() as db:
             service = RBACService(db)
             
             # 检查是否有访问权限
-            if not service.check_permission(user_id, path, method):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"没有访问权限: {method} {path}"
+            has_permission = await service.check_permission(user_id, path, method)
+            if not has_permission:
+                raise BusinessException(
+                    f"没有访问权限: {method} {path}",
+                    ResponseCode.FORBIDDEN
                 )
-            
-        finally:
-            db.close()
         
         # 继续处理请求
         response = await call_next(request)
@@ -226,9 +221,9 @@ def check_resource_permission(resource_type: str):
             db = kwargs.get("db")
             
             if not current_user or not db:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="权限检查配置错误"
+                raise BusinessException(
+                    "权限检查配置错误",
+                    ResponseCode.INTERNAL_ERROR
                 )
             
             # 获取资源ID（假设第一个参数是资源ID）

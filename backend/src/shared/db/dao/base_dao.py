@@ -27,8 +27,10 @@ class BaseDAO(Generic[ModelType]):
     async def create(self, db: AsyncSession, entity_data: Dict[str, Any]) -> ModelType:
         """创建实体"""
         # 自动设置时间戳
-        if hasattr(self.model, 'create_time') and 'create_time' not in entity_data:entity_data['create_time'] = now_shanghai()
-        if hasattr(self.model, 'update_time') and 'update_time' not in entity_data:entity_data['update_time'] = now_shanghai()
+        if hasattr(self.model, 'create_time') and 'create_time' not in entity_data:
+            entity_data['create_time'] = now_shanghai()
+        if hasattr(self.model, 'update_time') and 'update_time' not in entity_data:
+            entity_data['update_time'] = now_shanghai()
         instance = self.model(**entity_data)
         db.add(instance)
         await db.flush()  # 获取ID但不提交事务
@@ -105,15 +107,21 @@ class BaseDAO(Generic[ModelType]):
         if hasattr(self.model, 'update_time'):
             update_data['update_time'] = now_shanghai()
         
+        # 执行更新操作
         result = await db.execute(
             update(self.model)
             .where(self.model.id == id_value)
             .values(**update_data)
         )
         
-        updated_instance = result.scalar_one_or_none()
-        if updated_instance: await db.refresh(updated_instance)
-        return updated_instance
+        # 如果有记录被更新，查询并返回更新后的实例
+        if result.rowcount > 0:
+            updated_result = await db.execute(
+                select(self.model).where(self.model.id == id_value)
+            )
+            return updated_result.scalar_one_or_none()
+        
+        return None
     
     async def update_by_field(
         self,
@@ -124,15 +132,26 @@ class BaseDAO(Generic[ModelType]):
     ) -> Optional[ModelType]:
         """根据字段更新实体"""
         # 自动设置更新时间
-        if hasattr(self.model, 'update_time'):update_data['update_time'] = now_shanghai()
+        if hasattr(self.model, 'update_time'):
+            update_data['update_time'] = now_shanghai()
+        
         field = getattr(self.model, field_name)
+        
+        # 执行更新操作
         result = await db.execute(
             update(self.model)
             .where(field == field_value)
             .values(**update_data)
         )
-        result = await db.execute(select(self.model).where(field == field_value))
-        return result.scalar_one_or_none()
+        
+        # 如果有记录被更新，查询并返回更新后的实例
+        if result.rowcount > 0:
+            updated_result = await db.execute(
+                select(self.model).where(field == field_value)
+            )
+            return updated_result.scalar_one_or_none()
+        
+        return None
 
     
     async def delete_by_id(self, db: AsyncSession, id_value: Any) -> bool:
