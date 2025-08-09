@@ -107,7 +107,7 @@ class AuthApi {
         headers: {
           'Authorization': `Bearer ${token}`
         },
-        showError: false  // 验证失败不显示错误消息
+        // 验证失败不需要显示错误消息
       });
       return result.valid;
     } catch {
@@ -120,7 +120,7 @@ class AuthApi {
    */
   async register(data: RegisterRequest): Promise<RegisterResponse> {
     // 直接调用后端API，不使用mock
-    return await omind_post(`${this.baseUrl}/register`, data, { showError: false });
+    return await omind_post(`${this.baseUrl}/register`, data);
   }
 
   /**

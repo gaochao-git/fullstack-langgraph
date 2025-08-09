@@ -4,7 +4,7 @@
  * 2. omind_fetch_stream - 流式请求，主要与大模型通信
  */
 
-import { message } from 'antd';
+// 移除 antd 依赖，让组件自己处理消息提示
 
 // 获取基础URL
 const getBaseUrl = (): string => {
@@ -19,14 +19,6 @@ export interface RequestConfig {
   timeout?: number;
   // 新增：是否返回原始Response（默认false，返回解析后的数据）
   returnRaw?: boolean;
-  // 新增：显示成功消息
-  showSuccess?: boolean;
-  // 新增：自定义成功消息
-  successMessage?: string;
-  // 新增：显示错误消息（默认true，当autoHandle为true时）
-  showError?: boolean;
-  // 新增：自定义错误消息
-  errorMessage?: string;
 }
 
 // 流式请求配置接口
@@ -48,11 +40,7 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     headers = {},
     body,
     timeout = 30000,
-    returnRaw = false,
-    showSuccess = false,
-    successMessage,
-    showError = true,
-    errorMessage
+    returnRaw = false
   } = config;
 
   // 构建完整URL
@@ -93,7 +81,7 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     
     // 处理非2xx响应
     if (!response.ok) {
-      let errorMsg = errorMessage || `请求失败 (${response.status})`;
+      let errorMsg = `请求失败 (${response.status})`;
       
       try {
         const errorData = await response.json();
@@ -103,9 +91,7 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
         // 如果解析JSON失败，使用默认错误消息
       }
 
-      if (showError) {
-        message.error(errorMsg);
-      }
+      // 错误消息由调用方处理
       
       throw new Error(errorMsg);
     }
@@ -113,21 +99,8 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     // 解析响应
     const responseData = await response.json();
 
-    // 处理统一响应格式
-    if ('status' in responseData && responseData.status === 'error') {
-      const errorMsg = errorMessage || responseData.msg || responseData.error || '请求失败';
-      if (showError) {
-        message.error(errorMsg);
-      }
-      throw new Error(errorMsg);
-    }
-
-    // 成功处理
-    if (showSuccess) {
-      message.success(successMessage || responseData.msg || '操作成功');
-    }
-
-    // 返回完整的响应数据，让调用方自己处理
+    // 返回完整的响应数据，让调用方自己处理业务逻辑
+    // 包括 status === 'error' 的情况
     return responseData;
     
   } catch (error) {
@@ -135,17 +108,7 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     
     if (error instanceof Error && error.name === 'AbortError') {
       const timeoutError = new Error(`请求超时 (${timeout}ms)`);
-      if (showError) {
-        message.error(timeoutError.message);
-      }
       throw timeoutError;
-    }
-    
-    // 显示错误消息
-    if (showError && error instanceof Error) {
-      if (!error.message.includes('请求失败')) {
-        message.error(error.message);
-      }
     }
     
     throw error;
