@@ -154,6 +154,10 @@ fullstack-langgraph/
 3. **MCP工具调用**: 通过langchain-mcp-adapters集成MCP工具，工具调用需要正确的权限配置
 4. **认证中间件**: API路由默认需要认证，公开接口需要显式标记
 5. **数据库事务**: 使用SQLAlchemy的异步事务管理，注意正确处理事务边界
+6. **前端API处理**: 
+   - `base_api.ts`: 只处理HTTP错误，返回原始响应
+   - `services/xxxApi.ts`: 透传层，不做业务处理
+   - 组件/Hook层: 处理业务逻辑错误(`status === 'error'`)和UI消息显示
 
 ### 测试策略
 
