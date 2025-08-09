@@ -1,9 +1,5 @@
 import { omind_fetch, omind_post, omind_get } from '../utils/base_api';
 
-// 开发环境使用模拟API
-const isDevelopment = import.meta.env.MODE === 'development';
-import { mockAuthApi } from './mockAuthApi';
-
 interface LoginRequest {
   username: string;
   password: string;
@@ -92,11 +88,6 @@ class AuthApi {
    * 获取SSO登录URL
    */
   async getSSOUrl(): Promise<SSOUrlResponse> {
-    // 开发环境使用模拟API
-    if (isDevelopment) {
-      return mockAuthApi.getSSOUrl();
-    }
-    
     return await omind_get(`${this.baseUrl}/sso/url`);
   }
 
@@ -130,6 +121,21 @@ class AuthApi {
   async register(data: RegisterRequest): Promise<RegisterResponse> {
     // 直接调用后端API，不使用mock
     return await omind_post(`${this.baseUrl}/register`, data);
+  }
+
+  /**
+   * 获取密码策略
+   */
+  async getPasswordPolicy(): Promise<{
+    min_length: number;
+    require_uppercase: boolean;
+    require_lowercase: boolean;
+    require_digits: boolean;
+    require_special_chars: boolean;
+    requirements_text: string[];
+    special_chars: string;
+  }> {
+    return await omind_get(`${this.baseUrl}/password-policy`);
   }
 }
 

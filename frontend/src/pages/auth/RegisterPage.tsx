@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Form, Input, Button, Card, message, Space, Checkbox } from 'antd';
 import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
@@ -20,6 +20,36 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const { isDark } = useTheme();
   const [form] = Form.useForm();
+  const [passwordPolicy, setPasswordPolicy] = useState<{
+    min_length: number;
+    require_uppercase: boolean;
+    require_lowercase: boolean;
+    require_digits: boolean;
+    require_special_chars: boolean;
+    requirements_text: string[];
+    special_chars: string;
+  } | null>(null);
+
+  // 获取密码策略
+  useEffect(() => {
+    authApi.getPasswordPolicy()
+      .then(policy => {
+        setPasswordPolicy(policy);
+      })
+      .catch(err => {
+        console.error('获取密码策略失败:', err);
+        // 使用默认策略
+        setPasswordPolicy({
+          min_length: 8,
+          require_uppercase: true,
+          require_lowercase: true,
+          require_digits: true,
+          require_special_chars: true,
+          requirements_text: ['至少8个字符', '包含大写字母', '包含小写字母', '包含数字', '包含特殊字符'],
+          special_chars: '!@#$%^&*()_+-=[]{}|;:,.<>?'
+        });
+      });
+  }, []);
 
   const handleRegister = async (values: RegisterFormValues) => {
     try {
@@ -114,13 +144,40 @@ export function RegisterPage() {
               name="password"
               rules={[
                 { required: true, message: '请输入密码' },
-                { min: 6, message: '密码至少6个字符' },
-                { 
-                  pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{6,}$/,
-                  message: '密码必须包含大小写字母和数字'
-                }
+                ...(passwordPolicy ? [
+                  { min: passwordPolicy.min_length, message: `密码至少${passwordPolicy.min_length}个字符` },
+                  {
+                    validator: (_: any, value: string) => {
+                      if (!value) return Promise.resolve();
+                      
+                      // 根据策略验证密码
+                      if (passwordPolicy.require_lowercase && !/[a-z]/.test(value)) {
+                        return Promise.reject(new Error('密码必须包含小写字母'));
+                      }
+                      if (passwordPolicy.require_uppercase && !/[A-Z]/.test(value)) {
+                        return Promise.reject(new Error('密码必须包含大写字母'));
+                      }
+                      if (passwordPolicy.require_digits && !/\d/.test(value)) {
+                        return Promise.reject(new Error('密码必须包含数字'));
+                      }
+                      if (passwordPolicy.require_special_chars) {
+                        // 直接使用字符串检查，避免正则表达式转义问题
+                        const hasSpecialChar = passwordPolicy.special_chars.split('').some(char => value.includes(char));
+                        if (!hasSpecialChar) {
+                          return Promise.reject(new Error(`密码必须包含特殊字符 (${passwordPolicy.special_chars})`));
+                        }
+                      }
+                      return Promise.resolve();
+                    }
+                  }
+                ] : [])
               ]}
               hasFeedback
+              extra={passwordPolicy && passwordPolicy.requirements_text.length > 0 && (
+                <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                  密码要求：{passwordPolicy.requirements_text.join('、')}
+                </div>
+              )}
             >
               <Input.Password
                 prefix={<LockOutlined />}

@@ -44,21 +44,22 @@ class PasswordUtils:
         """检查密码强度
         返回: (是否强密码, 错误信息)
         """
-        if len(password) < 8:
-            return False, "密码长度至少8位"
+        # 使用配置中的密码策略
+        if len(password) < settings.MIN_PASSWORD_LENGTH:
+            return False, f"密码长度至少{settings.MIN_PASSWORD_LENGTH}位"
         
         has_lower = any(c.islower() for c in password)
         has_upper = any(c.isupper() for c in password)
         has_digit = any(c.isdigit() for c in password)
         has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
         
-        if not has_lower:
+        if settings.REQUIRE_LOWERCASE and not has_lower:
             return False, "密码必须包含小写字母"
-        if not has_upper:
+        if settings.REQUIRE_UPPERCASE and not has_upper:
             return False, "密码必须包含大写字母"
-        if not has_digit:
+        if settings.REQUIRE_DIGITS and not has_digit:
             return False, "密码必须包含数字"
-        if not has_special:
+        if settings.REQUIRE_SPECIAL_CHARS and not has_special:
             return False, "密码必须包含特殊字符"
         
         return True, ""

@@ -66,7 +66,7 @@ class SSOCallbackRequest(BaseModel):
 class RegisterRequest(BaseModel):
     """用户注册请求"""
     username: str = Field(..., min_length=3, max_length=20, description="用户名")
-    password: str = Field(..., min_length=6, description="密码")
+    password: str = Field(..., min_length=1, description="密码")  # 最小长度由validator检查
     email: EmailStr = Field(..., description="邮箱地址")
     display_name: str = Field(..., min_length=1, max_length=50, description="显示名称")
     
@@ -79,15 +79,11 @@ class RegisterRequest(BaseModel):
     
     @validator('password')
     def validate_password_strength(cls, v):
-        # 基本密码强度检查
-        if len(v) < 6:
-            raise ValueError('密码至少6个字符')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('密码必须包含数字')
-        if not any(c.isupper() for c in v):
-            raise ValueError('密码必须包含大写字母')
-        if not any(c.islower() for c in v):
-            raise ValueError('密码必须包含小写字母')
+        # 使用 PasswordUtils 进行密码强度检查
+        from .utils import PasswordUtils
+        is_strong, error_msg = PasswordUtils.is_strong_password(v)
+        if not is_strong:
+            raise ValueError(error_msg)
         return v
 
 

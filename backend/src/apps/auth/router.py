@@ -68,7 +68,7 @@ async def register(
     用户注册
     
     - **username**: 用户名（3-20个字符，只能包含字母数字下划线）
-    - **password**: 密码（至少6个字符，需包含大小写字母和数字）
+    - **password**: 密码（根据系统密码策略要求）
     - **email**: 邮箱地址
     - **display_name**: 显示名称
     """
@@ -79,6 +79,39 @@ async def register(
     user_agent = req.headers.get("user-agent")
     
     return await service.register_user(request, ip_address, user_agent)
+
+
+@router.get("/password-policy", summary="获取密码策略")
+async def get_password_policy():
+    """
+    获取当前系统的密码策略配置
+    
+    返回密码要求，供前端动态验证使用
+    """
+    from src.shared.core.config import settings
+    
+    # 构建密码要求描述
+    requirements = []
+    requirements.append(f"至少{settings.MIN_PASSWORD_LENGTH}个字符")
+    
+    if settings.REQUIRE_UPPERCASE:
+        requirements.append("包含大写字母")
+    if settings.REQUIRE_LOWERCASE:
+        requirements.append("包含小写字母")
+    if settings.REQUIRE_DIGITS:
+        requirements.append("包含数字")
+    if settings.REQUIRE_SPECIAL_CHARS:
+        requirements.append("包含特殊字符")
+    
+    return {
+        "min_length": settings.MIN_PASSWORD_LENGTH,
+        "require_uppercase": settings.REQUIRE_UPPERCASE,
+        "require_lowercase": settings.REQUIRE_LOWERCASE,
+        "require_digits": settings.REQUIRE_DIGITS,
+        "require_special_chars": settings.REQUIRE_SPECIAL_CHARS,
+        "requirements_text": requirements,
+        "special_chars": "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    }
 
 
 @router.post("/refresh", summary="刷新访问令牌")
