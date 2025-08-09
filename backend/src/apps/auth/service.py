@@ -593,12 +593,12 @@ class AuthService:
             for role in user_roles
         ]
     
-    def _get_user_permissions(self, user_id: str) -> List[str]:
+    async def _get_user_permissions(self, user_id: str) -> List[str]:
         """获取用户权限列表（用于JWT）"""
         from src.apps.auth.rbac_service import RBACService
         
         service = RBACService(self.db)
-        permissions = service.get_user_permissions(user_id)
+        permissions = await service.get_user_permissions(user_id)
         
         # 只返回权限名称列表（减少JWT大小）
         return [perm.permission_name for perm in permissions if perm.release_disable != "on"]

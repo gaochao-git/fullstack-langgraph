@@ -10,8 +10,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from urllib.parse import urlencode, quote
 import httpx
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, select, update
 from fastapi import HTTPException, status
 
 from src.apps.auth.models import (
@@ -20,22 +20,28 @@ from src.apps.auth.models import (
 from src.apps.user.rbac_models import RbacUser
 from src.apps.auth.utils import JWTUtils, generate_state_token, generate_nonce
 from src.apps.auth.schemas import SSOLoginUrlResponse, LoginResponse
+from src.shared.db.models import now_shanghai
 
 
 class SSOService:
     """SSO服务基类"""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.redirect_uri = os.getenv("SSO_REDIRECT_URI", "http://localhost:3000/sso/callback")
     
     async def get_login_url(self, provider_id: str) -> SSOLoginUrlResponse:
         """获取SSO登录URL"""
         # 获取提供商配置
-        provider = self.db.query(AuthSSOProvider).filter(
-            AuthSSOProvider.provider_id == provider_id,
-            AuthSSOProvider.is_active == True
-        ).first()
+        result = await self.db.execute(
+            select(AuthSSOProvider).where(
+                and_(
+                    AuthSSOProvider.provider_id == provider_id,
+                    AuthSSOProvider.is_active == True
+                )
+            )
+        )
+        provider = result.scalar_one_or_none()
         
         if not provider:
             raise HTTPException(
@@ -62,10 +68,15 @@ class SSOService:
     ) -> LoginResponse:
         """处理SSO回调"""
         # 获取提供商配置
-        provider = self.db.query(AuthSSOProvider).filter(
-            AuthSSOProvider.provider_id == provider_id,
-            AuthSSOProvider.is_active == True
-        ).first()
+        result = await self.db.execute(
+            select(AuthSSOProvider).where(
+                and_(
+                    AuthSSOProvider.provider_id == provider_id,
+                    AuthSSOProvider.is_active == True
+                )
+            )
+        )
+        provider = result.scalar_one_or_none()
         
         if not provider:
             raise HTTPException(
@@ -157,15 +168,17 @@ class SSOService:
             refresh_token = JWTUtils.create_refresh_token(token_data)
             
             # 记录登录历史
-            login_history = AuthLoginHistory(
-                user_id=user.user_id,
-                username=user.user_name,
-                login_type="sso",
-                success=True,
-                sso_provider=provider.provider_id
-            )
-            self.db.add(login_history)
-            self.db.commit()
+            async with self.db.begin():
+                login_history = AuthLoginHistory(
+                    user_id=user.user_id,
+                    username=user.user_name,
+                    login_type="sso",
+                    success=True,
+                    sso_provider=provider.provider_id,
+                    login_time=now_shanghai()
+                )
+                self.db.add(login_history)
+                await self.db.flush()
             
             # 构建用户信息
             user_info = {
@@ -187,14 +200,16 @@ class SSOService:
             
         except Exception as e:
             # 记录失败
-            login_history = AuthLoginHistory(
-                login_type="sso",
-                success=False,
-                failure_reason=str(e),
-                sso_provider=provider.provider_id
-            )
-            self.db.add(login_history)
-            self.db.commit()
+            async with self.db.begin():
+                login_history = AuthLoginHistory(
+                    login_type="sso",
+                    success=False,
+                    failure_reason=str(e),
+                    sso_provider=provider.provider_id,
+                    login_time=now_shanghai()
+                )
+                self.db.add(login_history)
+                await self.db.flush()
             
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -260,72 +275,102 @@ class SSOService:
         display_name = self._get_user_attribute(user_info, provider.display_name_attribute, "name")
         
         # 查找现有用户（通过SSO ID或邮箱）
-        auth_user = self.db.query(AuthUser).filter(
-            and_(
-                AuthUser.sso_provider == provider.provider_id,
-                AuthUser.sso_user_id == sso_user_id
+        result = await self.db.execute(
+            select(AuthUser).where(
+                and_(
+                    AuthUser.sso_provider == provider.provider_id,
+                    AuthUser.sso_user_id == sso_user_id
+                )
             )
-        ).first()
+        )
+        auth_user = result.scalar_one_or_none()
         
         if auth_user:
             # 返回现有用户
-            rbac_user = self.db.query(RbacUser).filter(
-                RbacUser.user_id == auth_user.user_id
-            ).first()
+            result = await self.db.execute(
+                select(RbacUser).where(
+                    RbacUser.user_id == auth_user.user_id
+                )
+            )
+            rbac_user = result.scalar_one_or_none()
             
             # 更新SSO属性
-            auth_user.sso_attributes = json.dumps(user_info)
-            auth_user.last_login = datetime.now(timezone.utc)
-            self.db.commit()
+            async with self.db.begin():
+                await self.db.execute(
+                    update(AuthUser).where(
+                        AuthUser.user_id == auth_user.user_id
+                    ).values(
+                        sso_attributes=json.dumps(user_info),
+                        last_login=now_shanghai()
+                    )
+                )
             
             return rbac_user
         
         # 通过邮箱查找
-        rbac_user = self.db.query(RbacUser).filter(
-            RbacUser.email == email
-        ).first()
+        result = await self.db.execute(
+            select(RbacUser).where(
+                RbacUser.email == email
+            )
+        )
+        rbac_user = result.scalar_one_or_none()
         
         if not rbac_user:
             # 创建新用户
-            user_id = f"sso_{provider.provider_id}_{secrets.token_urlsafe(8)}"
-            
-            rbac_user = RbacUser(
-                user_id=user_id,
-                user_name=username or email.split('@')[0],
-                display_name=display_name or username or email.split('@')[0],
-                email=email,
-                mobile="",  # SSO用户可能没有手机号
-                department_name="SSO用户",
-                group_name="SSO",
-                user_source=2,  # 2表示LDAP/SSO
-                is_active=1,
-                create_by="SSO",
-                update_by="SSO"
-            )
-            self.db.add(rbac_user)
-            self.db.flush()
+            async with self.db.begin():
+                user_id = f"sso_{provider.provider_id}_{secrets.token_urlsafe(8)}"
+                
+                rbac_user = RbacUser(
+                    user_id=user_id,
+                    user_name=username or email.split('@')[0],
+                    display_name=display_name or username or email.split('@')[0],
+                    email=email,
+                    mobile="",  # SSO用户可能没有手机号
+                    department_name="SSO用户",
+                    group_name="SSO",
+                    user_source=2,  # 2表示LDAP/SSO
+                    is_active=1,
+                    create_by="SSO",
+                    update_by="SSO",
+                    create_time=now_shanghai(),
+                    update_time=now_shanghai()
+                )
+                self.db.add(rbac_user)
+                await self.db.flush()
         
         # 创建或更新认证记录
-        auth_user = self.db.query(AuthUser).filter(
-            AuthUser.user_id == rbac_user.user_id
-        ).first()
-        
-        if not auth_user:
-            auth_user = AuthUser(
-                user_id=rbac_user.user_id,
-                sso_provider=provider.provider_id,
-                sso_user_id=sso_user_id,
-                sso_attributes=json.dumps(user_info),
-                last_login=datetime.now(timezone.utc)
+        async with self.db.begin():
+            result = await self.db.execute(
+                select(AuthUser).where(
+                    AuthUser.user_id == rbac_user.user_id
+                )
             )
-            self.db.add(auth_user)
-        else:
-            auth_user.sso_provider = provider.provider_id
-            auth_user.sso_user_id = sso_user_id
-            auth_user.sso_attributes = json.dumps(user_info)
-            auth_user.last_login = datetime.now(timezone.utc)
+            auth_user = result.scalar_one_or_none()
+            
+            if not auth_user:
+                auth_user = AuthUser(
+                    user_id=rbac_user.user_id,
+                    sso_provider=provider.provider_id,
+                    sso_user_id=sso_user_id,
+                    sso_attributes=json.dumps(user_info),
+                    last_login=now_shanghai(),
+                    created_at=now_shanghai()
+                )
+                self.db.add(auth_user)
+            else:
+                await self.db.execute(
+                    update(AuthUser).where(
+                        AuthUser.user_id == rbac_user.user_id
+                    ).values(
+                        sso_provider=provider.provider_id,
+                        sso_user_id=sso_user_id,
+                        sso_attributes=json.dumps(user_info),
+                        last_login=now_shanghai()
+                    )
+                )
+            
+            await self.db.flush()
         
-        self.db.commit()
         return rbac_user
     
     async def _create_sso_session(
@@ -335,20 +380,23 @@ class SSOService:
         token_data: Dict[str, Any]
     ) -> AuthSession:
         """创建SSO会话"""
-        session = AuthSession(
-            session_id=secrets.token_urlsafe(32),
-            user_id=user_id,
-            sso_provider=provider.provider_id,
-            sso_access_token=token_data.get("access_token"),  # 应加密存储
-            sso_refresh_token=token_data.get("refresh_token"),  # 应加密存储
-            sso_id_token=token_data.get("id_token"),
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=8),  # 8小时
-            ip_address=None,  # 应从请求获取
-            user_agent=None   # 应从请求获取
-        )
-        
-        self.db.add(session)
-        self.db.commit()
+        async with self.db.begin():
+            session = AuthSession(
+                session_id=secrets.token_urlsafe(32),
+                user_id=user_id,
+                sso_provider=provider.provider_id,
+                sso_access_token=token_data.get("access_token"),  # 应加密存储
+                sso_refresh_token=token_data.get("refresh_token"),  # 应加密存储
+                sso_id_token=token_data.get("id_token"),
+                expires_at=now_shanghai() + timedelta(hours=8),  # 8小时
+                created_at=now_shanghai(),
+                ip_address=None,  # 应从请求获取
+                user_agent=None   # 应从请求获取
+            )
+            
+            self.db.add(session)
+            await self.db.flush()
+            await self.db.refresh(session)
         
         return session
     

@@ -14,7 +14,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return (
       <Spin 
         size="large" 
-        tip="验证中..." 
+        tip="加载用户信息..." 
         spinning={true}
         style={{ 
           display: 'flex', 

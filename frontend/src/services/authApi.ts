@@ -69,7 +69,17 @@ class AuthApi {
    */
   async getCurrentUser(): Promise<LoginResponse['user']> {
     // 直接调用后端API，不使用mock
-    return await omind_get(`${this.baseUrl}/me`);
+    const response = await omind_get(`${this.baseUrl}/me`, { showLoading: false });
+    
+    // 处理统一响应格式
+    if (response.status === 'ok' && response.data) {
+      return response.data;
+    } else if (response.status === 'error') {
+      throw new Error(response.msg || '获取用户信息失败');
+    }
+    
+    // 兼容直接返回用户数据的情况
+    return response;
   }
 
   /**
@@ -102,7 +112,7 @@ class AuthApi {
         headers: {
           'Authorization': `Bearer ${token}`
         },
-        // 验证失败不需要显示错误消息
+        showLoading: false,  // 验证token不需要显示loading
       });
       return result.valid;
     } catch {

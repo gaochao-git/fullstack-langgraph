@@ -10,6 +10,7 @@ import { useAuth } from "./hooks/useAuth";
 import { configureAuthInterceptor } from "./utils/authInterceptor";
 import MenuLayout from "./components/MenuLayout";
 import { DynamicRouter } from "./components/DynamicRouter";
+import GlobalLoading from "./components/GlobalLoading";
 
 
 // 主应用组件（包装在主题提供者内部）
@@ -30,6 +31,7 @@ function AppContent() {
   return (
     <ConfigProvider theme={antdTheme}>
       <AntdApp>
+        <GlobalLoading />
         <Routes>
           {/* 公开路由 */}
           <Route path="/login" element={<LoginPage />} />

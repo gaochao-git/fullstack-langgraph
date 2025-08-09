@@ -4,8 +4,8 @@ RBAC权限服务
 """
 
 from typing import List, Dict, Any, Optional, Set
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, or_, select, update, delete
 from fastapi import HTTPException, status
 from functools import lru_cache
 import json
@@ -15,63 +15,85 @@ from src.apps.user.rbac_models import (
     RbacUser, RbacRole, RbacPermission, RbacMenu,
     RbacUsersRoles, RbacRolesPermissions
 )
+from src.shared.db.models import now_shanghai
 
 
 class RBACService:
     """RBAC权限服务"""
     
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
     
-    def get_user_roles(self, user_id: str) -> List[RbacRole]:
+    async def get_user_roles(self, user_id: str) -> List[RbacRole]:
         """获取用户的所有角色"""
-        roles = self.db.query(RbacRole).join(
-            RbacUsersRoles,
-            RbacUsersRoles.role_id == RbacRole.role_id
-        ).filter(
-            RbacUsersRoles.user_id == user_id
-        ).all()
+        result = await self.db.execute(
+            select(RbacRole).join(
+                RbacUsersRoles,
+                RbacUsersRoles.role_id == RbacRole.role_id
+            ).where(
+                RbacUsersRoles.user_id == user_id
+            )
+        )
+        roles = result.scalars().all()
         
-        return roles
+        return list(roles)
     
-    def get_user_permissions(self, user_id: str) -> List[RbacPermission]:
+    async def get_user_permissions(self, user_id: str) -> List[RbacPermission]:
         """获取用户的所有权限（通过角色）"""
         # 获取用户的所有角色ID
-        role_ids = self.db.query(RbacUsersRoles.role_id).filter(
-            RbacUsersRoles.user_id == user_id
-        ).subquery()
+        role_ids_result = await self.db.execute(
+            select(RbacUsersRoles.role_id).where(
+                RbacUsersRoles.user_id == user_id
+            )
+        )
+        role_ids = [row[0] for row in role_ids_result.fetchall()]
+        
+        if not role_ids:
+            return []
         
         # 获取这些角色的所有权限
-        permissions = self.db.query(RbacPermission).join(
-            RbacRolesPermissions,
-            RbacRolesPermissions.back_permission_id == RbacPermission.permission_id
-        ).filter(
-            RbacRolesPermissions.role_id.in_(role_ids)
-        ).distinct().all()
+        result = await self.db.execute(
+            select(RbacPermission).join(
+                RbacRolesPermissions,
+                RbacRolesPermissions.back_permission_id == RbacPermission.permission_id
+            ).where(
+                RbacRolesPermissions.role_id.in_(role_ids)
+            ).distinct()
+        )
+        permissions = result.scalars().all()
         
-        return permissions
+        return list(permissions)
     
-    def get_user_menus(self, user_id: str) -> List[RbacMenu]:
+    async def get_user_menus(self, user_id: str) -> List[RbacMenu]:
         """获取用户可访问的菜单"""
         # 获取用户的所有角色ID
-        role_ids = self.db.query(RbacUsersRoles.role_id).filter(
-            RbacUsersRoles.user_id == user_id
-        ).subquery()
+        role_ids_result = await self.db.execute(
+            select(RbacUsersRoles.role_id).where(
+                RbacUsersRoles.user_id == user_id
+            )
+        )
+        role_ids = [row[0] for row in role_ids_result.fetchall()]
+        
+        if not role_ids:
+            return []
         
         # 获取这些角色可访问的菜单（通过前端权限ID）
-        menus = self.db.query(RbacMenu).join(
-            RbacRolesPermissions,
-            RbacRolesPermissions.front_permission_id == RbacMenu.menu_id
-        ).filter(
-            and_(
-                RbacRolesPermissions.role_id.in_(role_ids),
-                RbacMenu.show_menu == 1  # 只返回需要显示的菜单
-            )
-        ).distinct().all()
+        result = await self.db.execute(
+            select(RbacMenu).join(
+                RbacRolesPermissions,
+                RbacRolesPermissions.front_permission_id == RbacMenu.menu_id
+            ).where(
+                and_(
+                    RbacRolesPermissions.role_id.in_(role_ids),
+                    RbacMenu.show_menu == 1  # 只返回需要显示的菜单
+                )
+            ).distinct()
+        )
+        menus = result.scalars().all()
         
-        return menus
+        return list(menus)
     
-    def check_permission(
+    async def check_permission(
         self, 
         user_id: str, 
         resource: str, 
@@ -88,7 +110,7 @@ class RBACService:
         Returns:
             bool: 是否有权限
         """
-        permissions = self.get_user_permissions(user_id)
+        permissions = await self.get_user_permissions(user_id)
         
         for perm in permissions:
             # 检查是否被禁用
@@ -105,106 +127,122 @@ class RBACService:
         
         return False
     
-    def check_role(self, user_id: str, role_names: List[str]) -> bool:
+    async def check_role(self, user_id: str, role_names: List[str]) -> bool:
         """检查用户是否有指定角色"""
-        user_roles = self.get_user_roles(user_id)
+        user_roles = await self.get_user_roles(user_id)
         user_role_names = [role.role_name for role in user_roles]
         
         # 检查是否有任一所需角色
         return any(role in user_role_names for role in role_names)
     
-    def assign_role_to_user(
+    async def assign_role_to_user(
         self, 
         user_id: str, 
         role_id: int, 
         created_by: str
     ):
         """给用户分配角色"""
-        # 检查是否已存在
-        existing = self.db.query(RbacUsersRoles).filter(
-            and_(
-                RbacUsersRoles.user_id == user_id,
-                RbacUsersRoles.role_id == role_id
-            )
-        ).first()
-        
-        if existing:
-            return
-        
-        # 创建关联
-        user_role = RbacUsersRoles(
-            user_id=user_id,
-            role_id=role_id,
-            create_by=created_by,
-            update_by=created_by
-        )
-        
-        self.db.add(user_role)
-        self.db.commit()
-    
-    def remove_role_from_user(self, user_id: str, role_id: int):
-        """移除用户的角色"""
-        self.db.query(RbacUsersRoles).filter(
-            and_(
-                RbacUsersRoles.user_id == user_id,
-                RbacUsersRoles.role_id == role_id
-            )
-        ).delete()
-        
-        self.db.commit()
-    
-    def get_role_by_name(self, role_name: str) -> Optional[RbacRole]:
-        """根据角色名获取角色"""
-        return self.db.query(RbacRole).filter(
-            RbacRole.role_name == role_name
-        ).first()
-    
-    def create_default_roles(self):
-        """创建默认角色"""
-        default_roles = [
-            {
-                "role_id": 1,
-                "role_name": "super_admin",
-                "description": "超级管理员",
-            },
-            {
-                "role_id": 2,
-                "role_name": "admin",
-                "description": "管理员",
-            },
-            {
-                "role_id": 3,
-                "role_name": "user",
-                "description": "普通用户",
-            }
-        ]
-        
-        for role_data in default_roles:
+        async with self.db.begin():
             # 检查是否已存在
-            existing = self.db.query(RbacRole).filter(
-                RbacRole.role_name == role_data["role_name"]
-            ).first()
-            
-            if not existing:
-                role = RbacRole(
-                    role_id=role_data["role_id"],
-                    role_name=role_data["role_name"],
-                    description=role_data["description"],
-                    create_by="system",
-                    update_by="system"
+            result = await self.db.execute(
+                select(RbacUsersRoles).where(
+                    and_(
+                        RbacUsersRoles.user_id == user_id,
+                        RbacUsersRoles.role_id == role_id
+                    )
                 )
-                self.db.add(role)
-        
-        self.db.commit()
+            )
+            existing = result.scalar_one_or_none()
+            
+            if existing:
+                return
+            
+            # 创建关联
+            user_role = RbacUsersRoles(
+                user_id=user_id,
+                role_id=role_id,
+                create_by=created_by,
+                update_by=created_by,
+                create_time=now_shanghai(),
+                update_time=now_shanghai()
+            )
+            
+            self.db.add(user_role)
+            await self.db.flush()
     
-    def get_permission_tree(self, user_id: str) -> Dict[str, Any]:
+    async def remove_role_from_user(self, user_id: str, role_id: int):
+        """移除用户的角色"""
+        async with self.db.begin():
+            await self.db.execute(
+                delete(RbacUsersRoles).where(
+                    and_(
+                        RbacUsersRoles.user_id == user_id,
+                        RbacUsersRoles.role_id == role_id
+                    )
+                )
+            )
+    
+    async def get_role_by_name(self, role_name: str) -> Optional[RbacRole]:
+        """根据角色名获取角色"""
+        result = await self.db.execute(
+            select(RbacRole).where(
+                RbacRole.role_name == role_name
+            )
+        )
+        return result.scalar_one_or_none()
+    
+    async def create_default_roles(self):
+        """创建默认角色"""
+        async with self.db.begin():
+            default_roles = [
+                {
+                    "role_id": 1,
+                    "role_name": "super_admin",
+                    "description": "超级管理员",
+                },
+                {
+                    "role_id": 2,
+                    "role_name": "admin",
+                    "description": "管理员",
+                },
+                {
+                    "role_id": 3,
+                    "role_name": "user",
+                    "description": "普通用户",
+                }
+            ]
+            
+            for role_data in default_roles:
+                # 检查是否已存在
+                result = await self.db.execute(
+                    select(RbacRole).where(
+                        RbacRole.role_name == role_data["role_name"]
+                    )
+                )
+                existing = result.scalar_one_or_none()
+                
+                if not existing:
+                    role = RbacRole(
+                        role_id=role_data["role_id"],
+                        role_name=role_data["role_name"],
+                        description=role_data["description"],
+                        create_by="system",
+                        update_by="system",
+                        create_time=now_shanghai(),
+                        update_time=now_shanghai()
+                    )
+                    self.db.add(role)
+            
+            await self.db.flush()
+    
+    async def get_permission_tree(self, user_id: str) -> Dict[str, Any]:
         """
         获取用户的权限树
         返回格式化的权限数据，便于前端使用
         """
-        roles = self.get_user_roles(user_id)
-        permissions = self.get_user_permissions(user_id)
-        menus = self.get_user_menus(user_id)
+        roles = await self.get_user_roles(user_id)
+        permissions = await self.get_user_permissions(user_id)
+        menus = await self.get_user_menus(user_id)
         
         # 构建菜单树
         menu_tree = self._build_menu_tree(menus)
@@ -301,11 +339,11 @@ class PermissionCache:
 permission_cache = PermissionCache()
 
 
-def check_api_permission(
+async def check_api_permission(
     user_id: str,
     path: str,
     method: str,
-    db: Session
+    db: AsyncSession
 ) -> bool:
     """
     检查API权限的便捷函数
@@ -320,11 +358,11 @@ def check_api_permission(
         bool: 是否有权限
     """
     service = RBACService(db)
-    return service.check_permission(user_id, path, method)
+    return await service.check_permission(user_id, path, method)
 
 
-def get_user_menu_tree(user_id: str, db: Session) -> List[Dict[str, Any]]:
+async def get_user_menu_tree(user_id: str, db: AsyncSession) -> List[Dict[str, Any]]:
     """获取用户菜单树的便捷函数"""
     service = RBACService(db)
-    permission_data = service.get_permission_tree(user_id)
+    permission_data = await service.get_permission_tree(user_id)
     return permission_data["menus"]

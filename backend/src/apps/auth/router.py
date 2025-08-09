@@ -170,7 +170,7 @@ async def get_current_user_permissions(
     from src.apps.auth.rbac_service import RBACService
     
     service = RBACService(db)
-    return service.get_permission_tree(current_user["sub"])
+    return await service.get_permission_tree(current_user["sub"])
 
 
 @router.post("/verify", response_model=TokenValidationResponse, summary="验证令牌")

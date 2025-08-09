@@ -6,6 +6,19 @@
 
 // 移除 antd 依赖，让组件自己处理消息提示
 
+// 全局请求计数器
+let activeRequests = 0;
+
+// 全局loading控制器
+export const globalLoadingController = {
+  show: () => {},
+  hide: () => {},
+  setHandler: (handler: { show: () => void; hide: () => void }) => {
+    globalLoadingController.show = handler.show;
+    globalLoadingController.hide = handler.hide;
+  }
+};
+
 // 获取基础URL
 const getBaseUrl = (): string => {
   return import.meta.env.VITE_API_BASE_URL || '';
@@ -19,6 +32,8 @@ export interface RequestConfig {
   timeout?: number;
   // 新增：是否返回原始Response（默认false，返回解析后的数据）
   returnRaw?: boolean;
+  // 新增：是否显示全局loading（默认true）
+  showLoading?: boolean;
 }
 
 // 流式请求配置接口
@@ -40,7 +55,8 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     headers = {},
     body,
     timeout = 30000,
-    returnRaw = false
+    returnRaw = false,
+    showLoading = true
   } = config;
 
   // 构建完整URL
@@ -68,12 +84,27 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
   const timeoutId = setTimeout(() => controller.abort(), timeout);
   fetchConfig.signal = controller.signal;
 
+  // 显示全局loading
+  if (showLoading) {
+    activeRequests++;
+    if (activeRequests === 1) {
+      globalLoadingController.show();
+    }
+  }
+
   try {
     const response = await fetch(fullUrl, fetchConfig);
     clearTimeout(timeoutId);
     
     // 如果需要原始Response，直接返回
     if (returnRaw) {
+      // 隐藏全局loading
+      if (showLoading) {
+        activeRequests--;
+        if (activeRequests === 0) {
+          globalLoadingController.hide();
+        }
+      }
       return response;
     }
     
@@ -99,12 +130,28 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
     // 解析响应
     const responseData = await response.json();
 
+    // 隐藏全局loading
+    if (showLoading) {
+      activeRequests--;
+      if (activeRequests === 0) {
+        globalLoadingController.hide();
+      }
+    }
+
     // 返回完整的响应数据，让调用方自己处理业务逻辑
     // 包括 status === 'error' 的情况
     return responseData;
     
   } catch (error) {
     clearTimeout(timeoutId);
+    
+    // 隐藏全局loading
+    if (showLoading) {
+      activeRequests--;
+      if (activeRequests === 0) {
+        globalLoadingController.hide();
+      }
+    }
     
     if (error instanceof Error && error.name === 'AbortError') {
       const timeoutError = new Error(`请求超时 (${timeout}ms)`);
