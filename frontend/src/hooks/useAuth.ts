@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from '@/services/authApi';
+import { tokenManager } from '@/utils/tokenManager';
 
 interface Role {
   role_id: string;
@@ -48,9 +49,11 @@ export const useAuth = create<AuthState>((set) => ({
       }
       
       // 处理成功响应
-      const { access_token, user } = response.data || response;
+      const { access_token, refresh_token, user } = response.data || response;
       
-      localStorage.setItem('token', access_token);
+      // 使用tokenManager保存tokens并启动自动刷新
+      tokenManager.saveTokens(access_token, refresh_token);
+      
       set({ 
         user, 
         token: access_token, 
@@ -75,7 +78,8 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    localStorage.removeItem('token');
+    // 使用tokenManager清除tokens并停止自动刷新
+    tokenManager.clearTokens();
     set({ 
       user: null, 
       token: null, 
@@ -101,7 +105,7 @@ export const useAuth = create<AuthState>((set) => ({
         loading: false 
       });
     } catch (error) {
-      localStorage.removeItem('token');
+      tokenManager.clearTokens();
       set({ 
         user: null, 
         token: null, 

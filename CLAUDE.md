@@ -320,13 +320,94 @@ apps/your_module/
    - 禁止循环导入
    - 禁止在运行时动态导入（除非必要）
 
+### 数据库使用规范
+
+#### 1. 异步数据库用法（推荐）
+
+##### 1.1 FastAPI 依赖注入（自动管理事务）
+```python
+from src.shared.db.config import get_async_db
+
+@router.get("/users")
+async def list_users(db: AsyncSession = Depends(get_async_db)):
+    # FastAPI 自动管理事务
+    users = await db.execute(select(User))
+    return users.scalars().all()
+```
+
+##### 1.2 Service层事务管理
+```python
+# 写操作必须使用 async with db.begin()
+async def create_user(self, db: AsyncSession, user_data: dict):
+    async with db.begin():  # 显式事务管理
+        user = User(**user_data)
+        db.add(user)
+        await db.flush()
+        return user
+
+# 只读操作不需要 begin()
+async def get_user_by_id(self, db: AsyncSession, user_id: str):
+    result = await db.execute(
+        select(User).where(User.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+```
+
+##### 1.3 独立上下文管理器（后台任务）
+```python
+from src.shared.db.config import get_async_db_context
+
+async with get_async_db_context() as session:
+    # 用于非FastAPI环境，如后台任务
+    result = await session.execute(select(User))
+    await session.commit()  # 需要手动提交
+```
+
+#### 2. 同步数据库用法（仅限必要场景）
+
+```python
+from src.shared.db.config import get_sync_db
+
+# 方式1：生成器模式
+db_gen = get_sync_db()
+db = next(db_gen)
+try:
+    agent = db.query(AgentConfig).filter(...).first()
+finally:
+    db.close()
+
+# 方式2：上下文管理器模式（推荐）
+with get_sync_db() as db:
+    model = db.query(AIModelConfig).filter(...).first()
+```
+
+#### 3. 何时使用 begin()
+
+| 场景 | 是否需要 begin() | 原因 |
+|------|-----------------|------|
+| FastAPI 端点 + Depends | ❌ | FastAPI 自动管理 |
+| Service 层写操作 | ✅ | 需要事务原子性 |
+| 多表操作 | ✅ | 保证数据一致性 |
+| 只读查询 | ❌ | 不需要事务 |
+| 使用 get_async_db_context() | ❌ | context manager 自带事务 |
+
+#### 4. 数据库使用最佳实践
+
+1. **新代码一律使用异步**
+2. **FastAPI 端点使用 `Depends(get_async_db)`**
+3. **Service 层写操作使用 `async with db.begin()`**
+4. **复杂操作（多表、先删后增）必须在同一事务中**
+5. **只在必要时使用同步（如 LangGraph 工具）**
+6. **避免混用同步和异步会话**
+
 ### 注意事项
 
 1. **不要在 endpoints.py 写业务逻辑**
 2. **Service 层不处理 HTTP 相关内容**
 3. **使用 BusinessException 而不是 HTTPException**
 4. **所有 API 返回统一响应格式**
-5. **数据库操作使用 async with db.begin()**
+5. **数据库写操作使用 `async with db.begin()`**
 6. **敏感信息不要记录到日志**
 7. **大量数据必须分页处理**
 8. **导入使用绝对路径，相对导入限制在2级以内**
+9. **数据库操作优先使用异步模式**

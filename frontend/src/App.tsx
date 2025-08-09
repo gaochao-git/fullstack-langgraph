@@ -26,6 +26,8 @@ function AppContent() {
         logout();
       }
     });
+    
+    // 不再需要启动定时器
   }, []);
 
   return (

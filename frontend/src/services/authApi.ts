@@ -85,8 +85,10 @@ class AuthApi {
   /**
    * 刷新token
    */
-  async refreshToken(): Promise<{ token: string }> {
-    return await omind_post(`${this.baseUrl}/refresh`);
+  async refreshToken(refreshToken: string) {
+    return await omind_post(`${this.baseUrl}/refresh`, {
+      refresh_token: refreshToken
+    });
   }
 
   /**

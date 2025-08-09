@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spin, message } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/services/authApi';
+import { tokenManager } from '@/utils/tokenManager';
 
 export function SSOCallback() {
   const [searchParams] = useSearchParams();
@@ -33,10 +34,10 @@ export function SSOCallback() {
       try {
         // 使用授权码换取token
         const response = await authApi.ssoCallback({ code, state: state || undefined });
-        const { token, user } = response;
+        const { token, refresh_token, user } = response;
         
-        // 保存token和用户信息
-        localStorage.setItem('token', token);
+        // 使用tokenManager保存tokens
+        tokenManager.saveTokens(token, refresh_token);
         auth.user = user;
         auth.token = token;
         auth.isAuthenticated = true;
