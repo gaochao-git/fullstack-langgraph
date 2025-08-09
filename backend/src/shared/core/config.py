@@ -65,10 +65,7 @@ class Settings(BaseSettings):
     REQUIRE_LOWERCASE: bool = True
     REQUIRE_DIGITS: bool = True
     REQUIRE_SPECIAL_CHARS: bool = True
-    
-    # MFA配置
-    MFA_ISSUER_NAME: str = "智能运维平台"
-    MFA_ENABLED: bool = False    
+     
     # DeepSeek配置
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_BASE_URL: Optional[str] = None
