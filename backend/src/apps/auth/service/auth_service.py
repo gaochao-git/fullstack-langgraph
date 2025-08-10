@@ -23,10 +23,11 @@ from src.apps.auth.utils import (
 )
 from src.apps.auth.schema import (
     LoginRequest, LoginResponse, UserProfile,
-    CreateAPIKeyRequest, CreateAPIKeyResponse
+    CreateAPIKeyRequest, CreateAPIKeyResponse, APIKeyInfo
 )
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
+from fastapi import HTTPException
 
 
 class AuthService:

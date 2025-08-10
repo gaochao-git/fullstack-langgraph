@@ -21,6 +21,7 @@ export function APIKeyManagement() {
   const [apiKeys, setApiKeys] = useState<APIKeyInfo[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newAPIKey, setNewAPIKey] = useState<string>('');
+  const [createdKeyInfo, setCreatedKeyInfo] = useState<APIKeyInfo | null>(null);
   const [permissions, setPermissions] = useState<{
     label: string;
     value: number;
@@ -141,6 +142,7 @@ export function APIKeyManagement() {
     try {
       const response = await apiKeyService.createAPIKey(values);
       setNewAPIKey(response.api_key);
+      setCreatedKeyInfo(response.key_info);
       message.success('API密钥创建成功');
       loadAPIKeys();
       // 不要在这里重置表单，因为需要显示创建的密钥
@@ -367,6 +369,13 @@ export function APIKeyManagement() {
           columns={columns}
           rowKey="key_id"
           scroll={{ x: 'max-content' }}
+          pagination={{
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 条记录`,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            defaultPageSize: 10,
+          }}
         />
       </Card>
 
@@ -377,6 +386,7 @@ export function APIKeyManagement() {
         onCancel={() => {
           setShowCreateModal(false);
           setNewAPIKey('');
+          setCreatedKeyInfo(null);
           form.resetFields();
         }}
         footer={null}
@@ -414,6 +424,36 @@ export function APIKeyManagement() {
             <Divider />
             
             <div>
+              <Text strong>授权的权限：</Text>
+              <div style={{ marginBottom: 16 }}>
+                {createdKeyInfo && createdKeyInfo.scopes && createdKeyInfo.scopes.length > 0 ? (
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {createdKeyInfo.scopes.map(scopeId => {
+                      const perm = permissions.find(p => p.value === scopeId);
+                      if (!perm) return null;
+                      return (
+                        <Tag key={scopeId} color={{
+                          'GET': 'green',
+                          'POST': 'blue',
+                          'PUT': 'orange',
+                          'DELETE': 'red',
+                          'PATCH': 'purple'
+                        }[perm.http_method] || 'default'}>
+                          {perm.http_method} {perm.api_route}
+                          {perm.description && ` - ${perm.description}`}
+                        </Tag>
+                      );
+                    })}
+                  </Space>
+                ) : (
+                  <Text type="secondary">无特定权限限制（完全访问）</Text>
+                )}
+              </div>
+            </div>
+            
+            <Divider />
+            
+            <div>
               <Text strong>使用示例：</Text>
               <Paragraph>
                 <pre style={{ 
@@ -422,7 +462,24 @@ export function APIKeyManagement() {
                   borderRadius: 4,
                   overflow: 'auto'
                 }}>
-{`# Python 示例
+{(() => {
+  // 获取创建时选择的权限
+  const selectedScopes = createdKeyInfo?.scopes || [];
+  const selectedPermissions = permissions.filter(p => selectedScopes.includes(p.value));
+  
+  // 如果有选择权限，使用第一个权限作为示例
+  let exampleUrl = 'http://localhost:8000/api/v1/auth/me';
+  let exampleMethod = 'GET';
+  
+  if (selectedPermissions.length > 0) {
+    const firstPerm = selectedPermissions[0];
+    exampleUrl = `http://localhost:8000${firstPerm.api_route}`;
+    exampleMethod = firstPerm.http_method;
+  }
+  
+  // 根据方法生成不同的示例
+  if (exampleMethod === 'GET') {
+    return `# Python 示例
 import requests
 
 headers = {
@@ -430,20 +487,97 @@ headers = {
 }
 
 response = requests.get(
-    'https://api.example.com/api/v1/data',
+    '${exampleUrl}',
     headers=headers
 )
+print(response.json())
 
 # Shell 示例
 curl -H "Authorization: Bearer ${newAPIKey}" \\
-     https://api.example.com/api/v1/data
+     ${exampleUrl}
 
 # JavaScript 示例
-const response = await fetch('https://api.example.com/api/v1/data', {
+const response = await fetch('${exampleUrl}', {
   headers: {
     'Authorization': 'Bearer ${newAPIKey}'
   }
-});`}
+});
+const data = await response.json();
+console.log(data);`;
+  } else if (exampleMethod === 'POST') {
+    return `# Python 示例
+import requests
+
+headers = {
+    'Authorization': 'Bearer ${newAPIKey}',
+    'Content-Type': 'application/json'
+}
+
+data = {
+    # 根据接口要求填写请求数据
+}
+
+response = requests.post(
+    '${exampleUrl}',
+    headers=headers,
+    json=data
+)
+print(response.json())
+
+# Shell 示例
+curl -X POST \\
+     -H "Authorization: Bearer ${newAPIKey}" \\
+     -H "Content-Type: application/json" \\
+     -d '{"key": "value"}' \\
+     ${exampleUrl}
+
+# JavaScript 示例
+const response = await fetch('${exampleUrl}', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer ${newAPIKey}',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    // 根据接口要求填写请求数据
+  })
+});
+const data = await response.json();
+console.log(data);`;
+  } else {
+    // PUT/DELETE/PATCH 等其他方法
+    return `# Python 示例
+import requests
+
+headers = {
+    'Authorization': 'Bearer ${newAPIKey}',
+    'Content-Type': 'application/json'
+}
+
+response = requests.${exampleMethod.toLowerCase()}(
+    '${exampleUrl}',
+    headers=headers
+)
+print(response.json())
+
+# Shell 示例
+curl -X ${exampleMethod} \\
+     -H "Authorization: Bearer ${newAPIKey}" \\
+     -H "Content-Type: application/json" \\
+     ${exampleUrl}
+
+# JavaScript 示例
+const response = await fetch('${exampleUrl}', {
+  method: '${exampleMethod}',
+  headers: {
+    'Authorization': 'Bearer ${newAPIKey}',
+    'Content-Type': 'application/json'
+  }
+});
+const data = await response.json();
+console.log(data);`;
+  }
+})()}
                 </pre>
               </Paragraph>
             </div>
@@ -454,6 +588,7 @@ const response = await fetch('https://api.example.com/api/v1/data', {
               onClick={() => {
                 setShowCreateModal(false);
                 setNewAPIKey('');
+                setCreatedKeyInfo(null);
                 form.resetFields();
               }}
             >
