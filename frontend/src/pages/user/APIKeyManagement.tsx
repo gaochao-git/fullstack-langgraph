@@ -214,67 +214,62 @@ export function APIKeyManagement() {
       title: '权限范围',
       dataIndex: 'scopes',
       key: 'scopes',
-      render: (scopes: string[] | undefined) => (
-        scopes && scopes.length > 0 ? (
-          <Space size="small" wrap>
-            {scopes.slice(0, 2).map(scope => (
-              <Tooltip key={scope} title={(() => {
-                const perm = permissions.find(p => p.value === scope);
-                if (!perm) return scope;
-                return `${perm.http_method} ${perm.api_route} - ${perm.description || ''}`;
-              })()}>
-                <Tag color="green">
-                  {(() => {
-                    const perm = permissions.find(p => p.value === scope);
-                    if (!perm) return scope;
-                    const method = perm.http_method || 'GET';
-                    const methodColor = {
-                      'GET': 'green',
-                      'POST': 'blue',
-                      'PUT': 'orange',
-                      'DELETE': 'red',
-                      'PATCH': 'purple'
-                    }[method] || 'default';
-                    return (
-                      <Space size={4}>
-                        <Tag color={methodColor} style={{ margin: 0 }}>{method}</Tag>
-                        <span>{perm.api_route}</span>
-                      </Space>
-                    );
-                  })()}
-                </Tag>
-              </Tooltip>
-            ))}
-            {scopes.length > 2 && (
+      render: (scopes: number[] | undefined) => {
+        if (!scopes || scopes.length === 0) {
+          return <Text type="secondary">无权限</Text>;
+        }
+        
+        // 获取第一个权限的信息
+        const firstScope = scopes[0];
+        const firstPerm = permissions.find(p => p.value === firstScope);
+        
+        if (!firstPerm) {
+          return <Text type="secondary">无权限</Text>;
+        }
+        
+        // 根据方法类型设置Tag颜色
+        const methodColor = {
+          'GET': 'green',
+          'POST': 'blue',
+          'PUT': 'orange',
+          'DELETE': 'red',
+          'PATCH': 'purple'
+        }[firstPerm.http_method] || 'default';
+        
+        return (
+          <Space size={4}>
+            <Tag color={methodColor} style={{ borderRadius: 4 }}>
+              {firstPerm.http_method}&nbsp;&nbsp;{firstPerm.api_route}
+            </Tag>
+            {scopes.length > 1 && (
               <Tooltip title={
                 <div>
                   {scopes.map(scope => {
                     const perm = permissions.find(p => p.value === scope);
-                    if (!perm) return <div key={scope}>{scope}</div>;
+                    if (!perm) return null;
                     return (
                       <div key={scope} style={{ marginBottom: 4 }}>
-                        <Tag size="small" color={{
-                          'GET': 'green',
-                          'POST': 'blue',
-                          'PUT': 'orange',
-                          'DELETE': 'red',
-                          'PATCH': 'purple'
-                        }[perm.http_method] || 'default'} style={{ marginRight: 8 }}>
-                          {perm.http_method}
-                        </Tag>
-                        {perm.api_route}
+                        {perm.http_method} {perm.api_route}
                         {perm.description && ` - ${perm.description}`}
                       </div>
                     );
                   })}
                 </div>
               }>
-                <Tag>+{scopes.length - 2}</Tag>
+                <span style={{ 
+                  color: '#666', 
+                  backgroundColor: '#f0f0f0', 
+                  padding: '2px 8px', 
+                  borderRadius: 4,
+                  fontSize: 12
+                }}>
+                  +{scopes.length - 1}
+                </span>
               </Tooltip>
             )}
           </Space>
-        ) : <Text type="secondary">无权限</Text>
-      )
+        );
+      }
     },
     {
       title: '创建时间',
