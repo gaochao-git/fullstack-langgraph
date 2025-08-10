@@ -5,6 +5,7 @@ export { UserManagement } from './pages/UserManagement';
 export { RoleManagement } from './pages/RoleManagement';
 export { PermissionManagement } from './pages/PermissionManagement';
 export { MenuManagement } from './pages/MenuManagement';
+export { APIKeyManagement } from './APIKeyManagement';
 
 // API服务
 export { userApi, roleApi, permissionApi, menuApi } from './services/rbacApi';

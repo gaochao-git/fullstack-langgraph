@@ -203,21 +203,28 @@ class TerminateSessionRequest(BaseModel):
 
 class CreateAPIKeyRequest(BaseModel):
     """创建API Key请求"""
-    name: str = Field(..., min_length=1, max_length=100, description="API Key名称")
-    expires_in_days: Optional[int] = Field(None, ge=1, le=365, description="过期天数")
-    scopes: Optional[List[str]] = Field(default_factory=list, description="权限范围")
+    user_id: str = Field(..., description="用户ID")
+    key_name: str = Field(..., min_length=1, max_length=100, description="API Key名称")
+    mark_comment: str = Field(..., min_length=1, max_length=64, description="工单号")
+    expires_in_days: Optional[int] = Field(None, ge=1, le=3650, description="过期天数")
+    scopes: Optional[List[int]] = Field(default_factory=list, description="权限ID列表")
+    allowed_ips: Optional[List[str]] = Field(default_factory=list, description="允许的IP列表")
 
 
 class APIKeyInfo(BaseModel):
     """API Key信息"""
     key_id: str
-    name: str
-    key_hint: str  # 只显示前8位
+    user_id: str
+    user_name: Optional[str] = None
+    key_name: str
+    key_prefix: str
+    mark_comment: Optional[str] = None
     created_at: datetime
     expires_at: Optional[datetime] = None
-    last_used: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
     is_active: bool
-    scopes: List[str]
+    scopes: Optional[List[int]] = []
+    allowed_ips: Optional[List[str]] = []
 
 
 class CreateAPIKeyResponse(BaseModel):

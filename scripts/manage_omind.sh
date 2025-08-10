@@ -88,7 +88,14 @@ execute_component_command() {
     log_step "执行: $component/manage.sh $command"
     
     cd "$component"
-    ./manage.sh "$command" "$@"
+    
+    # 如果是开发环境启动后端，设置 DEV_MODE
+    if [ "$component" = "backend" ] && [ "$command" = "start" ] && [ "${OMIND_DEV_MODE:-false}" = "true" ]; then
+        DEV_MODE=true ./manage.sh "$command" "$@"
+    else
+        ./manage.sh "$command" "$@"
+    fi
+    
     local result=$?
     cd "$PROJECT_ROOT"
     

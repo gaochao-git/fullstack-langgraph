@@ -112,8 +112,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 client_ip=request.client.host if request.client else "-"
             )
             
-            # 应用日志记录错误概要（简化，详细信息由审计中间件处理）
-            self.logger.error(f"Request failed: {request.method} {request.url.path} - {type(e).__name__}")
+            # 应用日志记录错误概要（包含完整堆栈信息）
+            self.logger.error(f"Request failed: {request.method} {request.url.path} - {type(e).__name__}", exc_info=True)
             
             # 返回错误响应
             return JSONResponse(

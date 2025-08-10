@@ -5,7 +5,7 @@
 
 from typing import Optional, List, Annotated
 from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -19,12 +19,11 @@ from src.shared.schemas.response import ResponseCode
 
 # Security schemes
 bearer_scheme = HTTPBearer(auto_error=False)
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def get_current_user_optional(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    api_key: Optional[str] = Depends(api_key_header),
     db: AsyncSession = Depends(get_async_db)
 ) -> Optional[dict]:
     """
@@ -35,40 +34,91 @@ async def get_current_user_optional(
     import jwt
     
     try:
-        # 优先尝试JWT认证
+        # 尝试Bearer Token认证
         if credentials:
             token = credentials.credentials
             
-            # 解码token
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            
-            # 检查token是否在黑名单中
-            jti = payload.get("jti")
-            if jti and TokenBlacklist.is_blacklisted(jti):
-                return None
-            
-            # 验证token类型
-            if payload.get("type") != "access":
-                return None
-            
-            # 查询用户是否存在且活跃
-            stmt = select(RbacUser).where(RbacUser.user_id == payload.get("sub"))
-            result = await db.execute(stmt)
-            user = result.scalar_one_or_none()
-            
-            if user and user.is_active:
-                return {
-                    "sub": user.user_id,
-                    "username": user.user_name,
-                    "email": user.email,
-                    "display_name": user.display_name,
-                    "token_type": "jwt"
-                }
+            # 检查是否是API Key（以omind_ak_开头）
+            if token.startswith("omind_ak_"):
+                # API Key认证
+                key_hash = APIKeyUtils.hash_api_key(token)
+                
+                # 查询API Key记录
+                stmt = select(AuthApiKey).where(
+                    AuthApiKey.key_hash == key_hash,
+                    AuthApiKey.is_active == True
+                )
+                result = await db.execute(stmt)
+                api_key_record = result.scalar_one_or_none()
+                
+                if not api_key_record:
+                    return None
+                
+                # 检查是否过期
+                from datetime import datetime, timezone
+                if api_key_record.expires_at and api_key_record.expires_at < datetime.now(timezone.utc):
+                    return None
+                
+                # 检查IP白名单
+                if api_key_record.allowed_ips:
+                    import json
+                    allowed_ips = json.loads(api_key_record.allowed_ips)
+                    client_ip = request.client.host if request.client else None
+                    if allowed_ips and client_ip not in allowed_ips:
+                        return None
+                
+                # 更新最后使用时间
+                api_key_record.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+                
+                # 查询用户信息
+                stmt = select(RbacUser).where(RbacUser.user_id == api_key_record.user_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                if user and user.is_active:
+                    # 获取权限范围
+                    scopes = []
+                    if api_key_record.scopes:
+                        scopes = json.loads(api_key_record.scopes)
+                    
+                    return {
+                        "sub": user.user_id,
+                        "username": user.user_name,
+                        "email": user.email,
+                        "display_name": user.display_name,
+                        "token_type": "api_key",
+                        "api_key_name": api_key_record.key_name,
+                        "scopes": scopes
+                    }
+            else:
+                # JWT认证
+                # 解码token
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                
+                # 检查token是否在黑名单中
+                jti = payload.get("jti")
+                if jti and TokenBlacklist.is_blacklisted(jti):
+                    return None
+                
+                # 验证token类型
+                if payload.get("type") != "access":
+                    return None
+                
+                # 查询用户是否存在且活跃
+                stmt = select(RbacUser).where(RbacUser.user_id == payload.get("sub"))
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                if user and user.is_active:
+                    return {
+                        "sub": user.user_id,
+                        "username": user.user_name,
+                        "email": user.email,
+                        "display_name": user.display_name,
+                        "token_type": "jwt"
+                    }
         
-        # 尝试API Key认证
-        if api_key:
-            # TODO: 实现API Key认证逻辑
-            pass
             
     except Exception as e:
         # 认证失败时返回None而不是抛出异常，但打印错误用于调试

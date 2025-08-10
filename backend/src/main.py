@@ -86,7 +86,7 @@ def create_app() -> FastAPI:
             if stats['orphaned'] > 0:
                 logger.warning(f"⚠️ 发现 {stats['orphaned']} 个孤立权限")
         except Exception as e:
-            logger.error(f"❌ API权限同步失败: {e}")
+            logger.error(f"❌ API权限同步失败: {e}", exc_info=True)
             # 不阻止应用启动
 
     # 注册API路由

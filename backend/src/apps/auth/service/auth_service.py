@@ -547,6 +547,7 @@ class AuthService:
                 key_name=request.key_name,
                 key_prefix=prefix,
                 key_hash=key_hash,
+                mark_comment=request.mark_comment,
                 scopes=json.dumps(request.scopes) if request.scopes else None,
                 allowed_ips=json.dumps(request.allowed_ips) if request.allowed_ips else None,
                 expires_at=expires_at,
@@ -556,11 +557,24 @@ class AuthService:
             self.db.add(api_key_record)
             await self.db.commit()
             
+            # 构建返回信息
+            key_info = APIKeyInfo(
+                key_id=str(api_key_record.id),
+                user_id=user_id,
+                key_name=request.key_name,
+                key_prefix=prefix,
+                mark_comment=request.mark_comment,
+                created_at=api_key_record.create_time,
+                expires_at=expires_at,
+                last_used_at=None,
+                is_active=True,
+                scopes=request.scopes or [],
+                allowed_ips=request.allowed_ips or []
+            )
+            
             return CreateAPIKeyResponse(
                 api_key=api_key,
-                key_prefix=prefix,
-                key_name=request.key_name,
-                expires_at=expires_at
+                key_info=key_info
             )
             
         except Exception as e:
@@ -603,3 +617,7 @@ class AuthService:
         
         # 只返回权限名称列表（减少JWT大小）
         return [perm.permission_name for perm in permissions if perm.release_disable != "on"]
+
+
+# 创建全局实例
+auth_service = AuthService(None)  # 使用None，因为会通过依赖注入传入session

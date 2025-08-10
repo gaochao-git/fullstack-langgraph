@@ -159,23 +159,25 @@ class APIKeyUtils:
     
     @staticmethod
     def generate_api_key() -> tuple[str, str, str]:
-        """生成API密钥
+        """生成API密钥（Bearer Token格式）
         返回: (完整密钥, 密钥前缀, 密钥哈希)
         """
-        # 生成32字节的随机密钥
-        key_bytes = secrets.token_bytes(32)
-        key = secrets.token_urlsafe(32)
-        
-        # 生成前缀（用于识别）
-        prefix = f"sk_{secrets.token_urlsafe(4)}"
-        
-        # 完整密钥
-        full_key = f"{prefix}_{key}"
+        # 生成Bearer Token格式的API Key
+        # 格式：omind_ak_<random>
+        key_id = f"omind_ak_{secrets.token_urlsafe(32)}"
         
         # 计算哈希（用于存储）
-        key_hash = hashlib.sha256(full_key.encode()).hexdigest()
+        key_hash = hashlib.sha256(key_id.encode()).hexdigest()
         
-        return full_key, prefix, key_hash
+        # 前缀用于显示（只显示前16个字符）
+        prefix = key_id[:16]
+        
+        return key_id, prefix, key_hash
+    
+    @staticmethod
+    def hash_api_key(api_key: str) -> str:
+        """计算API密钥的哈希值"""
+        return hashlib.sha256(api_key.encode()).hexdigest()
     
     @staticmethod
     def verify_api_key(api_key: str, stored_hash: str) -> bool:

@@ -23,28 +23,7 @@ class BaseService(Generic[ModelType]):
     def __init__(self, model: Type[ModelType]):
         self.model = model
     
-    # ==================== 异步操作 ====================
-    
-    async def create(self, session: AsyncSession, **kwargs) -> ModelType:
-        """创建记录"""
-        try:
-            # 自动设置创建时间
-            if hasattr(self.model, 'create_time') and 'create_time' not in kwargs:
-                kwargs['create_time'] = now_shanghai()
-            if hasattr(self.model, 'update_time') and 'update_time' not in kwargs:
-                kwargs['update_time'] = now_shanghai()
-            
-            instance = self.model(**kwargs)
-            session.add(instance)
-            await session.commit()
-            await session.refresh(instance)
-            return instance
-        except IntegrityError as e:
-            await session.rollback()
-            raise ValueError(f"数据完整性错误: {str(e)}")
-        except Exception as e:
-            await session.rollback()
-            raise e
+    # ==================== 查询操作（推荐使用） ====================
     
     async def get_by_id(self, session: AsyncSession, id_value: Any) -> Optional[ModelType]:
         """根据ID获取记录"""
@@ -100,99 +79,6 @@ class BaseService(Generic[ModelType]):
         result = await session.execute(query)
         return result.scalars().all()
     
-    async def update(
-        self, 
-        session: AsyncSession, 
-        id_value: Any, 
-        **kwargs
-    ) -> Optional[ModelType]:
-        """更新记录"""
-        try:
-            # 自动设置更新时间
-            if hasattr(self.model, 'update_time'):
-                kwargs['update_time'] = now_shanghai()
-            
-            # 执行更新
-            result = await session.execute(
-                update(self.model)
-                .where(self.model.id == id_value)
-                .values(**kwargs)
-                .returning(self.model)
-            )
-            
-            updated_instance = result.scalar_one_or_none()
-            if updated_instance:
-                await session.commit()
-                await session.refresh(updated_instance)
-            
-            return updated_instance
-        except IntegrityError as e:
-            await session.rollback()
-            raise ValueError(f"数据完整性错误: {str(e)}")
-        except Exception as e:
-            await session.rollback()
-            raise e
-    
-    async def update_by_field(
-        self,
-        session: AsyncSession,
-        field_name: str,
-        field_value: Any,
-        **kwargs
-    ) -> Optional[ModelType]:
-        """根据字段更新记录"""
-        try:
-            # 自动设置更新时间
-            if hasattr(self.model, 'update_time'):
-                kwargs['update_time'] = now_shanghai()
-            
-            field = getattr(self.model, field_name)
-            result = await session.execute(
-                update(self.model)
-                .where(field == field_value)
-                .values(**kwargs)
-                .returning(self.model)
-            )
-            
-            updated_instance = result.scalar_one_or_none()
-            if updated_instance:
-                await session.commit()
-                await session.refresh(updated_instance)
-            
-            return updated_instance
-        except Exception as e:
-            await session.rollback()
-            raise e
-    
-    async def delete(self, session: AsyncSession, id_value: Any) -> bool:
-        """删除记录"""
-        try:
-            result = await session.execute(
-                delete(self.model).where(self.model.id == id_value)
-            )
-            await session.commit()
-            return result.rowcount > 0
-        except Exception as e:
-            await session.rollback()
-            raise e
-    
-    async def delete_by_field(
-        self, 
-        session: AsyncSession, 
-        field_name: str, 
-        field_value: Any
-    ) -> int:
-        """根据字段删除记录，返回删除的数量"""
-        try:
-            field = getattr(self.model, field_name)
-            result = await session.execute(
-                delete(self.model).where(field == field_value)
-            )
-            await session.commit()
-            return result.rowcount
-        except Exception as e:
-            await session.rollback()
-            raise e
     
     async def count(
         self, 
@@ -229,57 +115,18 @@ class BaseService(Generic[ModelType]):
         )
         return result.first() is not None
     
-    # ==================== 同步操作（兼容现有代码） ====================
+    # ==================== 简单写操作（不自动提交） ====================
     
-    def sync_create(self, session: Session, **kwargs) -> ModelType:
-        """同步创建记录"""
-        try:
-            # 自动设置创建时间
-            if hasattr(self.model, 'create_time') and 'create_time' not in kwargs:
-                kwargs['create_time'] = now_shanghai()
-            if hasattr(self.model, 'update_time') and 'update_time' not in kwargs:
-                kwargs['update_time'] = now_shanghai()
-            
-            instance = self.model(**kwargs)
-            session.add(instance)
-            session.commit()
-            session.refresh(instance)
-            return instance
-        except IntegrityError as e:
-            session.rollback()
-            raise ValueError(f"数据完整性错误: {str(e)}")
-        except Exception as e:
-            session.rollback()
-            raise e
+    async def delete_by_id(self, session: AsyncSession, id_value: Any) -> int:
+        """根据ID删除记录（不自动提交，需要在 async with session.begin() 中使用）
+        
+        返回删除的记录数
+        """
+        result = await session.execute(
+            delete(self.model).where(self.model.id == id_value)
+        )
+        return result.rowcount
     
-    def sync_get_by_id(self, session: Session, id_value: Any) -> Optional[ModelType]:
-        """同步根据ID获取记录"""
-        return session.query(self.model).filter(self.model.id == id_value).first()
-    
-    def sync_get_list(
-        self, 
-        session: Session,
-        filters: Optional[Dict[str, Any]] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None
-    ) -> List[ModelType]:
-        """同步获取记录列表"""
-        query = session.query(self.model)
-        
-        # 添加过滤条件
-        if filters:
-            for field_name, field_value in filters.items():
-                if hasattr(self.model, field_name):
-                    field = getattr(self.model, field_name)
-                    query = query.filter(field == field_value)
-        
-        # 添加分页
-        if offset:
-            query = query.offset(offset)
-        if limit:
-            query = query.limit(limit)
-        
-        return query.all()
     
     # ==================== 工具方法 ====================
     

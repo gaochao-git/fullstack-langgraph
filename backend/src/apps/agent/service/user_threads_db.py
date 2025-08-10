@@ -29,7 +29,7 @@ async def check_user_thread_exists(user_name: str, thread_id: str) -> bool:
             return user_thread is not None
                     
     except Exception as e:
-        logger.error(f"检查用户线程关联失败: {e}")
+        logger.error(f"检查用户线程关联失败: {e}", exc_info=True)
         return False
 
 
@@ -80,7 +80,7 @@ async def create_user_thread_mapping(
         logger.warning(f"用户线程关联已存在，跳过创建: {user_name} -> {thread_id}")
         return True  # 已存在也算成功
     except Exception as e:
-        logger.error(f"创建用户线程关联失败: {e}")
+        logger.error(f"创建用户线程关联失败: {e}", exc_info=True)
         return False
 
 
@@ -108,7 +108,7 @@ async def get_user_threads(
             return [thread.to_dict() for thread in user_threads]
                     
     except Exception as e:
-        logger.error(f"获取用户线程列表失败: {e}")
+        logger.error(f"获取用户线程列表失败: {e}", exc_info=True)
         return []
 
 
@@ -145,7 +145,7 @@ async def update_thread_title(
                 return success
                     
     except Exception as e:
-        logger.error(f"更新线程标题失败: {e}")
+        logger.error(f"更新线程标题失败: {e}", exc_info=True)
         return False
 
 
@@ -182,7 +182,7 @@ async def archive_thread(
                 return success
                     
     except Exception as e:
-        logger.error(f"归档线程失败: {e}")
+        logger.error(f"归档线程失败: {e}", exc_info=True)
         return False
 
 
@@ -209,7 +209,7 @@ async def delete_thread(user_name: str, thread_id: str) -> bool:
                 return success
                     
     except Exception as e:
-        logger.error(f"删除线程失败: {e}")
+        logger.error(f"删除线程失败: {e}", exc_info=True)
         return False
 
 
@@ -254,7 +254,7 @@ async def update_thread_message_count(
                 return True
                     
     except Exception as e:
-        logger.error(f"更新线程消息数量失败: {e}")
+        logger.error(f"更新线程消息数量失败: {e}", exc_info=True)
         return False
 
 
@@ -276,7 +276,7 @@ async def get_thread_by_id(user_name: str, thread_id: str) -> Optional[Dict[str,
                 return None
                     
     except Exception as e:
-        logger.error(f"获取线程详情失败: {e}")
+        logger.error(f"获取线程详情失败: {e}", exc_info=True)
         return None
 
 
@@ -319,10 +319,10 @@ async def create_or_get_user(user_name: str, display_name: Optional[str] = None)
                 user = result.scalar_one_or_none()
                 return user.to_dict() if user else None
         except Exception as e:
-            logger.error(f"获取用户失败: {e}")
+            logger.error(f"获取用户失败: {e}", exc_info=True)
             return None
     except Exception as e:
-        logger.error(f"创建或获取用户失败: {e}")
+        logger.error(f"创建或获取用户失败: {e}", exc_info=True)
         return None
 
 

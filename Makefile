@@ -54,7 +54,7 @@ dev-mcp:
 # Run all development servers concurrently
 dev:
 	@echo "🚀 Starting all development servers..."
-	@./scripts/manage_omind.sh start
+	@OMIND_DEV_MODE=true ./scripts/manage_omind.sh start
 	@echo "🖥️  Starting frontend development server..."
 	@cd frontend && npm run dev
 

@@ -390,11 +390,11 @@ class AIModelService:
                         return []
                     else:
                         error_text = await response.text()
-                        logger.error(f"Ollama发现失败 HTTP {response.status}: {error_text}")
+                        logger.error(f"Ollama发现失败 HTTP {response.status}: {error_text}", exc_info=True)
                         return []
                         
         except asyncio.TimeoutError:
-            logger.error(f"Ollama发现超时: {endpoint_url}")
+            logger.error(f"Ollama发现超时: {endpoint_url}", exc_info=True)
             return []
         except Exception as e:
             logger.error(f"Ollama发现错误: {str(e)}", exc_info=True)

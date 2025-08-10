@@ -26,6 +26,8 @@ export const componentRegistry = {
   
   'MCPManagement': lazy(() => import('../pages/mcp').then(m => ({ default: m.MCPManagement }))),
   
+  'APIKeyManagement': lazy(() => import('../pages/user').then(m => ({ default: m.APIKeyManagement }))),
+  
   // 待开发的页面
   'HomePage': lazy(() => Promise.resolve({ 
     default: () => React.createElement('div', { style: { padding: '20px', textAlign: 'center' } }, '首页 - 待开发')

@@ -183,6 +183,9 @@ class AuthApiKey(BaseModel):
     scopes = Column(Text, nullable=True, comment="权限范围（JSON数组）")
     allowed_ips = Column(Text, nullable=True, comment="允许的IP列表（JSON数组）")
     
+    # 审计字段
+    mark_comment = Column(String(64), nullable=False, default='', comment="工单号")
+    
     # 生命周期
     issued_at = Column(DateTime, default=now_shanghai, nullable=False, comment="签发时间")
     expires_at = Column(DateTime, nullable=True, comment="过期时间（null表示永不过期）")

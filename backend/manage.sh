@@ -81,12 +81,23 @@ start() {
     # 设置环境变量
     export PYTHONPATH="$SCRIPT_DIR:$PYTHONPATH"
     
-    # 启动服务
-    nohup python -m uvicorn src.main:app \
-        --host 0.0.0.0 \
-        --port $PORT \
-        --workers 1 \
-        > "$LOG_FILE" 2>&1 &
+    # 检查是否是开发模式（通过环境变量控制）
+    if [ "${DEV_MODE:-false}" = "true" ]; then
+        log_info "开发模式：启用热重载"
+        # 开发模式使用 --reload，不使用 nohup，直接输出到日志
+        python -m uvicorn src.main:app \
+            --host 0.0.0.0 \
+            --port $PORT \
+            --reload \
+            > "$LOG_FILE" 2>&1 &
+    else
+        # 生产模式使用 workers
+        nohup python -m uvicorn src.main:app \
+            --host 0.0.0.0 \
+            --port $PORT \
+            --workers 1 \
+            > "$LOG_FILE" 2>&1 &
+    fi
     
     local pid=$!
     echo $pid > "$PID_FILE"

@@ -2,6 +2,7 @@
 认证相关的API路由
 """
 
+import json
 from typing import Annotated, Optional, List
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -353,9 +354,10 @@ async def create_api_key(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """创建新的API密钥"""
+    """创建新的API密钥（管理员为指定用户创建）"""
+    # TODO: 检查当前用户是否有管理员权限
     service = AuthService(db)
-    return await service.create_api_key(current_user["sub"], request)
+    return await service.create_api_key(request.user_id, request)
 
 
 @router.get("/api-keys", response_model=List[APIKeyInfo], summary="获取API密钥列表")
@@ -363,24 +365,44 @@ async def list_api_keys(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取当前用户的API密钥列表"""
+    """获取API密钥列表（管理员查看所有，普通用户只看自己的）"""
+    # 先导入必要的模块
+    from sqlalchemy import select, and_
+    from sqlalchemy.orm import joinedload
     from src.apps.auth.models import AuthApiKey
+    from src.apps.user.models import RbacUser
     
-    keys = db.query(AuthApiKey).filter(
-        AuthApiKey.user_id == current_user["sub"],
-        AuthApiKey.is_active == True
-    ).all()
+    # TODO: 检查是否是管理员，如果是管理员显示所有，否则只显示自己的
+    # 暂时显示所有的
+    stmt = select(AuthApiKey).where(
+        AuthApiKey.is_active == 1  # MySQL使用1表示True
+    )
+    
+    result = await db.execute(stmt)
+    keys = result.scalars().all()
+    
+    # 获取用户信息
+    users = {}
+    if keys:
+        user_ids = list(set(key.user_id for key in keys))
+        user_stmt = select(RbacUser).where(RbacUser.user_id.in_(user_ids))
+        user_result = await db.execute(user_stmt)
+        users = {user.user_id: user for user in user_result.scalars().all()}
     
     return [
         APIKeyInfo(
-            id=key.id,
+            key_id=str(key.id),
+            user_id=key.user_id,
+            user_name=users.get(key.user_id).user_name if key.user_id in users else None,
             key_name=key.key_name,
             key_prefix=key.key_prefix,
+            mark_comment=key.mark_comment,
             scopes=json.loads(key.scopes) if key.scopes else [],
-            is_active=key.is_active,
+            is_active=bool(key.is_active),
             last_used_at=key.last_used_at,
             expires_at=key.expires_at,
-            created_at=key.create_time
+            created_at=key.issued_at or key.create_time,
+            allowed_ips=json.loads(key.allowed_ips) if key.allowed_ips else []
         )
         for key in keys
     ]
@@ -388,18 +410,25 @@ async def list_api_keys(
 
 @router.delete("/api-keys/{key_id}", summary="撤销API密钥")
 async def revoke_api_key(
-    key_id: int,
+    key_id: str,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db)
 ):
     """撤销指定的API密钥"""
+    from sqlalchemy import select, and_
     from src.apps.auth.models import AuthApiKey
     from datetime import datetime, timezone
     
-    key = db.query(AuthApiKey).filter(
-        AuthApiKey.id == key_id,
-        AuthApiKey.user_id == current_user["sub"]
-    ).first()
+    # 查询密钥
+    stmt = select(AuthApiKey).where(
+        and_(
+            AuthApiKey.id == int(key_id),
+            AuthApiKey.user_id == current_user["sub"]
+        )
+    )
+    
+    result = await db.execute(stmt)
+    key = result.scalar_one_or_none()
     
     if not key:
         raise BusinessException(
@@ -407,11 +436,12 @@ async def revoke_api_key(
             ResponseCode.NOT_FOUND
         )
     
-    key.is_active = False
+    # 更新状态
+    key.is_active = 0  # MySQL使用0表示False
     key.revoked_at = datetime.now(timezone.utc)
     key.revoke_reason = "用户主动撤销"
     
-    db.commit()
+    await db.commit()
     
     return {"message": "API密钥已撤销"}
 

@@ -134,6 +134,10 @@ class AppLogFormatter(logging.Formatter):
         ip = getattr(record, 'ip', LOCAL_IP)
         msg = record.getMessage()
         
+        # 添加异常堆栈信息
+        if record.exc_info:
+            msg += '\n' + self.formatException(record.exc_info)
+        
         return f"{log_time}|{log_level}|{thread_id}|{trace_id}|{idc}|{ip}|{msg}"
 
 
