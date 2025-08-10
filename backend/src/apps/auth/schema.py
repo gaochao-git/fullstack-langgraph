@@ -222,9 +222,13 @@ class APIKeyInfo(BaseModel):
     created_at: datetime
     expires_at: Optional[datetime] = None
     last_used_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    revoke_reason: Optional[str] = None
     is_active: bool
     scopes: Optional[List[int]] = []
     allowed_ips: Optional[List[str]] = []
+    create_by: Optional[str] = None
+    update_by: Optional[str] = None
 
 
 class CreateAPIKeyResponse(BaseModel):

@@ -530,7 +530,8 @@ class AuthService:
     async def create_api_key(
         self, 
         user_id: str, 
-        request: CreateAPIKeyRequest
+        request: CreateAPIKeyRequest,
+        creator: str = None
     ) -> CreateAPIKeyResponse:
         """创建API密钥"""
         try:
@@ -552,7 +553,7 @@ class AuthService:
                 scopes=json.dumps(request.scopes) if request.scopes else None,
                 allowed_ips=json.dumps(request.allowed_ips) if request.allowed_ips else None,
                 expires_at=expires_at,
-                create_by=user_id
+                create_by=creator or user_id  # 使用创建者或默认为用户自己
             )
             
             self.db.add(api_key_record)
@@ -570,7 +571,9 @@ class AuthService:
                 last_used_at=None,
                 is_active=True,
                 scopes=request.scopes or [],
-                allowed_ips=request.allowed_ips or []
+                allowed_ips=request.allowed_ips or [],
+                create_by=api_key_record.create_by,
+                update_by=api_key_record.update_by
             )
             
             return CreateAPIKeyResponse(

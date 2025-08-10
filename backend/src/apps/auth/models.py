@@ -199,6 +199,7 @@ class AuthApiKey(BaseModel):
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
     create_by = Column(String(50), nullable=False, comment="创建人")
+    update_by = Column(String(50), nullable=True, comment="更新人")
 
 
 class AuthSSOProvider(BaseModel):

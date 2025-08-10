@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Card, Table, Button, Form, Input, Modal,
-  Space, Alert, Tag, Tooltip,
+  Space, Alert, Tag, Tooltip, Switch, Radio,
   Select, Typography, Divider, Spin, App
 } from 'antd';
 import { 
@@ -40,6 +40,7 @@ export function APIKeyManagement() {
     email?: string;
   }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('active');
   const [form] = Form.useForm();
 
   // 加载API密钥列表
@@ -151,22 +152,49 @@ export function APIKeyManagement() {
     }
   };
 
+  // 切换激活状态
+  const handleToggleStatus = async (keyId: string, keyName: string, currentStatus: boolean) => {
+    try {
+      const result = await apiKeyService.toggleAPIKeyStatus(keyId);
+      message.success(result.message);
+      loadAPIKeys();
+    } catch (error: any) {
+      console.error('切换状态失败:', error);
+      const errorMsg = error?.message || error?.msg || '切换状态失败';
+      message.error(errorMsg);
+    }
+  };
+
   // 撤销API密钥
   const handleRevokeAPIKey = (keyId: string, keyName: string) => {
     modal.confirm({
-      title: '确认撤销',
+      title: '确认永久撤销',
       icon: <ExclamationCircleOutlined />,
-      content: `确定要撤销API密钥 "${keyName}" 吗？撤销后无法恢复。`,
-      okText: '确认撤销',
+      content: (
+        <div>
+          <p>确定要永久撤销API密钥 "{keyName}" 吗？</p>
+          <Alert
+            message="警告"
+            description="撤销是永久性操作，无法恢复。如果只是想临时禁用，请使用启用/禁用开关。"
+            type="warning"
+            showIcon
+            style={{ marginTop: 12 }}
+          />
+        </div>
+      ),
+      okText: '确认永久撤销',
       okType: 'danger',
       cancelText: '取消',
+      width: 500,
       onOk: async () => {
         try {
           await apiKeyService.revokeAPIKey(keyId);
-          message.success('API密钥已撤销');
+          message.success('API密钥已永久撤销');
           loadAPIKeys();
-        } catch {
-          message.error('撤销失败');
+        } catch (error: any) {
+          console.error('撤销API密钥失败:', error);
+          const errorMsg = error?.message || error?.msg || '撤销失败';
+          message.error(errorMsg);
         }
       }
     });
@@ -181,11 +209,24 @@ export function APIKeyManagement() {
     });
   };
 
+  // 过滤后的数据
+  const filteredApiKeys = useMemo(() => {
+    if (statusFilter === 'all') {
+      return apiKeys;
+    } else if (statusFilter === 'active') {
+      return apiKeys.filter(key => !key.revoked_at);
+    } else {
+      return apiKeys.filter(key => !!key.revoked_at);
+    }
+  }, [apiKeys, statusFilter]);
+
   const columns = [
     {
       title: '用户',
       dataIndex: 'user_name',
       key: 'user_name',
+      filters: Array.from(new Set(apiKeys.map(k => k.user_name || k.user_id))).map(name => ({ text: name, value: name })),
+      onFilter: (value: string, record: APIKeyInfo) => (record.user_name || record.user_id) === value,
       render: (text: string, record: APIKeyInfo) => (
         <Space>
           <UserOutlined />
@@ -197,11 +238,63 @@ export function APIKeyManagement() {
       title: '名称',
       dataIndex: 'key_name',
       key: 'key_name',
+      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
+        <div style={{ padding: 8 }}>
+          <Input
+            placeholder="搜索名称"
+            value={selectedKeys[0]}
+            onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+            onPressEnter={() => confirm()}
+            style={{ width: 188, marginBottom: 8, display: 'block' }}
+          />
+          <Space>
+            <Button
+              type="primary"
+              onClick={() => confirm()}
+              size="small"
+              style={{ width: 90 }}
+            >
+              搜索
+            </Button>
+            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
+              重置
+            </Button>
+          </Space>
+        </div>
+      ),
+      onFilter: (value: string, record: APIKeyInfo) => 
+        record.key_name.toLowerCase().includes(value.toLowerCase()),
     },
     {
       title: '工单号',
       dataIndex: 'mark_comment',
       key: 'mark_comment',
+      filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: any) => (
+        <div style={{ padding: 8 }}>
+          <Input
+            placeholder="搜索工单号"
+            value={selectedKeys[0]}
+            onChange={e => setSelectedKeys(e.target.value ? [e.target.value] : [])}
+            onPressEnter={() => confirm()}
+            style={{ width: 188, marginBottom: 8, display: 'block' }}
+          />
+          <Space>
+            <Button
+              type="primary"
+              onClick={() => confirm()}
+              size="small"
+              style={{ width: 90 }}
+            >
+              搜索
+            </Button>
+            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
+              重置
+            </Button>
+          </Space>
+        </div>
+      ),
+      onFilter: (value: string, record: APIKeyInfo) => 
+        record.mark_comment?.toLowerCase().includes(value.toLowerCase()) || false,
       render: (text: string) => text || <Text type="secondary">-</Text>
     },
     {
@@ -275,6 +368,8 @@ export function APIKeyManagement() {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      sorter: (a: APIKeyInfo, b: APIKeyInfo) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       render: (text: string) => dayjs(text).format('YYYY-MM-DD HH:mm')
     },
     {
@@ -292,34 +387,87 @@ export function APIKeyManagement() {
         text ? dayjs(text).format('YYYY-MM-DD HH:mm') : <Text type="secondary">从未使用</Text>
     },
     {
+      title: '创建人',
+      dataIndex: 'create_by',
+      key: 'create_by',
+      render: (text: string) => text || <Text type="secondary">-</Text>
+    },
+    {
+      title: '更新人',
+      dataIndex: 'update_by',
+      key: 'update_by',
+      render: (text: string) => text || <Text type="secondary">-</Text>
+    },
+    {
       title: '状态',
       dataIndex: 'is_active',
       key: 'is_active',
-      render: (active: boolean) => (
-        <Tag color={active ? 'success' : 'default'}>
-          {active ? '激活' : '已撤销'}
-        </Tag>
-      )
+      filters: [
+        { text: '启用', value: true },
+        { text: '禁用', value: false },
+      ],
+      onFilter: (value: boolean, record: APIKeyInfo) => record.is_active === value,
+      render: (active: boolean, record: APIKeyInfo) => {
+        // 如果已经被撤销
+        if (record.revoked_at) {
+          return (
+            <Tooltip title={`撤销时间: ${dayjs(record.revoked_at).format('YYYY-MM-DD HH:mm:ss')}${record.revoke_reason ? `\n原因: ${record.revoke_reason}` : ''}`}>
+              <Tag color="error">已撤销</Tag>
+            </Tooltip>
+          );
+        }
+        // 如果已过期
+        if (record.expires_at && new Date(record.expires_at) < new Date()) {
+          return <Tag color="warning">已过期</Tag>;
+        }
+        // 正常的激活/禁用状态
+        return (
+          <Tag color={active ? 'success' : 'default'}>
+            {active ? '启用' : '禁用'}
+          </Tag>
+        );
+      }
     },
     {
       title: '操作',
       key: 'action',
       fixed: 'right',
-      render: (_: unknown, record: APIKeyInfo) => (
-        <Space size="small">
-          {record.is_active && (
-            <Button
-              type="link"
-              danger
-              size="small"
-              icon={<DeleteOutlined />}
-              onClick={() => handleRevokeAPIKey(record.key_id, record.key_name)}
-            >
-              撤销
-            </Button>
-          )}
-        </Space>
-      ),
+      render: (_: unknown, record: APIKeyInfo) => {
+        // 检查是否已过期
+        const isExpired = record.expires_at && new Date(record.expires_at) < new Date();
+        // 检查是否已撤销
+        const isRevoked = !!record.revoked_at;
+        
+        return (
+          <Space size="small">
+            {!isRevoked && !isExpired && (
+              <>
+                <Switch
+                  size="small"
+                  checked={record.is_active}
+                  onChange={() => handleToggleStatus(record.key_id, record.key_name, record.is_active)}
+                  checkedChildren="启用"
+                  unCheckedChildren="禁用"
+                />
+                <Button
+                  type="link"
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleRevokeAPIKey(record.key_id, record.key_name)}
+                >
+                  撤销
+                </Button>
+              </>
+            )}
+            {(isRevoked || isExpired) && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {isRevoked ? '已撤销' : '已过期'}
+              </Text>
+            )}
+          </Space>
+        );
+      },
     },
   ];
 
@@ -330,37 +478,45 @@ export function APIKeyManagement() {
           <Space>
             <KeyOutlined />
             <span>API密钥管理</span>
+            <Tooltip 
+              title={
+                <div>
+                  <div>• API密钥创建后只显示一次，请立即复制保存</div>
+                  <div>• 使用Bearer Token认证方式：Authorization: Bearer &lt;token&gt;</div>
+                  <div>• 建议为不同用途创建不同的密钥，便于管理和撤销</div>
+                  <div>• 定期轮换密钥以保证安全</div>
+                </div>
+              }
+              placement="bottomLeft"
+            >
+              <InfoCircleOutlined style={{ fontSize: 14, color: '#1890ff', marginLeft: 8 }} />
+            </Tooltip>
           </Space>
         }
         extra={
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />}
-            onClick={() => setShowCreateModal(true)}
-          >
-            创建密钥
-          </Button>
+          <Space>
+            <Radio.Group 
+              value={statusFilter} 
+              onChange={(e) => setStatusFilter(e.target.value)}
+              buttonStyle="solid"
+            >
+              <Radio.Button value="all">全部</Radio.Button>
+              <Radio.Button value="active">未撤销</Radio.Button>
+              <Radio.Button value="revoked">已撤销</Radio.Button>
+            </Radio.Group>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />}
+              onClick={() => setShowCreateModal(true)}
+            >
+              创建密钥
+            </Button>
+          </Space>
         }
       >
-        <Alert
-          message="API密钥用于程序化访问系统"
-          description={
-            <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
-              <li>API密钥创建后只显示一次，请立即复制保存</li>
-              <li>使用Bearer Token认证方式：Authorization: Bearer &lt;token&gt;</li>
-              <li>建议为不同用途创建不同的密钥，便于管理和撤销</li>
-              <li>定期轮换密钥以保证安全</li>
-            </ul>
-          }
-          type="info"
-          showIcon
-          icon={<InfoCircleOutlined />}
-          style={{ marginBottom: 16 }}
-        />
-
         <Table
           loading={loading}
-          dataSource={apiKeys}
+          dataSource={filteredApiKeys}
           columns={columns}
           rowKey="key_id"
           scroll={{ x: 'max-content' }}

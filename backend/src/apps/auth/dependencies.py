@@ -46,7 +46,8 @@ async def get_current_user_optional(
                 # 查询API Key记录
                 stmt = select(AuthApiKey).where(
                     AuthApiKey.key_hash == key_hash,
-                    AuthApiKey.is_active == True
+                    AuthApiKey.is_active == 1,  # MySQL使用1表示True
+                    AuthApiKey.revoked_at.is_(None)  # 未被撤销
                 )
                 result = await db.execute(stmt)
                 api_key_record = result.scalar_one_or_none()

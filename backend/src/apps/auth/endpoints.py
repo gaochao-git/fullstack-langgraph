@@ -357,7 +357,7 @@ async def create_api_key(
     """创建新的API密钥（管理员为指定用户创建）"""
     # TODO: 检查当前用户是否有管理员权限
     service = AuthService(db)
-    return await service.create_api_key(request.user_id, request)
+    return await service.create_api_key(request.user_id, request, current_user["username"])
 
 
 @router.get("/api-keys", response_model=List[APIKeyInfo], summary="获取API密钥列表")
@@ -373,9 +373,9 @@ async def list_api_keys(
     from src.apps.user.models import RbacUser
     
     # TODO: 检查是否是管理员，如果是管理员显示所有，否则只显示自己的
-    # 暂时显示所有的
-    stmt = select(AuthApiKey).where(
-        AuthApiKey.is_active == 1  # MySQL使用1表示True
+    # 暂时显示所有的（包括已禁用和已撤销的）
+    stmt = select(AuthApiKey).order_by(
+        AuthApiKey.create_time.desc()  # 按创建时间倒序
     )
     
     result = await db.execute(stmt)
@@ -401,8 +401,12 @@ async def list_api_keys(
             is_active=bool(key.is_active),
             last_used_at=key.last_used_at,
             expires_at=key.expires_at,
+            revoked_at=key.revoked_at,
+            revoke_reason=key.revoke_reason,
             created_at=key.issued_at or key.create_time,
-            allowed_ips=json.loads(key.allowed_ips) if key.allowed_ips else []
+            allowed_ips=json.loads(key.allowed_ips) if key.allowed_ips else [],
+            create_by=key.create_by,
+            update_by=key.update_by
         )
         for key in keys
     ]
@@ -411,20 +415,22 @@ async def list_api_keys(
 @router.delete("/api-keys/{key_id}", summary="撤销API密钥")
 async def revoke_api_key(
     key_id: str,
+    reason: str = "用户主动撤销",
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """撤销指定的API密钥"""
+    """永久撤销指定的API密钥
+    
+    撤销后的密钥将无法再次启用，这是一个永久性操作。
+    如果只是想临时禁用，请使用禁用/启用功能。
+    """
     from sqlalchemy import select, and_
     from src.apps.auth.models import AuthApiKey
     from datetime import datetime, timezone
     
     # 查询密钥
     stmt = select(AuthApiKey).where(
-        and_(
-            AuthApiKey.id == int(key_id),
-            AuthApiKey.user_id == current_user["sub"]
-        )
+        AuthApiKey.id == int(key_id)
     )
     
     result = await db.execute(stmt)
@@ -436,14 +442,66 @@ async def revoke_api_key(
             ResponseCode.NOT_FOUND
         )
     
-    # 更新状态
-    key.is_active = 0  # MySQL使用0表示False
+    # 检查是否已经撤销
+    if key.revoked_at is not None:
+        raise BusinessException(
+            "API密钥已经被撤销",
+            ResponseCode.BAD_REQUEST
+        )
+    
+    # 永久撤销密钥
     key.revoked_at = datetime.now(timezone.utc)
-    key.revoke_reason = "用户主动撤销"
+    key.revoke_reason = reason
+    key.is_active = 0  # 同时设置为非激活状态
+    key.update_by = current_user["username"]  # 记录更新人
     
     await db.commit()
     
-    return {"message": "API密钥已撤销"}
+    return {"message": "API密钥已永久撤销"}
+
+
+@router.put("/api-keys/{key_id}/toggle", summary="切换API密钥激活状态")
+async def toggle_api_key_status(
+    key_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """切换API密钥的激活状态（启用/禁用）
+    
+    这是一个临时性操作，可以随时切换。
+    已撤销的密钥无法再次启用。
+    """
+    from sqlalchemy import select
+    from src.apps.auth.models import AuthApiKey
+    
+    stmt = select(AuthApiKey).where(
+        AuthApiKey.id == int(key_id)
+    )
+    
+    result = await db.execute(stmt)
+    key = result.scalar_one_or_none()
+    
+    if not key:
+        raise BusinessException(
+            "API密钥不存在",
+            ResponseCode.NOT_FOUND
+        )
+    
+    # 检查是否已经撤销
+    if key.revoked_at is not None:
+        raise BusinessException(
+            "已撤销的API密钥无法重新启用",
+            ResponseCode.BAD_REQUEST
+        )
+    
+    # 切换激活状态
+    key.is_active = 0 if key.is_active == 1 else 1
+    key.update_by = current_user["username"]  # 记录更新人
+    
+    await db.commit()
+    
+    status = "启用" if key.is_active == 1 else "禁用"
+    return {"message": f"API密钥已{status}", "is_active": bool(key.is_active)}
 
 
 # ============= 会话管理 =============
