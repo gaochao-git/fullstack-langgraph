@@ -1,15 +1,15 @@
 """
 User统一服务层
-同时支持静态方法（兼容现有API）和实例方法（新架构）
+直接使用 SQLAlchemy，不依赖 DAO 层
 """
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_, and_, update, delete
 
-from src.shared.db.dao import UserDAO, UserThreadDAO
 from src.apps.user.models import User, UserThread
+from src.shared.db.models import now_shanghai
 from src.shared.db.transaction import transactional, sync_transactional
 from src.shared.core.logging import get_logger
 
@@ -20,11 +20,6 @@ class UserService:
     """用户服务 - 支持新旧两种调用方式"""
     
     _instance = None
-    _dao = None
-    
-    def __init__(self):
-        if not self._dao:
-            self._dao = UserDAO()
     
     @classmethod
     def get_instance(cls):
@@ -38,14 +33,18 @@ class UserService:
     @staticmethod
     async def get_user_by_name(session: AsyncSession, username: str) -> Optional[User]:
         """根据用户名获取用户（静态方法）"""
-        service = UserService.get_instance()
-        return await service._dao.get_by_username(session, username)
+        result = await session.execute(
+            select(User).where(User.user_name == username)
+        )
+        return result.scalar_one_or_none()
     
     @staticmethod
     async def get_active_users(session: AsyncSession) -> List[User]:
         """获取活跃用户（静态方法）"""
-        service = UserService.get_instance()
-        return await service._dao.get_active_users(session)
+        result = await session.execute(
+            select(User).where(User.is_active == True)
+        )
+        return list(result.scalars().all())
     
     @staticmethod
     async def create_user(session: AsyncSession, user_data: Dict[str, Any]) -> User:
@@ -56,8 +55,18 @@ class UserService:
     @staticmethod
     async def update_last_login(session: AsyncSession, username: str) -> Optional[User]:
         """更新最后登录时间（静态方法）"""
-        service = UserService.get_instance()
-        return await service._dao.update_last_login(session, username)
+        async with session.begin():
+            result = await session.execute(
+                update(User)
+                .where(User.user_name == username)
+                .values(last_login=now_shanghai())
+            )
+            if result.rowcount > 0:
+                result = await session.execute(
+                    select(User).where(User.user_name == username)
+                )
+                return result.scalar_one_or_none()
+        return None
     
     # ==================== 实例方法（新架构） ====================
     
@@ -73,22 +82,33 @@ class UserService:
             raise ValueError("Username is required")
         
         # 检查用户名是否已存在
-        existing = await self._dao.get_by_username(session, user_data['user_name'])
-        if existing:
+        result = await session.execute(
+            select(User).where(User.user_name == user_data['user_name'])
+        )
+        if result.scalar_one_or_none():
             raise ValueError(f"User with name {user_data['user_name']} already exists")
         
         # 检查邮箱是否已存在
         if user_data.get('email'):
-            existing_email = await self._dao.get_by_email(session, user_data['email'])
-            if existing_email:
+            result = await session.execute(
+                select(User).where(User.email == user_data['email'])
+            )
+            if result.scalar_one_or_none():
                 raise ValueError(f"User with email {user_data['email']} already exists")
         
         # 设置默认值
         user_data.setdefault('user_type', 'regular')
         user_data.setdefault('is_active', True)
+        user_data.setdefault('create_time', now_shanghai())
+        user_data.setdefault('update_time', now_shanghai())
         
+        # 创建用户
         logger.info(f"Creating user: {user_data['user_name']}")
-        return await self._dao.create(session, user_data)
+        user = User(**user_data)
+        session.add(user)
+        await session.flush()
+        await session.refresh(user)
+        return user
     
     async def get_user_by_id(
         self, 
@@ -96,7 +116,10 @@ class UserService:
         user_id: int
     ) -> Optional[User]:
         """根据ID获取用户（实例方法）"""
-        return await self._dao.get_by_id(session, user_id)
+        result = await session.execute(
+            select(User).where(User.id == user_id)
+        )
+        return result.scalar_one_or_none()
     
     async def get_user_list(
         self, 
@@ -109,23 +132,29 @@ class UserService:
         """获取用户列表（实例方法）"""
         offset = (page - 1) * size
         
-        # 构建过滤条件
-        filters = {}
+        # 构建查询
+        query = select(User)
+        conditions = []
+        
         if active_only:
-            filters['is_active'] = True
+            conditions.append(User.is_active == True)
         if user_type:
-            filters['user_type'] = user_type
+            conditions.append(User.user_type == user_type)
         
-        # 获取数据和总数
-        users = await self._dao.get_list(
-            session, 
-            filters=filters if filters else None,
-            limit=size, 
-            offset=offset,
-            order_by='create_time'
-        )
+        if conditions:
+            query = query.where(and_(*conditions))
         
-        total = await self._dao.count(session, filters=filters if filters else None)
+        # 获取数据
+        query = query.order_by(User.create_time.desc()).offset(offset).limit(size)
+        result = await session.execute(query)
+        users = list(result.scalars().all())
+        
+        # 获取总数
+        count_query = select(func.count(User.id))
+        if conditions:
+            count_query = count_query.where(and_(*conditions))
+        count_result = await session.execute(count_query)
+        total = count_result.scalar()
         
         return {
             'items': [user.to_dict() for user in users],
@@ -146,17 +175,33 @@ class UserService:
         """搜索用户（实例方法）"""
         offset = (page - 1) * size
         
-        users = await self._dao.search_by_name(
-            session, 
-            keyword,
-            active_only=active_only,
-            limit=size, 
-            offset=offset
+        # 构建查询
+        query = select(User).where(
+            or_(
+                User.user_name.contains(keyword),
+                User.display_name.contains(keyword)
+            )
         )
         
-        # 获取搜索结果总数（简化实现）
-        all_results = await self._dao.search_by_name(session, keyword, active_only=active_only)
-        total = len(all_results)
+        if active_only:
+            query = query.where(User.is_active == True)
+        
+        # 获取数据
+        query = query.order_by(User.create_time.desc()).offset(offset).limit(size)
+        result = await session.execute(query)
+        users = list(result.scalars().all())
+        
+        # 获取总数
+        count_query = select(func.count(User.id)).where(
+            or_(
+                User.user_name.contains(keyword),
+                User.display_name.contains(keyword)
+            )
+        )
+        if active_only:
+            count_query = count_query.where(User.is_active == True)
+        count_result = await session.execute(count_query)
+        total = count_result.scalar()
         
         return {
             'items': [user.to_dict() for user in users],
@@ -176,16 +221,30 @@ class UserService:
     ) -> Optional[User]:
         """更新用户信息（实例方法）"""
         # 检查是否存在
-        existing = await self._dao.get_by_username(session, username)
-        if not existing:
+        result = await session.execute(
+            select(User).where(User.user_name == username)
+        )
+        if not result.scalar_one_or_none():
             raise ValueError(f"User with name {username} not found")
         
         # 移除不可更新的字段
         update_data.pop('user_name', None)
         update_data.pop('create_time', None)
+        update_data['update_time'] = now_shanghai()
         
+        # 更新
         logger.info(f"Updating user: {username}")
-        return await self._dao.update_by_field(session, 'user_name', username, update_data)
+        await session.execute(
+            update(User)
+            .where(User.user_name == username)
+            .values(**update_data)
+        )
+        
+        # 返回更新后的用户
+        result = await session.execute(
+            select(User).where(User.user_name == username)
+        )
+        return result.scalar_one_or_none()
     
     @transactional()
     async def deactivate_user(
@@ -195,17 +254,34 @@ class UserService:
     ) -> Optional[User]:
         """停用用户（实例方法）"""
         logger.info(f"Deactivating user: {username}")
-        return await self._dao.deactivate_user(session, username)
+        return await self.update_user(session, username, {'is_active': False})
     
     async def get_user_statistics(
         self, 
         session: AsyncSession
     ) -> Dict[str, Any]:
         """获取用户统计信息（实例方法）"""
-        total_users = await self._dao.count(session)
-        active_users = await self._dao.count_active_users(session)
-        regular_users = await self._dao.count_by_user_type(session, 'regular')
-        admin_users = await self._dao.count_by_user_type(session, 'admin')
+        # 总用户数
+        total_result = await session.execute(select(func.count(User.id)))
+        total_users = total_result.scalar()
+        
+        # 活跃用户数
+        active_result = await session.execute(
+            select(func.count(User.id)).where(User.is_active == True)
+        )
+        active_users = active_result.scalar()
+        
+        # 普通用户数
+        regular_result = await session.execute(
+            select(func.count(User.id)).where(User.user_type == 'regular')
+        )
+        regular_users = regular_result.scalar()
+        
+        # 管理员用户数
+        admin_result = await session.execute(
+            select(func.count(User.id)).where(User.user_type == 'admin')
+        )
+        admin_users = admin_result.scalar()
         
         return {
             'total': total_users,
@@ -219,18 +295,13 @@ class UserService:
     
     async def get_by_username(self, session: AsyncSession, username: str) -> Optional[User]:
         """根据用户名获取用户（向后兼容）"""
-        return await self._dao.get_by_username(session, username)
+        return await self.get_user_by_name(session, username)
 
 
 class UserThreadService:
     """用户会话服务 - 支持新旧两种调用方式"""
     
     _instance = None
-    _dao = None
-    
-    def __init__(self):
-        if not self._dao:
-            self._dao = UserThreadDAO()
     
     @classmethod
     def get_instance(cls):
@@ -248,8 +319,13 @@ class UserThreadService:
         include_archived: bool = False
     ) -> List[UserThread]:
         """获取用户会话（静态方法）"""
-        service = UserThreadService.get_instance()
-        return await service._dao.get_user_threads(session, username, include_archived)
+        query = select(UserThread).where(UserThread.user_name == username)
+        if not include_archived:
+            query = query.where(UserThread.is_archived == False)
+        query = query.order_by(UserThread.update_at.desc())
+        
+        result = await session.execute(query)
+        return list(result.scalars().all())
     
     @staticmethod
     async def create_thread(session: AsyncSession, thread_data: Dict[str, Any]) -> UserThread:
@@ -265,8 +341,48 @@ class UserThreadService:
         count: int
     ) -> Optional[UserThread]:
         """更新会话消息数量（静态方法）"""
-        service = UserThreadService.get_instance()
-        return await service._dao.update_message_count(session, username, thread_id, count)
+        async with session.begin():
+            # 先获取当前记录
+            result = await session.execute(
+                select(UserThread).where(
+                    and_(
+                        UserThread.user_name == username,
+                        UserThread.thread_id == thread_id
+                    )
+                )
+            )
+            thread = result.scalar_one_or_none()
+            
+            if thread:
+                # 更新消息数量
+                new_count = max(0, (thread.message_count or 0) + count)
+                await session.execute(
+                    update(UserThread)
+                    .where(
+                        and_(
+                            UserThread.user_name == username,
+                            UserThread.thread_id == thread_id
+                        )
+                    )
+                    .values(
+                        message_count=new_count,
+                        last_message_time=now_shanghai(),
+                        update_at=now_shanghai()
+                    )
+                )
+                
+                # 返回更新后的记录
+                result = await session.execute(
+                    select(UserThread).where(
+                        and_(
+                            UserThread.user_name == username,
+                            UserThread.thread_id == thread_id
+                        )
+                    )
+                )
+                return result.scalar_one_or_none()
+        
+        return None
     
     # ==================== 实例方法（新架构） ====================
     
@@ -284,18 +400,30 @@ class UserThreadService:
             raise ValueError("Thread ID is required")
         
         # 检查是否已存在
-        existing = await self._dao.get_by_user_and_thread(
-            session, thread_data['user_name'], thread_data['thread_id']
+        result = await session.execute(
+            select(UserThread).where(
+                and_(
+                    UserThread.user_name == thread_data['user_name'],
+                    UserThread.thread_id == thread_data['thread_id']
+                )
+            )
         )
-        if existing:
+        if result.scalar_one_or_none():
             raise ValueError(f"Thread {thread_data['thread_id']} already exists for user {thread_data['user_name']}")
         
         # 设置默认值
         thread_data.setdefault('is_archived', False)
         thread_data.setdefault('message_count', 0)
+        thread_data.setdefault('create_at', now_shanghai())
+        thread_data.setdefault('update_at', now_shanghai())
         
+        # 创建线程
         logger.info(f"Creating thread {thread_data['thread_id']} for user {thread_data['user_name']}")
-        return await self._dao.create(session, thread_data)
+        thread = UserThread(**thread_data)
+        session.add(thread)
+        await session.flush()
+        await session.refresh(thread)
+        return thread
     
     async def get_user_thread_list(
         self, 
@@ -309,23 +437,29 @@ class UserThreadService:
         """获取用户会话列表（实例方法）"""
         offset = (page - 1) * size
         
-        # 构建过滤条件
-        filters = {'user_name': username}
+        # 构建查询
+        query = select(UserThread).where(UserThread.user_name == username)
+        conditions = []
+        
         if not include_archived:
-            filters['is_archived'] = False
+            conditions.append(UserThread.is_archived == False)
         if agent_id:
-            filters['agent_id'] = agent_id
+            conditions.append(UserThread.agent_id == agent_id)
         
-        # 获取数据和总数
-        threads = await self._dao.get_list(
-            session, 
-            filters=filters,
-            limit=size, 
-            offset=offset,
-            order_by='update_at'
-        )
+        if conditions:
+            query = query.where(and_(*conditions))
         
-        total = await self._dao.count(session, filters=filters)
+        # 获取数据
+        query = query.order_by(UserThread.update_at.desc()).offset(offset).limit(size)
+        result = await session.execute(query)
+        threads = list(result.scalars().all())
+        
+        # 获取总数
+        count_query = select(func.count(UserThread.id)).where(UserThread.user_name == username)
+        if conditions:
+            count_query = count_query.where(and_(*conditions))
+        count_result = await session.execute(count_query)
+        total = count_result.scalar()
         
         return {
             'items': [thread.to_dict() for thread in threads],
@@ -344,7 +478,35 @@ class UserThreadService:
     ) -> Optional[UserThread]:
         """归档用户会话（实例方法）"""
         logger.info(f"Archiving thread {thread_id} for user {username}")
-        return await self._dao.archive_thread(session, username, thread_id)
+        
+        # 更新归档状态
+        result = await session.execute(
+            update(UserThread)
+            .where(
+                and_(
+                    UserThread.user_name == username,
+                    UserThread.thread_id == thread_id
+                )
+            )
+            .values(
+                is_archived=True,
+                update_at=now_shanghai()
+            )
+        )
+        
+        if result.rowcount > 0:
+            # 返回更新后的记录
+            result = await session.execute(
+                select(UserThread).where(
+                    and_(
+                        UserThread.user_name == username,
+                        UserThread.thread_id == thread_id
+                    )
+                )
+            )
+            return result.scalar_one_or_none()
+        
+        return None
     
     async def get_thread_statistics(
         self, 
@@ -354,8 +516,18 @@ class UserThreadService:
         """获取会话统计信息（实例方法）"""
         if username:
             # 单个用户的统计
-            total_threads = await self._dao.count_user_threads(session, username, include_archived=True)
-            active_threads = await self._dao.count_user_threads(session, username, include_archived=False)
+            total_query = select(func.count(UserThread.id)).where(UserThread.user_name == username)
+            total_result = await session.execute(total_query)
+            total_threads = total_result.scalar()
+            
+            active_query = select(func.count(UserThread.id)).where(
+                and_(
+                    UserThread.user_name == username,
+                    UserThread.is_archived == False
+                )
+            )
+            active_result = await session.execute(active_query)
+            active_threads = active_result.scalar()
             
             return {
                 'user': username,
@@ -365,8 +537,13 @@ class UserThreadService:
             }
         else:
             # 全局统计
-            total_threads = await self._dao.count(session)
-            archived_threads = await self._dao.count(session, filters={'is_archived': True})
+            total_result = await session.execute(select(func.count(UserThread.id)))
+            total_threads = total_result.scalar()
+            
+            archived_result = await session.execute(
+                select(func.count(UserThread.id)).where(UserThread.is_archived == True)
+            )
+            archived_threads = archived_result.scalar()
             
             return {
                 'total': total_threads,
