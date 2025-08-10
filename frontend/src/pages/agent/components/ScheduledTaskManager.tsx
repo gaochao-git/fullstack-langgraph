@@ -53,14 +53,14 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     
     setLoading(true);
     try {
-      console.log('正在获取智能体定时任务:', agentId);
+      // 正在获取智能体定时任务: agentId
       // 获取所有任务，然后在前端过滤
       const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      console.log('获取到的任务数据:', data);
+      // 获取到的任务数据
       
       const allTasks = data?.data?.items || [];
       
@@ -73,15 +73,15 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           }
           return false;
         } catch (error) {
-          console.error('解析任务配置失败:', error);
+          // 解析任务配置失败
           return false;
         }
       });
       
-      console.log('过滤后的任务列表:', filteredTasks);
+      // 过滤后的任务列表
       setTasks(filteredTasks);
     } catch (error) {
-      console.error('获取智能体定时任务失败:', error);
+      // 获取智能体定时任务失败
       message.error('获取定时任务列表失败');
       setTasks([]);
     } finally {
@@ -134,7 +134,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       createForm.resetFields();
       await fetchTasks();
     } catch (error) {
-      console.error('创建任务失败:', error);
+      // 创建任务失败
       message.error('创建任务失败');
     }
   };
@@ -150,7 +150,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         extraConfig = JSON.parse(task.task_extra_config);
       }
     } catch (error) {
-      console.error('解析任务配置失败:', error);
+      // 解析任务配置失败
     }
     
     // 设置智能体任务表单初始值
@@ -218,7 +218,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       editForm.resetFields();
       await fetchTasks();
     } catch (error) {
-      console.error('更新任务失败:', error);
+      // 更新任务失败
       message.error('更新任务失败');
     }
   };
@@ -238,7 +238,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       message.success(`任务已${task.task_enabled ? '暂停' : '启动'}`);
       await fetchTasks();
     } catch (error) {
-      console.error('切换任务状态失败:', error);
+      // 切换任务状态失败
       message.error('操作失败');
     }
   };
@@ -255,7 +255,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       setSelectedTaskMessages(Array.isArray(data) ? data : []);
       setMessageModalVisible(true);
     } catch (error) {
-      console.error('获取任务执行记录失败:', error);
+      // 获取任务执行记录失败
       message.error('获取执行记录失败');
       setSelectedTaskMessages([]);
     } finally {
@@ -283,7 +283,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           message.success('删除任务成功');
           await fetchTasks();
         } catch (error) {
-          console.error('删除任务失败:', error);
+          // 删除任务失败
           message.error('删除任务失败');
         }
       },
@@ -337,7 +337,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
             url = config.agent_url || '-';
           }
         } catch (error) {
-          console.error('解析任务配置失败:', error);
+          // 解析任务配置失败
         }
         
         return (

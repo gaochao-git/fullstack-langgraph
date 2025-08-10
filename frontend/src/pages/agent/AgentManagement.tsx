@@ -147,11 +147,11 @@ const AgentManagement: React.FC = () => {
         const activeModels = data.data.items.filter((model: any) => model.status === 'active');
         setAvailableModels(activeModels);
       } else {
-        console.warn('加载可用模型响应格式异常:', data);
+        // 加载可用模型响应格式异常
         setAvailableModels([]);
       }
     } catch (error) {
-      console.error('加载可用模型失败:', error);
+      // 加载可用模型失败，使用默认模型
       // 如果加载失败，使用默认模型
       setAvailableModels([]);
     }
@@ -171,10 +171,10 @@ const AgentManagement: React.FC = () => {
       // 处理成功响应
       const data = response.data || response;
       const agentsData = data.items || data;
-      console.log('Agents data loaded:', agentsData);
+      // 智能体数据加载成功
       setAgents(Array.isArray(agentsData) ? agentsData.map(transformAgentToLocal) : []);
     } catch (error) {
-      console.error('加载智能体数据失败:', error);
+      // 加载智能体数据失败
       message.error('加载智能体数据失败');
     }
   };
@@ -185,23 +185,23 @@ const AgentManagement: React.FC = () => {
       // 加载MCP服务器
       try {
         const response = await agentApi.getMCPServers();
-        console.log('MCP servers response:', response);
+        // MCP服务器响应
         
         // 处理统一响应格式
         if (response.status === 'ok' && response.data && response.data.items) {
           const mcpServersData = response.data.items;
-          console.log('MCP servers data:', mcpServersData);
+          // MCP服务器数据
           setMcpServers(mcpServersData.map(transformMCPServerToLocal));
         } else if (response.status === 'error') {
-          console.error('加载MCP服务器失败:', response.msg);
+          // 加载MCP服务器失败
           message.error(response.msg || '加载MCP服务器失败');
           setMcpServers([]);
         } else {
-          console.warn('MCP服务器响应格式异常:', response);
+          // MCP服务器响应格式异常
           setMcpServers([]);
         }
       } catch (error) {
-        console.error('加载MCP服务器数据失败:', error);
+        // 加载MCP服务器数据失败
         setMcpServers([]);
       }
       
@@ -209,7 +209,7 @@ const AgentManagement: React.FC = () => {
       await loadAvailableModels();
       
     } catch (error) {
-      console.error('加载辅助数据失败:', error);
+      // 加载辅助数据失败
     }
   };
 
@@ -263,7 +263,7 @@ const AgentManagement: React.FC = () => {
       
       message.success('智能体状态已更新');
     } catch (error) {
-      console.error('切换智能体状态失败:', error);
+      // 切换智能体状态失败
       message.error('切换智能体状态失败，请重试');
     }
   };
@@ -370,7 +370,7 @@ const AgentManagement: React.FC = () => {
 
       setAgentEditModal(false);
     } catch (error) {
-      console.error('保存智能体失败:', error);
+      // 保存智能体失败
       message.error('保存智能体失败，请重试');
     } finally {
       setFormSubmitting(false);
@@ -461,7 +461,7 @@ const AgentManagement: React.FC = () => {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log('删除按钮被点击:', agent.id);
+                        // 删除智能体: agent.id
                         handleDeleteAgent(agent);
                       }}
                     >

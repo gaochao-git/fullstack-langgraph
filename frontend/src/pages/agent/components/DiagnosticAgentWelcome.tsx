@@ -209,12 +209,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
   const formatDiagnosisQuestion = (fault: Fault): string => {
     // 验证四要素是否完整
     if (!fault.time || !fault.ip || !fault.description || !fault.sopId) {
-      console.error('故障四要素不完整:', { 
-        time: fault.time, 
-        ip: fault.ip, 
-        description: fault.description, 
-        sopId: fault.sopId 
-      });
+      // 故障四要素不完整
       return `故障信息不完整，无法进行诊断排查。`;
     }
     
@@ -224,8 +219,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
   // 计算统计数据
   const stats = useMemo(() => {
     // 临时调试：打印当前mockFaults的实际内容
-    console.log('当前mockFaults数据:', mockFaults);
-    console.log('mockFaults长度:', mockFaults.length);
+    // 当前mockFaults数据
     
     const activeFaults = mockFaults.filter(f => f.status === "active").length;
     const analyzingFaults = mockFaults.filter(f => f.status === "analyzing").length;
@@ -246,7 +240,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
       p3: p3Faults
     };
     
-    console.log('统计结果:', result);
+    // 统计结果
     return result;
   }, []);
 
@@ -800,7 +794,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('点击开始排查按钮', fault.id, fault.title);
+                                // 点击开始排查按钮
                                 
                                 if (!hasFourElements) {
                                   alert('故障信息不完整，无法进行诊断排查。请确保包含：故障时间、故障IP、故障现象、SOP编号。');
@@ -809,10 +803,10 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
                                 
                                 if (onStartDiagnosis) {
                                   const question = formatDiagnosisQuestion(fault);
-                                  console.log('调用onStartDiagnosis:', question);
+                                  // 调用onStartDiagnosis
                                   onStartDiagnosis(question);
                                 } else {
-                                  console.log('onStartDiagnosis未定义，使用回退逻辑');
+                                  // onStartDiagnosis未定义，使用回退逻辑
                                   const scenario = DIAGNOSIS_SCENARIOS[fault.id as keyof typeof DIAGNOSIS_SCENARIOS];
                                   if (scenario) {
                                     const faultWithDescription = {
@@ -912,7 +906,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                console.log('点击开始排查按钮', fault.id, fault.title);
+                                // 点击开始排查按钮
                                 
                                 if (!hasFourElements) {
                                   alert('故障信息不完整，无法进行诊断排查。请确保包含：故障时间、故障IP、故障现象、SOP编号。');
@@ -921,10 +915,10 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
                                 
                                 if (onStartDiagnosis) {
                                   const question = formatDiagnosisQuestion(fault);
-                                  console.log('调用onStartDiagnosis:', question);
+                                  // 调用onStartDiagnosis
                                   onStartDiagnosis(question);
                                 } else {
-                                  console.log('onStartDiagnosis未定义，使用回退逻辑');
+                                  // onStartDiagnosis未定义，使用回退逻辑
                                   const scenario = DIAGNOSIS_SCENARIOS[fault.id as keyof typeof DIAGNOSIS_SCENARIOS];
                                   if (scenario) {
                                     const faultWithDescription = {

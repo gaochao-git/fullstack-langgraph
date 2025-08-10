@@ -136,26 +136,6 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
   // 系统工具定义
   const systemTools = [
     { 
-      name: 'get_sop_content', 
-      category: 'sop', 
-      description: '获取指定SOP的完整内容。用于查看标准操作程序的详细步骤和说明。\n\nArgs:\n    sop_id: SOP的唯一标识符\n\nReturns:\n    包含SOP完整内容的JSON字符串，包括标题、步骤、注意事项等'
-    },
-    { 
-      name: 'get_sop_detail', 
-      category: 'sop', 
-      description: '获取SOP的详细信息和元数据。用于了解SOP的基本信息、分类和适用场景。\n\nArgs:\n    sop_id: SOP的唯一标识符\n\nReturns:\n    包含SOP详细信息的JSON字符串，包括创建时间、更新时间、分类、严重级别等'
-    },
-    { 
-      name: 'list_sops', 
-      category: 'sop', 
-      description: '列出所有可用的SOP清单。用于浏览和发现相关的标准操作程序。\n\nArgs:\n    category: 可选，SOP分类筛选\n    limit: 可选，返回数量限制，默认为50\n\nReturns:\n    包含SOP列表的JSON字符串，每个条目包含ID、标题、分类等基本信息'
-    },
-    { 
-      name: 'search_sops', 
-      category: 'sop', 
-      description: '搜索相关的SOP文档。用于根据关键词快速找到相关的操作程序。\n\nArgs:\n    query: 搜索关键词\n    category: 可选，限定搜索的分类\n\nReturns:\n    包含匹配SOP列表的JSON字符串，按相关性排序'
-    },
-    { 
       name: 'get_current_time', 
       category: 'general', 
       description: '获取当前的系统时间。用于记录操作时间点或进行时间相关的判断。\n\nArgs:\n    format: 可选，时间格式，默认为ISO 8601格式\n    timezone: 可选，时区，默认为系统时区\n\nReturns:\n    格式化的当前时间字符串'
@@ -454,11 +434,11 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           setEditExpandedKeys(selectedServerIds);
         }
       } else if (response.status === 'error') {
-        console.error('获取智能体详细配置失败:', response.msg);
+        // 获取智能体详细配置失败
         message.error(response.msg || '获取智能体详细配置失败');
       }
     } catch (error) {
-      console.error('获取智能体详细配置失败:', error);
+      // 获取智能体详细配置失败
       message.error('获取智能体详细配置失败');
     }
   };

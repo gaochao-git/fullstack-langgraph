@@ -28,7 +28,7 @@ class TokenManager {
       );
       return JSON.parse(jsonPayload);
     } catch (error) {
-      console.error('Failed to parse JWT:', error);
+      // Failed to parse JWT
       return null;
     }
   }
@@ -72,18 +72,18 @@ class TokenManager {
           throw new Error('No refresh token available');
         }
 
-        console.log('Refreshing access token...');
+        // Refreshing access token
         const response = await authApi.refreshToken(refreshToken);
 
         if (response.status === 'ok' && response.data) {
           const { access_token } = response.data;
           localStorage.setItem('token', access_token);
-          console.log('Access token refreshed successfully');
+          // Access token refreshed successfully
         } else {
           throw new Error(response.msg || 'Failed to refresh token');
         }
       } catch (error) {
-        console.error('Failed to refresh token:', error);
+        // Failed to refresh token
         // 刷新失败，清除token并跳转登录
         this.clearTokens();
         message.error('登录已过期，请重新登录');

@@ -19,7 +19,7 @@ export class MenuApiService {
         
       const result = await omind_get(url);
       
-      console.log('🔍 getUserMenus 原始响应:', result);
+      // getUserMenus 原始响应
       
       // 后端直接返回 {menus: [...]} 格式，不是标准的 ApiResponse
       const menusData = result.menus || result.data || result;
@@ -31,11 +31,11 @@ export class MenuApiService {
         // 转换为菜单权限格式
         return this.transformToUserMenuPermission(flattenedMenus);
       } else {
-        console.warn('菜单数据格式不正确:', result);
+        // 菜单数据格式不正确
         throw new Error('菜单数据格式错误');
       }
     } catch (error) {
-      console.error('Error fetching user menus:', error);
+      // Error fetching user menus
       // 返回空菜单
       return {
         menus: [],
@@ -81,7 +81,7 @@ export class MenuApiService {
 
       return result.data;
     } catch (error) {
-      console.error('Error fetching all menus:', error);
+      // Error fetching all menus
       return [];
     }
   }

@@ -128,7 +128,7 @@ export function MenuManagement() {
       setLoading(true);
       const response = await fetch('/api/v1/auth/admin/menus');
       const data = await response.json();
-      console.log('Menu data:', data);
+      // Menu data loaded
       
       // 确保所有菜单都有合理的sort_order值
       const normalizeMenuData = (menus: RawMenuData[]): RawMenuData[] => {
@@ -220,7 +220,7 @@ export function MenuManagement() {
       message.success('移动成功');
       loadMenuTree();
     } catch (error) {
-      console.error('Move up error:', error);
+      // Move up error
       message.error('移动失败');
     }
   };
@@ -266,7 +266,7 @@ export function MenuManagement() {
       message.success('移动成功');
       loadMenuTree();
     } catch (error) {
-      console.error('Move down error:', error);
+      // Move down error
       message.error('移动失败');
     }
   };
@@ -708,17 +708,17 @@ export function MenuManagement() {
 
   // 删除菜单
   const handleDelete = (menu: RawMenuData) => {
-    console.log('handleDelete被调用，菜单:', menu.menu_name, menu.menu_id);
+    // handleDelete被调用，菜单: menu.menu_name, menu.menu_id
     
     // 检查是否是系统核心菜单（首页、用户服务、系统管理等核心菜单不能删除）
     const systemCoreMenus = ['首页', '用户服务', '系统管理'];
     if (menu.parent_id === -1 && systemCoreMenus.includes(menu.menu_name)) {
-      console.log('系统核心菜单不能删除:', menu.menu_name);
+      // 系统核心菜单不能删除: menu.menu_name
       message.warning(`系统核心菜单"${menu.menu_name}"不能删除`);
       return;
     }
 
-    console.log('准备显示确认对话框...');
+    // 准备显示确认对话框
     setMenuToDelete(menu);
     setDeleteModalOpen(true);
   };
@@ -727,7 +727,7 @@ export function MenuManagement() {
   const confirmDelete = async () => {
     if (!menuToDelete) return;
     
-    console.log('确认删除，准备调用API...');
+    // 确认删除，准备调用API
     setDeleteLoading(true);
     
     try {
@@ -735,7 +735,7 @@ export function MenuManagement() {
         method: 'DELETE'
       });
 
-      console.log('删除API响应状态:', response.status);
+      // 删除API响应状态: response.status
       if (response.ok) {
         message.success('删除成功');
         loadMenuTree(); // 重新加载菜单
@@ -743,16 +743,16 @@ export function MenuManagement() {
           setSelectedMenu(null);
           form.resetFields();
         }
-        console.log('删除成功，关闭Modal');
+        // 删除成功，关闭Modal
         setDeleteModalOpen(false);
         setMenuToDelete(null);
       } else {
         const errorData = await response.json();
-        console.error('删除API错误:', errorData);
+        // 删除API错误
         message.error(errorData.msg || '删除失败');
       }
     } catch (error) {
-      console.error('Delete menu error:', error);
+      // Delete menu error
       message.error('删除失败');
     } finally {
       setDeleteLoading(false);
@@ -761,7 +761,7 @@ export function MenuManagement() {
 
   // 取消删除
   const cancelDelete = () => {
-    console.log('取消删除');
+    // 取消删除
     setDeleteModalOpen(false);
     setMenuToDelete(null);
   };
@@ -844,14 +844,14 @@ export function MenuManagement() {
 
   // 处理拖拽
   const handleDrop: TreeProps['onDrop'] = async (info) => {
-    console.log('Drop info:', info);
-    console.log('开始处理拖拽...');
+    // Drop info
+    // 开始处理拖拽
     const dropKey = info.node.key as string;
     const dragKey = info.dragNode.key as string;
     const dropPos = info.node.pos.split('-');
     const dropPosition = info.dropPosition - Number(dropPos[dropPos.length - 1]);
 
-    console.log('拖拽信息:', {
+    // 拖拽信息: {
       dragKey,
       dropKey,
       dropPosition,
@@ -862,13 +862,13 @@ export function MenuManagement() {
     const draggedNode = findNodeByKey(treeData, dragKey);
     const dropNode = findNodeByKey(treeData, dropKey);
     
-    console.log('找到的节点:', {
+    // 找到的节点: {
       draggedNode: draggedNode ? draggedNode.menu_name : 'null',
       dropNode: dropNode ? dropNode.menu_name : 'null'
     });
     
     if (!draggedNode || !dropNode) {
-      console.log('节点未找到，退出');
+      // 节点未找到，退出
       return;
     }
 
@@ -882,7 +882,7 @@ export function MenuManagement() {
     };
 
     if (!info.dropToGap && isDescendant(draggedNode, dropKey)) {
-      console.log('检测到拖拽到子节点，阻止操作');
+      // 检测到拖拽到子节点，阻止操作
       message.error('不能将菜单拖拽到其子菜单下');
       return;
     }
@@ -895,9 +895,9 @@ export function MenuManagement() {
       // 拖拽到节点内部（成为子节点）
       // 检查目标节点的层级
       const targetDepth = getMenuDepthWithData(dropNode.menu_id, rawMenuData);
-      console.log('目标节点深度:', targetDepth);
+      // 目标节点深度: targetDepth
       if (targetDepth >= 4) {
-        console.log('层级超过限制，阻止操作');
+        // 层级超过限制，阻止操作
         message.error('菜单层级不能超过5级');
         return;
       }
@@ -955,7 +955,7 @@ export function MenuManagement() {
       }
     }
 
-    console.log('准备更新数据:', {
+    // 准备更新数据: {
       newParentId,
       newSortOrder
     });

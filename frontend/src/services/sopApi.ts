@@ -24,7 +24,7 @@ export class SOPUtils {
       }
       return [];
     } catch (error) {
-      console.error('Failed to parse SOP steps:', error);
+      // Failed to parse SOP steps
       return [];
     }
   }
@@ -52,7 +52,7 @@ export class SOPUtils {
       }
       return [];
     } catch (error) {
-      console.error('Failed to parse tools:', error);
+      // Failed to parse tools
       return [];
     }
   }

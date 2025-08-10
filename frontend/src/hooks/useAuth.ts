@@ -122,6 +122,6 @@ export const useAuth = create<AuthState>((set) => ({
     // 2. 获取新的token和权限
     // 3. 更新用户状态和当前角色
     // 4. 刷新菜单和权限
-    console.log('角色切换功能待实现', roleId);
+    // TODO: 实现角色切换功能
   }
 }));

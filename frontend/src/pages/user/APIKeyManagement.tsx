@@ -61,7 +61,7 @@ export function APIKeyManagement() {
     setLoadingPermissions(true);
     try {
       const response = await permissionApi.listPermissions({ page: 1, page_size: 1000 });
-      console.log('权限响应数据:', response); // 调试日志
+      // 权限响应数据
       
       if (response.items) {
         // 将权限转换为Select组件需要的格式
@@ -82,10 +82,10 @@ export function APIKeyManagement() {
             permission_name: perm.permission_name,
             module: perm.permission_name ? perm.permission_name.split('/')[3] : 'other' // 从路由提取模块名
           }));
-        console.log('转换后的权限选项:', permissionOptions); // 调试日志
+        // 转换后的权限选项
         setPermissions(permissionOptions);
       } else {
-        console.warn('权限数据结构异常:', response);
+        // 权限数据结构异常
         message.warning('权限数据为空');
       }
     } catch {
@@ -100,7 +100,7 @@ export function APIKeyManagement() {
     setLoadingUsers(true);
     try {
       const response = await userApi.listUsers({ page: 1, page_size: 1000 });
-      console.log('用户响应数据:', response); // 调试日志
+      // 用户响应数据
       
       if (response.items) {
         // 将用户转换为Select组件需要的格式
@@ -119,10 +119,10 @@ export function APIKeyManagement() {
             display_name: user.display_name,
             email: user.email
           }));
-        console.log('转换后的用户选项:', userOptions); // 调试日志
+        // 转换后的用户选项
         setUsers(userOptions);
       } else {
-        console.warn('用户数据结构异常:', response);
+        // 用户数据结构异常
         message.warning('用户数据为空');
       }
     } catch {
@@ -159,7 +159,7 @@ export function APIKeyManagement() {
       message.success(result.message);
       loadAPIKeys();
     } catch (error: any) {
-      console.error('切换状态失败:', error);
+      // 切换状态失败
       const errorMsg = error?.message || error?.msg || '切换状态失败';
       message.error(errorMsg);
     }
@@ -192,7 +192,7 @@ export function APIKeyManagement() {
           message.success('API密钥已永久撤销');
           loadAPIKeys();
         } catch (error: any) {
-          console.error('撤销API密钥失败:', error);
+          // 撤销API密钥失败
           const errorMsg = error?.message || error?.msg || '撤销失败';
           message.error(errorMsg);
         }
@@ -654,7 +654,7 @@ const response = await fetch('${exampleUrl}', {
   }
 });
 const data = await response.json();
-console.log(data);`;
+// console.log(data);`;
   } else if (exampleMethod === 'POST') {
     return `# Python 示例
 import requests
@@ -694,7 +694,7 @@ const response = await fetch('${exampleUrl}', {
   })
 });
 const data = await response.json();
-console.log(data);`;
+// console.log(data);`;
   } else {
     // PUT/DELETE/PATCH 等其他方法
     return `# Python 示例
@@ -726,7 +726,7 @@ const response = await fetch('${exampleUrl}', {
   }
 });
 const data = await response.json();
-console.log(data);`;
+// console.log(data);`;
   }
 })()}
                 </pre>

@@ -145,7 +145,7 @@ export default function ChatEngine({
       }));
       
       setAvailableModels(models);
-      console.log('智能体可用模型列表:', models);
+      // 智能体可用模型列表
       
       // 设置默认选中当前使用的模型
       const currentModelName = agent.llm_info?.model_name;
@@ -155,7 +155,7 @@ export default function ChatEngine({
         setCurrentModel(models[0].type);
       }
     } catch (error) {
-      console.error('处理agent配置信息失败:', error);
+      // 处理agent配置信息失败
     }
   }, [agent, currentModel]);
 
@@ -217,15 +217,15 @@ export default function ChatEngine({
         }
       };
       
-      console.log('🚀 前端提交数据:', submitData);
-      console.log('🚀 前端提交配置:', submitConfig);
+      // 前端提交数据
+      // 前端提交配置
       
       const submitOptions = {
         config: submitConfig,
         user_name: "zhangsan123"
       };
       
-      console.log('🚀 最终提交选项:', submitOptions);
+      // 最终提交选项
       thread.submit(submitData, submitOptions);
     },
     [thread, currentModel, agentId]
@@ -238,7 +238,7 @@ export default function ChatEngine({
   // 模型切换处理函数
   const handleModelChange = useCallback((modelType: string) => {
     setCurrentModel(modelType);
-    console.log('切换到模型:', modelType);
+    // 切换到模型: modelType
   }, []);
 
   const handleInterruptResume = useCallback((approved: boolean) => {
@@ -259,7 +259,7 @@ export default function ChatEngine({
       setHistoryThreads(threads);
       setError(null); // 清除错误状态
     } catch (error) {
-      console.error('获取历史线程出错:', error);
+      // 获取历史线程出错
       setError('获取历史线程出错');
     } finally {
       setLoadingHistory(false);

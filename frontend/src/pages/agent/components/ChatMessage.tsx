@@ -95,7 +95,7 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
               variant="default"
               size="sm"
               onClick={() => {
-                console.log(`🔧 确认工具: ${toolCall.name}`, toolCall.args);
+                // 确认工具: toolCall.name
                 // 传递详细的审批信息给后端
                 onApprove?.();
               }}
@@ -107,7 +107,7 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
               variant="outline"
               size="sm"
               onClick={() => {
-                console.log(`❌ 拒绝工具: ${toolCall.name}`);
+                // 拒绝工具: toolCall.name
                 onReject?.();
               }}
               className="border-red-400 text-red-600 hover:bg-red-50 font-medium text-xs px-2 py-1 h-6"
@@ -323,7 +323,7 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
               toolResult={toolResult}
               isPending={isPending}
               onApprove={() => {
-                console.log(`🔧 确认工具: ${toolCall.name}`, toolCall.args);
+                // 确认工具: toolCall.name
                 // 传递详细的审批信息给后端
                 onInterruptResume?.({
                   "工具名": toolCall.name,
@@ -332,7 +332,7 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
                 });
               }}
               onReject={() => {
-                console.log(`🔧 拒绝工具: ${toolCall.name}`, toolCall.args);
+                // 拒绝工具: toolCall.name
                 // 传递详细的审批信息给后端
                 onInterruptResume?.({
                   "工具名": toolCall.name,

@@ -18,7 +18,10 @@ import pymysql
 from load_config import get_sop_config
 
 # 配置日志
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # 创建MCP服务器实例
@@ -55,6 +58,9 @@ def _execute_query(query: str, params: tuple = None) -> List[Dict[str, Any]]:
         connection = _create_mysql_connection()
         cursor = connection.cursor(pymysql.cursors.DictCursor)
         
+        logger.debug(f"Executing query: {query}")
+        logger.debug(f"With params: {params}")
+        
         if params:
             cursor.execute(query, params)
         else:
@@ -62,10 +68,13 @@ def _execute_query(query: str, params: tuple = None) -> List[Dict[str, Any]]:
         
         results = cursor.fetchall()
         cursor.close()
+        logger.debug(f"Query returned {len(results)} rows")
         return results
         
     except Exception as e:
         logger.error(f"查询执行失败: {e}")
+        logger.error(f"Query was: {query}")
+        logger.error(f"Params were: {params}")
         return []
     finally:
         if connection:
@@ -83,7 +92,7 @@ async def get_sop_detail(sop_key: str) -> str:
     """
     try:
         query = """
-        SELECT * FROM sop_templates 
+        SELECT * FROM sop_prompt_templates 
         WHERE sop_id = %s
         LIMIT 1
         """
@@ -106,7 +115,7 @@ async def get_sop_detail(sop_key: str) -> str:
         else:
             # 如果没有找到，搜索相似的SOP
             search_query = """
-            SELECT sop_id FROM sop_templates 
+            SELECT sop_id FROM sop_prompt_templates 
             WHERE sop_title LIKE %s
             LIMIT 10
             """
@@ -137,14 +146,16 @@ async def get_sop_content(sop_key: str) -> str:
         JSON格式的SOP内容和状态信息
     """
     try:
+        logger.info(f"Getting SOP content for: {sop_key}")
         query = """
         SELECT sop_id, sop_title, sop_category, sop_description, 
-               sop_severity, sop_steps, sop_symptoms, tools_required
-        FROM sop_templates 
+               sop_severity, sop_steps, tools_required
+        FROM sop_prompt_templates 
         WHERE sop_id = %s
         LIMIT 1
         """
         results = _execute_query(query, (sop_key,))
+        logger.info(f"Query results: {len(results) if results else 0} rows found")
         
         if results:
             sop_data = results[0]
@@ -173,7 +184,6 @@ async def get_sop_content(sop_key: str) -> str:
                 "description": sop_data.get("sop_description", ""),
                 "severity": sop_data.get("sop_severity", ""),
                 "steps": sop_steps,
-                "symptoms": sop_data.get("sop_symptoms", "").split(",") if sop_data.get("sop_symptoms") else [],
                 "tools_needed": tools_required
             }
             
@@ -186,7 +196,7 @@ async def get_sop_content(sop_key: str) -> str:
         else:
             # 如果没有找到，搜索相似的SOP
             search_query = """
-            SELECT sop_id FROM sop_templates 
+            SELECT sop_id FROM sop_prompt_templates 
             WHERE sop_title LIKE %s
             LIMIT 10
             """
@@ -224,7 +234,7 @@ async def list_sops(category: str = "") -> str:
         if category:
             query = """
             SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
-            FROM sop_templates
+            FROM sop_prompt_templates
             WHERE sop_category = %s
             LIMIT 50
             """
@@ -232,7 +242,7 @@ async def list_sops(category: str = "") -> str:
         else:
             query = """
             SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
-            FROM sop_templates
+            FROM sop_prompt_templates
             LIMIT 50
             """
             results = _execute_query(query)
@@ -272,7 +282,7 @@ async def search_sops(keyword: str) -> str:
     try:
         query = """
         SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
-        FROM sop_templates
+        FROM sop_prompt_templates
         WHERE sop_title LIKE %s OR sop_description LIKE %s
         LIMIT 20
         """
