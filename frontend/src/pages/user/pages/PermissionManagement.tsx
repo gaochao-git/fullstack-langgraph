@@ -8,10 +8,10 @@ import {
   KeyOutlined, ReloadOutlined, SearchOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { permissionApi } from '../services/rbacApi';
+import { permissionApi } from '@/pages/user/services/rbacApi';
 import type { 
   RbacPermission, PermissionCreateRequest, PermissionUpdateRequest, PermissionQueryParams 
-} from '../types/rbac';
+} from '@/pages/user/types/rbac';
 
 const { Option } = Select;
 

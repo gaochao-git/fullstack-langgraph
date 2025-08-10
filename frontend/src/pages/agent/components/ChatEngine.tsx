@@ -6,8 +6,8 @@ import ChatMessages, { type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
 import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";
-import { omind_get } from "../../../utils/base_api";
-import { type Agent } from "../../../services/agentApi";
+import { omind_get } from "@/utils/base_api";
+import { type Agent } from "@/services/agentApi";
 
 // 历史会话类型定义
 interface HistoryThread {

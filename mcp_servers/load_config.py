@@ -133,6 +133,12 @@ def get_zabbix_config() -> Dict[str, Any]:
         raise RuntimeError("Zabbix服务未启用")
     return get_config()['zabbix']
 
+def get_sop_config() -> Dict[str, Any]:
+    """获取SOP配置"""
+    if not is_service_enabled('sop'):
+        raise RuntimeError("SOP服务未启用")
+    return get_config()['sop']
+
 # 打印当前配置信息（调试用）
 if __name__ == "__main__":
     import json

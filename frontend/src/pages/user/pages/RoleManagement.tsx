@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 // import type { TransferProps } from 'antd/es/transfer';
-import { roleApi, permissionApi, menuApi } from '../services/rbacApi';
+import { roleApi, permissionApi, menuApi } from '@/pages/user/services/rbacApi';
 import type { 
   RbacRole, RbacPermission, RbacMenu, RoleCreateRequest, RoleUpdateRequest, RoleQueryParams 
 } from '../types/rbac';

@@ -8,8 +8,8 @@ import {
   EyeOutlined, EyeInvisibleOutlined, MoreOutlined,
   HomeOutlined, MenuOutlined
 } from '@ant-design/icons';
-import { authApi } from '../../services/authApi';
-import { omind_get, omind_put, omind_post, omind_del } from '../../utils/base_api';
+import { authApi } from '@/services/authApi';
+import { omind_get, omind_put, omind_post, omind_del } from '@/utils/base_api';
 
 interface MenuNode {
   key: string;

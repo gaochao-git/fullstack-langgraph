@@ -8,6 +8,7 @@ services:
   ssh: true          # SSH远程连接服务
   elasticsearch: true # Elasticsearch搜索服务
   zabbix: true       # Zabbix监控服务
+  sop: true          # SOP标准操作程序服务
 
 # MySQL配置（当 services.mysql = true 时需要）
 mysql:
@@ -42,3 +43,11 @@ zabbix:
   username: Admin
   password: zabbix
   default_host_ip: 127.0.0.1
+
+# SOP配置（当 services.sop = true 时需要）
+sop:
+  host: 82.156.146.51
+  port: 3306
+  username: gaochao
+  password: "fffjjj"
+  database: omind  # SOP数据库名称

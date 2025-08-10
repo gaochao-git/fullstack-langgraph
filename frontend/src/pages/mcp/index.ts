@@ -10,7 +10,7 @@
 export { default as MCPManagement } from './pages/MCPManagement';
 
 // === 服务 ===
-export { MCPApi } from '../../services/mcpApi';
+export { MCPApi } from '@/services/mcpApi';
 
 // === 类型定义 (从服务中导出) ===
 export type { 
@@ -20,5 +20,5 @@ export type {
   MCPListParams,
   MCPTestRequest,
   MCPTestResponse
-} from '../../services/mcpApi';
+} from '@/services/mcpApi';
 

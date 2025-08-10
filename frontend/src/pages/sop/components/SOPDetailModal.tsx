@@ -14,7 +14,7 @@ import {
   ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { SOPTemplate, SOPSeverity } from '../types/sop';
-import { SOPUtils } from '../../../services/sopApi';
+import { SOPUtils } from '@/services/sopApi';
 
 const { Text, Paragraph, Title } = Typography;
 

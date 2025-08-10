@@ -13,11 +13,11 @@ import {
   getIconBackgroundColor
 } from './components/AgentIconSystem';
 import { useNavigate } from "react-router-dom";
-import { agentApi } from "../../services/agentApi";
-import { useTheme } from "../../hooks/ThemeContext";
+import { agentApi } from "@/services/agentApi";
+import { useTheme } from "@/hooks/ThemeContext";
 
 const { Title, Text, Paragraph } = Typography;
-import { Agent as ApiAgent } from '../../services/agentApi';
+import { Agent as ApiAgent } from '@/services/agentApi';
 
 type Agent = ApiAgent;
 

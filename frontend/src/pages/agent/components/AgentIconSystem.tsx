@@ -1,6 +1,6 @@
 import React, { createElement } from 'react';
-import { Icons, IconCategories, type IconName } from '../../../icons';
-import iconConfigData from '../../../icons/icon-config.json';
+import { Icons, IconCategories, type IconName } from '@/icons';
+import iconConfigData from '@/icons/icon-config.json';
 
 // 定义分类颜色
 export const categoryColors = iconConfigData.categories;

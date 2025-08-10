@@ -37,8 +37,8 @@ import {
   ExclamationCircleOutlined,
   LoadingOutlined
 } from '@ant-design/icons';
-import { useTheme } from '../../../hooks/ThemeContext';
-import { omind_get, omind_post, omind_put, omind_del } from '../../../utils/base_api';
+import { useTheme } from '@/hooks/ThemeContext';
+import { omind_get, omind_post, omind_put, omind_del } from '@/utils/base_api';
 
 const { Option } = Select;
 const { TextArea } = Input;

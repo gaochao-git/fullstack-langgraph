@@ -23,8 +23,8 @@ import {
   CopyOutlined,
   CheckCircleOutlined
 } from '@ant-design/icons';
-import { useTheme } from '../../../hooks/ThemeContext';
-import { omind_post } from '../../../utils/base_api';
+import { useTheme } from '@/hooks/ThemeContext';
+import { omind_post } from '@/utils/base_api';
 
 const { TextArea } = Input;
 const { Panel } = Collapse;

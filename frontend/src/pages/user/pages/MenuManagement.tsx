@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import { Icons } from '@/icons';
 import type { DataNode, TreeProps } from 'antd/es/tree';
-import iconConfig from '../../../icons/icon-config.json';
+import iconConfig from '@/icons/icon-config.json';
 
 interface MenuNode extends DataNode {
   key: string;

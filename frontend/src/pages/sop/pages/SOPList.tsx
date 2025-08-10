@@ -20,7 +20,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
-import { SOPApi, SOPUtils } from '../../../services/sopApi';
+import { SOPApi, SOPUtils } from '@/services/sopApi';
 import SOPFormModal from '../components/SOPFormModal';
 import SOPDetailModal from '../components/SOPDetailModal';
 

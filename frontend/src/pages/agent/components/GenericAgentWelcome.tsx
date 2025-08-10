@@ -3,7 +3,7 @@ import { Tag } from 'antd';
 import { RobotOutlined } from '@ant-design/icons';
 import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
-import { type Agent } from '../../../services/agentApi';
+import { type Agent } from '@/services/agentApi';
 
 // 欢迎页面组件属性
 interface GenericAgentWelcomeProps {

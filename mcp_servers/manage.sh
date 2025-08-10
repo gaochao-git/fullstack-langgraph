@@ -22,9 +22,9 @@ COMPONENT_NAME="MCP Servers"
 COMPONENT_ID="mcp_servers"
 
 # 配置
-SERVERS=("db_query" "ssh_exec" "es_search" "zabbix_monitor")
-SERVICE_NAMES=("mysql" "ssh" "elasticsearch" "zabbix")
-PORTS=(3001 3002 3003 3004)
+SERVERS=("db_query" "ssh_exec" "es_search" "zabbix_monitor" "sop_server")
+SERVICE_NAMES=("mysql" "ssh" "elasticsearch" "zabbix" "sop")
+PORTS=(3001 3002 3003 3004 3005)
 PID_DIR="pids"
 LOG_DIR="logs"
 
@@ -142,6 +142,9 @@ start_server() {
             ;;
         zabbix_monitor)
             py_file="servers/zabbix_mcp_server.py"
+            ;;
+        sop_server)
+            py_file="servers/sop_mcp_server.py"
             ;;
     esac
     

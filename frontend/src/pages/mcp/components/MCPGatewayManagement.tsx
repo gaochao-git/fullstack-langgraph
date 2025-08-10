@@ -39,7 +39,7 @@ import {
   UpOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { useTheme } from '../../../hooks/ThemeContext';
+import { useTheme } from '@/hooks/ThemeContext';
 
 const { Search } = Input;
 const { Option } = Select;

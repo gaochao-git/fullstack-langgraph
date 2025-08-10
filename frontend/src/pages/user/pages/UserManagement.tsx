@@ -8,7 +8,7 @@ import {
   UserOutlined, ReloadOutlined 
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { userApi, roleApi } from '../services/rbacApi';
+import { userApi, roleApi } from '@/pages/user/services/rbacApi';
 import type { 
   RbacUser, RbacRole, UserCreateRequest, UserUpdateRequest, UserQueryParams 
 } from '../types/rbac';

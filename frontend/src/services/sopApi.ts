@@ -6,7 +6,7 @@ import {
   SOPTemplate,
   SOPTemplateRequest,
   SOPListParams
-} from '../pages/sop/types/sop';
+} from '@/pages/sop/types/sop';
 import { omind_get, omind_post, omind_put, omind_del } from '@/utils/base_api';
 
 // 工具函数

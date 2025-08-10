@@ -14,7 +14,7 @@ export { default as TasksManagement } from './pages/TasksManagement';
 export { default as ScheduledTaskManager } from './components/ScheduledTaskManager';
 
 // === 服务 ===
-export { ScheduledTaskApi } from '../../services/scheduledTaskApi';
+export { ScheduledTaskApi } from '@/services/scheduledTaskApi';
 
 // === 类型定义 (从服务中导出) ===
 export type { 
@@ -22,5 +22,5 @@ export type {
   ScheduledTaskCreateRequest, 
   ScheduledTaskUpdateRequest, 
   ScheduledTaskListParams
-} from '../../services/scheduledTaskApi';
+} from '@/services/scheduledTaskApi';
 

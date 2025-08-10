@@ -7,7 +7,7 @@ import asyncio
 from typing import List
 from src.shared.core.logging import get_logger
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from src.shared.tools import sop_tool, general_tool
+from src.apps.agent.tools import general_tool
 from ..tools_utils import get_tools_config_from_db
 from src.apps.mcp.service.mcp_service import mcp_service
 from src.shared.db.config import get_sync_db
@@ -25,15 +25,12 @@ async def get_diagnostic_tools(agent_id: str = "diagnostic_agent"):
         # 1. 处理系统工具
         system_tools_config = tools_config.get('system_tools', [])
         system_tools_map = {
-            'get_sop_content': sop_tool.get_sop_content,
-            'get_sop_detail': sop_tool.get_sop_detail,
-            'list_sops': sop_tool.list_sops,
-            'search_sops': sop_tool.search_sops,
             'get_current_time': general_tool.get_current_time,
         }
         # 按需加载
         for tool_name in system_tools_config:
-            all_tools.append(system_tools_map[tool_name])
+            if tool_name in system_tools_map:
+                all_tools.append(system_tools_map[tool_name])
         
         # 2. 处理MCP工具
         mcp_tools_config = tools_config.get('mcp_tools', [])
