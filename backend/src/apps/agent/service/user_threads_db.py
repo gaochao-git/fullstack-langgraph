@@ -18,8 +18,8 @@ logger = get_logger(__name__)
 async def check_user_thread_exists(user_name: str, thread_id: str) -> bool:
     """检查用户线程关联是否存在"""
     try:
-        async with get_async_db_context() as session:
-            result = await session.execute(
+        async with get_async_db_context() as db:
+            result = await db.execute(
                 select(UserThread).where(
                     UserThread.user_name == user_name,
                     UserThread.thread_id == thread_id
@@ -48,10 +48,10 @@ async def create_user_thread_mapping(
             thread_title = f"对话 {now_shanghai().strftime('%m-%d %H:%M')}"
             logger.info(f"🏷️ 使用默认标题: {thread_title}")
         
-        async with get_async_db_context() as session:
-            async with session.begin():
+        async with get_async_db_context() as db:
+            async with db.begin():
                 # 检查是否已存在，避免重复插入
-                existing = await session.execute(
+                existing = await db.execute(
                     select(UserThread).where(
                         UserThread.user_name == user_name,
                         UserThread.thread_id == thread_id
@@ -71,7 +71,7 @@ async def create_user_thread_mapping(
                     is_archived=False
                 )
                 
-                session.add(new_user_thread)
+                db.add(new_user_thread)
                 
                 logger.info(f"✅ 创建用户线程关联成功: {user_name} -> {thread_id}")
                 return True
@@ -92,7 +92,7 @@ async def get_user_threads(
 ) -> List[Dict[str, Any]]:
     """获取用户的所有线程"""
     try:
-        async with get_async_db_context() as session:
+        async with get_async_db_context() as db:
             query = select(UserThread).where(UserThread.user_name == user_name)
             
             # 如果指定了archived状态，添加过滤条件
@@ -102,7 +102,7 @@ async def get_user_threads(
             # 排序和分页
             query = query.order_by(UserThread.create_at.desc()).limit(limit).offset(offset)
             
-            result = await session.execute(query)
+            result = await db.execute(query)
             user_threads = result.scalars().all()
             
             return [thread.to_dict() for thread in user_threads]
@@ -119,9 +119,9 @@ async def update_thread_title(
 ) -> bool:
     """更新线程标题"""
     try:
-        async with get_async_db_context() as session:
-            async with session.begin():
-                result = await session.execute(
+        async with get_async_db_context() as db:
+            async with db.begin():
+                result = await db.execute(
                     update(UserThread)
                     .where(
                         UserThread.user_name == user_name,
@@ -156,9 +156,9 @@ async def archive_thread(
 ) -> bool:
     """归档或取消归档线程"""
     try:
-        async with get_async_db_context() as session:
-            async with session.begin():
-                result = await session.execute(
+        async with get_async_db_context() as db:
+            async with db.begin():
+                result = await db.execute(
                     update(UserThread)
                     .where(
                         UserThread.user_name == user_name,
@@ -189,9 +189,9 @@ async def archive_thread(
 async def delete_thread(user_name: str, thread_id: str) -> bool:
     """删除用户线程关联"""
     try:
-        async with get_async_db_context() as session:
-            async with session.begin():
-                result = await session.execute(
+        async with get_async_db_context() as db:
+            async with db.begin():
+                result = await db.execute(
                     delete(UserThread).where(
                         UserThread.user_name == user_name,
                         UserThread.thread_id == thread_id
@@ -220,10 +220,10 @@ async def update_thread_message_count(
 ) -> bool:
     """更新线程消息数量"""
     try:
-        async with get_async_db_context() as session:
-            async with session.begin():
+        async with get_async_db_context() as db:
+            async with db.begin():
                 # 先获取当前记录
-                result = await session.execute(
+                result = await db.execute(
                     select(UserThread).where(
                         UserThread.user_name == user_name,
                         UserThread.thread_id == thread_id
@@ -238,7 +238,7 @@ async def update_thread_message_count(
                 # 更新消息数量和最后消息时间
                 new_count = max(0, (user_thread.message_count or 0) + increment)
                 
-                await session.execute(
+                await db.execute(
                     update(UserThread)
                     .where(
                         UserThread.user_name == user_name,
@@ -261,8 +261,8 @@ async def update_thread_message_count(
 async def get_thread_by_id(user_name: str, thread_id: str) -> Optional[Dict[str, Any]]:
     """根据ID获取特定线程"""
     try:
-        async with get_async_db_context() as session:
-            result = await session.execute(
+        async with get_async_db_context() as db:
+            result = await db.execute(
                 select(UserThread).where(
                     UserThread.user_name == user_name,
                     UserThread.thread_id == thread_id
@@ -283,10 +283,10 @@ async def get_thread_by_id(user_name: str, thread_id: str) -> Optional[Dict[str,
 async def create_or_get_user(user_name: str, display_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """创建或获取用户"""
     try:
-        async with get_async_db_context() as session:
-            async with session.begin():
+        async with get_async_db_context() as db:
+            async with db.begin():
                 # 先尝试获取用户
-                result = await session.execute(
+                result = await db.execute(
                     select(User).where(User.user_name == user_name)
                 )
                 user = result.scalar_one_or_none()
@@ -302,9 +302,9 @@ async def create_or_get_user(user_name: str, display_name: Optional[str] = None)
                     is_active=True
                 )
                 
-                session.add(new_user)
-                await session.flush()
-                await session.refresh(new_user)
+                db.add(new_user)
+                await db.flush()
+                await db.refresh(new_user)
                 
                 logger.info(f"✅ 创建新用户成功: {user_name}")
                 return new_user.to_dict()
@@ -312,8 +312,8 @@ async def create_or_get_user(user_name: str, display_name: Optional[str] = None)
     except IntegrityError:
         # 可能是并发创建导致的重复，重新获取
         try:
-            async with get_async_db_context() as session:
-                result = await session.execute(
+            async with get_async_db_context() as db:
+                result = await db.execute(
                     select(User).where(User.user_name == user_name)
                 )
                 user = result.scalar_one_or_none()

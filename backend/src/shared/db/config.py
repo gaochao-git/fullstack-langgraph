@@ -111,8 +111,8 @@ def get_async_db_context():
     获取异步数据库会话上下文管理器 - 用于手动管理
     
     Usage:
-        async with get_async_db_context() as session:
-            result = await session.execute(...)
+        async with get_async_db_context() as db:
+            result = await db.execute(...)
     """
     return AsyncSessionLocal()
 

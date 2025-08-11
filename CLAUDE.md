@@ -380,7 +380,7 @@ from src.shared.db.config import get_async_db_context
 
 # 用于独立函数、后台任务、定时任务等非FastAPI路由环境
 async with get_async_db_context() as session:
-    async with session.begin():  # 这里可以使用事务块
+    async with db.begin():  # 这里可以使用事务块
         user = User(name="test")
         session.add(user)
         await session.flush()
@@ -404,7 +404,7 @@ def some_sync_function(db: Session = Depends(get_sync_db)):
 2. **FastAPI 端点使用 `Depends(get_async_db)`**
 3. **Service 层推荐使用 `async with db.begin()`** - 事务管理更清晰
 4. **复杂操作（多表、先删后增）必须在同一事务中**
-5. **独立函数使用 `get_async_db_context()` 和 `async with session.begin()`**
+5. **独立函数使用 `get_async_db_context()` 和 `async with db.begin()`**
 6. **只在必要时使用同步（如 LangGraph 工具）**
 7. **避免混用同步和异步会话**
 

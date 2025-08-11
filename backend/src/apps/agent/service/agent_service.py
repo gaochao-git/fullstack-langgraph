@@ -24,15 +24,15 @@ class AgentService:
     
     async def create_agent(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         agent_data: Dict[str, Any]
     ) -> AgentConfig:
         """创建智能体配置"""
-        async with session.begin():
+        async with db.begin():
             # 生成agent_id（如果未提供）
             if not agent_data.get('agent_id'): agent_data['agent_id'] = f"custom_{uuid.uuid4().hex[:8]}"
             # 检查是否已存在
-            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_data['agent_id']))
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_data['agent_id']))
             existing = result.scalar_one_or_none()
             if existing: raise BusinessException(f"智能体ID {agent_data['agent_id']} 已存在", ResponseCode.DUPLICATE_RESOURCE)
             
@@ -53,18 +53,18 @@ class AgentService:
             
             logger.info(f"Creating agent: {agent_data['agent_id']}")
             instance = AgentConfig(**agent_data)
-            session.add(instance)
-            await session.flush()
-            await session.refresh(instance)
+            db.add(instance)
+            await db.flush()
+            await db.refresh(instance)
             return instance
     
     async def get_agent_by_id(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         agent_id: str,
     ) -> Optional[Dict[str, Any]]:
         """根据ID获取智能体配置"""
-        result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+        result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
         db_agent = result.scalar_one_or_none()
         if db_agent:
             agent_dict = db_agent.to_dict()
@@ -81,7 +81,7 @@ class AgentService:
     
     async def list_agents(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         page: int = 1,
         size: int = 10,
         search: Optional[str] = None,
@@ -113,7 +113,7 @@ class AgentService:
                     )
                 )
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             db_agents = list(result.scalars().all())
             total = len(db_agents)
         else:
@@ -129,7 +129,7 @@ class AgentService:
             
             query = query.order_by(AgentConfig.create_time.desc())
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             db_agents = list(result.scalars().all())
             
             # 计算总数
@@ -142,7 +142,7 @@ class AgentService:
                         conditions.append(field == field_value)
                 if conditions:
                     count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         
         # 转换为字典格式
@@ -162,14 +162,14 @@ class AgentService:
     
     async def update_agent(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         agent_id: str,
         update_data: Dict[str, Any]
     ) -> Optional[AgentConfig]:
         """更新智能体配置"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             existing = result.scalar_one_or_none()
             if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
             
@@ -182,21 +182,21 @@ class AgentService:
                 update_data['agent_capabilities'] = update_data.pop('capabilities')
             
             logger.info(f"Updating agent: {agent_id}")
-            await session.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
+            await db.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
             
             # 返回更新后的数据
-            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
     async def delete_agent(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         agent_id: str
     ) -> bool:
         """删除智能体配置"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             existing = result.scalar_one_or_none()
             if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
             
@@ -204,12 +204,12 @@ class AgentService:
             if existing.is_builtin == 'yes': raise BusinessException(f"不能删除内置智能体: {agent_id}", ResponseCode.FORBIDDEN)
             
             logger.info(f"Deleting agent: {agent_id}")
-            result = await session.execute(delete(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            result = await db.execute(delete(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.rowcount > 0
     
     async def update_mcp_config(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         agent_id: str,
         enabled_servers: List[str],
         selected_tools: List[str]
@@ -229,31 +229,31 @@ class AgentService:
         # 构建完整工具配置
         tools_info = {'system_tools': [], 'mcp_tools': mcp_tools_config}
         update_data = {'tools_info': tools_info}
-        return await self.update_agent(session, agent_id, update_data)
+        return await self.update_agent(db, agent_id, update_data)
     
     async def update_agent_status(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         agent_id: str,
         status: str
     ) -> Optional[AgentConfig]:
         """更新智能体状态"""
-        async with session.begin():
+        async with db.begin():
             update_data = {'agent_status': status,'update_time': now_shanghai()}
-            await session.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
-            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            await db.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
     async def update_statistics(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         agent_id: str,
         total_runs: int,
         success_rate: float,
         avg_response_time: float
     ) -> Optional[AgentConfig]:
         """更新运行统计信息"""
-        async with session.begin():
+        async with db.begin():
             update_data = {
                 'total_runs': total_runs,
                 'success_rate': success_rate,
@@ -261,13 +261,13 @@ class AgentService:
                 'last_used': now_shanghai(),
                 'update_time': now_shanghai()
             }
-            await session.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
-            result = await session.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            await db.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
-    async def get_statistics(self, session: AsyncSession):
+    async def get_statistics(self, db: AsyncSession):
         """获取智能体统计信息 - 返回原始查询结果让响应层处理"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 func.count(AgentConfig.id).label('total'),
                 func.sum(
@@ -295,7 +295,7 @@ class AgentService:
     
     async def search_agents(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         keyword: str,
         page: int = 1,
         size: int = 10
@@ -308,7 +308,7 @@ class AgentService:
         ).where(and_(AgentConfig.agent_enabled == 'yes',AgentConfig.is_active == True)
         ).offset(offset).limit(size)
         
-        result = await session.execute(query)
+        result = await db.execute(query)
         db_agents = list(result.scalars().all())
         
         # 转换数据库结果

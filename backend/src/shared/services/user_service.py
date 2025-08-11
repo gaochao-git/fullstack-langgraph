@@ -31,38 +31,38 @@ class UserService:
     # ==================== 静态方法（兼容现有API） ====================
     
     @staticmethod
-    async def get_user_by_name(session: AsyncSession, username: str) -> Optional[User]:
+    async def get_user_by_name(db: AsyncSession, username: str) -> Optional[User]:
         """根据用户名获取用户（静态方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(User).where(User.user_name == username)
         )
         return result.scalar_one_or_none()
     
     @staticmethod
-    async def get_active_users(session: AsyncSession) -> List[User]:
+    async def get_active_users(db: AsyncSession) -> List[User]:
         """获取活跃用户（静态方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(User).where(User.is_active == True)
         )
         return list(result.scalars().all())
     
     @staticmethod
-    async def create_user(session: AsyncSession, user_data: Dict[str, Any]) -> User:
+    async def create_user(db: AsyncSession, user_data: Dict[str, Any]) -> User:
         """创建用户（静态方法）"""
         service = UserService.get_instance()
-        return await service.create_user_account(session, user_data)
+        return await service.create_user_account(db, user_data)
     
     @staticmethod
-    async def update_last_login(session: AsyncSession, username: str) -> Optional[User]:
+    async def update_last_login(db: AsyncSession, username: str) -> Optional[User]:
         """更新最后登录时间（静态方法）"""
-        async with session.begin():
-            result = await session.execute(
+        async with db.begin():
+            result = await db.execute(
                 update(User)
                 .where(User.user_name == username)
                 .values(last_login=now_shanghai())
             )
             if result.rowcount > 0:
-                result = await session.execute(
+                result = await db.execute(
                     select(User).where(User.user_name == username)
                 )
                 return result.scalar_one_or_none()
@@ -73,7 +73,7 @@ class UserService:
     @transactional()
     async def create_user_account(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         user_data: Dict[str, Any]
     ) -> User:
         """创建用户账户（实例方法）"""
@@ -82,7 +82,7 @@ class UserService:
             raise ValueError("Username is required")
         
         # 检查用户名是否已存在
-        result = await session.execute(
+        result = await db.execute(
             select(User).where(User.user_name == user_data['user_name'])
         )
         if result.scalar_one_or_none():
@@ -90,7 +90,7 @@ class UserService:
         
         # 检查邮箱是否已存在
         if user_data.get('email'):
-            result = await session.execute(
+            result = await db.execute(
                 select(User).where(User.email == user_data['email'])
             )
             if result.scalar_one_or_none():
@@ -105,25 +105,25 @@ class UserService:
         # 创建用户
         logger.info(f"Creating user: {user_data['user_name']}")
         user = User(**user_data)
-        session.add(user)
-        await session.flush()
-        await session.refresh(user)
+        db.add(user)
+        await db.flush()
+        await db.refresh(user)
         return user
     
     async def get_user_by_id(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         user_id: int
     ) -> Optional[User]:
         """根据ID获取用户（实例方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(User).where(User.id == user_id)
         )
         return result.scalar_one_or_none()
     
     async def get_user_list(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         active_only: bool = True,
         user_type: Optional[str] = None,
         page: int = 1,
@@ -146,14 +146,14 @@ class UserService:
         
         # 获取数据
         query = query.order_by(User.create_time.desc()).offset(offset).limit(size)
-        result = await session.execute(query)
+        result = await db.execute(query)
         users = list(result.scalars().all())
         
         # 获取总数
         count_query = select(func.count(User.id))
         if conditions:
             count_query = count_query.where(and_(*conditions))
-        count_result = await session.execute(count_query)
+        count_result = await db.execute(count_query)
         total = count_result.scalar()
         
         return {
@@ -166,7 +166,7 @@ class UserService:
     
     async def search_users(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         keyword: str,
         active_only: bool = True,
         page: int = 1,
@@ -188,7 +188,7 @@ class UserService:
         
         # 获取数据
         query = query.order_by(User.create_time.desc()).offset(offset).limit(size)
-        result = await session.execute(query)
+        result = await db.execute(query)
         users = list(result.scalars().all())
         
         # 获取总数
@@ -200,7 +200,7 @@ class UserService:
         )
         if active_only:
             count_query = count_query.where(User.is_active == True)
-        count_result = await session.execute(count_query)
+        count_result = await db.execute(count_query)
         total = count_result.scalar()
         
         return {
@@ -215,13 +215,13 @@ class UserService:
     @transactional()
     async def update_user(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         username: str,
         update_data: Dict[str, Any]
     ) -> Optional[User]:
         """更新用户信息（实例方法）"""
         # 检查是否存在
-        result = await session.execute(
+        result = await db.execute(
             select(User).where(User.user_name == username)
         )
         if not result.scalar_one_or_none():
@@ -234,14 +234,14 @@ class UserService:
         
         # 更新
         logger.info(f"Updating user: {username}")
-        await session.execute(
+        await db.execute(
             update(User)
             .where(User.user_name == username)
             .values(**update_data)
         )
         
         # 返回更新后的用户
-        result = await session.execute(
+        result = await db.execute(
             select(User).where(User.user_name == username)
         )
         return result.scalar_one_or_none()
@@ -249,36 +249,36 @@ class UserService:
     @transactional()
     async def deactivate_user(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         username: str
     ) -> Optional[User]:
         """停用用户（实例方法）"""
         logger.info(f"Deactivating user: {username}")
-        return await self.update_user(session, username, {'is_active': False})
+        return await self.update_user(db, username, {'is_active': False})
     
     async def get_user_statistics(
         self, 
-        session: AsyncSession
+        db: AsyncSession
     ) -> Dict[str, Any]:
         """获取用户统计信息（实例方法）"""
         # 总用户数
-        total_result = await session.execute(select(func.count(User.id)))
+        total_result = await db.execute(select(func.count(User.id)))
         total_users = total_result.scalar()
         
         # 活跃用户数
-        active_result = await session.execute(
+        active_result = await db.execute(
             select(func.count(User.id)).where(User.is_active == True)
         )
         active_users = active_result.scalar()
         
         # 普通用户数
-        regular_result = await session.execute(
+        regular_result = await db.execute(
             select(func.count(User.id)).where(User.user_type == 'regular')
         )
         regular_users = regular_result.scalar()
         
         # 管理员用户数
-        admin_result = await session.execute(
+        admin_result = await db.execute(
             select(func.count(User.id)).where(User.user_type == 'admin')
         )
         admin_users = admin_result.scalar()
@@ -293,9 +293,9 @@ class UserService:
     
     # ==================== 向后兼容方法 ====================
     
-    async def get_by_username(self, session: AsyncSession, username: str) -> Optional[User]:
+    async def get_by_username(self, db: AsyncSession, username: str) -> Optional[User]:
         """根据用户名获取用户（向后兼容）"""
-        return await self.get_user_by_name(session, username)
+        return await self.get_user_by_name(db, username)
 
 
 class UserThreadService:
@@ -314,7 +314,7 @@ class UserThreadService:
     
     @staticmethod
     async def get_user_threads(
-        session: AsyncSession, 
+        db: AsyncSession, 
         username: str,
         include_archived: bool = False
     ) -> List[UserThread]:
@@ -324,26 +324,26 @@ class UserThreadService:
             query = query.where(UserThread.is_archived == False)
         query = query.order_by(UserThread.update_at.desc())
         
-        result = await session.execute(query)
+        result = await db.execute(query)
         return list(result.scalars().all())
     
     @staticmethod
-    async def create_thread(session: AsyncSession, thread_data: Dict[str, Any]) -> UserThread:
+    async def create_thread(db: AsyncSession, thread_data: Dict[str, Any]) -> UserThread:
         """创建用户会话（静态方法）"""
         service = UserThreadService.get_instance()
-        return await service.create_user_thread(session, thread_data)
+        return await service.create_user_thread(db, thread_data)
     
     @staticmethod
     async def update_thread_message_count(
-        session: AsyncSession, 
+        db: AsyncSession, 
         username: str, 
         thread_id: str,
         count: int
     ) -> Optional[UserThread]:
         """更新会话消息数量（静态方法）"""
-        async with session.begin():
+        async with db.begin():
             # 先获取当前记录
-            result = await session.execute(
+            result = await db.execute(
                 select(UserThread).where(
                     and_(
                         UserThread.user_name == username,
@@ -356,7 +356,7 @@ class UserThreadService:
             if thread:
                 # 更新消息数量
                 new_count = max(0, (thread.message_count or 0) + count)
-                await session.execute(
+                await db.execute(
                     update(UserThread)
                     .where(
                         and_(
@@ -372,7 +372,7 @@ class UserThreadService:
                 )
                 
                 # 返回更新后的记录
-                result = await session.execute(
+                result = await db.execute(
                     select(UserThread).where(
                         and_(
                             UserThread.user_name == username,
@@ -389,7 +389,7 @@ class UserThreadService:
     @transactional()
     async def create_user_thread(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         thread_data: Dict[str, Any]
     ) -> UserThread:
         """创建用户会话（实例方法）"""
@@ -400,7 +400,7 @@ class UserThreadService:
             raise ValueError("Thread ID is required")
         
         # 检查是否已存在
-        result = await session.execute(
+        result = await db.execute(
             select(UserThread).where(
                 and_(
                     UserThread.user_name == thread_data['user_name'],
@@ -420,14 +420,14 @@ class UserThreadService:
         # 创建线程
         logger.info(f"Creating thread {thread_data['thread_id']} for user {thread_data['user_name']}")
         thread = UserThread(**thread_data)
-        session.add(thread)
-        await session.flush()
-        await session.refresh(thread)
+        db.add(thread)
+        await db.flush()
+        await db.refresh(thread)
         return thread
     
     async def get_user_thread_list(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         username: str,
         include_archived: bool = False,
         agent_id: Optional[str] = None,
@@ -451,14 +451,14 @@ class UserThreadService:
         
         # 获取数据
         query = query.order_by(UserThread.update_at.desc()).offset(offset).limit(size)
-        result = await session.execute(query)
+        result = await db.execute(query)
         threads = list(result.scalars().all())
         
         # 获取总数
         count_query = select(func.count(UserThread.id)).where(UserThread.user_name == username)
         if conditions:
             count_query = count_query.where(and_(*conditions))
-        count_result = await session.execute(count_query)
+        count_result = await db.execute(count_query)
         total = count_result.scalar()
         
         return {
@@ -472,7 +472,7 @@ class UserThreadService:
     @transactional()
     async def archive_user_thread(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         username: str,
         thread_id: str
     ) -> Optional[UserThread]:
@@ -480,7 +480,7 @@ class UserThreadService:
         logger.info(f"Archiving thread {thread_id} for user {username}")
         
         # 更新归档状态
-        result = await session.execute(
+        result = await db.execute(
             update(UserThread)
             .where(
                 and_(
@@ -496,7 +496,7 @@ class UserThreadService:
         
         if result.rowcount > 0:
             # 返回更新后的记录
-            result = await session.execute(
+            result = await db.execute(
                 select(UserThread).where(
                     and_(
                         UserThread.user_name == username,
@@ -510,14 +510,14 @@ class UserThreadService:
     
     async def get_thread_statistics(
         self, 
-        session: AsyncSession,
+        db: AsyncSession,
         username: Optional[str] = None
     ) -> Dict[str, Any]:
         """获取会话统计信息（实例方法）"""
         if username:
             # 单个用户的统计
             total_query = select(func.count(UserThread.id)).where(UserThread.user_name == username)
-            total_result = await session.execute(total_query)
+            total_result = await db.execute(total_query)
             total_threads = total_result.scalar()
             
             active_query = select(func.count(UserThread.id)).where(
@@ -526,7 +526,7 @@ class UserThreadService:
                     UserThread.is_archived == False
                 )
             )
-            active_result = await session.execute(active_query)
+            active_result = await db.execute(active_query)
             active_threads = active_result.scalar()
             
             return {
@@ -537,10 +537,10 @@ class UserThreadService:
             }
         else:
             # 全局统计
-            total_result = await session.execute(select(func.count(UserThread.id)))
+            total_result = await db.execute(select(func.count(UserThread.id)))
             total_threads = total_result.scalar()
             
-            archived_result = await session.execute(
+            archived_result = await db.execute(
                 select(func.count(UserThread.id)).where(UserThread.is_archived == True)
             )
             archived_threads = archived_result.scalar()
