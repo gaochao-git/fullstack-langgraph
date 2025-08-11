@@ -23,6 +23,7 @@ export const componentRegistry = {
   
   'SOPManagement': lazy(() => import('../pages/sop').then(m => ({ default: m.SOPManagement }))),
   'SOPList': lazy(() => import('../pages/sop').then(m => ({ default: m.SOPList }))),
+  'SOPProblemRuleManagement': lazy(() => import('../pages/sop').then(m => ({ default: m.SOPProblemRuleManagement }))),
   
   'MCPManagement': lazy(() => import('../pages/mcp').then(m => ({ default: m.MCPManagement }))),
   

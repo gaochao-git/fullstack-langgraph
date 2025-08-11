@@ -851,21 +851,13 @@ export function MenuManagement() {
     const dropPos = info.node.pos.split('-');
     const dropPosition = info.dropPosition - Number(dropPos[dropPos.length - 1]);
 
-    // 拖拽信息: {
-      dragKey,
-      dropKey,
-      dropPosition,
-      dropToGap: info.dropToGap
-    });
+    // 拖拽信息
 
     // 找到拖拽的节点和目标节点
     const draggedNode = findNodeByKey(treeData, dragKey);
     const dropNode = findNodeByKey(treeData, dropKey);
     
-    // 找到的节点: {
-      draggedNode: draggedNode ? draggedNode.menu_name : 'null',
-      dropNode: dropNode ? dropNode.menu_name : 'null'
-    });
+    // 找到的节点
     
     if (!draggedNode || !dropNode) {
       // 节点未找到，退出
@@ -955,10 +947,7 @@ export function MenuManagement() {
       }
     }
 
-    // 准备更新数据: {
-      newParentId,
-      newSortOrder
-    });
+    // 准备更新数据
 
     try {
       // 先更新parent_id和sort_order

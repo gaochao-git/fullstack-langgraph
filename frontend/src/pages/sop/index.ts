@@ -12,6 +12,7 @@
 // === 页面组件 ===
 export { default as SOPList } from './pages/SOPList';
 export { default as SOPManagement } from './pages/SOPManagement';
+export { default as SOPProblemRuleManagement } from './pages/SOPProblemRuleManagement';
 
 // === 可复用组件 ===
 export { default as SOPFormModal } from './components/SOPFormModal';
@@ -25,4 +26,5 @@ export { SOPApi, SOPUtils } from '@/services/sopApi';
 
 // === 类型定义 ===
 export * from './types/sop';
+export * from './types/sopProblemRule';
 

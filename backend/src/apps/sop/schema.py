@@ -85,3 +85,68 @@ class ApiResponse(BaseModel):
     data: Optional[object] = None
     message: Optional[str] = None
     error: Optional[str] = None
+
+
+# ============ SOP Problem Rule 相关模型 ============
+
+class RuleInfo(BaseModel):
+    """规则信息"""
+    source_type: str = Field("zabbix", description="数据源类型")
+    item_keys: List[str] = Field(..., description="监控项key列表", min_items=1)
+
+
+class SOPProblemRuleBase(BaseModel):
+    """SOP问题规则基础模型"""
+    rule_name: str = Field(..., description="规则名称", min_length=1, max_length=200)
+    sop_id: str = Field(..., description="关联的SOP ID", min_length=1, max_length=100)
+    rules_info: RuleInfo = Field(..., description="规则信息")
+    is_enabled: bool = Field(True, description="是否启用")
+
+
+class SOPProblemRuleCreate(SOPProblemRuleBase):
+    """创建SOP问题规则请求"""
+    pass
+
+
+class SOPProblemRuleUpdate(BaseModel):
+    """更新SOP问题规则请求"""
+    rule_name: Optional[str] = Field(None, description="规则名称", min_length=1, max_length=200)
+    sop_id: Optional[str] = Field(None, description="关联的SOP ID", min_length=1, max_length=100)
+    rules_info: Optional[RuleInfo] = Field(None, description="规则信息")
+    is_enabled: Optional[bool] = Field(None, description="是否启用")
+
+
+class SOPProblemRuleResponse(BaseModel):
+    """SOP问题规则响应"""
+    id: int
+    rule_name: str
+    sop_id: str
+    rules_info: str  # JSON string from database
+    is_enabled: bool
+    created_by: str
+    updated_by: Optional[str]
+    create_time: str
+    update_time: str
+    
+    # 扩展字段
+    sop_name: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class SOPProblemRuleQuery(BaseModel):
+    """SOP问题规则查询参数"""
+    search: Optional[str] = Field(None, description="搜索关键词", max_length=200)
+    sop_id: Optional[str] = Field(None, description="SOP ID", max_length=100)
+    is_enabled: Optional[bool] = Field(None, description="是否启用")
+    page: int = Field(1, description="页码", ge=1)
+    page_size: int = Field(10, description="每页大小", ge=1, le=100)
+
+
+# ============ Zabbix 相关模型 ============
+
+class ZabbixItemOption(BaseModel):
+    """Zabbix监控项选项"""
+    value: str = Field(..., description="监控项key")
+    label: str = Field(..., description="监控项显示名称")
