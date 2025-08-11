@@ -254,6 +254,199 @@ class ZabbixService:
         
         logger.info(f"Retrieved {len(all_items)} common items from Zabbix")
         return all_items
+    
+    async def get_problems(
+        self,
+        host_ids: Optional[List[str]] = None,
+        severity_min: int = 0,
+        recent_only: bool = True,
+        limit: int = 1000
+    ) -> List[Dict[str, Any]]:
+        """
+        获取当前活跃的问题（异常指标）
+        
+        Args:
+            host_ids: 主机ID列表，为空则获取所有主机
+            severity_min: 最小严重级别 (0:未分类, 1:信息, 2:警告, 3:一般, 4:严重, 5:灾难)
+            recent_only: 是否只获取最近的问题
+            limit: 返回数量限制
+            
+        Returns:
+            问题列表，包含问题详情和相关的监控项信息
+        """
+        # 首先通过trigger.get获取活跃的触发器
+        trigger_params = {
+            "output": ["triggerid", "description", "priority", "lastchange", "value"],
+            "selectHosts": ["hostid", "host", "name", "status"],
+            "selectItems": ["itemid", "name", "key_", "lastvalue", "units"],
+            "selectLastEvent": ["eventid", "name", "clock", "severity", "acknowledged"],
+            "only_true": 1,  # 只获取当前触发的
+            "active": 1,     # 只获取活跃的
+            "sortfield": "lastchange",
+            "sortorder": "DESC",
+            "limit": limit
+        }
+        
+        # 根据严重级别过滤
+        if severity_min > 0:
+            trigger_params["min_severity"] = severity_min
+        
+        # 根据主机过滤
+        if host_ids:
+            trigger_params["hostids"] = host_ids
+        
+        try:
+            triggers = await self._call_api("trigger.get", trigger_params)
+            
+            # 处理返回数据，转换为问题格式
+            severity_names = {
+                "0": "未分类",
+                "1": "信息",
+                "2": "警告", 
+                "3": "一般",
+                "4": "严重",
+                "5": "灾难"
+            }
+            
+            problems = []
+            for trigger in triggers:
+                # 从触发器构建问题对象
+                problem = {}
+                
+                # 使用lastEvent的信息
+                if trigger.get("lastEvent"):
+                    event = trigger["lastEvent"][0] if isinstance(trigger["lastEvent"], list) else trigger["lastEvent"]
+                    problem["eventid"] = event.get("eventid", "")
+                    problem["name"] = event.get("name", trigger.get("description", ""))
+                    problem["clock"] = event.get("clock", str(trigger.get("lastchange", "")))
+                    problem["severity"] = event.get("severity", trigger.get("priority", "0"))
+                    problem["acknowledged"] = event.get("acknowledged", "0")
+                else:
+                    # 如果没有lastEvent，使用触发器信息
+                    problem["eventid"] = f"trigger_{trigger.get('triggerid', '')}"
+                    problem["name"] = trigger.get("description", "")
+                    problem["clock"] = str(trigger.get("lastchange", ""))
+                    problem["severity"] = trigger.get("priority", "0")
+                    problem["acknowledged"] = "0"
+                
+                # 添加严重级别名称
+                problem["severity_name"] = severity_names.get(problem["severity"], "未知")
+                
+                # 添加主机信息
+                if trigger.get("hosts"):
+                    host = trigger["hosts"][0] if isinstance(trigger["hosts"], list) else trigger["hosts"]
+                    problem["hostname"] = host.get("name", host.get("host", ""))
+                    problem["hostid"] = host.get("hostid", "")
+                    problem["host"] = host.get("host", "")
+                    
+                    # 获取主机的IP地址
+                    if host.get("hostid"):
+                        try:
+                            # 获取主机接口信息
+                            host_params = {
+                                "output": ["hostid"],
+                                "selectInterfaces": ["ip", "dns", "main", "type"],
+                                "hostids": [host["hostid"]]
+                            }
+                            host_details = await self._call_api("host.get", host_params)
+                            if host_details and host_details[0].get("interfaces"):
+                                # 找到主接口或第一个接口
+                                interfaces = host_details[0]["interfaces"]
+                                main_interface = next((i for i in interfaces if i.get("main") == "1"), interfaces[0])
+                                if main_interface.get("ip") and main_interface["ip"] != "127.0.0.1":
+                                    problem["host_ip"] = main_interface["ip"]
+                                elif main_interface.get("dns"):
+                                    problem["host_ip"] = main_interface["dns"]
+                                else:
+                                    problem["host_ip"] = main_interface.get("ip", "")
+                            else:
+                                problem["host_ip"] = ""
+                        except:
+                            problem["host_ip"] = ""
+                    else:
+                        problem["host_ip"] = ""
+                else:
+                    problem["hostname"] = ""
+                    problem["hostid"] = ""
+                    problem["host"] = ""
+                    problem["host_ip"] = ""
+                
+                # 添加监控项信息
+                if trigger.get("items"):
+                    item = trigger["items"][0] if isinstance(trigger["items"], list) else trigger["items"]
+                    problem["item_name"] = item.get("name", "")
+                    problem["item_key"] = item.get("key_", "")
+                    problem["last_value"] = item.get("lastvalue", "")
+                    problem["units"] = item.get("units", "")
+                else:
+                    problem["item_name"] = ""
+                    problem["item_key"] = ""
+                    problem["last_value"] = ""
+                    problem["units"] = ""
+                
+                # 添加触发器信息
+                problem["trigger_description"] = trigger.get("description", "")
+                problem["trigger_priority"] = trigger.get("priority", "0")
+                problem["triggerid"] = trigger.get("triggerid", "")
+                
+                problems.append(problem)
+            
+            logger.info(f"Retrieved {len(problems)} problems from Zabbix")
+            return problems
+            
+        except Exception as e:
+            logger.error(f"Failed to get problems from Zabbix: {e}")
+            raise BusinessException(
+                f"获取Zabbix问题失败: {str(e)}",
+                ResponseCode.BAD_GATEWAY
+            )
+    
+    async def get_problem_items(self, limit: int = 1000) -> List[str]:
+        """
+        获取有问题的监控项key列表
+        
+        Args:
+            limit: 返回数量限制
+            
+        Returns:
+            有问题的监控项key列表（去重）
+        """
+        problems = await self.get_problems(limit=limit)
+        
+        # 提取所有有问题的item keys并去重
+        item_keys = set()
+        for problem in problems:
+            item_key = problem.get("item_key", "")
+            if item_key:
+                item_keys.add(item_key)
+        
+        # 转换为有序列表
+        item_keys_list = sorted(list(item_keys))
+        
+        logger.info(f"Found {len(item_keys_list)} unique problem item keys")
+        return item_keys_list
+    
+    async def get_hosts(self) -> List[Dict[str, Any]]:
+        """
+        获取所有监控的主机列表
+        
+        Returns:
+            主机列表
+        """
+        params = {
+            "output": ["hostid", "host", "name", "status"],
+            "sortfield": "name"
+        }
+        
+        hosts = await self._call_api("host.get", params)
+        
+        # 处理返回数据
+        for host in hosts:
+            # 添加状态描述
+            host["status_name"] = "启用" if host.get("status") == "0" else "禁用"
+        
+        logger.info(f"Retrieved {len(hosts)} hosts from Zabbix")
+        return hosts
 
 
 # 单例实例管理

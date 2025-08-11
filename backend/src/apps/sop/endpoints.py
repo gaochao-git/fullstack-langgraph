@@ -308,3 +308,91 @@ async def get_zabbix_items(
             f"获取Zabbix监控项失败: {str(e)}",
             ResponseCode.BAD_GATEWAY
         )
+
+
+@router.get("/v1/sops/zabbix/problems", response_model=UnifiedResponse)
+async def get_zabbix_problems(
+    host_id: Optional[str] = Query(None, description="主机ID"),
+    severity_min: int = Query(2, ge=0, le=5, description="最小严重级别"),
+    recent_only: bool = Query(True, description="只获取最近的问题"),
+    limit: int = Query(100, ge=1, le=1000, description="返回数量限制")
+):
+    """获取Zabbix当前的问题（异常指标）"""
+    try:
+        zabbix_service = get_zabbix_service()
+        
+        async with zabbix_service:
+            host_ids = [host_id] if host_id else None
+            problems = await zabbix_service.get_problems(
+                host_ids=host_ids,
+                severity_min=severity_min,
+                recent_only=recent_only,
+                limit=limit
+            )
+        
+        return success_response(
+            data=problems,
+            msg="获取Zabbix问题成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get Zabbix problems: {e}")
+        raise BusinessException(
+            f"获取Zabbix问题失败: {str(e)}",
+            ResponseCode.BAD_GATEWAY
+        )
+
+
+@router.get("/v1/sops/zabbix/problem-items", response_model=UnifiedResponse)
+async def get_zabbix_problem_items(
+    limit: int = Query(100, ge=1, le=1000, description="返回数量限制")
+):
+    """获取有问题的监控项key列表"""
+    try:
+        zabbix_service = get_zabbix_service()
+        
+        async with zabbix_service:
+            item_keys = await zabbix_service.get_problem_items(limit=limit)
+        
+        # 格式化为选项格式
+        options = [
+            {
+                "value": key,
+                "label": key
+            }
+            for key in item_keys
+        ]
+        
+        return success_response(
+            data=options,
+            msg="获取问题监控项成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get Zabbix problem items: {e}")
+        raise BusinessException(
+            f"获取问题监控项失败: {str(e)}",
+            ResponseCode.BAD_GATEWAY
+        )
+
+
+@router.get("/v1/sops/zabbix/hosts", response_model=UnifiedResponse)
+async def get_zabbix_hosts():
+    """获取Zabbix监控的主机列表"""
+    try:
+        zabbix_service = get_zabbix_service()
+        
+        async with zabbix_service:
+            hosts = await zabbix_service.get_hosts()
+        
+        return success_response(
+            data=hosts,
+            msg="获取Zabbix主机列表成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get Zabbix hosts: {e}")
+        raise BusinessException(
+            f"获取Zabbix主机列表失败: {str(e)}",
+            ResponseCode.BAD_GATEWAY
+        )

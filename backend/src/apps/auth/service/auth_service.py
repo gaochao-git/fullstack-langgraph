@@ -27,7 +27,6 @@ from src.apps.auth.schema import (
 )
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
-from fastapi import HTTPException
 
 
 class AuthService:
@@ -40,191 +39,192 @@ class AuthService:
     
     async def login_with_password(self, request: LoginRequest, ip_address: str = None, user_agent: str = None) -> LoginResponse:
         """使用密码登录"""
-        # 记录登录尝试
-        login_history = AuthLoginHistory(
-            username=request.username,
-            login_type="jwt",
-            ip_address=ip_address,
-            user_agent=user_agent,
-        )
-        
-        try:
-            # 查找用户 (使用异步查询)
-            stmt = select(RbacUser).where(
-                or_(
-                    RbacUser.user_name == request.username,
-                    RbacUser.email == request.username
-                )
+        async with self.db.begin():
+            # 记录登录尝试
+            login_history = AuthLoginHistory(
+                username=request.username,
+                login_type="jwt",
+                ip_address=ip_address,
+                user_agent=user_agent,
             )
-            result = await self.db.execute(stmt)
-            rbac_user = result.scalar_one_or_none()
             
-            if not rbac_user:
-                raise BusinessException(
-                    "用户名或密码错误",
-                    ResponseCode.UNAUTHORIZED
-                )
-            
-            # 检查用户是否激活
-            if rbac_user.is_active != 1:
-                raise BusinessException(
-                    "账户已被禁用",
-                    ResponseCode.FORBIDDEN
-                )
-            
-            # 获取认证信息 (使用异步查询)
-            stmt = select(AuthUser).where(AuthUser.user_id == rbac_user.user_id)
-            result = await self.db.execute(stmt)
-            auth_user = result.scalar_one_or_none()
-            
-            if not auth_user:
-                # 首次登录，创建认证记录
-                auth_user = AuthUser(
-                    user_id=rbac_user.user_id,
-                    create_time=datetime.now(timezone.utc)
-                )
-                self.db.add(auth_user)
-                await self.db.flush()
-            
-            # 检查账户是否被锁定
-            if auth_user.locked_until and auth_user.locked_until > datetime.now(timezone.utc):
-                remaining_minutes = (auth_user.locked_until - datetime.now(timezone.utc)).seconds // 60
-                raise BusinessException(
-                    f"账户已被锁定，请{remaining_minutes}分钟后再试",
-                    ResponseCode.FORBIDDEN
-                )
-            
-            # 验证密码
-            if not auth_user.password_hash or not PasswordUtils.verify_password(
-                request.password, auth_user.password_hash
-            ):
-                # 增加失败次数
-                auth_user.login_attempts += 1
-                
-                # 检查是否需要锁定账户
-                if auth_user.login_attempts >= self.max_login_attempts:
-                    auth_user.locked_until = datetime.now(timezone.utc) + timedelta(
-                        minutes=self.lockout_duration
+            try:
+                # 查找用户 (使用异步查询)
+                stmt = select(RbacUser).where(
+                    or_(
+                        RbacUser.user_name == request.username,
+                        RbacUser.email == request.username
                     )
-                    await self.db.commit()
-                    raise BusinessException(
-                        f"登录失败次数过多，账户已被锁定{self.lockout_duration}分钟",
-                        ResponseCode.FORBIDDEN
-                    )
-                
-                await self.db.commit()
-                raise BusinessException(
-                    "用户名或密码错误",
-                    ResponseCode.UNAUTHORIZED
                 )
-            
-            # 检查MFA
-            if auth_user.mfa_enabled:
-                if not request.mfa_code:
-                    raise BusinessException(
-                        "需要MFA验证码",
-                        ResponseCode.FORBIDDEN
-                    )
+                result = await self.db.execute(stmt)
+                rbac_user = result.scalar_one_or_none()
                 
-                if not MFAUtils.verify_totp(auth_user.mfa_secret, request.mfa_code):
+                if not rbac_user:
                     raise BusinessException(
-                        "MFA验证码错误",
+                        "用户名或密码错误",
                         ResponseCode.UNAUTHORIZED
                     )
-            
-            # 登录成功，重置失败次数
-            auth_user.login_attempts = 0
-            auth_user.last_login = datetime.now(timezone.utc)
-            auth_user.last_login_ip = None  # 应从请求中获取
-            
-            # 获取用户角色和权限
-            user_roles = await self._get_user_roles(rbac_user.user_id)
-            user_permissions = []  # TODO: Fix async permissions
-            
-            # 创建令牌
-            token_data = {
-                "sub": rbac_user.user_id,
-                "username": rbac_user.user_name,
-                "roles": [role["role_id"] for role in user_roles],
-                "permissions": user_permissions  # 可选：将权限加入token
-            }
-            
-            access_token = JWTUtils.create_access_token(token_data)
-            refresh_token = JWTUtils.create_refresh_token(token_data)
-            
-            # 保存令牌记录
-            access_jti = JWTUtils.get_jti(access_token)
-            refresh_jti = JWTUtils.get_jti(refresh_token)
-            
-            # Access Token
-            access_token_record = AuthToken(
-                user_id=rbac_user.user_id,
-                token_jti=access_jti,
-                token_type="access",
-                expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
-                device_id=request.device_id,
-                device_name=request.device_name,
-                ip_address=None,  # 应从请求中获取
-                user_agent=None,  # 应从请求中获取
-            )
-            self.db.add(access_token_record)
-            
-            # Refresh Token
-            refresh_token_record = AuthToken(
-                user_id=rbac_user.user_id,
-                token_jti=refresh_jti,
-                token_type="refresh",
-                expires_at=datetime.now(timezone.utc) + timedelta(days=7),
-                device_id=request.device_id,
-                device_name=request.device_name,
-                ip_address=None,  # 应从请求中获取
-                user_agent=None,  # 应从请求中获取
-            )
-            self.db.add(refresh_token_record)
-            
-            # 记录登录成功
-            login_history.user_id = rbac_user.user_id
-            login_history.success = True
-            
-            self.db.add(login_history)
-            await self.db.commit()
-            
-            # 构建用户信息
-            user_info = {
-                "id": str(rbac_user.id),
-                "user_id": rbac_user.user_id,
-                "username": rbac_user.user_name,
-                "display_name": rbac_user.display_name,
-                "email": rbac_user.email,
-                "roles": user_roles
-            }
-            
-            return LoginResponse(
-                access_token=access_token,
-                refresh_token=refresh_token,
-                token_type="Bearer",
-                expires_in=1800,  # 30分钟
-                user=user_info
-            )
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            # 记录登录失败
-            login_history.success = False
-            login_history.failure_reason = str(e)
-            self.db.add(login_history)
-            await self.db.commit()
-            raise BusinessException(
-                "登录处理失败",
-                ResponseCode.INTERNAL_ERROR
-            )
+                
+                # 检查用户是否激活
+                if rbac_user.is_active != 1:
+                    raise BusinessException(
+                        "账户已被禁用",
+                        ResponseCode.FORBIDDEN
+                    )
+                
+                # 获取认证信息 (使用异步查询)
+                stmt = select(AuthUser).where(AuthUser.user_id == rbac_user.user_id)
+                result = await self.db.execute(stmt)
+                auth_user = result.scalar_one_or_none()
+                
+                if not auth_user:
+                    # 首次登录，创建认证记录
+                    auth_user = AuthUser(
+                        user_id=rbac_user.user_id,
+                        create_time=datetime.now(timezone.utc)
+                    )
+                    self.db.add(auth_user)
+                    await self.db.flush()
+                
+                # 检查账户是否被锁定
+                if auth_user.locked_until and auth_user.locked_until > datetime.now(timezone.utc):
+                    remaining_minutes = (auth_user.locked_until - datetime.now(timezone.utc)).seconds // 60
+                    raise BusinessException(
+                        f"账户已被锁定，请{remaining_minutes}分钟后再试",
+                        ResponseCode.FORBIDDEN
+                    )
+                
+                # 验证密码
+                if not auth_user.password_hash or not PasswordUtils.verify_password(
+                    request.password, auth_user.password_hash
+                ):
+                    # 增加失败次数
+                    auth_user.login_attempts += 1
+                    
+                    # 检查是否需要锁定账户
+                    if auth_user.login_attempts >= self.max_login_attempts:
+                        auth_user.locked_until = datetime.now(timezone.utc) + timedelta(
+                            minutes=self.lockout_duration
+                        )
+                        await self.db.flush()
+                        raise BusinessException(
+                            f"登录失败次数过多，账户已被锁定{self.lockout_duration}分钟",
+                            ResponseCode.FORBIDDEN
+                        )
+                    
+                    await self.db.flush()
+                    raise BusinessException(
+                        "用户名或密码错误",
+                        ResponseCode.UNAUTHORIZED
+                    )
+                
+                # 检查MFA
+                if auth_user.mfa_enabled:
+                    if not request.mfa_code:
+                        raise BusinessException(
+                            "需要MFA验证码",
+                            ResponseCode.FORBIDDEN
+                        )
+                    
+                    if not MFAUtils.verify_totp(auth_user.mfa_secret, request.mfa_code):
+                        raise BusinessException(
+                            "MFA验证码错误",
+                            ResponseCode.UNAUTHORIZED
+                        )
+                
+                # 登录成功，重置失败次数
+                auth_user.login_attempts = 0
+                auth_user.last_login = datetime.now(timezone.utc)
+                auth_user.last_login_ip = None  # 应从请求中获取
+                
+                # 获取用户角色和权限
+                user_roles = await self._get_user_roles(rbac_user.user_id)
+                user_permissions = []  # TODO: Fix async permissions
+                
+                # 创建令牌
+                token_data = {
+                    "sub": rbac_user.user_id,
+                    "username": rbac_user.user_name,
+                    "roles": [role["role_id"] for role in user_roles],
+                    "permissions": user_permissions  # 可选：将权限加入token
+                }
+                
+                access_token = JWTUtils.create_access_token(token_data)
+                refresh_token = JWTUtils.create_refresh_token(token_data)
+                
+                # 保存令牌记录
+                access_jti = JWTUtils.get_jti(access_token)
+                refresh_jti = JWTUtils.get_jti(refresh_token)
+                
+                # Access Token
+                access_token_record = AuthToken(
+                    user_id=rbac_user.user_id,
+                    token_jti=access_jti,
+                    token_type="access",
+                    expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
+                    device_id=request.device_id,
+                    device_name=request.device_name,
+                    ip_address=None,  # 应从请求中获取
+                    user_agent=None,  # 应从请求中获取
+                )
+                self.db.add(access_token_record)
+                
+                # Refresh Token
+                refresh_token_record = AuthToken(
+                    user_id=rbac_user.user_id,
+                    token_jti=refresh_jti,
+                    token_type="refresh",
+                    expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+                    device_id=request.device_id,
+                    device_name=request.device_name,
+                    ip_address=None,  # 应从请求中获取
+                    user_agent=None,  # 应从请求中获取
+                )
+                self.db.add(refresh_token_record)
+                
+                # 记录登录成功
+                login_history.user_id = rbac_user.user_id
+                login_history.success = True
+                
+                self.db.add(login_history)
+                await self.db.flush()
+                
+                # 构建用户信息
+                user_info = {
+                    "id": str(rbac_user.id),
+                    "user_id": rbac_user.user_id,
+                    "username": rbac_user.user_name,
+                    "display_name": rbac_user.display_name,
+                    "email": rbac_user.email,
+                    "roles": user_roles
+                }
+                
+                return LoginResponse(
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                    token_type="Bearer",
+                    expires_in=1800,  # 30分钟
+                    user=user_info
+                )
+                
+            except BusinessException:
+                raise
+            except Exception as e:
+                # 记录登录失败
+                login_history.success = False
+                login_history.failure_reason = str(e)
+                self.db.add(login_history)
+                await self.db.flush()
+                raise BusinessException(
+                    "登录处理失败",
+                    ResponseCode.INTERNAL_ERROR
+                )
     
     async def register_user(self, request, ip_address: str = None, user_agent: str = None):
         """用户注册"""
         from src.apps.auth.schema import RegisterRequest, RegisterResponse
         
-        try:
+        async with self.db.begin():
             # 检查用户名是否已存在
             stmt = select(RbacUser).where(
                 or_(
@@ -286,8 +286,7 @@ class AuthService:
             )
             self.db.add(login_history)
             
-            # 提交事务
-            await self.db.commit()
+            await self.db.flush()
             
             return RegisterResponse(
                 success=True,
@@ -298,20 +297,10 @@ class AuthService:
                     "email": request.email
                 }
             )
-            
-        except HTTPException:
-            await self.db.rollback()
-            raise
-        except Exception as e:
-            await self.db.rollback()
-            raise BusinessException(
-                f"注册失败: {str(e)}",
-                ResponseCode.INTERNAL_ERROR
-            )
     
     async def refresh_access_token(self, refresh_token: str) -> Dict[str, str]:
         """刷新访问令牌"""
-        try:
+        async with self.db.begin():
             # 解码刷新令牌
             payload = JWTUtils.decode_token(refresh_token)
             
@@ -374,25 +363,17 @@ class AuthService:
             # 更新刷新令牌的最后使用时间
             token_record.last_used_at = datetime.now(timezone.utc)
             
-            await self.db.commit()
+            await self.db.flush()
             
             return {
                 "access_token": new_access_token,
                 "token_type": "Bearer",
                 "expires_in": 1800
             }
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise BusinessException(
-                "刷新令牌失败",
-                ResponseCode.INTERNAL_ERROR
-            )
     
     async def logout(self, user_id: str, current_jti: str, everywhere: bool = False):
         """登出"""
-        try:
+        async with self.db.begin():
             if everywhere:
                 # 撤销用户的所有令牌
                 stmt = select(AuthToken).where(
@@ -421,13 +402,7 @@ class AuthService:
                     token.revoke_reason = "用户主动登出"
                     TokenBlacklist.add(current_jti)
             
-            await self.db.commit()
-            
-        except Exception as e:
-            raise BusinessException(
-                "登出失败",
-                ResponseCode.INTERNAL_ERROR
-            )
+            await self.db.flush()
     
     async def get_user_profile(self, user_id: str) -> UserProfile:
         """获取用户资料"""
@@ -473,7 +448,7 @@ class AuthService:
                 mfa_enabled=auth_user.mfa_enabled if auth_user else False
             )
             
-        except HTTPException:
+        except BusinessException:
             raise
         except Exception as e:
             raise BusinessException(
@@ -483,7 +458,7 @@ class AuthService:
     
     async def change_password(self, user_id: str, old_password: str, new_password: str):
         """修改密码"""
-        try:
+        async with self.db.begin():
             # 获取认证信息
             stmt = select(AuthUser).where(
                 AuthUser.user_id == user_id
@@ -517,15 +492,7 @@ class AuthService:
             auth_user.password_changed_at = datetime.now(timezone.utc)
             auth_user.require_password_change = False
             
-            await self.db.commit()
-            
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise BusinessException(
-                "修改密码失败",
-                ResponseCode.INTERNAL_ERROR
-            )
+            await self.db.flush()
     
     async def create_api_key(
         self, 
@@ -534,7 +501,7 @@ class AuthService:
         creator: str = None
     ) -> CreateAPIKeyResponse:
         """创建API密钥"""
-        try:
+        async with self.db.begin():
             # 生成API密钥
             api_key, prefix, key_hash = APIKeyUtils.generate_api_key()
             
@@ -557,7 +524,8 @@ class AuthService:
             )
             
             self.db.add(api_key_record)
-            await self.db.commit()
+            await self.db.flush()
+            await self.db.refresh(api_key_record)
             
             # 构建返回信息
             key_info = APIKeyInfo(
@@ -579,12 +547,6 @@ class AuthService:
             return CreateAPIKeyResponse(
                 api_key=api_key,
                 key_info=key_info
-            )
-            
-        except Exception as e:
-            raise BusinessException(
-                "创建API密钥失败",
-                ResponseCode.INTERNAL_ERROR
             )
     
     async def _get_user_roles(self, user_id: str) -> List[Dict[str, Any]]:

@@ -324,72 +324,63 @@ apps/your_module/
 
 #### 1. 异步数据库用法（推荐）
 
-##### 1.1 FastAPI 依赖注入（自动管理事务）
+##### 1.1 FastAPI 依赖注入
 ```python
 from src.shared.db.config import get_async_db
-
-@router.get("/users")
-async def list_users(db: AsyncSession = Depends(get_async_db)):
-    # FastAPI 自动管理事务
-    users = await db.execute(select(User))
-    return users.scalars().all()
+@router.post("/users")
+async def create_user(user_data: UserCreate, db: AsyncSession = Depends(get_async_db)):
+    # 写操作需要调用service层，由service层管理事务
+    return await user_service.create_user(db, user_data)
 ```
 
 ##### 1.2 Service层事务管理
 ```python
-# 写操作必须使用 async with db.begin()
-async def create_user(self, db: AsyncSession, user_data: dict):
-    async with db.begin():  # 显式事务管理
-        user = User(**user_data)
-        db.add(user)
-        await db.flush()
-        return user
+class UserService:
+    # 写操作必须使用 async with db.begin()
+    async def create_user(self, db: AsyncSession, user_data: dict):
+        async with db.begin():  # 显式事务管理
+            user = User(**user_data)
+            db.add(user)            # 将对象添加到会话
+            await db.flush()        # 真正执行SQL,但是不提交事物，上层会自己管理事务
+            await db.refresh(user)  # 从数据库重新加载对象，包含数据库自动生成的值
+            return user             # 返回包含数据库生成值的完整对象
 
-# 只读操作不需要 begin()
-async def get_user_by_id(self, db: AsyncSession, user_id: str):
-    result = await db.execute(
-        select(User).where(User.user_id == user_id)
-    )
-    return result.scalar_one_or_none()
+    # 只读操作不需要 begin()
+    async def get_user_by_id(self, db: AsyncSession, user_id: str):
+        result = await db.execute(select(User).where(User.user_id == user_id))
+        return result.scalar_one_or_none()
 ```
 
 ##### 1.3 独立上下文管理器（后台任务）
 ```python
 from src.shared.db.config import get_async_db_context
-
 async with get_async_db_context() as session:
     # 用于非FastAPI环境，如后台任务
     result = await session.execute(select(User))
     await session.commit()  # 需要手动提交
 ```
 
-#### 2. 同步数据库用法（仅限必要场景）
+#### 2. 同步数据库用法（仅限智能体langgraph直接查询数据库场景，后续可能会废弃掉）
 
 ```python
-from src.shared.db.config import get_sync_db
+from src.shared.db.config import get_sync_db, get_sync_db_context
 
-# 方式1：生成器模式
-db_gen = get_sync_db()
-db = next(db_gen)
-try:
+# 方式1：生成器模式（用于依赖注入）
+def some_sync_function(db: Session = Depends(get_sync_db)):
     agent = db.query(AgentConfig).filter(...).first()
-finally:
-    db.close()
+    # 需要手动管理事务
 
-# 方式2：上下文管理器模式（推荐）
-with get_sync_db() as db:
+# 方式2：上下文管理器模式（推荐，自动提交）
+with get_sync_db_context() as db:
     model = db.query(AIModelConfig).filter(...).first()
+    # 退出时自动提交（成功）或回滚（异常）
 ```
 
 #### 3. 何时使用 begin()
 
 | 场景 | 是否需要 begin() | 原因 |
 |------|-----------------|------|
-| FastAPI 端点 + Depends | ❌ | FastAPI 自动管理 |
 | Service 层写操作 | ✅ | 需要事务原子性 |
-| 多表操作 | ✅ | 保证数据一致性 |
-| 只读查询 | ❌ | 不需要事务 |
-| 使用 get_async_db_context() | ❌ | context manager 自带事务 |
 
 #### 4. 数据库使用最佳实践
 
@@ -399,6 +390,48 @@ with get_sync_db() as db:
 4. **复杂操作（多表、先删后增）必须在同一事务中**
 5. **只在必要时使用同步（如 LangGraph 工具）**
 6. **避免混用同步和异步会话**
+
+#### 5. 常见场景示例
+
+##### 5.1 多表操作事务
+```python
+async def create_user_with_role(self, db: AsyncSession, user_data: dict, role_id: str):
+    async with db.begin():
+        # 创建用户
+        user = RbacUser(**user_data)
+        db.add(user)
+        await db.flush()
+        
+        # 创建用户角色关联
+        user_role = RbacUsersRoles(user_id=user.user_id, role_id=role_id)
+        db.add(user_role)
+        await db.flush()
+        
+        # 创建认证记录
+        auth_user = AuthUser(user_id=user.user_id, password_hash=hash_password(password))
+        db.add(auth_user)
+        await db.flush()
+        
+        return user  # 事务自动提交
+```
+
+##### 5.2 错误的做法
+```python
+# ❌ 错误：在路由层处理事务
+@router.post("/users")
+async def create_user(data: UserCreate, db: AsyncSession = Depends(get_async_db)):
+    user = User(**data.dict())
+    db.add(user)
+    await db.commit()  # 错误！路由层不应该管理事务
+    return user
+
+# ❌ 错误：Service层忘记使用 begin()
+async def update_user(self, db: AsyncSession, user_id: str, data: dict):
+    user = await self.get_user_by_id(db, user_id)
+    for key, value in data.items():
+        setattr(user, key, value)
+    await db.commit()  # 错误！没有事务上下文
+```
 
 ### 注意事项
 

@@ -110,6 +110,47 @@ export class SOPApi {
   static async getTeams() {
     return await omind_get('/api/v1/sops/meta/teams');
   }
+
+  // 获取Zabbix监控项
+  static async getZabbixItems(params: { search?: string; limit?: number } = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    const url = `/api/v1/sops/zabbix/items${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+
+  // 获取Zabbix问题
+  static async getZabbixProblems(params: {
+    host_id?: string;
+    severity_min?: number;
+    recent_only?: boolean;
+    limit?: number;
+  } = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.host_id) queryParams.append('host_id', params.host_id);
+    if (params.severity_min !== undefined) queryParams.append('severity_min', params.severity_min.toString());
+    if (params.recent_only !== undefined) queryParams.append('recent_only', params.recent_only.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    const url = `/api/v1/sops/zabbix/problems${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+
+  // 获取Zabbix问题监控项
+  static async getZabbixProblemItems(params: { limit?: number } = {}) {
+    const queryParams = new URLSearchParams();
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    const url = `/api/v1/sops/zabbix/problem-items${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+
+  // 获取Zabbix主机列表
+  static async getZabbixHosts() {
+    return await omind_get('/api/v1/sops/zabbix/hosts');
+  }
 }
+
+// 导出实例
+export const sopApi = new SOPApi();
 
 export default SOPApi;

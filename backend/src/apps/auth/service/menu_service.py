@@ -5,11 +5,12 @@
 from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_
-from fastapi import HTTPException, status
 
 from src.apps.user.models import RbacMenu
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 logger = get_logger(__name__)
 
@@ -31,9 +32,9 @@ class MenuService:
                 result = await db.execute(stmt)
                 existing = result.scalar_one_or_none()
                 if existing:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"菜单ID {menu_data['menu_id']} 已存在"
+                    raise BusinessException(
+                        f"菜单ID {menu_data['menu_id']} 已存在",
+                        ResponseCode.CONFLICT
                     )
             
             # 生成菜单ID（如果没有提供）
@@ -79,9 +80,9 @@ class MenuService:
             menu = result.scalar_one_or_none()
             
             if not menu:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"菜单 {menu_id} 不存在"
+                raise BusinessException(
+                    f"菜单 {menu_id} 不存在",
+                    ResponseCode.NOT_FOUND
                 )
             
             # 更新字段
@@ -123,9 +124,9 @@ class MenuService:
             children = result.scalars().all()
             
             if children:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="该菜单有子菜单，请先删除子菜单"
+                raise BusinessException(
+                    "该菜单有子菜单，请先删除子菜单",
+                    ResponseCode.VALIDATION_ERROR
                 )
             
             # 删除菜单
@@ -133,9 +134,9 @@ class MenuService:
             result = await db.execute(stmt)
             
             if result.rowcount == 0:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"菜单 {menu_id} 不存在"
+                raise BusinessException(
+                    f"菜单 {menu_id} 不存在",
+                    ResponseCode.NOT_FOUND
                 )
             
             logger.info(f"Deleted menu: {menu_id}")

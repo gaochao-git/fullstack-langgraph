@@ -10,8 +10,9 @@ from typing import Optional, Dict, Any, Union
 from passlib.context import CryptContext
 import jwt
 from jwt import PyJWTError as JWTError
-from fastapi import HTTPException, status
 import pyotp
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 
 
 # 密码加密上下文
@@ -117,10 +118,9 @@ class JWTUtils:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             return payload
         except JWTError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的认证凭据",
-                headers={"WWW-Authenticate": "Bearer"},
+            raise BusinessException(
+                "无效的认证凭据",
+                ResponseCode.UNAUTHORIZED
             )
     
     @staticmethod

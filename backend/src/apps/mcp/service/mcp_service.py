@@ -18,13 +18,13 @@ class MCPService:
     
     async def create_server(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         server_data: MCPServerCreate
     ) -> MCPServer:
         """创建MCP服务器"""
-        async with session.begin():
+        async with db.begin():
             # 业务验证
-            result = await session.execute(
+            result = await db.execute(
                 select(MCPServer).where(MCPServer.server_id == server_data.server_id)
             )
             existing = result.scalar_one_or_none()
@@ -54,18 +54,18 @@ class MCPService:
             
             logger.info(f"Creating MCP server: {server_data.server_id}")
             instance = MCPServer(**data)
-            session.add(instance)
-            await session.flush()
-            await session.refresh(instance)
+            db.add(instance)
+            await db.flush()
+            await db.refresh(instance)
             return instance
     
     async def get_server_by_id(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         server_id: str
     ) -> Optional[MCPServer]:
         """根据ID获取MCP服务器"""
-        result = await session.execute(
+        result = await db.execute(
             select(MCPServer).where(MCPServer.server_id == server_id)
         )
         return result.scalar_one_or_none()
@@ -83,7 +83,7 @@ class MCPService:
     
     async def list_servers(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         params: MCPQueryParams
     ) -> Tuple[List[MCPServer], int]:
         """列出MCP服务器"""
@@ -104,7 +104,7 @@ class MCPService:
                 query = query.where(and_(*conditions))
             
             query = query.offset(params.offset).limit(params.limit)
-            result = await session.execute(query)
+            result = await db.execute(query)
             servers = list(result.scalars().all())
             
             # 获取搜索总数
@@ -113,7 +113,7 @@ class MCPService:
             )
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         else:
             # 普通查询
@@ -131,28 +131,28 @@ class MCPService:
             
             query = query.order_by(MCPServer.create_time.desc())
             query = query.offset(params.offset).limit(params.limit)
-            result = await session.execute(query)
+            result = await db.execute(query)
             servers = list(result.scalars().all())
             
             # 计算总数
             count_query = select(func.count(MCPServer.id))
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         
         return servers, total
     
     async def update_server(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         server_id: str, 
         server_data: MCPServerUpdate
     ) -> Optional[MCPServer]:
         """更新MCP服务器"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(
+            result = await db.execute(
                 select(MCPServer).where(MCPServer.server_id == server_id)
             )
             existing = result.scalar_one_or_none()
@@ -182,25 +182,25 @@ class MCPService:
             data['update_time'] = now_shanghai()
             
             logger.info(f"Updating MCP server: {server_id}")
-            await session.execute(
+            await db.execute(
                 update(MCPServer).where(MCPServer.server_id == server_id).values(**data)
             )
             
             # 返回更新后的数据
-            result = await session.execute(
+            result = await db.execute(
                 select(MCPServer).where(MCPServer.server_id == server_id)
             )
             return result.scalar_one_or_none()
     
     async def delete_server(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         server_id: str
     ) -> bool:
         """删除MCP服务器"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(
+            result = await db.execute(
                 select(MCPServer).where(MCPServer.server_id == server_id)
             )
             existing = result.scalar_one_or_none()
@@ -208,14 +208,14 @@ class MCPService:
                 return False
             
             logger.info(f"Deleting MCP server: {server_id}")
-            result = await session.execute(
+            result = await db.execute(
                 delete(MCPServer).where(MCPServer.server_id == server_id)
             )
             return result.rowcount > 0
     
-    async def get_teams(self, session: AsyncSession) -> List[str]:
+    async def get_teams(self, db: AsyncSession) -> List[str]:
         """获取所有团队"""
-        result = await session.execute(
+        result = await db.execute(
             select(distinct(MCPServer.team_name)).where(
                 MCPServer.team_name.isnot(None)
             )
@@ -224,10 +224,10 @@ class MCPService:
     
     async def get_status_statistics(
         self, 
-        session: AsyncSession
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取状态统计"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 MCPServer.connection_status.label('status'),
                 func.count(MCPServer.id).label('count')
@@ -235,23 +235,23 @@ class MCPService:
         )
         return [{'status': row.status, 'count': row.count} for row in result.fetchall()]
     
-    async def get_enabled_servers(self, session: AsyncSession) -> List[MCPServer]:
+    async def get_enabled_servers(self, db: AsyncSession) -> List[MCPServer]:
         """获取启用的服务器（兼容性方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(MCPServer).where(MCPServer.is_enabled == 'on')
         )
         return list(result.scalars().all())
     
-    async def get_connected_servers(self, session: AsyncSession) -> List[MCPServer]:
+    async def get_connected_servers(self, db: AsyncSession) -> List[MCPServer]:
         """获取已连接的服务器（兼容性方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(MCPServer).where(MCPServer.connection_status == 'connected')
         )
         return list(result.scalars().all())
     
     async def update_connection_status(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         server_id: str,
         status: str
     ) -> Optional[MCPServer]:
@@ -260,18 +260,18 @@ class MCPService:
             'connection_status': status,
             'update_time': now_shanghai()
         }
-        await session.execute(
+        await db.execute(
             update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
         )
         
-        result = await session.execute(
+        result = await db.execute(
             select(MCPServer).where(MCPServer.server_id == server_id)
         )
         return result.scalar_one_or_none()
     
     async def update_server_tools(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         server_id: str,
         tools: List[str]
     ) -> Optional[MCPServer]:
@@ -282,11 +282,11 @@ class MCPService:
             'available_tools': json.dumps(tools) if tools else None,
             'update_time': now_shanghai()
         }
-        await session.execute(
+        await db.execute(
             update(MCPServer).where(MCPServer.server_id == server_id).values(**update_data)
         )
         
-        result = await session.execute(
+        result = await db.execute(
             select(MCPServer).where(MCPServer.server_id == server_id)
         )
         return result.scalar_one_or_none()

@@ -23,22 +23,22 @@ class AIModelService:
     
     async def create_model(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         model_data: Dict[str, Any]
     ) -> AIModelConfig:
         """创建AI模型"""
-        async with session.begin():
+        async with db.begin():
             # 生成唯一ID
             model_id = f"model-{uuid.uuid4().hex[:12]}"
             
             # 检查模型ID是否已存在
-            result = await session.execute(
+            result = await db.execute(
                 select(AIModelConfig).where(AIModelConfig.model_id == model_id)
             )
             existing = result.scalar_one_or_none()
             while existing:
                 model_id = f"model-{uuid.uuid4().hex[:12]}"
-                result = await session.execute(
+                result = await db.execute(
                     select(AIModelConfig).where(AIModelConfig.model_id == model_id)
                 )
                 existing = result.scalar_one_or_none()
@@ -60,25 +60,25 @@ class AIModelService:
             
             logger.info(f"Creating AI model: {model_data.get('model_name')}")
             instance = AIModelConfig(**data)
-            session.add(instance)
-            await session.flush()
-            await session.refresh(instance)
+            db.add(instance)
+            await db.flush()
+            await db.refresh(instance)
             return instance
     
     async def get_model_by_id(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         model_id: str
     ) -> Optional[AIModelConfig]:
         """根据ID获取AI模型"""
-        result = await session.execute(
+        result = await db.execute(
             select(AIModelConfig).where(AIModelConfig.model_id == model_id)
         )
         return result.scalar_one_or_none()
     
     async def list_models(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         page: int = 1,
         size: int = 10,
         provider: Optional[str] = None,
@@ -103,7 +103,7 @@ class AIModelService:
                 query = query.where(and_(*conditions))
             
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             models = list(result.scalars().all())
             
             # 获取搜索总数
@@ -112,7 +112,7 @@ class AIModelService:
             )
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         else:
             # 普通查询
@@ -128,28 +128,28 @@ class AIModelService:
             
             query = query.order_by(AIModelConfig.create_time.desc())
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             models = list(result.scalars().all())
             
             # 计算总数
             count_query = select(func.count(AIModelConfig.id))
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         
         return models, total
     
     async def update_model(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         model_id: str, 
         model_data: Dict[str, Any]
     ) -> Optional[AIModelConfig]:
         """更新AI模型"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(
+            result = await db.execute(
                 select(AIModelConfig).where(AIModelConfig.model_id == model_id)
             )
             existing = result.scalar_one_or_none()
@@ -171,25 +171,25 @@ class AIModelService:
                 data['config_data'] = json.dumps(data['config_data'])
             
             logger.info(f"Updating AI model: {model_id}")
-            await session.execute(
+            await db.execute(
                 update(AIModelConfig).where(AIModelConfig.model_id == model_id).values(**data)
             )
             
             # 返回更新后的数据
-            result = await session.execute(
+            result = await db.execute(
                 select(AIModelConfig).where(AIModelConfig.model_id == model_id)
             )
             return result.scalar_one_or_none()
     
     async def delete_model(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         model_id: str
     ) -> bool:
         """删除AI模型"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(
+            result = await db.execute(
                 select(AIModelConfig).where(AIModelConfig.model_id == model_id)
             )
             existing = result.scalar_one_or_none()
@@ -197,23 +197,23 @@ class AIModelService:
                 return False
             
             logger.info(f"Deleting AI model: {model_id}")
-            result = await session.execute(
+            result = await db.execute(
                 delete(AIModelConfig).where(AIModelConfig.model_id == model_id)
             )
             return result.rowcount > 0
     
-    async def get_providers(self, session: AsyncSession) -> List[str]:
+    async def get_providers(self, db: AsyncSession) -> List[str]:
         """获取所有提供商"""
-        result = await session.execute(
+        result = await db.execute(
             select(distinct(AIModelConfig.model_provider)).where(
                 AIModelConfig.model_provider.isnot(None)
             )
         )
         return [row[0] for row in result.fetchall()]
     
-    async def get_model_types(self, session: AsyncSession) -> List[str]:
+    async def get_model_types(self, db: AsyncSession) -> List[str]:
         """获取所有模型类型"""
-        result = await session.execute(
+        result = await db.execute(
             select(distinct(AIModelConfig.model_type)).where(
                 AIModelConfig.model_type.isnot(None)
             )
@@ -222,10 +222,10 @@ class AIModelService:
     
     async def get_status_statistics(
         self, 
-        session: AsyncSession
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取状态统计"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 AIModelConfig.model_status.label('status'),
                 func.count(AIModelConfig.id).label('count')
@@ -235,10 +235,10 @@ class AIModelService:
     
     async def get_provider_statistics(
         self, 
-        session: AsyncSession
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取提供商统计"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 AIModelConfig.model_provider.label('provider'),
                 func.count(AIModelConfig.id).label('count')
@@ -246,41 +246,41 @@ class AIModelService:
         )
         return [{'provider': row.provider, 'count': row.count} for row in result.fetchall()]
     
-    async def get_active_models(self, session: AsyncSession) -> List[AIModelConfig]:
+    async def get_active_models(self, db: AsyncSession) -> List[AIModelConfig]:
         """获取激活的模型（兼容性方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(AIModelConfig).where(AIModelConfig.model_status == 'active')
         )
         return list(result.scalars().all())
     
     async def get_models_by_provider(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         provider: str
     ) -> List[AIModelConfig]:
         """获取指定提供商的模型（兼容性方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(AIModelConfig).where(AIModelConfig.model_provider == provider)
         )
         return list(result.scalars().all())
     
     async def update_model_status(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         model_id: str,
         status: str
     ) -> Optional[AIModelConfig]:
         """更新模型状态"""
-        async with session.begin():
+        async with db.begin():
             update_data = {
                 'model_status': status,
                 'update_time': now_shanghai()
             }
-            await session.execute(
+            await db.execute(
                 update(AIModelConfig).where(AIModelConfig.model_id == model_id).values(**update_data)
             )
             
-            result = await session.execute(
+            result = await db.execute(
                 select(AIModelConfig).where(AIModelConfig.model_id == model_id)
             )
             return result.scalar_one_or_none()

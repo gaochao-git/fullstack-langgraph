@@ -18,13 +18,13 @@ class ScheduledTaskService:
     
     async def create_task(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         task_data: Dict[str, Any]
     ) -> PeriodicTask:
         """创建定时任务"""
-        async with session.begin():
+        async with db.begin():
             # 业务验证
-            result = await session.execute(
+            result = await db.execute(
                 select(PeriodicTask).where(PeriodicTask.task_name == task_data['task_name'])
             )
             existing = result.scalar_one_or_none()
@@ -44,36 +44,36 @@ class ScheduledTaskService:
             
             logger.info(f"Creating scheduled task: {task_data['task_name']}")
             instance = PeriodicTask(**data)
-            session.add(instance)
-            await session.flush()
-            await session.refresh(instance)
+            db.add(instance)
+            await db.flush()
+            await db.refresh(instance)
             return instance
     
     async def get_task_by_id(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         task_id: int
     ) -> Optional[PeriodicTask]:
         """根据ID获取定时任务"""
-        result = await session.execute(
+        result = await db.execute(
             select(PeriodicTask).where(PeriodicTask.id == task_id)
         )
         return result.scalar_one_or_none()
     
     async def get_task_by_name(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         task_name: str
     ) -> Optional[PeriodicTask]:
         """根据名称获取定时任务"""
-        result = await session.execute(
+        result = await db.execute(
             select(PeriodicTask).where(PeriodicTask.task_name == task_name)
         )
         return result.scalar_one_or_none()
     
     async def list_tasks(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         page: int = 1,
         size: int = 10,
         enabled_only: bool = False,
@@ -97,7 +97,7 @@ class ScheduledTaskService:
                 query = query.where(and_(*conditions))
             
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             tasks = list(result.scalars().all())
             
             # 获取搜索总数
@@ -106,7 +106,7 @@ class ScheduledTaskService:
             )
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         else:
             # 普通查询
@@ -120,28 +120,28 @@ class ScheduledTaskService:
             
             query = query.order_by(PeriodicTask.update_time.desc())
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             tasks = list(result.scalars().all())
             
             # 计算总数
             count_query = select(func.count(PeriodicTask.id))
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         
         return tasks, total
     
     async def update_task(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         task_id: int, 
         task_data: Dict[str, Any]
     ) -> Optional[PeriodicTask]:
         """更新定时任务"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(
+            result = await db.execute(
                 select(PeriodicTask).where(PeriodicTask.id == task_id)
             )
             existing = result.scalar_one_or_none()
@@ -160,25 +160,25 @@ class ScheduledTaskService:
             data['update_time'] = now_shanghai()
             
             logger.info(f"Updating scheduled task: {task_id}")
-            await session.execute(
+            await db.execute(
                 update(PeriodicTask).where(PeriodicTask.id == task_id).values(**data)
             )
             
             # 返回更新后的数据
-            result = await session.execute(
+            result = await db.execute(
                 select(PeriodicTask).where(PeriodicTask.id == task_id)
             )
             return result.scalar_one_or_none()
     
     async def delete_task(
         self, 
-        session: AsyncSession, 
+        db: AsyncSession, 
         task_id: int
     ) -> bool:
         """删除定时任务"""
-        async with session.begin():
+        async with db.begin():
             # 检查是否存在
-            result = await session.execute(
+            result = await db.execute(
                 select(PeriodicTask).where(PeriodicTask.id == task_id)
             )
             existing = result.scalar_one_or_none()
@@ -186,19 +186,19 @@ class ScheduledTaskService:
                 return False
             
             logger.info(f"Deleting scheduled task: {task_id}")
-            result = await session.execute(
+            result = await db.execute(
                 delete(PeriodicTask).where(PeriodicTask.id == task_id)
             )
             return result.rowcount > 0
     
     async def enable_task(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         task_id: int
     ) -> bool:
         """启用定时任务"""
-        async with session.begin():
-            result = await session.execute(
+        async with db.begin():
+            result = await db.execute(
                 update(PeriodicTask)
                 .where(PeriodicTask.id == task_id)
                 .values(task_enabled=True, update_time=now_shanghai())
@@ -207,31 +207,31 @@ class ScheduledTaskService:
     
     async def disable_task(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         task_id: int
     ) -> bool:
         """禁用定时任务"""
-        async with session.begin():
-            result = await session.execute(
+        async with db.begin():
+            result = await db.execute(
                 update(PeriodicTask)
                 .where(PeriodicTask.id == task_id)
                 .values(task_enabled=False, update_time=now_shanghai())
             )
             return result.rowcount > 0
     
-    async def get_enabled_tasks(self, session: AsyncSession) -> List[PeriodicTask]:
+    async def get_enabled_tasks(self, db: AsyncSession) -> List[PeriodicTask]:
         """获取启用的任务（兼容性方法）"""
-        result = await session.execute(
+        result = await db.execute(
             select(PeriodicTask).where(PeriodicTask.task_enabled == True)
         )
         return list(result.scalars().all())
     
     async def get_task_statistics(
         self, 
-        session: AsyncSession
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取任务统计"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 func.count(PeriodicTask.id).label('total'),
                 func.sum(
@@ -248,14 +248,14 @@ class ScheduledTaskService:
     # TaskResult相关方法
     async def get_task_execution_logs(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         task_id: int,
         skip: int = 0,
         limit: int = 50
     ) -> List[TaskResult]:
         """获取任务执行日志"""
         # 先获取任务信息
-        task_result = await session.execute(
+        task_result = await db.execute(
             select(PeriodicTask).where(PeriodicTask.id == task_id)
         )
         task = task_result.scalar_one_or_none()
@@ -263,7 +263,7 @@ class ScheduledTaskService:
             return []
         
         # 根据任务名称获取执行结果
-        result = await session.execute(
+        result = await db.execute(
             select(TaskResult)
             .where(TaskResult.task_name == task.task_name)
             .offset(skip)
@@ -274,22 +274,22 @@ class ScheduledTaskService:
     
     async def get_task_result_by_id(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         result_id: int
     ) -> Optional[TaskResult]:
         """根据ID获取任务执行结果"""
-        result = await session.execute(
+        result = await db.execute(
             select(TaskResult).where(TaskResult.id == result_id)
         )
         return result.scalar_one_or_none()
     
     async def get_recent_task_results(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         limit: int = 50
     ) -> List[TaskResult]:
         """获取最近的任务执行结果"""
-        result = await session.execute(
+        result = await db.execute(
             select(TaskResult)
             .order_by(TaskResult.task_execute_time.desc())
             .limit(limit)
@@ -299,7 +299,7 @@ class ScheduledTaskService:
     # CeleryTaskRecord相关方法
     async def list_task_records(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         page: int = 1,
         size: int = 10,
         task_name: Optional[str] = None,
@@ -320,7 +320,7 @@ class ScheduledTaskService:
                 query = query.where(and_(*conditions))
             
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             records = list(result.scalars().all())
             
             # 获取搜索总数
@@ -329,7 +329,7 @@ class ScheduledTaskService:
             )
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         else:
             # 普通查询
@@ -343,35 +343,35 @@ class ScheduledTaskService:
             
             query = query.order_by(CeleryTaskRecord.create_time.desc())
             query = query.offset(offset).limit(size)
-            result = await session.execute(query)
+            result = await db.execute(query)
             records = list(result.scalars().all())
             
             # 计算总数
             count_query = select(func.count(CeleryTaskRecord.id))
             if conditions:
                 count_query = count_query.where(and_(*conditions))
-            count_result = await session.execute(count_query)
+            count_result = await db.execute(count_query)
             total = count_result.scalar()
         
         return records, total
     
     async def get_task_record_by_id(
         self,
-        session: AsyncSession,
+        db: AsyncSession,
         record_id: int
     ) -> Optional[CeleryTaskRecord]:
         """根据ID获取任务执行记录"""
-        result = await session.execute(
+        result = await db.execute(
             select(CeleryTaskRecord).where(CeleryTaskRecord.id == record_id)
         )
         return result.scalar_one_or_none()
     
     async def get_record_statistics(
         self,
-        session: AsyncSession
+        db: AsyncSession
     ) -> List[Dict[str, Any]]:
         """获取任务记录状态统计"""
-        result = await session.execute(
+        result = await db.execute(
             select(
                 CeleryTaskRecord.task_status.label('status'),
                 func.count(CeleryTaskRecord.id).label('count')

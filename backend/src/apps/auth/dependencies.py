@@ -70,7 +70,7 @@ async def get_current_user_optional(
                 
                 # 更新最后使用时间
                 api_key_record.last_used_at = datetime.now(timezone.utc)
-                await db.commit()
+                # 注意：依赖项中的更新将由FastAPI的请求生命周期自动提交
                 
                 # 查询用户信息
                 stmt = select(RbacUser).where(RbacUser.user_id == api_key_record.user_id)

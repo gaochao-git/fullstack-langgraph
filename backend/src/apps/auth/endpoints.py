@@ -455,8 +455,6 @@ async def revoke_api_key(
     key.is_active = 0  # 同时设置为非激活状态
     key.update_by = current_user["username"]  # 记录更新人
     
-    await db.commit()
-    
     return {"message": "API密钥已永久撤销"}
 
 
@@ -497,8 +495,6 @@ async def toggle_api_key_status(
     # 切换激活状态
     key.is_active = 0 if key.is_active == 1 else 1
     key.update_by = current_user["username"]  # 记录更新人
-    
-    await db.commit()
     
     status = "启用" if key.is_active == 1 else "禁用"
     return {"message": f"API密钥已{status}", "is_active": bool(key.is_active)}
@@ -569,7 +565,7 @@ async def terminate_session(
         token.revoke_reason = "用户主动终止会话"
         TokenBlacklist.add(token.token_jti)
     
-    db.commit()
+    # 注意：事务将由FastAPI自动提交
     
     return {"message": "会话已终止"}
 
@@ -653,7 +649,6 @@ async def create_menu(
         menu_data.dict(exclude_unset=True),
         creator="admin"
     )
-    await db.commit()
     return MenuResponse(**menu.to_dict())
 
 
@@ -685,7 +680,6 @@ async def update_menu(
         menu_data.dict(exclude_unset=True),
         updater="admin"
     )
-    await db.commit()
     return MenuResponse(**menu.to_dict())
 
 
@@ -696,7 +690,6 @@ async def delete_menu(
 ):
     """删除菜单"""
     await menu_service.delete_menu(db, menu_id)
-    await db.commit()
     return {"message": f"菜单 {menu_id} 删除成功"}
 
 
@@ -722,7 +715,6 @@ async def update_menu_sort(
         menu_id, 
         {"sort_order": sort_order}
     )
-    await db.commit()
     return {"message": "排序更新成功"}
 
 
@@ -774,6 +766,6 @@ async def init_admin(
     )
     db.add(auth_user)
     
-    db.commit()
+    # 注意：事务将由FastAPI自动提交
     
     return {"message": "管理员账户创建成功"}

@@ -9,11 +9,13 @@ import {
   BarChart3,
   Activity,
   CheckCircle,
-  Loader2
+  Loader2,
+  AlertCircle
 } from "lucide-react";
 import ReactEcharts from 'echarts-for-react';
 import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
+import ZabbixProblemsModal from './ZabbixProblemsModal';
 
 // 故障类型定义
 type FaultPriority = "P1" | "P2" | "P3";
@@ -204,6 +206,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
   const [expandedFault, setExpandedFault] = useState<string | null>(null);
+  const [showZabbixProblems, setShowZabbixProblems] = useState(false);
 
   // 将故障四要素组合成一句话提问
   const formatDiagnosisQuestion = (fault: Fault): string => {
@@ -334,6 +337,21 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
           </h1>
         </div>
         <div className="ml-8">
+          {/* 添加查看Zabbix异常按钮 */}
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setShowZabbixProblems(true)}
+              className={cn(
+                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 flex items-center gap-2",
+                isDark
+                  ? 'bg-red-600/20 hover:bg-red-600/40 border-red-500 text-red-300 hover:text-white shadow-md'
+                  : 'bg-red-500/20 hover:bg-red-500/40 border-red-400 text-red-700 hover:text-red-800 shadow-md'
+              )}
+            >
+              <AlertCircle className="w-4 h-4" />
+              查看Zabbix异常
+            </button>
+          </div>
           <div className="relative">
             <Search className={cn(
               "absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4",
@@ -1049,6 +1067,24 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
           💡 也可直接在下方输入框描述新故障进行智能诊断
         </p>
       </div>
+
+      {/* Zabbix问题模态框 */}
+      <ZabbixProblemsModal
+        visible={showZabbixProblems}
+        onClose={() => setShowZabbixProblems(false)}
+        onSelectProblem={(problem) => {
+          // 构造诊断问题
+          const diagnosisMessage = `发现Zabbix异常：${problem.hostname} - ${problem.name}
+当前值：${problem.last_value} ${problem.units}
+严重级别：${problem.severity_name}
+监控项：${problem.item_key}
+请帮助我诊断这个问题。`;
+          
+          if (onStartDiagnosis) {
+            onStartDiagnosis(diagnosisMessage);
+          }
+        }}
+      />
     </div>
   );
 }

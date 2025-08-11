@@ -30,7 +30,7 @@ class MCPGatewayConfigService:
         config_data: MCPGatewayConfigCreate
     ) -> MCPConfig:
         """创建MCP Gateway配置"""
-        try:
+        async with db.begin():
             # 检查名称是否已存在
             existing = await db.execute(
                 select(MCPConfig).where(
@@ -61,20 +61,11 @@ class MCPGatewayConfigService:
             )
 
             db.add(new_config)
-            await db.commit()
+            await db.flush()
             await db.refresh(new_config)
 
             logger.info(f"创建MCP Gateway配置成功: {config_data.name}")
             return new_config
-
-        except IntegrityError as e:
-            await db.rollback()
-            logger.error(f"创建MCP Gateway配置失败，数据完整性错误: {str(e)}", exc_info=True)
-            raise BusinessException("配置名称已存在", ResponseCode.BAD_REQUEST)
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"创建MCP Gateway配置失败: {str(e)}", exc_info=True)
-            raise BusinessException("创建配置失败", ResponseCode.INTERNAL_ERROR)
 
     async def get_config_by_id(self, db: AsyncSession, config_id: int) -> Optional[MCPConfig]:
         """根据ID获取配置"""
@@ -152,7 +143,7 @@ class MCPGatewayConfigService:
         config_data: MCPGatewayConfigUpdate
     ) -> Optional[MCPConfig]:
         """更新配置"""
-        try:
+        async with db.begin():
             # 检查配置是否存在
             config = await self.get_config_by_id(db, config_id)
             if not config:
@@ -206,7 +197,7 @@ class MCPGatewayConfigService:
                     .where(MCPConfig.id == config_id)
                     .values(**update_data)
                 )
-                await db.commit()
+                await db.flush()
                 
                 # 重新获取更新后的配置
                 config = await self.get_config_by_id(db, config_id)
@@ -214,17 +205,9 @@ class MCPGatewayConfigService:
             logger.info(f"更新MCP Gateway配置成功: {config_id}")
             return config
 
-        except BusinessException:
-            await db.rollback()
-            raise
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"更新MCP Gateway配置失败: {str(e)}", exc_info=True)
-            raise BusinessException("更新配置失败", ResponseCode.INTERNAL_ERROR)
-
     async def delete_config(self, db: AsyncSession, config_id: int) -> bool:
         """软删除配置"""
-        try:
+        async with db.begin():
             config = await self.get_config_by_id(db, config_id)
             if not config:
                 return False
@@ -234,15 +217,10 @@ class MCPGatewayConfigService:
                 .where(MCPConfig.id == config_id)
                 .values(is_deleted=1)
             )
-            await db.commit()
+            await db.flush()
 
             logger.info(f"删除MCP Gateway配置成功: {config_id}")
             return True
-
-        except Exception as e:
-            await db.rollback()
-            logger.error(f"删除MCP Gateway配置失败: {str(e)}")
-            raise BusinessException("删除配置失败", ResponseCode.INTERNAL_ERROR)
 
     async def get_all_active_configs(self, db: AsyncSession) -> List[MCPConfig]:
         """获取所有激活的配置"""
