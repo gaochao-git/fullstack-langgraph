@@ -20,6 +20,7 @@ import ZabbixProblemsModal from './ZabbixProblemsModal';
 // 故障类型定义
 type FaultPriority = "P1" | "P2" | "P3";
 type FaultStatus = "active" | "analyzing" | "analyzed" | "resolved";
+type FaultTeam = "系统" | "网络" | "组件" | "数据库" | "云管" | "机房";
 
 interface Fault {
   id: string;
@@ -29,6 +30,7 @@ interface Fault {
   time: string;
   priority: FaultPriority;
   status: FaultStatus;
+  team?: FaultTeam; // 新增团队字段
   sopId?: string;
   analysisResult?: string;
   threadId?: string;
@@ -205,6 +207,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [teamFilter, setTeamFilter] = useState<string>("all");
   const [expandedFault, setExpandedFault] = useState<string | null>(null);
   const [showZabbixProblems, setShowZabbixProblems] = useState(false);
 
@@ -232,6 +235,14 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
     const p2Faults = mockFaults.filter(f => f.priority === "P2").length;
     const p3Faults = mockFaults.filter(f => f.priority === "P3").length;
     
+    // 团队统计
+    const systemFaults = mockFaults.filter(f => f.team === "系统" || f.tags?.includes("系统")).length;
+    const networkFaults = mockFaults.filter(f => f.team === "网络" || f.tags?.includes("网络")).length;
+    const componentFaults = mockFaults.filter(f => f.team === "组件" || f.tags?.includes("组件")).length;
+    const databaseFaults = mockFaults.filter(f => f.team === "数据库" || f.tags?.includes("数据库")).length;
+    const cloudFaults = mockFaults.filter(f => f.team === "云管" || f.tags?.includes("云管")).length;
+    const roomFaults = mockFaults.filter(f => f.team === "机房" || f.tags?.includes("机房")).length;
+    
     const result = {
       total: mockFaults.length,
       active: activeFaults,
@@ -240,7 +251,13 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
       resolved: resolvedFaults,
       p1: p1Faults,
       p2: p2Faults,
-      p3: p3Faults
+      p3: p3Faults,
+      system: systemFaults,
+      network: networkFaults,
+      component: componentFaults,
+      database: databaseFaults,
+      cloud: cloudFaults,
+      room: roomFaults
     };
     
     // 统计结果
@@ -268,6 +285,13 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
     // 状态过滤
     if (statusFilter !== "all") {
       filtered = filtered.filter(fault => fault.status === statusFilter);
+    }
+
+    // 团队过滤
+    if (teamFilter !== "all") {
+      filtered = filtered.filter(fault => 
+        fault.team === teamFilter || fault.tags?.includes(teamFilter)
+      );
     }
 
     // 时间过滤
@@ -319,62 +343,52 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
         ? "bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900" 
         : "bg-gradient-to-br from-blue-50 via-white to-blue-50"
     )}>
-      {/* 标题和搜索区域 */}
+      {/* 统一的统计和过滤区域 */}
       <div className={cn(
-        "flex items-center justify-between rounded-lg border backdrop-blur-sm py-1.5 px-3 shadow-xl transition-colors duration-200",
+        "rounded-xl p-3 border backdrop-blur-sm shadow-xl transition-colors duration-200",
         isDark 
-          ? "bg-gradient-to-r from-slate-800/75 via-cyan-900/30 to-slate-800/75 border-cyan-500/40 shadow-cyan-500/25" 
-          : "bg-gradient-to-r from-blue-100/75 via-purple-100/30 to-blue-100/75 border-blue-300/40 shadow-blue-500/25"
+          ? "bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 border-blue-500/40 shadow-blue-500/20" 
+          : "bg-gradient-to-br from-blue-100/75 via-purple-100/35 to-blue-100/75 border-blue-300/40 shadow-blue-500/20"
       )}>
-        <div className="text-center flex-1">
-          <h1 className={cn(
-            "text-lg md:text-xl font-bold bg-gradient-to-r bg-clip-text text-transparent",
-            isDark 
-              ? "from-blue-400 to-purple-400" 
-              : "from-blue-600 to-purple-600"
-          )}>
-            故障诊断助手
-          </h1>
-        </div>
-        <div className="ml-8">
-          {/* 添加查看Zabbix异常按钮 */}
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              onClick={() => setShowZabbixProblems(true)}
-              className={cn(
-                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 flex items-center gap-2",
-                isDark
-                  ? 'bg-red-600/20 hover:bg-red-600/40 border-red-500 text-red-300 hover:text-white shadow-md'
-                  : 'bg-red-500/20 hover:bg-red-500/40 border-red-400 text-red-700 hover:text-red-800 shadow-md'
-              )}
-            >
-              <AlertCircle className="w-4 h-4" />
-              查看Zabbix异常
-            </button>
+        {/* 第一行：操作按钮 */}
+        <div className="flex items-center justify-between gap-4 mb-3">
+          {/* 左侧：查看Zabbix异常按钮 */}
+          <button
+            onClick={() => setShowZabbixProblems(true)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200 flex items-center gap-2",
+              isDark
+                ? 'bg-red-600/20 hover:bg-red-600/40 border-red-500 text-red-300 hover:text-white shadow-md'
+                : 'bg-red-500/20 hover:bg-red-500/40 border-red-400 text-red-700 hover:text-red-800 shadow-md'
+            )}
+          >
+            <AlertCircle className="w-4 h-4" />
+            查看Zabbix异常
+          </button>
+          
+          {/* 中间：机房占位 */}
+          <div className="flex flex-wrap gap-1.5">
+            {['10', '11', '12', '20', '21', '30', '31', '32'].map((room) => (
+              <button
+                key={room}
+                className={cn(
+                  "px-3 py-1 rounded text-xs font-medium border transition-all duration-200",
+                  isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50'
+                    : 'bg-gray-100/50 border-gray-300 text-gray-700 hover:bg-gray-200/50'
+                )}
+              >
+                {room}
+              </button>
+            ))}
           </div>
-          <div className="relative">
-            <Search className={cn(
-              "absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4",
-              isDark ? "text-slate-400" : "text-gray-500"
-            )} />
-            <input
-              placeholder="搜索故障标题、描述或IP..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={cn(
-                "w-full pl-9 pr-4 py-1 text-xs md:text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-400 shadow-lg transition-all duration-200",
-                isDark 
-                  ? "bg-slate-700/60 border-slate-600 text-slate-100 placeholder-slate-400 focus:bg-slate-700" 
-                  : "bg-white/60 border-gray-300 text-gray-900 placeholder-gray-500 focus:bg-white"
-              )}
-            />
-          </div>
-          {/* 时间筛选按钮 */}
-          <div className="flex flex-wrap gap-2 mt-2">
+          
+          {/* 右侧：时间筛选按钮 */}
+          <div className="flex flex-wrap gap-1.5">
             <button 
               onClick={() => setTimeFilter(timeFilter === '10min' ? 'all' : '10min')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200",
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200",
                 timeFilter === '10min' 
                   ? isDark
                     ? 'bg-cyan-500 border-cyan-400 text-white shadow-md' 
@@ -389,7 +403,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
             <button 
               onClick={() => setTimeFilter(timeFilter === '30min' ? 'all' : '30min')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200",
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200",
                 timeFilter === '30min' 
                   ? isDark
                     ? 'bg-cyan-500 border-cyan-400 text-white shadow-md' 
@@ -404,7 +418,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
             <button 
               onClick={() => setTimeFilter(timeFilter === '1hour' ? 'all' : '1hour')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200",
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200",
                 timeFilter === '1hour' 
                   ? isDark
                     ? 'bg-cyan-500 border-cyan-400 text-white shadow-md' 
@@ -419,7 +433,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
             <button 
               onClick={() => setTimeFilter(timeFilter === 'today' ? 'all' : 'today')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200",
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200",
                 timeFilter === 'today' 
                   ? isDark
                     ? 'bg-cyan-500 border-cyan-400 text-white shadow-md' 
@@ -434,7 +448,7 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
             <button 
               onClick={() => setTimeFilter(timeFilter === 'week' ? 'all' : 'week')}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs md:text-sm font-medium border transition-all duration-200",
+                "px-3 py-1 rounded-lg text-xs font-medium border transition-all duration-200",
                 timeFilter === 'week' 
                   ? isDark
                     ? 'bg-cyan-500 border-cyan-400 text-white shadow-md' 
@@ -448,251 +462,138 @@ function DiagnosticAgentWelcome({ onDiagnose, onContinueChat, onEndDiagnosis, on
             </button>
           </div>
         </div>
-      </div>
 
-      {/* 双栏统计仪表板 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 第一栏：优先级统计 */}
-        <div className={cn(
-          "rounded-xl p-2 border backdrop-blur-sm shadow-xl transition-colors duration-200",
-          isDark 
-            ? "bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 border-blue-500/40 shadow-blue-500/20" 
-            : "bg-gradient-to-br from-blue-100/75 via-purple-100/35 to-blue-100/75 border-blue-300/40 shadow-blue-500/20"
-        )}>
+        {/* 第二行：团队报警统计 */}
+        <div className="flex items-center gap-4">
           <h3 className={cn(
-            "text-xs md:text-sm font-semibold mb-1 flex items-center gap-1",
+            "text-sm font-semibold flex items-center gap-2",
             isDark ? "text-white" : "text-gray-900"
           )}>
             <AlertTriangle className={cn(
               "w-4 h-4",
               isDark ? "text-red-400" : "text-red-600"
             )} />
-            报警等级
+            团队报警
           </h3>
-          <div className="flex items-center gap-2">
-            {/* 总数环形图+数字 */}
-            <div className="relative flex-shrink-0">
-              <ReactEcharts
-                option={{
-                  series: [{
-                    type: 'pie',
-                    radius: ['75%', '99%'],
-                    center: ['50%', '50%'],
-                    label: { show: false },
-                    labelLine: { show: false },
-                    silent: true,
-                    data: [
-                      { value: stats.p1, name: 'P1', itemStyle: { color: '#ef4444', borderWidth: 0 } },
-                      { value: stats.p2, name: 'P2', itemStyle: { color: '#f97316', borderWidth: 0 } },
-                      { value: stats.p3, name: 'P3', itemStyle: { color: '#eab308', borderWidth: 0 } },
-                    ]
-                  }]
-                }}
-                style={{ width: 90, height: 90 }}
-                opts={{ renderer: 'canvas', devicePixelRatio: window.devicePixelRatio }}
-                notMerge={true}
-                lazyUpdate={true}
-              />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className={cn(
-                  "text-xs md:text-sm font-bold leading-none",
-                  isDark ? "text-yellow-400" : "text-blue-600"
-                )}>{stats.total}</span>
-                <span className={cn(
-                  "text-xs md:text-sm leading-tight",
-                  isDark ? "text-slate-300" : "text-gray-600"
-                )}>总数</span>
-              </div>
-            </div>
-            {/* P1/P2/P3按钮 */}
-            <div className="flex flex-col gap-2 flex-1">
-              <button onClick={() => { 
-                  if (priorityFilter === 'P1') {
-                    setPriorityFilter('all');
-                  } else {
-                    setPriorityFilter('P1');
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200",
-                  priorityFilter === 'P1' 
-                    ? 'bg-red-500 border-red-400 text-white shadow-lg transform scale-105' 
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-red-300 hover:bg-red-900/40 hover:border-red-500'
-                      : 'bg-red-100/50 border-red-300 text-red-700 hover:bg-red-200/50 hover:border-red-400'
-                )}
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />P1 紧急 ({stats.p1})
-              </button>
-              <button onClick={() => { 
-                  if (priorityFilter === 'P2') {
-                    setPriorityFilter('all');
-                  } else {
-                    setPriorityFilter('P2');
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200",
-                  priorityFilter === 'P2' 
-                    ? 'bg-orange-500 border-orange-400 text-white shadow-lg transform scale-105' 
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-orange-300 hover:bg-orange-900/40 hover:border-orange-500'
-                      : 'bg-orange-100/50 border-orange-300 text-orange-700 hover:bg-orange-200/50 hover:border-orange-400'
-                )}
-              >
-                <Clock className="w-3.5 h-3.5" />P2 重要 ({stats.p2})
-              </button>
-              <button onClick={() => { 
-                  if (priorityFilter === 'P3') {
-                    setPriorityFilter('all');
-                  } else {
-                    setPriorityFilter('P3');
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200",
-                  priorityFilter === 'P3' 
-                    ? 'bg-yellow-500 border-yellow-400 text-gray-900 shadow-lg transform scale-105' 
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-yellow-300 hover:bg-yellow-900/40 hover:border-yellow-500'
-                      : 'bg-yellow-100/50 border-yellow-300 text-yellow-700 hover:bg-yellow-200/50 hover:border-yellow-400'
-                )}
-              >
-                <Server className="w-3.5 h-3.5" />P3 一般 ({stats.p3})
-              </button>
+          
+          {/* 总数环形图+数字 */}
+          <div className="relative flex-shrink-0">
+            <ReactEcharts
+              option={{
+                series: [{
+                  type: 'pie',
+                  radius: ['75%', '99%'],
+                  center: ['50%', '50%'],
+                  label: { show: false },
+                  labelLine: { show: false },
+                  silent: true,
+                  data: [
+                    { value: stats.system || 3, name: '系统', itemStyle: { color: '#3b82f6', borderWidth: 0 } },
+                    { value: stats.network || 0, name: '网络', itemStyle: { color: '#8b5cf6', borderWidth: 0 } },
+                    { value: stats.component || 0, name: '组件', itemStyle: { color: '#06b6d4', borderWidth: 0 } },
+                    { value: stats.database || 5, name: '数据库', itemStyle: { color: '#10b981', borderWidth: 0 } },
+                    { value: stats.cloud || 0, name: '云管', itemStyle: { color: '#f59e0b', borderWidth: 0 } },
+                    { value: stats.room || 0, name: '机房', itemStyle: { color: '#ec4899', borderWidth: 0 } },
+                  ]
+                }]
+              }}
+              style={{ width: 80, height: 80 }}
+              opts={{ renderer: 'canvas', devicePixelRatio: window.devicePixelRatio }}
+              notMerge={true}
+              lazyUpdate={true}
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className={cn(
+                "text-sm font-bold leading-none",
+                isDark ? "text-yellow-400" : "text-blue-600"
+              )}>{stats.total}</span>
+              <span className={cn(
+                "text-xs leading-tight",
+                isDark ? "text-slate-300" : "text-gray-600"
+              )}>总数</span>
             </div>
           </div>
-        </div>
-        {/* 第二栏：状态统计 */}
-        <div className={cn(
-          "rounded-xl p-2 border backdrop-blur-sm shadow-xl transition-colors duration-200",
-          isDark 
-            ? "bg-gradient-to-br from-slate-800/75 via-blue-900/35 to-slate-700/75 border-blue-500/40 shadow-blue-500/20" 
-            : "bg-gradient-to-br from-blue-100/75 via-purple-100/35 to-blue-100/75 border-blue-300/40 shadow-blue-500/20"
-        )}>
-          <h3 className={cn(
-            "text-xs md:text-sm font-semibold mb-1 flex items-center gap-1",
-            isDark ? "text-white" : "text-gray-900"
-          )}>
-            <Activity className={cn(
-              "w-4 h-4",
-              isDark ? "text-blue-400" : "text-blue-600"
-            )} />
-            处理状态
-          </h3>
-          <div className="flex items-center gap-2">
-            {/* 已解决占比环形图+数字 */}
-            <div className="relative flex-shrink-0">
-              <ReactEcharts
-                option={{
-                  series: [{
-                    type: 'pie',
-                    radius: ['75%', '99%'],
-                    center: ['50%', '50%'],
-                    label: { show: false },
-                    labelLine: { show: false },
-                    silent: true,
-                    data: [
-                      { value: stats.active, name: '待处理', itemStyle: { color: '#ef4444', borderWidth: 0 } },
-                      { value: stats.analyzing, name: '分析中', itemStyle: { color: '#3b82f6', borderWidth: 0 } },
-                      { value: stats.analyzed, name: '已分析', itemStyle: { color: '#10b981', borderWidth: 0 } },
-                      { value: stats.resolved, name: '已解决', itemStyle: { color: '#a855f7', borderWidth: 0 } },
-                    ]
-                  }]
-                }}
-                style={{ width: 90, height: 90 }}
-                opts={{ renderer: 'canvas', devicePixelRatio: window.devicePixelRatio }}
-                notMerge={true}
-                lazyUpdate={true}
-              />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className={cn(
-                  "text-sm font-bold leading-none",
-                  isDark ? "text-red-400" : "text-red-600"
-                )}>{stats.total > 0 ? Math.round(stats.active / stats.total * 100) : 0}%</span>
-                <span className={cn(
-                  "text-xs leading-tight",
-                  isDark ? "text-slate-300" : "text-gray-600"
-                )}>待处理</span>
-              </div>
-            </div>
-            {/* 状态按钮组 */}
-            <div className="flex flex-col gap-2 flex-1">
-              <button onClick={() => { 
-                  if (statusFilter === 'active') {
-                    setStatusFilter('all');
-                  } else {
-                    setStatusFilter('active');
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200",
-                  statusFilter === 'active' 
-                    ? 'bg-red-500 border-red-400 text-white shadow-lg transform scale-105' 
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-red-300 hover:bg-red-900/40 hover:border-red-500'
-                      : 'bg-red-100/50 border-red-300 text-red-700 hover:bg-red-200/50 hover:border-red-400'
-                )}
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />待处理 ({stats.active})
-              </button>
-              <button onClick={() => { 
-                  if (statusFilter === 'analyzing') {
-                    setStatusFilter('all');
-                  } else {
-                    setStatusFilter('analyzing');
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-200",
-                  statusFilter === 'analyzing' 
-                    ? 'bg-blue-500 border-blue-400 text-white shadow-lg transform scale-105' 
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-blue-300 hover:bg-blue-900/40 hover:border-blue-500'
-                      : 'bg-blue-100/50 border-blue-300 text-blue-700 hover:bg-blue-200/50 hover:border-blue-400'
-                )}
-              >
-                <Activity className="w-3.5 h-3.5" />分析中 ({stats.analyzing})
-              </button>
-              <div className="flex gap-2">
-                <button onClick={() => { 
-                    if (statusFilter === 'analyzed') {
-                      setStatusFilter('all');
-                    } else {
-                      setStatusFilter('analyzed');
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200 flex-1",
-                    statusFilter === 'analyzed' 
-                      ? 'bg-green-500 border-green-400 text-white shadow-lg transform scale-105' 
-                      : isDark
-                        ? 'bg-slate-700/50 border-slate-600 text-green-300 hover:bg-green-900/40 hover:border-green-500'
-                        : 'bg-green-100/50 border-green-300 text-green-700 hover:bg-green-200/50 hover:border-green-400'
-                  )}
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />已分析 ({stats.analyzed})
-                </button>
-                <button onClick={() => { 
-                    if (statusFilter === 'resolved') {
-                      setStatusFilter('all');
-                    } else {
-                      setStatusFilter('resolved');
-                    }
-                  }}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200 flex-1",
-                    statusFilter === 'resolved' 
-                      ? 'bg-purple-500 border-purple-400 text-white shadow-lg transform scale-105' 
-                      : isDark
-                        ? 'bg-slate-700/50 border-slate-600 text-purple-300 hover:bg-purple-900/40 hover:border-purple-500'
-                        : 'bg-purple-100/50 border-purple-300 text-purple-700 hover:bg-purple-200/50 hover:border-purple-400'
-                  )}
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />已解决 ({stats.resolved})
-                </button>
-              </div>
-            </div>
+          
+          {/* 团队按钮 */}
+          <div className="flex-1 flex flex-wrap gap-2">
+            <button
+              onClick={() => setTeamFilter(teamFilter === '系统' ? 'all' : '系统')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                teamFilter === '系统'
+                  ? 'bg-blue-500 border-blue-400 text-white shadow-lg'
+                  : isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-blue-300 hover:bg-blue-900/40 hover:border-blue-500'
+                    : 'bg-blue-100/50 border-blue-300 text-blue-700 hover:bg-blue-200/50 hover:border-blue-400'
+              )}
+            >
+              系统 ({stats.system || 3})
+            </button>
+            <button
+              onClick={() => setTeamFilter(teamFilter === '网络' ? 'all' : '网络')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                teamFilter === '网络'
+                  ? 'bg-purple-500 border-purple-400 text-white shadow-lg'
+                  : isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-purple-300 hover:bg-purple-900/40 hover:border-purple-500'
+                    : 'bg-purple-100/50 border-purple-300 text-purple-700 hover:bg-purple-200/50 hover:border-purple-400'
+              )}
+            >
+              网络 ({stats.network || 0})
+            </button>
+            <button
+              onClick={() => setTeamFilter(teamFilter === '组件' ? 'all' : '组件')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                teamFilter === '组件'
+                  ? 'bg-cyan-500 border-cyan-400 text-white shadow-lg'
+                  : isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-900/40 hover:border-cyan-500'
+                    : 'bg-cyan-100/50 border-cyan-300 text-cyan-700 hover:bg-cyan-200/50 hover:border-cyan-400'
+              )}
+            >
+              组件 ({stats.component || 0})
+            </button>
+            <button
+              onClick={() => setTeamFilter(teamFilter === '数据库' ? 'all' : '数据库')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                teamFilter === '数据库'
+                  ? 'bg-green-500 border-green-400 text-white shadow-lg'
+                  : isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-green-300 hover:bg-green-900/40 hover:border-green-500'
+                    : 'bg-green-100/50 border-green-300 text-green-700 hover:bg-green-200/50 hover:border-green-400'
+              )}
+            >
+              数据库 ({stats.database || 5})
+            </button>
+            <button
+              onClick={() => setTeamFilter(teamFilter === '云管' ? 'all' : '云管')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                teamFilter === '云管'
+                  ? 'bg-yellow-500 border-yellow-400 text-gray-900 shadow-lg'
+                  : isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-yellow-300 hover:bg-yellow-900/40 hover:border-yellow-500'
+                    : 'bg-yellow-100/50 border-yellow-300 text-yellow-700 hover:bg-yellow-200/50 hover:border-yellow-400'
+              )}
+            >
+              云管 ({stats.cloud || 0})
+            </button>
+            <button
+              onClick={() => setTeamFilter(teamFilter === '机房' ? 'all' : '机房')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                teamFilter === '机房'
+                  ? 'bg-pink-500 border-pink-400 text-white shadow-lg'
+                  : isDark
+                    ? 'bg-slate-700/50 border-slate-600 text-pink-300 hover:bg-pink-900/40 hover:border-pink-500'
+                    : 'bg-pink-100/50 border-pink-300 text-pink-700 hover:bg-pink-200/50 hover:border-pink-400'
+              )}
+            >
+              机房 ({stats.room || 0})
+            </button>
           </div>
         </div>
       </div>

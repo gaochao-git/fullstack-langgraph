@@ -322,42 +322,69 @@ apps/your_module/
 
 ### 数据库使用规范
 
+#### 事务管理说明
+
+本项目采用标准的SQLAlchemy事务管理模式：
+
+**Service层必须使用 `async with db.begin()`**：
+- 所有写操作（create/update/delete）都必须在事务块中
+- 事务块会自动提交或回滚
+- 只读操作不需要事务块
+
+**重要**：不使用 `async with db.begin()` 的写操作不会被保存到数据库！
+
 #### 1. 异步数据库用法（推荐）
 
-##### 1.1 FastAPI 依赖注入
+##### 1.1 FastAPI 依赖注入（路由层）
 ```python
 from src.shared.db.config import get_async_db
+
 @router.post("/users")
 async def create_user(user_data: UserCreate, db: AsyncSession = Depends(get_async_db)):
-    # 写操作需要调用service层，由service层管理事务
-    return await user_service.create_user(db, user_data)
+    # 路由层调用service
+    user = await user_service.create_user(db, user_data)
+    return success_response(user)
 ```
 
-##### 1.2 Service层事务管理
+##### 1.2 Service层数据库操作
+
 ```python
 class UserService:
-    # 写操作必须使用 async with db.begin()
+    # 写操作必须使用事务块
     async def create_user(self, db: AsyncSession, user_data: dict):
-        async with db.begin():  # 显式事务管理
+        async with db.begin():
             user = User(**user_data)
-            db.add(user)            # 将对象添加到会话
-            await db.flush()        # 真正执行SQL,但是不提交事物，上层会自己管理事务
-            await db.refresh(user)  # 从数据库重新加载对象，包含数据库自动生成的值
-            return user             # 返回包含数据库生成值的完整对象
-
-    # 只读操作不需要 begin()
+            db.add(user)
+            await db.flush()
+            await db.refresh(user)
+            return user  # 事务自动提交
+    
+    # 更新操作也需要事务块
+    async def update_user(self, db: AsyncSession, user_id: str, data: dict):
+        async with db.begin():
+            user = await self.get_user_by_id(db, user_id)
+            for key, value in data.items():
+                setattr(user, key, value)
+            await db.flush()
+            return user
+    
+    # 只读操作不需要事务块
     async def get_user_by_id(self, db: AsyncSession, user_id: str):
         result = await db.execute(select(User).where(User.user_id == user_id))
         return result.scalar_one_or_none()
 ```
 
-##### 1.3 独立上下文管理器（后台任务）
+##### 1.3 独立函数/后台任务（非路由环境）
 ```python
 from src.shared.db.config import get_async_db_context
+
+# 用于独立函数、后台任务、定时任务等非FastAPI路由环境
 async with get_async_db_context() as session:
-    # 用于非FastAPI环境，如后台任务
-    result = await session.execute(select(User))
-    await session.commit()  # 需要手动提交
+    async with session.begin():  # 这里可以使用事务块
+        user = User(name="test")
+        session.add(user)
+        await session.flush()
+        # 自动提交或回滚
 ```
 
 #### 2. 同步数据库用法（仅限智能体langgraph直接查询数据库场景，如获取提示词、工具等）
@@ -371,25 +398,21 @@ def some_sync_function(db: Session = Depends(get_sync_db)):
     # 需要手动管理事务
 ```
 
-#### 3. 何时使用 begin()
-
-| 场景 | 是否需要 begin() | 原因 |
-|------|-----------------|------|
-| Service 层写操作 | ✅ | 需要事务原子性 |
-
 #### 4. 数据库使用最佳实践
 
 1. **新代码一律使用异步**
 2. **FastAPI 端点使用 `Depends(get_async_db)`**
-3. **Service 层写操作使用 `async with db.begin()`**
+3. **Service 层推荐使用 `async with db.begin()`** - 事务管理更清晰
 4. **复杂操作（多表、先删后增）必须在同一事务中**
-5. **只在必要时使用同步（如 LangGraph 工具）**
-6. **避免混用同步和异步会话**
+5. **独立函数使用 `get_async_db_context()` 和 `async with session.begin()`**
+6. **只在必要时使用同步（如 LangGraph 工具）**
+7. **避免混用同步和异步会话**
 
 #### 5. 常见场景示例
 
-##### 5.1 多表操作事务
+##### 5.1 多表操作（推荐方式）
 ```python
+# Service层 - 使用 async with db.begin()
 async def create_user_with_role(self, db: AsyncSession, user_data: dict, role_id: str):
     async with db.begin():
         # 创建用户
@@ -408,24 +431,12 @@ async def create_user_with_role(self, db: AsyncSession, user_data: dict, role_id
         await db.flush()
         
         return user  # 事务自动提交
-```
 
-##### 5.2 错误的做法
-```python
-# ❌ 错误：在路由层处理事务
-@router.post("/users")
-async def create_user(data: UserCreate, db: AsyncSession = Depends(get_async_db)):
-    user = User(**data.dict())
-    db.add(user)
-    await db.commit()  # 错误！路由层不应该管理事务
-    return user
-
-# ❌ 错误：Service层忘记使用 begin()
-async def update_user(self, db: AsyncSession, user_id: str, data: dict):
-    user = await self.get_user_by_id(db, user_id)
-    for key, value in data.items():
-        setattr(user, key, value)
-    await db.commit()  # 错误！没有事务上下文
+# 路由层 - 简单调用
+@router.post("/users/with-role")
+async def create_user_with_role(data: UserCreateWithRole, db: AsyncSession = Depends(get_async_db)):
+    user = await user_service.create_user_with_role(db, data.dict(), data.role_id)
+    return success_response(user)
 ```
 
 ### 注意事项
@@ -434,7 +445,7 @@ async def update_user(self, db: AsyncSession, user_id: str, data: dict):
 2. **Service 层不处理 HTTP 相关内容**
 3. **使用 BusinessException 而不是 HTTPException**
 4. **所有 API 返回统一响应格式**
-5. **数据库写操作使用 `async with db.begin()`**
+5. **Service层推荐使用 `async with db.begin()` 管理事务**
 6. **敏感信息不要记录到日志**
 7. **大量数据必须分页处理**
 8. **导入使用绝对路径，相对导入限制在2级以内**

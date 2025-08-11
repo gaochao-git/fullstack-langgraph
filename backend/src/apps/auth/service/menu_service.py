@@ -25,7 +25,7 @@ class MenuService:
         creator: str = "admin"
     ) -> RbacMenu:
         """创建菜单"""
-        try:
+        async with db.begin():
             # 检查菜单ID是否已存在
             if 'menu_id' in menu_data:
                 stmt = select(RbacMenu).where(RbacMenu.menu_id == menu_data['menu_id'])
@@ -60,11 +60,6 @@ class MenuService:
             
             logger.info(f"Created menu: {menu.menu_name} (ID: {menu.menu_id})")
             return menu
-            
-        except Exception as e:
-            logger.error(f"Failed to create menu: {e}")
-            await db.rollback()
-            raise
     
     async def update_menu(
         self,
@@ -74,7 +69,7 @@ class MenuService:
         updater: str = "admin"
     ) -> Optional[RbacMenu]:
         """更新菜单"""
-        try:
+        async with db.begin():
             stmt = select(RbacMenu).where(RbacMenu.menu_id == menu_id)
             result = await db.execute(stmt)
             menu = result.scalar_one_or_none()
@@ -105,11 +100,6 @@ class MenuService:
             
             logger.info(f"Updated menu: {menu_id}")
             return updated_menu
-            
-        except Exception as e:
-            logger.error(f"Failed to update menu {menu_id}: {e}")
-            await db.rollback()
-            raise
     
     async def delete_menu(
         self,
@@ -117,7 +107,7 @@ class MenuService:
         menu_id: int
     ) -> bool:
         """删除菜单"""
-        try:
+        async with db.begin():
             # 检查是否有子菜单
             stmt = select(RbacMenu).where(RbacMenu.parent_id == menu_id)
             result = await db.execute(stmt)
@@ -141,11 +131,6 @@ class MenuService:
             
             logger.info(f"Deleted menu: {menu_id}")
             return True
-            
-        except Exception as e:
-            logger.error(f"Failed to delete menu {menu_id}: {e}")
-            await db.rollback()
-            raise
     
     async def get_menu_by_id(
         self,
