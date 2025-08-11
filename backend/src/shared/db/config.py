@@ -169,11 +169,6 @@ class SyncDBContext:
         self.session.close()
 
 
-def get_sync_db_context():
-    """获取同步数据库会话上下文管理器 - 用于with语句"""
-    return SyncDBContext()
-
-
 # 统一接口：既可以用于依赖注入，也可以用于上下文管理
 # 1. 依赖注入：db: Session = Depends(get_sync_db)  
 # 2. 上下文管理：with get_sync_db() as db:

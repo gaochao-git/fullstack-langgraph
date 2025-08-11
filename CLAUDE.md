@@ -360,20 +360,15 @@ async with get_async_db_context() as session:
     await session.commit()  # 需要手动提交
 ```
 
-#### 2. 同步数据库用法（仅限智能体langgraph直接查询数据库场景，后续可能会废弃掉）
+#### 2. 同步数据库用法（仅限智能体langgraph直接查询数据库场景，如获取提示词、工具等）
 
 ```python
-from src.shared.db.config import get_sync_db, get_sync_db_context
+from src.shared.db.config import get_sync_db
 
 # 方式1：生成器模式（用于依赖注入）
 def some_sync_function(db: Session = Depends(get_sync_db)):
     agent = db.query(AgentConfig).filter(...).first()
     # 需要手动管理事务
-
-# 方式2：上下文管理器模式（推荐，自动提交）
-with get_sync_db_context() as db:
-    model = db.query(AIModelConfig).filter(...).first()
-    # 退出时自动提交（成功）或回滚（异常）
 ```
 
 #### 3. 何时使用 begin()

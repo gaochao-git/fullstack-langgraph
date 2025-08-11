@@ -210,7 +210,12 @@ class ColoredConsoleFormatter(colorlog.ColoredFormatter):
         
         # 动态设置格式，包含上下文和额外信息
         location = "%(name)s:%(lineno)d:%(funcName)s"
-        self._style._fmt = f"%(log_color)s%(asctime)s%(reset)s | %(log_color)s%(levelname)s%(reset)s | {location}{context_str} | %(message)s{extra_info}"
+        
+        # 将 extra_info 添加到 record.msg 而不是格式字符串中，避免 % 字符问题
+        if extra_info:
+            record.msg = record.msg + extra_info
+        
+        self._style._fmt = f"%(log_color)s%(asctime)s%(reset)s | %(log_color)s%(levelname)s%(reset)s | {location}{context_str} | %(message)s"
         
         return super().format(record)
 
