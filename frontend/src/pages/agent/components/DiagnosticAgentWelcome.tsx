@@ -32,16 +32,15 @@ interface Fault {
   ip: string;
   time: string;
   priority: FaultPriority;
-  severity: FaultSeverity;
+  severity?: FaultSeverity;
   status: FaultStatus;
-  team: FaultTeam;
+  team?: FaultTeam;
   room?: string;
-  components?: string[];
-  affectedServices?: string;
-  possibleCauses?: string[];
-  suggestedSolutions?: string[];
-  relatedFaults?: string[];
-  analysisProgress?: number;
+  sopId?: string;
+  analysisResult?: string;
+  threadId?: string;
+  lastUpdated: string;
+  tags: string[];
 }
 
 // 模拟数据
