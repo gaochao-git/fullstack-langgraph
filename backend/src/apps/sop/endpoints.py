@@ -225,7 +225,6 @@ async def create_sop_problem_rule(
         rule_data, 
         "system"  # 暂时使用固定值
     )
-    await db.commit()
     
     return success_response(
         data=rule.to_dict() if hasattr(rule, 'to_dict') else rule,
@@ -248,8 +247,6 @@ async def update_sop_problem_rule(
         "system"  # 暂时使用固定值
     )
     
-    await db.commit()
-    
     return success_response(
         data=rule.to_dict() if hasattr(rule, 'to_dict') else rule,
         msg="更新规则成功"
@@ -263,7 +260,6 @@ async def delete_sop_problem_rule(
 ):
     """删除SOP问题规则"""
     await sop_problem_rule_service.delete_rule(db, rule_id)
-    await db.commit()
     
     return success_response(
         data={"deleted_id": rule_id},

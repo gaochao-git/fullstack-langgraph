@@ -39,41 +39,42 @@ class SOPProblemRuleService:
         Returns:
             创建的规则
         """
-        # 先检查SOP是否存在（查询操作，不需要事务）
-        sop = await db.execute(
-            select(SOPTemplate).where(SOPTemplate.sop_id == rule_data.sop_id)
-        )
-        if not sop.scalar_one_or_none():
-            raise BusinessException(
-                f"SOP {rule_data.sop_id} 不存在",
-                ResponseCode.NOT_FOUND
+        async with db.begin():
+            # 检查SOP是否存在
+            sop = await db.execute(
+                select(SOPTemplate).where(SOPTemplate.sop_id == rule_data.sop_id)
             )
-        
-        # 检查规则名称是否重复（查询操作，不需要事务）
-        existing = await db.execute(
-            select(SOPProblemRule).where(SOPProblemRule.rule_name == rule_data.rule_name)
-        )
-        if existing.scalar_one_or_none():
-            raise BusinessException(
-                f"规则名称 {rule_data.rule_name} 已存在",
-                ResponseCode.VALIDATION_ERROR
+            if not sop.scalar_one_or_none():
+                raise BusinessException(
+                    f"SOP {rule_data.sop_id} 不存在",
+                    ResponseCode.NOT_FOUND
+                )
+            
+            # 检查规则名称是否重复
+            existing = await db.execute(
+                select(SOPProblemRule).where(SOPProblemRule.rule_name == rule_data.rule_name)
             )
-        
-        # 创建规则
-        rule = SOPProblemRule(
-            rule_name=rule_data.rule_name,
-            sop_id=rule_data.sop_id,
-            rules_info=rule_data.rules_info.model_dump(),
-            is_enabled=1 if rule_data.is_enabled else 0,
-            created_by=created_by
-        )
-        
-        db.add(rule)
-        await db.flush()
-        await db.refresh(rule)
-                
-        logger.info(f"Created SOP problem rule: {rule.rule_name} by {created_by}")
-        return rule
+            if existing.scalar_one_or_none():
+                raise BusinessException(
+                    f"规则名称 {rule_data.rule_name} 已存在",
+                    ResponseCode.VALIDATION_ERROR
+                )
+            
+            # 创建规则
+            rule = SOPProblemRule(
+                rule_name=rule_data.rule_name,
+                sop_id=rule_data.sop_id,
+                rules_info=rule_data.rules_info.model_dump(),
+                is_enabled=1 if rule_data.is_enabled else 0,
+                created_by=created_by
+            )
+            
+            db.add(rule)
+            await db.flush()
+            await db.refresh(rule)
+                    
+            logger.info(f"Created SOP problem rule: {rule.rule_name} by {created_by}")
+            return rule
         
     async def update_rule(
         self,
@@ -94,63 +95,63 @@ class SOPProblemRuleService:
         Returns:
             更新后的规则
         """
-        # 查询操作不需要事务
-        # 获取现有规则
-        result = await db.execute(
-            select(SOPProblemRule).where(SOPProblemRule.id == rule_id)
-        )
-        rule = result.scalar_one_or_none()
-        
-        if not rule:
-            raise BusinessException(
-                f"规则 {rule_id} 不存在",
-                ResponseCode.NOT_FOUND
+        async with db.begin():
+            # 获取现有规则
+            result = await db.execute(
+                select(SOPProblemRule).where(SOPProblemRule.id == rule_id)
             )
-        
-        # 如果更新规则名称，检查是否重复
-        if rule_data.rule_name and rule_data.rule_name != rule.rule_name:
-            existing = await db.execute(
-                select(SOPProblemRule).where(
-                    and_(
-                        SOPProblemRule.rule_name == rule_data.rule_name,
-                        SOPProblemRule.id != rule_id
-                    )
-                )
-            )
-            if existing.scalar_one_or_none():
+            rule = result.scalar_one_or_none()
+            
+            if not rule:
                 raise BusinessException(
-                    f"规则名称 {rule_data.rule_name} 已存在",
-                    ResponseCode.VALIDATION_ERROR
-                )
-        
-        # 如果更新SOP ID，检查SOP是否存在
-        if rule_data.sop_id:
-            sop = await db.execute(
-                select(SOPTemplate).where(SOPTemplate.sop_id == rule_data.sop_id)
-            )
-            if not sop.scalar_one_or_none():
-                raise BusinessException(
-                    f"SOP {rule_data.sop_id} 不存在",
+                    f"规则 {rule_id} 不存在",
                     ResponseCode.NOT_FOUND
                 )
-        
-        # 更新字段
-        update_dict = rule_data.model_dump(exclude_unset=True)
-        if "rules_info" in update_dict and update_dict["rules_info"]:
-            update_dict["rules_info"] = update_dict["rules_info"]
-        if "is_enabled" in update_dict:
-            update_dict["is_enabled"] = 1 if update_dict["is_enabled"] else 0
             
-        for key, value in update_dict.items():
-            setattr(rule, key, value)
-        
-        rule.updated_by = updated_by
-        
-        await db.flush()
-        await db.refresh(rule)
+            # 如果更新规则名称，检查是否重复
+            if rule_data.rule_name and rule_data.rule_name != rule.rule_name:
+                existing = await db.execute(
+                    select(SOPProblemRule).where(
+                        and_(
+                            SOPProblemRule.rule_name == rule_data.rule_name,
+                            SOPProblemRule.id != rule_id
+                        )
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    raise BusinessException(
+                        f"规则名称 {rule_data.rule_name} 已存在",
+                        ResponseCode.VALIDATION_ERROR
+                    )
             
-        logger.info(f"Updated SOP problem rule: {rule.rule_name} by {updated_by}")
-        return rule
+            # 如果更新SOP ID，检查SOP是否存在
+            if rule_data.sop_id:
+                sop = await db.execute(
+                    select(SOPTemplate).where(SOPTemplate.sop_id == rule_data.sop_id)
+                )
+                if not sop.scalar_one_or_none():
+                    raise BusinessException(
+                        f"SOP {rule_data.sop_id} 不存在",
+                        ResponseCode.NOT_FOUND
+                    )
+            
+            # 更新字段
+            update_dict = rule_data.model_dump(exclude_unset=True)
+            if "rules_info" in update_dict and update_dict["rules_info"]:
+                update_dict["rules_info"] = update_dict["rules_info"]
+            if "is_enabled" in update_dict:
+                update_dict["is_enabled"] = 1 if update_dict["is_enabled"] else 0
+                
+            for key, value in update_dict.items():
+                setattr(rule, key, value)
+            
+            rule.updated_by = updated_by
+            
+            await db.flush()
+            await db.refresh(rule)
+                
+            logger.info(f"Updated SOP problem rule: {rule.rule_name} by {updated_by}")
+            return rule
         
     async def delete_rule(
         self,
@@ -167,21 +168,22 @@ class SOPProblemRuleService:
         Returns:
             是否成功
         """
-        result = await db.execute(
-            select(SOPProblemRule).where(SOPProblemRule.id == rule_id)
-        )
-        rule = result.scalar_one_or_none()
-        
-        if not rule:
-            raise BusinessException(
-                f"规则 {rule_id} 不存在",
-                ResponseCode.NOT_FOUND
+        async with db.begin():
+            result = await db.execute(
+                select(SOPProblemRule).where(SOPProblemRule.id == rule_id)
             )
-        
-        await db.delete(rule)
+            rule = result.scalar_one_or_none()
             
-        logger.info(f"Deleted SOP problem rule: {rule.rule_name}")
-        return True
+            if not rule:
+                raise BusinessException(
+                    f"规则 {rule_id} 不存在",
+                    ResponseCode.NOT_FOUND
+                )
+            
+            await db.delete(rule)
+                
+            logger.info(f"Deleted SOP problem rule: {rule.rule_name}")
+            return True
         
     async def get_rule(
         self,
