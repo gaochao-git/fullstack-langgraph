@@ -206,7 +206,7 @@ async def get_sop_problem_rule(
     """获取SOP问题规则详情"""
     rule = await sop_problem_rule_service.get_rule(db, rule_id)
     if not rule:
-        raise BusinessException(ResponseCode.NOT_FOUND, f"规则 {rule_id} 不存在")
+        raise BusinessException(f"规则 {rule_id} 不存在", ResponseCode.NOT_FOUND)
     
     return success_response(
         data=rule,

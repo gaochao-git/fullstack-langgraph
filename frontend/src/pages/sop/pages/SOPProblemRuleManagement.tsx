@@ -204,6 +204,7 @@ const SOPProblemRuleManagement: React.FC = () => {
       dataIndex: 'rule_name',
       key: 'rule_name',
       width: 200,
+      ellipsis: true,
     },
     {
       title: '数据源',
@@ -218,14 +219,15 @@ const SOPProblemRuleManagement: React.FC = () => {
       title: '指标名称',
       key: 'item_keys',
       width: 300,
+      ellipsis: true,
       render: (record: SOPProblemRule) => {
         const ruleInfo = parseRuleInfo(record.rules_info);
         const itemKeys = ruleInfo.item_keys || [];
         return (
-          <Space direction="vertical" size="small">
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
             {itemKeys.map((key, index) => (
               <Tooltip key={index} title={key}>
-                <Tag><code style={{ fontSize: '11px' }}>{key}</code></Tag>
+                <Tag style={{ maxWidth: '100%' }}><code style={{ fontSize: '11px' }}>{key}</code></Tag>
               </Tooltip>
             ))}
           </Space>
@@ -235,7 +237,8 @@ const SOPProblemRuleManagement: React.FC = () => {
     {
       title: '关联SOP',
       key: 'sop',
-      width: 300,
+      width: 250,
+      ellipsis: true,
       render: (record: SOPProblemRule) => (
         <Space>
           <LinkOutlined />
@@ -262,18 +265,20 @@ const SOPProblemRuleManagement: React.FC = () => {
       dataIndex: 'created_by',
       key: 'created_by',
       width: 100,
+      ellipsis: true,
     },
     {
       title: '创建时间',
       dataIndex: 'create_time',
       key: 'create_time',
       width: 180,
+      ellipsis: true,
     },
     {
       title: '操作',
       key: 'action',
       width: 150,
-      fixed: 'right',
+      fixed: 'right' as const,
       render: (record: SOPProblemRule) => (
         <Space>
           <Button
@@ -321,7 +326,7 @@ const SOPProblemRuleManagement: React.FC = () => {
         dataSource={rules}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 'max-content' }}
         pagination={{
           defaultPageSize: 10,
           showSizeChanger: true,
