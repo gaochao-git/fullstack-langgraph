@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     LOG_DIR: str = "logs"
+    
+    # 报警服务配置
+    ALARM_API_URL: Optional[str] = None  # 报警数据获取接口URL，从.env文件读取
 
     AUTH_MOCK: str = False
     NO_PROXY: str = ""  # 结局claude 本地开proxy影响httpx调用其他接口

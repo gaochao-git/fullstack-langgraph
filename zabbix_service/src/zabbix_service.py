@@ -2,13 +2,29 @@
 Zabbix服务集成
 用于与Zabbix API交互，获取监控指标等信息
 """
+import os
 import httpx
 import json
+import logging
 from typing import List, Dict, Any, Optional
-from src.shared.core.logging import get_logger
-from src.shared.core.exceptions import BusinessException, ResponseCode
 
-logger = get_logger(__name__)
+# 配置日志
+logger = logging.getLogger(__name__)
+
+
+class BusinessException(Exception):
+    """业务异常"""
+    def __init__(self, message: str, code: str = "ERROR"):
+        self.message = message
+        self.code = code
+        super().__init__(message)
+
+
+class ResponseCode:
+    """响应代码常量"""
+    BAD_GATEWAY = "BAD_GATEWAY"
+    UNAUTHORIZED = "UNAUTHORIZED"
+    INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
 class ZabbixService:
@@ -522,10 +538,9 @@ def get_zabbix_service() -> ZabbixService:
     Returns:
         ZabbixService实例
     """
-    # 从配置中读取Zabbix连接信息
-    # TODO: 从配置文件或环境变量读取
-    url = "http://82.156.146.51:8080/zabbix/api_jsonrpc.php"
-    username = "Admin"
-    password = "zabbix"
+    # 从环境变量读取Zabbix连接信息
+    url = os.getenv("ZABBIX_API_URL", "http://82.156.146.51:8080/zabbix/api_jsonrpc.php")
+    username = os.getenv("ZABBIX_USERNAME", "Admin")
+    password = os.getenv("ZABBIX_PASSWORD", "zabbix")
     
     return ZabbixService(url, username, password)

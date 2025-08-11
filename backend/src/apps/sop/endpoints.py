@@ -14,6 +14,7 @@ from src.apps.sop.schema import (
 from src.apps.sop.service.sop_service import sop_service
 from src.apps.sop.service.sop_problem_rule_service import sop_problem_rule_service
 from src.apps.sop.service.zabbix_service import get_zabbix_service
+from src.apps.sop.service.alarm_service import alarm_service
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException
@@ -267,7 +268,7 @@ async def delete_sop_problem_rule(
     )
 
 
-# ============ Zabbix 相关接口 ============
+# ============ 报警相关接口 ============
 
 @router.get("/v1/sops/zabbix/items", response_model=UnifiedResponse)
 async def get_zabbix_items(
@@ -310,6 +311,61 @@ async def get_zabbix_items(
         )
 
 
+@router.get("/v1/sops/alarms", response_model=UnifiedResponse)
+async def get_alarms(
+    alarm_level: Optional[List[str]] = Query(None, description="严重级别过滤，支持多选"),
+    alarm_time: Optional[str] = Query(None, description="时间过滤，返回大于等于此时间的告警"),
+    team_tag: Optional[List[str]] = Query(None, description="团队标签过滤，支持多选"),
+    idc_tag: Optional[List[str]] = Query(None, description="机房标签过滤，支持多选"),
+    alarm_ip: Optional[str] = Query(None, description="主机IP过滤"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(50, ge=1, le=1000, description="每页数量")
+):
+    """
+    获取报警系统的当前报警
+    
+    注意：外部报警接口需要返回统一格式的数据
+    """
+    logger.info(f"Getting alarms with filters: level={alarm_level}, time>={alarm_time}, team={team_tag}, idc={idc_tag}, ip={alarm_ip}")
+    
+    try:
+        result = await alarm_service.get_alarms(
+            alarm_level=alarm_level,
+            alarm_time=alarm_time,
+            team_tag=team_tag,
+            idc_tag=idc_tag,
+            alarm_ip=alarm_ip,
+            page=page,
+            page_size=page_size
+        )
+        
+        # 如果结果是分页格式，直接返回
+        if isinstance(result, dict) and 'data' in result:
+            logger.info(f"Successfully retrieved {result.get('total', 0)} total alarms, page {result.get('page', 1)}")
+            return success_response(
+                data=result,
+                msg="获取报警成功"
+            )
+        else:
+            # 兼容旧格式
+            logger.info(f"Successfully retrieved alarms (legacy format)")
+            return success_response(
+                data=result,
+                msg="获取报警成功"
+            )
+        
+    except BusinessException as e:
+        logger.error(f"Business exception getting alarms: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error getting alarms: {e}", exc_info=True)
+        raise BusinessException(
+            f"获取报警失败: {str(e)}",
+            ResponseCode.BAD_GATEWAY
+        )
+
+
+# 保留原有的Zabbix接口作为Zabbix特定实现
 @router.get("/v1/sops/zabbix/problems", response_model=UnifiedResponse)
 async def get_zabbix_problems(
     host_id: Optional[str] = Query(None, description="主机ID"),
@@ -317,7 +373,9 @@ async def get_zabbix_problems(
     recent_only: bool = Query(True, description="只获取最近的问题"),
     limit: int = Query(100, ge=1, le=1000, description="返回数量限制")
 ):
-    """获取Zabbix当前的问题（异常指标）"""
+    """获取Zabbix当前的问题（专用于Zabbix系统）"""
+    logger.info(f"Getting Zabbix problems with params: severity_min={severity_min}, recent_only={recent_only}, limit={limit}")
+    
     try:
         zabbix_service = get_zabbix_service()
         
@@ -329,20 +387,25 @@ async def get_zabbix_problems(
                 recent_only=recent_only,
                 limit=limit
             )
+            logger.info(f"Successfully retrieved {len(problems)} problems from Zabbix")
         
         return success_response(
             data=problems,
             msg="获取Zabbix问题成功"
         )
         
+    except BusinessException as e:
+        logger.error(f"Business exception getting Zabbix problems: {e}")
+        raise
     except Exception as e:
-        logger.error(f"Failed to get Zabbix problems: {e}")
+        logger.error(f"Unexpected error getting Zabbix problems: {e}", exc_info=True)
         raise BusinessException(
             f"获取Zabbix问题失败: {str(e)}",
             ResponseCode.BAD_GATEWAY
         )
 
 
+# Zabbix特定接口
 @router.get("/v1/sops/zabbix/problem-items", response_model=UnifiedResponse)
 async def get_zabbix_problem_items(
     limit: int = Query(100, ge=1, le=1000, description="返回数量限制")

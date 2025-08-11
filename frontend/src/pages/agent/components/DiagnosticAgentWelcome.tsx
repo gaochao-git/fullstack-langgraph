@@ -1,29 +1,24 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   AlertTriangle, 
   Clock, 
   Server, 
-  Play, 
   MessageCircle,
-  Search,
   BarChart3,
-  Activity,
-  CheckCircle,
   Loader2,
   AlertCircle,
   Building2,
-  Users
+  Users,
+  RefreshCw
 } from "lucide-react";
-import ReactEcharts from 'echarts-for-react';
 import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
-import ZabbixProblemsModal from './ZabbixProblemsModal';
+import SOPApi from '@/services/sopApi';
+import { message, Tag } from 'antd';
 
 // 故障类型定义
-type FaultPriority = "P1" | "P2" | "P3";
 type FaultSeverity = "warning" | "error" | "critical";
 type FaultStatus = "active" | "analyzing" | "analyzed" | "resolved";
-type FaultTeam = "系统" | "网络" | "组件" | "数据库" | "云管" | "机房";
 
 interface Fault {
   id: string;
@@ -31,104 +26,100 @@ interface Fault {
   description: string;
   ip: string;
   time: string;
-  priority: FaultPriority;
   severity?: FaultSeverity;
   status: FaultStatus;
-  team?: FaultTeam;
-  room?: string;
+  team?: string; // 动态团队
+  room?: string; // 动态机房
+  level?: string; // 动态等级
   sopId?: string;
   analysisResult?: string;
   threadId?: string;
   lastUpdated: string;
   tags: string[];
+  // Zabbix相关字段
+  eventid?: string;
+  hostname?: string;
+  item_key?: string;
+  last_value?: string;
+  units?: string;
+  trigger_description?: string;
+  // 标签信息
+  idc_tag?: string;
+  team_tag?: string;
+  level_tag?: string;
 }
 
-// 模拟数据
-const mockFaults: Fault[] = [
-  {
-    id: "1",
-    title: "数据库连接超时",
-    description: "MySQL主库连接池耗尽，导致应用无法获取连接",
-    ip: "192.168.1.10",
-    time: "2024-01-15 14:30:00",
-    priority: "P1",
-    severity: "critical",
-    status: "active",
-    team: "数据库",
-    room: "10",
-    components: ["MySQL", "连接池", "应用服务"],
-    affectedServices: "订单服务、用户服务",
-    possibleCauses: ["连接数配置过低", "慢查询导致连接占用", "应用未正确释放连接"],
-    suggestedSolutions: ["增加最大连接数", "优化慢查询", "检查应用连接池配置"]
-  },
-  {
-    id: "2",
-    title: "API网关响应缓慢",
-    description: "网关平均响应时间超过3秒，影响用户体验",
-    ip: "192.168.1.20",
-    time: "2024-01-15 14:25:00",
-    priority: "P2",
-    severity: "error",
-    status: "analyzing",
-    team: "系统",
-    room: "20",
-    analysisProgress: 65,
-    components: ["API网关", "负载均衡", "后端服务"],
-    affectedServices: "所有API服务",
-    possibleCauses: ["流量突增", "后端服务响应慢", "网关配置不当"],
-    suggestedSolutions: ["扩容网关实例", "优化后端服务", "调整网关缓存策略"],
-    relatedFaults: ["3"]
-  },
-  {
-    id: "3",
-    title: "缓存服务内存使用率高",
-    description: "Redis内存使用率达到85%，有OOM风险",
-    ip: "192.168.1.30",
-    time: "2024-01-15 14:20:00",
-    priority: "P2",
-    severity: "warning",
-    status: "analyzed",
-    team: "系统",
-    room: "10",
-    components: ["Redis", "缓存服务"],
-    affectedServices: "缓存依赖服务",
-    possibleCauses: ["缓存数据未设置过期时间", "大key占用过多内存", "缓存雪崩"],
-    suggestedSolutions: ["清理过期数据", "优化大key", "增加Redis节点"],
-    relatedFaults: ["2"]
-  },
-  {
-    id: "4",
-    title: "磁盘空间不足告警",
-    description: "/data分区使用率达到90%",
-    ip: "192.168.1.40",
-    time: "2024-01-15 14:15:00",
-    priority: "P3",
-    severity: "warning",
-    status: "resolved",
-    team: "系统",
-    room: "30",
-    components: ["存储", "日志系统"],
-    affectedServices: "日志收集服务",
-    possibleCauses: ["日志文件过大", "未配置日志轮转", "临时文件未清理"],
-    suggestedSolutions: ["配置日志轮转", "清理临时文件", "扩容磁盘"]
-  },
-  {
-    id: "5",
-    title: "应用服务CPU使用率高",
-    description: "用户服务CPU使用率持续在80%以上",
-    ip: "192.168.1.50",
-    time: "2024-01-15 14:10:00",
-    priority: "P2",
-    severity: "error",
-    status: "active",
-    team: "系统",
-    room: "20",
-    components: ["应用服务", "JVM"],
-    affectedServices: "用户服务",
-    possibleCauses: ["代码死循环", "GC频繁", "请求量突增"],
-    suggestedSolutions: ["分析线程堆栈", "优化JVM参数", "服务扩容"]
+// 从Zabbix数据中提取标签值
+const extractTagValue = (tags: any[], tagPrefix: string): string | undefined => {
+  if (!Array.isArray(tags)) return undefined;
+  
+  const tag = tags.find(t => 
+    t.tag && t.tag.toLowerCase().startsWith(tagPrefix.toLowerCase())
+  );
+  
+  if (tag && tag.value) {
+    return tag.value;
   }
-];
+  
+  // 如果没有value，尝试从tag本身提取（格式如：team_tag:数据库）
+  if (tag && tag.tag.includes(':')) {
+    return tag.tag.split(':')[1];
+  }
+  
+  return undefined;
+};
+
+// 映射报警严重级别到我们的系统
+const mapAlarmSeverity = (severity: string): FaultSeverity => {
+  // 兼容多种监控系统的严重级别
+  const levelStr = severity ? severity.toString().toLowerCase() : '';
+  
+  // P级别映射
+  if (levelStr.includes('p0') || levelStr.includes('p1')) {
+    return 'critical';
+  }
+  if (levelStr.includes('p2') || levelStr.includes('p3')) {
+    return 'error';
+  }
+  if (levelStr.includes('p4') || levelStr.includes('p5')) {
+    return 'warning';
+  }
+  
+  // 文字级别映射
+  switch (levelStr) {
+    case '0': // 未分类
+    case '1': // 信息
+    case '2': // 警告
+    case 'warning':
+    case 'low':
+    case '低':
+    case '提示':
+      return 'warning';
+    case '3': // 一般
+    case '4': // 严重
+    case 'error':
+    case 'medium':
+    case 'high':
+    case '中':
+    case '高':
+      return 'error';
+    case '5': // 灾难
+    case 'critical':
+    case 'disaster':
+    case '严重':
+    case '紧急':
+      return 'critical';
+    default:
+      return 'warning';
+  }
+};
+
+// 动态团队和机房列表（从数据中提取）
+interface DynamicFilters {
+  teams: Set<string>;
+  rooms: Set<string>;
+  levels: Set<string>;
+}
 
 interface DiagnosticAgentWelcomeProps {
   onSwitchToChat: () => void;
@@ -136,53 +127,191 @@ interface DiagnosticAgentWelcomeProps {
 
 export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAgentWelcomeProps) {
   const { isDark } = useTheme();
-  const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [roomFilter, setRoomFilter] = useState<string>("all");
+  const [levelFilter, setLevelFilter] = useState<string>("all");
   const [expandedFault, setExpandedFault] = useState<string | null>(null);
-  const [showZabbixModal, setShowZabbixModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [faults, setFaults] = useState<Fault[]>([]);
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilters>({
+    teams: new Set(),
+    rooms: new Set(),
+    levels: new Set()
+  });
 
-  const rooms = ['10', '11', '12', '20', '21', '30', '31', '32'];
+  // 获取报警数据
+  const fetchAlarms = async () => {
+    setLoading(true);
+    try {
+      console.log('开始获取报警数据...');
+      const response = await SOPApi.getAlarms({
+        page: 1,
+        page_size: 500  // 获取更多数据用于前端过滤
+      });
+      
+      console.log('报警API响应:', response);
+
+      if (response.status === 'ok' && response.data) {
+        let alarmData: any[] = [];
+        
+        // 处理分页格式或数组格式
+        if (response.data.data && Array.isArray(response.data.data)) {
+          // 新的分页格式
+          alarmData = response.data.data;
+          console.log('总告警数:', response.data.total);
+          console.log('当前页:', response.data.page);
+          console.log('每页数量:', response.data.page_size);
+        } else if (Array.isArray(response.data)) {
+          // 兼容旧的数组格式
+          alarmData = response.data;
+        }
+        
+        const newTeams = new Set<string>();
+        const newRooms = new Set<string>();
+        const newLevels = new Set<string>();
+        
+        console.log('获取到的数据条数:', alarmData.length);
+        if (alarmData.length > 0) {
+          console.log('第一条数据示例:', alarmData[0]);
+        }
+        
+        // 转换报警数据为Fault格式
+        const alarmFaults: Fault[] = alarmData.map((alert: any) => {
+          const ip = alert.alarm_ip || '未知IP';
+          const hostname = alert.hostname || '未知主机';
+          
+          // 新格式：直接从字段获取标签信息
+          const team = alert.team_tag;
+          const room = alert.idc_tag;
+          const level = alert.alarm_level;
+          
+          // 收集动态过滤项（只添加有值的）
+          if (team) newTeams.add(team);
+          if (room) newRooms.add(room);
+          if (level) newLevels.add(level);
+          
+          return {
+            id: `alert-${alert.alarm_id}`,
+            title: alert.alarm_name,
+            description: alert.alarm_desc,
+            ip: ip,
+            time: alert.alarm_time || new Date().toLocaleString('zh-CN'),
+            severity: mapAlarmSeverity(alert.alarm_level),
+            status: 'active',
+            team: team || undefined,
+            room: room || undefined,
+            level: level || undefined,
+            lastUpdated: alert.alarm_time || new Date().toLocaleString('zh-CN'),
+            tags: [team, room, alert.alarm_source, alert.alarm_key].filter(Boolean),
+            // 保留原始监控数据
+            eventid: alert.alarm_id,
+            hostname: hostname,
+            item_key: alert.alarm_key,
+            last_value: alert.alarm_value,
+            units: alert.alarm_unit,
+            trigger_description: alert.alarm_desc,
+            // 保存标签信息
+            idc_tag: room || undefined,
+            team_tag: team || undefined,
+            level_tag: level || undefined
+          };
+        });
+
+        setFaults(alarmFaults);
+        setDynamicFilters({
+          teams: newTeams,
+          rooms: newRooms,
+          levels: newLevels
+        });
+      } else if (response.status === 'error') {
+        // 处理后端返回的错误
+        console.error('报警服务错误:', response.msg);
+        message.error(response.msg || '获取报警数据失败');
+        
+        // 如果是连接问题，提供更详细的信息
+        if (response.msg && response.msg.includes('Cannot send a request')) {
+          message.warning('请联系管理员检查报警服务连接');
+        }
+        
+        // 设置空数据，但保留错误状态以显示提示
+        setFaults([]);
+        setDynamicFilters({
+          teams: new Set(['连接失败']),
+          rooms: new Set(['连接失败']),
+          levels: new Set(['连接失败'])
+        });
+      } else {
+        // 其他未知情况
+        console.warn('未知的响应格式:', response);
+        message.warning('获取数据格式异常');
+        setFaults([]);
+      }
+    } catch (error) {
+      console.error('获取报警数据失败:', error);
+      message.error('网络请求失败，请检查网络连接');
+      setFaults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 组件加载时获取数据
+  useEffect(() => {
+    fetchAlarms();
+  }, []);
 
   // 统计数据
   const stats = useMemo(() => {
-    const teamStats = {
-      system: mockFaults.filter(f => f.team === "系统").length,
-      network: mockFaults.filter(f => f.team === "网络").length,
-      component: mockFaults.filter(f => f.team === "组件").length,
-      database: mockFaults.filter(f => f.team === "数据库").length,
-      cloud: mockFaults.filter(f => f.team === "云管").length,
-      room: mockFaults.filter(f => f.team === "机房").length,
-    };
+    // 动态统计各团队数据
+    const teamStats: Record<string, number> = {};
+    dynamicFilters.teams.forEach(team => {
+      teamStats[team] = faults.filter(f => f.team === team).length;
+    });
+    
+    // 动态统计各机房数据
+    const roomStats: Record<string, number> = {};
+    dynamicFilters.rooms.forEach(room => {
+      roomStats[room] = faults.filter(f => f.room === room).length;
+    });
+    
+    // 动态统计各等级数据
+    const levelStats: Record<string, number> = {};
+    dynamicFilters.levels.forEach(level => {
+      levelStats[level] = faults.filter(f => f.level === level).length;
+    });
     
     const severityStats = {
-      warning: mockFaults.filter(f => f.severity === "warning").length,
-      error: mockFaults.filter(f => f.severity === "error").length,
-      critical: mockFaults.filter(f => f.severity === "critical").length,
+      warning: faults.filter(f => f.severity === "warning").length,
+      error: faults.filter(f => f.severity === "error").length,
+      critical: faults.filter(f => f.severity === "critical").length,
     };
     
     return {
-      total: mockFaults.length,
-      ...teamStats,
+      total: faults.length,
+      teamStats,
+      roomStats,
+      levelStats,
       ...severityStats
     };
-  }, []);
+  }, [faults, dynamicFilters]);
 
   // 过滤故障列表
   const filteredFaults = useMemo(() => {
-    return mockFaults.filter(fault => {
-      if (priorityFilter !== "all" && fault.severity !== priorityFilter) return false;
+    return faults.filter(fault => {
+      if (severityFilter !== "all" && fault.severity !== severityFilter) return false;
       if (statusFilter !== "all" && fault.status !== statusFilter) return false;
       if (teamFilter !== "all" && fault.team !== teamFilter) return false;
       if (roomFilter !== "all" && fault.room !== roomFilter) return false;
+      if (levelFilter !== "all" && fault.level !== levelFilter) return false;
       if (timeFilter !== "all") {
         // 这里可以根据timeFilter实现时间过滤逻辑
       }
       return true;
     }).slice(0, 50);
-  }, [priorityFilter, statusFilter, teamFilter, roomFilter, timeFilter]);
+  }, [faults, severityFilter, statusFilter, teamFilter, roomFilter, levelFilter, timeFilter]);
 
   return (
     <div className="space-y-6">
@@ -226,16 +355,17 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
               </div>
               
               <button
-                onClick={() => setShowZabbixModal(true)}
+                onClick={fetchAlarms}
+                disabled={loading}
                 className={cn(
                   "px-4 py-1.5 rounded-lg font-medium transition-all duration-200 flex items-center gap-2",
                   isDark
-                    ? 'bg-red-900/50 hover:bg-red-800/50 text-red-300 border border-red-700'
-                    : 'bg-red-100 hover:bg-red-200 text-red-700 border border-red-300'
+                    ? 'bg-blue-900/50 hover:bg-blue-800/50 text-blue-300 border border-blue-700 disabled:opacity-50'
+                    : 'bg-blue-100 hover:bg-blue-200 text-blue-700 border border-blue-300 disabled:opacity-50'
                 )}
               >
-                <AlertCircle className="w-4 h-4" />
-                Zabbix异常
+                <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+                刷新
               </button>
             </div>
           </div>
@@ -253,10 +383,10 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
             </h3>
             <div className="flex-1 flex flex-wrap gap-2">
               <button
-                onClick={() => setPriorityFilter(priorityFilter === 'warning' ? 'all' : 'warning')}
+                onClick={() => setSeverityFilter(severityFilter === 'warning' ? 'all' : 'warning')}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 min-w-[100px]",
-                  priorityFilter === 'warning'
+                  severityFilter === 'warning'
                     ? isDark
                       ? 'bg-yellow-600 border-yellow-500 text-white shadow-sm'
                       : 'bg-yellow-500 border-yellow-400 text-white shadow-sm'
@@ -268,10 +398,10 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                 Warning ({stats.warning})
               </button>
               <button
-                onClick={() => setPriorityFilter(priorityFilter === 'error' ? 'all' : 'error')}
+                onClick={() => setSeverityFilter(severityFilter === 'error' ? 'all' : 'error')}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 min-w-[100px]",
-                  priorityFilter === 'error'
+                  severityFilter === 'error'
                     ? isDark
                       ? 'bg-orange-600 border-orange-500 text-white shadow-sm'
                       : 'bg-orange-500 border-orange-400 text-white shadow-sm'
@@ -283,10 +413,10 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                 Error ({stats.error})
               </button>
               <button
-                onClick={() => setPriorityFilter(priorityFilter === 'critical' ? 'all' : 'critical')}
+                onClick={() => setSeverityFilter(severityFilter === 'critical' ? 'all' : 'critical')}
                 className={cn(
                   "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 min-w-[100px]",
-                  priorityFilter === 'critical'
+                  severityFilter === 'critical'
                     ? isDark
                       ? 'bg-red-600 border-red-500 text-white shadow-sm'
                       : 'bg-red-500 border-red-400 text-white shadow-sm'
@@ -301,134 +431,128 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
           </div>
         </div>
 
-        {/* 第三行：机房选择 */}
-        <div className="mb-4">
-          <div className="flex items-start gap-4">
-            <h3 className={cn(
-              "text-sm font-semibold pt-2 flex items-center gap-2",
-              isDark ? "text-slate-300" : "text-gray-700"
-            )}>
-              <Building2 className="w-4 h-4" />
-              机房选择
-            </h3>
-            <div className="flex-1 flex flex-wrap gap-2">
-              {rooms.map((room) => {
-                const roomCount = mockFaults.filter(f => f.room === room).length;
-                return (
-                  <button
-                    key={room}
-                    onClick={() => setRoomFilter(roomFilter === room ? 'all' : room)}
-                    className={cn(
-                      "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 min-w-[80px]",
-                      roomFilter === room
-                        ? isDark
-                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
-                          : 'bg-indigo-500 border-indigo-400 text-white shadow-sm'
-                        : isDark
-                          ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500'
-                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
-                    )}
-                  >
-                    {room} ({roomCount})
-                  </button>
-                );
-              })}
+        {/* 第三行：等级过滤 - 只在有数据时显示 */}
+        {dynamicFilters.levels.size > 0 && (
+          <div className="mb-4">
+            <div className="flex items-start gap-4">
+              <h3 className={cn(
+                "text-sm font-semibold pt-2 flex items-center gap-2",
+                isDark ? "text-slate-300" : "text-gray-700"
+              )}>
+                <AlertCircle className="w-4 h-4" />
+                等级分类
+              </h3>
+              <div className="flex-1 flex flex-wrap gap-2">
+                {Array.from(dynamicFilters.levels).sort().map((level) => {
+                  const levelCount = stats.levelStats[level] || 0;
+                  return (
+                    <button
+                      key={level}
+                      onClick={() => setLevelFilter(levelFilter === level ? 'all' : level)}
+                      className={cn(
+                        "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200",
+                        levelFilter === level
+                          ? isDark
+                            ? 'bg-purple-600 border-purple-500 text-white shadow-sm'
+                            : 'bg-purple-500 border-purple-400 text-white shadow-sm'
+                          : isDark
+                            ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                      )}
+                    >
+                      {level} ({levelCount})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* 第四行：团队报警统计 */}
-        <div>
-          <div className="flex items-start gap-4">
-            <h3 className={cn(
-              "text-sm font-semibold pt-2 flex items-center gap-2",
-              isDark ? "text-slate-300" : "text-gray-700"
-            )}>
-              <Users className="w-4 h-4" />
-              团队分类
-            </h3>
-            <div className="flex-1 flex flex-wrap gap-2">
-              <button
-                onClick={() => setTeamFilter(teamFilter === '系统' ? 'all' : '系统')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
-                  teamFilter === '系统'
-                    ? 'bg-blue-500 border-blue-400 text-white shadow-lg'
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-blue-300 hover:bg-blue-900/40 hover:border-blue-500'
-                      : 'bg-blue-100/50 border-blue-300 text-blue-700 hover:bg-blue-200/50 hover:border-blue-400'
-                )}
-              >
-                系统 ({stats.system || 3})
-              </button>
-              <button
-                onClick={() => setTeamFilter(teamFilter === '网络' ? 'all' : '网络')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
-                  teamFilter === '网络'
-                    ? 'bg-purple-500 border-purple-400 text-white shadow-lg'
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-purple-300 hover:bg-purple-900/40 hover:border-purple-500'
-                      : 'bg-purple-100/50 border-purple-300 text-purple-700 hover:bg-purple-200/50 hover:border-purple-400'
-                )}
-              >
-                网络 ({stats.network || 0})
-              </button>
-              <button
-                onClick={() => setTeamFilter(teamFilter === '组件' ? 'all' : '组件')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
-                  teamFilter === '组件'
-                    ? 'bg-cyan-500 border-cyan-400 text-white shadow-lg'
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-cyan-300 hover:bg-cyan-900/40 hover:border-cyan-500'
-                      : 'bg-cyan-100/50 border-cyan-300 text-cyan-700 hover:bg-cyan-200/50 hover:border-cyan-400'
-                )}
-              >
-                组件 ({stats.component || 0})
-              </button>
-              <button
-                onClick={() => setTeamFilter(teamFilter === '数据库' ? 'all' : '数据库')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
-                  teamFilter === '数据库'
-                    ? 'bg-green-500 border-green-400 text-white shadow-lg'
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-green-300 hover:bg-green-900/40 hover:border-green-500'
-                      : 'bg-green-100/50 border-green-300 text-green-700 hover:bg-green-200/50 hover:border-green-400'
-                )}
-              >
-                数据库 ({stats.database || 5})
-              </button>
-              <button
-                onClick={() => setTeamFilter(teamFilter === '云管' ? 'all' : '云管')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
-                  teamFilter === '云管'
-                    ? 'bg-yellow-500 border-yellow-400 text-gray-900 shadow-lg'
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-yellow-300 hover:bg-yellow-900/40 hover:border-yellow-500'
-                      : 'bg-yellow-100/50 border-yellow-300 text-yellow-700 hover:bg-yellow-200/50 hover:border-yellow-400'
-                )}
-              >
-                云管 ({stats.cloud || 0})
-              </button>
-              <button
-                onClick={() => setTeamFilter(teamFilter === '机房' ? 'all' : '机房')}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
-                  teamFilter === '机房'
-                    ? 'bg-pink-500 border-pink-400 text-white shadow-lg'
-                    : isDark
-                      ? 'bg-slate-700/50 border-slate-600 text-pink-300 hover:bg-pink-900/40 hover:border-pink-500'
-                      : 'bg-pink-100/50 border-pink-300 text-pink-700 hover:bg-pink-200/50 hover:border-pink-400'
-                )}
-              >
-                机房 ({stats.room || 0})
-              </button>
+        {/* 第四行：机房选择 - 只在有数据时显示 */}
+        {dynamicFilters.rooms.size > 0 && (
+          <div className="mb-4">
+            <div className="flex items-start gap-4">
+              <h3 className={cn(
+                "text-sm font-semibold pt-2 flex items-center gap-2",
+                isDark ? "text-slate-300" : "text-gray-700"
+              )}>
+                <Building2 className="w-4 h-4" />
+                机房选择
+              </h3>
+              <div className="flex-1 flex flex-wrap gap-2">
+                {Array.from(dynamicFilters.rooms).sort().map((room) => {
+                  const roomCount = stats.roomStats[room] || 0;
+                  return (
+                    <button
+                      key={room}
+                      onClick={() => setRoomFilter(roomFilter === room ? 'all' : room)}
+                      className={cn(
+                        "px-4 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 min-w-[80px]",
+                        roomFilter === room
+                          ? isDark
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
+                            : 'bg-indigo-500 border-indigo-400 text-white shadow-sm'
+                          : isDark
+                            ? 'bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                      )}
+                    >
+                      {room} ({roomCount})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* 第五行：团队报警统计 - 只在有数据时显示 */}
+        {dynamicFilters.teams.size > 0 && (
+          <div>
+            <div className="flex items-start gap-4">
+              <h3 className={cn(
+                "text-sm font-semibold pt-2 flex items-center gap-2",
+                isDark ? "text-slate-300" : "text-gray-700"
+              )}>
+                <Users className="w-4 h-4" />
+                团队分类
+              </h3>
+              <div className="flex-1 flex flex-wrap gap-2">
+                {Array.from(dynamicFilters.teams).sort().map((team, index) => {
+                  const teamCount = stats.teamStats[team] || 0;
+                  // 动态颜色映射
+                  const colorClasses = [
+                    { active: 'bg-blue-500 border-blue-400', inactive: isDark ? 'text-blue-300 hover:bg-blue-900/40 hover:border-blue-500' : 'bg-blue-100/50 border-blue-300 text-blue-700 hover:bg-blue-200/50 hover:border-blue-400' },
+                    { active: 'bg-purple-500 border-purple-400', inactive: isDark ? 'text-purple-300 hover:bg-purple-900/40 hover:border-purple-500' : 'bg-purple-100/50 border-purple-300 text-purple-700 hover:bg-purple-200/50 hover:border-purple-400' },
+                    { active: 'bg-cyan-500 border-cyan-400', inactive: isDark ? 'text-cyan-300 hover:bg-cyan-900/40 hover:border-cyan-500' : 'bg-cyan-100/50 border-cyan-300 text-cyan-700 hover:bg-cyan-200/50 hover:border-cyan-400' },
+                    { active: 'bg-green-500 border-green-400', inactive: isDark ? 'text-green-300 hover:bg-green-900/40 hover:border-green-500' : 'bg-green-100/50 border-green-300 text-green-700 hover:bg-green-200/50 hover:border-green-400' },
+                    { active: 'bg-yellow-500 border-yellow-400', inactive: isDark ? 'text-yellow-300 hover:bg-yellow-900/40 hover:border-yellow-500' : 'bg-yellow-100/50 border-yellow-300 text-yellow-700 hover:bg-yellow-200/50 hover:border-yellow-400' },
+                    { active: 'bg-pink-500 border-pink-400', inactive: isDark ? 'text-pink-300 hover:bg-pink-900/40 hover:border-pink-500' : 'bg-pink-100/50 border-pink-300 text-pink-700 hover:bg-pink-200/50 hover:border-pink-400' },
+                  ];
+                  const colorClass = colorClasses[index % colorClasses.length];
+                  
+                  return (
+                    <button
+                      key={team}
+                      onClick={() => setTeamFilter(teamFilter === team ? 'all' : team)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all duration-200",
+                        teamFilter === team
+                          ? `${colorClass.active} text-white shadow-lg`
+                          : isDark
+                            ? `bg-slate-700/50 border-slate-600 ${colorClass.inactive}`
+                            : colorClass.inactive
+                      )}
+                    >
+                      {team} ({teamCount})
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 故障列表 */}
@@ -459,7 +583,40 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
           )}
         </div>
         
-        {filteredFaults.length === 0 ? (
+        {faults.length === 0 && dynamicFilters.teams.has('连接失败') ? (
+          <div className={cn(
+            "p-8 text-center border rounded-2xl",
+            isDark 
+              ? "bg-slate-700/30 border-slate-600/50" 
+              : "bg-gray-100/30 border-gray-300/50"
+          )}>
+            <AlertCircle className={cn(
+              "w-16 h-16 mx-auto mb-4",
+              isDark ? "text-orange-400" : "text-orange-500"
+            )} />
+            <h3 className={cn(
+              "text-xl font-medium mb-2",
+              isDark ? "text-slate-200" : "text-gray-700"
+            )}>报警服务连接失败</h3>
+            <p className={cn(
+              "mb-4",
+              isDark ? "text-slate-400" : "text-gray-600"
+            )}>无法连接到报警服务，请联系管理员检查服务状态</p>
+            <button
+              onClick={fetchAlarms}
+              disabled={loading}
+              className={cn(
+                "px-4 py-2 rounded-lg font-medium transition-all duration-200 inline-flex items-center gap-2",
+                isDark
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50'
+              )}
+            >
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+              重试连接
+            </button>
+          </div>
+        ) : filteredFaults.length === 0 ? (
           <div className={cn(
             "p-8 text-center border rounded-2xl",
             isDark 
@@ -499,16 +656,6 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        "text-xs px-2 py-0.5 rounded-full font-semibold",
-                        fault.priority === "P1"
-                          ? "bg-red-500 text-white"
-                          : fault.priority === "P2"
-                          ? "bg-orange-500 text-white"
-                          : "bg-yellow-500 text-gray-900"
-                      )}>
-                        {fault.priority}
-                      </span>
-                      <span className={cn(
                         "text-xs px-2 py-0.5 rounded-full",
                         fault.status === "active"
                           ? isDark
@@ -530,14 +677,16 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                          fault.status === "analyzing" ? "分析中" :
                          fault.status === "analyzed" ? "已分析" : "已解决"}
                       </span>
-                      <span className={cn(
-                        "text-xs px-2 py-0.5 rounded-full",
-                        isDark
-                          ? "bg-slate-700 text-slate-300"
-                          : "bg-gray-200 text-gray-700"
-                      )}>
-                        {fault.team}
-                      </span>
+                      {fault.team && (
+                        <span className={cn(
+                          "text-xs px-2 py-0.5 rounded-full",
+                          isDark
+                            ? "bg-slate-700 text-slate-300"
+                            : "bg-gray-200 text-gray-700"
+                        )}>
+                          {fault.team}
+                        </span>
+                      )}
                       {fault.room && (
                         <span className={cn(
                           "text-xs px-2 py-0.5 rounded-full",
@@ -545,7 +694,17 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                             ? "bg-purple-900/50 text-purple-300"
                             : "bg-purple-100 text-purple-700"
                         )}>
-                          机房{fault.room}
+                          {fault.room}
+                        </span>
+                      )}
+                      {fault.level && (
+                        <span className={cn(
+                          "text-xs px-2 py-0.5 rounded-full font-medium",
+                          isDark
+                            ? "bg-indigo-900/50 text-indigo-300"
+                            : "bg-indigo-100 text-indigo-700"
+                        )}>
+                          {fault.level}
                         </span>
                       )}
                     </div>
@@ -569,6 +728,14 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                         <Server className="w-3 h-3" />
                         {fault.ip}
                       </span>
+                      {fault.hostname && (
+                        <span className={cn(
+                          "text-xs",
+                          isDark ? "text-slate-500" : "text-gray-400"
+                        )}>
+                          ({fault.hostname})
+                        </span>
+                      )}
                       <span className={cn(
                         "flex items-center gap-1",
                         isDark ? "text-slate-400" : "text-gray-500"
@@ -579,20 +746,6 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    {fault.status === "analyzing" && fault.analysisProgress && (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className={cn(
-                          "w-4 h-4 animate-spin",
-                          isDark ? "text-blue-400" : "text-blue-600"
-                        )} />
-                        <span className={cn(
-                          "text-xs",
-                          isDark ? "text-blue-400" : "text-blue-600"
-                        )}>
-                          {fault.analysisProgress}%
-                        </span>
-                      </div>
-                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -616,49 +769,40 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
                     "mt-3 pt-3 border-t space-y-2",
                     isDark ? "border-slate-600" : "border-gray-200"
                   )}>
-                    {fault.components && (
-                      <div>
-                        <span className={cn(
-                          "text-xs font-medium",
-                          isDark ? "text-slate-300" : "text-gray-700"
-                        )}>涉及组件：</span>
-                        <span className={cn(
-                          "text-xs ml-2",
-                          isDark ? "text-slate-400" : "text-gray-600"
-                        )}>
-                          {fault.components.join("、")}
-                        </span>
-                      </div>
-                    )}
-                    {fault.affectedServices && (
-                      <div>
-                        <span className={cn(
-                          "text-xs font-medium",
-                          isDark ? "text-slate-300" : "text-gray-700"
-                        )}>影响服务：</span>
-                        <span className={cn(
-                          "text-xs ml-2",
-                          isDark ? "text-slate-400" : "text-gray-600"
-                        )}>
-                          {fault.affectedServices}
-                        </span>
-                      </div>
-                    )}
-                    {fault.possibleCauses && (
-                      <div>
-                        <span className={cn(
-                          "text-xs font-medium",
-                          isDark ? "text-slate-300" : "text-gray-700"
-                        )}>可能原因：</span>
-                        <ul className={cn(
-                          "text-xs mt-1 ml-4 list-disc",
-                          isDark ? "text-slate-400" : "text-gray-600"
-                        )}>
-                          {fault.possibleCauses.map((cause, index) => (
-                            <li key={index}>{cause}</li>
-                          ))}
-                        </ul>
-                      </div>
+                    {fault.item_key && (
+                      <>
+                        <div>
+                          <span className={cn(
+                            "text-xs font-medium",
+                            isDark ? "text-slate-300" : "text-gray-700"
+                          )}>监控项：</span>
+                          <span className={cn(
+                            "text-xs ml-2 font-mono",
+                            isDark ? "text-slate-400" : "text-gray-600"
+                          )}>
+                            {fault.item_key}
+                          </span>
+                        </div>
+                        <div>
+                          <span className={cn(
+                            "text-xs font-medium",
+                            isDark ? "text-slate-300" : "text-gray-700"
+                          )}>当前值：</span>
+                          <span className={cn(
+                            "text-xs ml-2 font-mono",
+                            isDark ? "text-slate-400" : "text-gray-600"
+                          )}>
+                            {fault.last_value} {fault.units || ''}
+                          </span>
+                        </div>
+                        <div>
+                          <span className={cn(
+                            "text-xs font-medium",
+                            isDark ? "text-slate-300" : "text-gray-700"
+                          )}>数据来源：</span>
+                          <Tag color="blue" className="text-xs ml-2">实时报警</Tag>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -668,16 +812,21 @@ export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAge
         )}
       </div>
 
-      {/* Zabbix异常弹窗 */}
-      {showZabbixModal && (
-        <ZabbixProblemsModal
-          open={showZabbixModal}
-          onClose={() => setShowZabbixModal(false)}
-          onSelect={(problem) => {
-            console.log('选中的问题:', problem);
-            setShowZabbixModal(false);
-          }}
-        />
+      {/* 加载遮罩 */}
+      {loading && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className={cn(
+            "p-4 rounded-lg shadow-lg",
+            isDark ? "bg-slate-800" : "bg-white"
+          )}>
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+              <span className={isDark ? "text-white" : "text-gray-900"}>
+                正在加载报警数据...
+              </span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

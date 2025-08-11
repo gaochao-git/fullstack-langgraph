@@ -111,7 +111,41 @@ export class SOPApi {
     return await omind_get('/api/v1/sops/meta/teams');
   }
 
-  // 获取Zabbix监控项
+  // 获取报警 - 通用接口
+  static async getAlarms(params: {
+    alarm_level?: string[];
+    alarm_time?: string;
+    team_tag?: string[];
+    idc_tag?: string[];
+    alarm_ip?: string;
+    page?: number;
+    page_size?: number;
+  } = {}) {
+    const queryParams = new URLSearchParams();
+    
+    // 处理数组参数
+    if (params.alarm_level) {
+      params.alarm_level.forEach(level => queryParams.append('alarm_level', level));
+    }
+    if (params.team_tag) {
+      params.team_tag.forEach(tag => queryParams.append('team_tag', tag));
+    }
+    if (params.idc_tag) {
+      params.idc_tag.forEach(tag => queryParams.append('idc_tag', tag));
+    }
+    
+    // 处理单值参数
+    if (params.alarm_time) queryParams.append('alarm_time', params.alarm_time);
+    if (params.alarm_ip) queryParams.append('alarm_ip', params.alarm_ip);
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.page_size) queryParams.append('page_size', params.page_size.toString());
+    
+    const url = `/api/v1/sops/alarms${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+
+
+  // 获取Zabbix监控项（保留以兼容）
   static async getZabbixItems(params: { search?: string; limit?: number } = {}) {
     const queryParams = new URLSearchParams();
     if (params.search) queryParams.append('search', params.search);
@@ -120,7 +154,7 @@ export class SOPApi {
     return await omind_get(url);
   }
 
-  // 获取Zabbix问题
+  // 获取Zabbix问题（保留作为Zabbix专用）
   static async getZabbixProblems(params: {
     host_id?: string;
     severity_min?: number;
