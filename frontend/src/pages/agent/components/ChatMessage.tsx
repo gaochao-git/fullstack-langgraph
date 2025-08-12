@@ -877,7 +877,7 @@ function ChatMessages({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col relative w-full overflow-hidden h-full" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
+    <div className="flex flex-col relative w-full overflow-hidden h-full" style={{ backgroundColor: token.colorBgContainer }}>
       <style>
         {`
           @keyframes buttonSpin {
