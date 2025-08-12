@@ -254,7 +254,7 @@ class AuthService:
             rbac_user = RbacUser(
                 user_id=user_id,
                 user_name=request.username,
-                display_name=request.display_name,
+                display_name=request.display_name or request.username,  # 如果没有显示名称，使用用户名
                 email=request.email,
                 mobile="",
                 department_name="默认部门",

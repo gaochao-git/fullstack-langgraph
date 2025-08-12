@@ -68,6 +68,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
     confirm_password: str = Field(..., min_length=6)
+    display_name: Optional[str] = Field(None, max_length=100, description="显示名称")
     phone: Optional[str] = None
     
     @validator('confirm_password')

@@ -57,6 +57,7 @@ export function RegisterPage() {
       const response = await authApi.register({
         username: values.username,
         password: values.password,
+        confirm_password: values.confirmPassword,  // 添加确认密码字段
         email: values.email,
         display_name: values.display_name
       });
