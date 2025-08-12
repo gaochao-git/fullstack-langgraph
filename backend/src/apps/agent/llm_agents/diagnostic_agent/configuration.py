@@ -7,6 +7,7 @@ from src.apps.agent.service.agent_config_service import AgentConfigService
 from src.shared.db.config import get_sync_db
 from langchain_openai import ChatOpenAI
 from src.shared.core.logging import get_logger
+import httpx
 
 logger = get_logger(__name__)
 
@@ -73,12 +74,16 @@ class Configuration(BaseModel):
         else:
             logger.warning("API密钥: 未设置")
         
+        # 创建自定义 httpx 客户端，忽略 SSL 验证
+        http_client = httpx.Client(verify=False)
+        
         return ChatOpenAI(
             model=actual_model,
             temperature=actual_temperature,
             max_retries=self.model_max_retries,
             api_key=self.get_api_key(),
             base_url=self.model_base_url,
+            http_client=http_client  # 使用自定义 HTTP 客户端
         )
 
     @classmethod

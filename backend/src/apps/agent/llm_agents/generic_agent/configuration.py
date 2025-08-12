@@ -5,6 +5,9 @@ from langchain_core.runnables import RunnableConfig
 from src.apps.agent.service.agent_config_service import AgentConfigService
 from src.shared.db.config import get_sync_db
 from langchain_openai import ChatOpenAI
+from src.shared.core.logging import get_logger
+import httpx
+logger = get_logger(__name__)
 
 
 class Configuration(BaseModel):
@@ -222,11 +225,14 @@ class Configuration(BaseModel):
         # 获取base_url - 根据provider设置默认值
         base_url = "https://api.deepseek.com" if self.model_provider.lower() == "deepseek" else "https://api.openai.com/v1"
         
-        print(f"🤖 创建通用Agent LLM实例:")
-        print(f"   提供商: {self.model_provider}")
-        print(f"   模型: {actual_model}")
-        print(f"   温度: {actual_temp}")
-        print(f"   API端点: {base_url}")
+        logger.info(f"创建通用Agent LLM实例:")
+        logger.info(f"   提供商: {self.model_provider}")
+        logger.info(f"   模型: {actual_model}")
+        logger.info(f"   温度: {actual_temp}")
+        logger.info(f"   API端点: {base_url}")
+        
+        # 创建自定义 httpx 客户端，忽略 SSL 验证
+        http_client = httpx.Client(verify=False)
         
         return ChatOpenAI(
             model=actual_model,
@@ -235,6 +241,7 @@ class Configuration(BaseModel):
             max_retries=self.model_max_retries,
             api_key=self.get_api_key(),
             base_url=base_url,
+            http_client=http_client,  # 使用自定义 HTTP 客户端
         )
 
     def to_dict(self) -> Dict[str, Any]:
