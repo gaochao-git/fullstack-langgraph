@@ -87,13 +87,15 @@ export default function ChatEngine({
     return threadIdFromUrl ? { threadId: threadIdFromUrl } : {};
   };
 
+  // 构造完整的 API URL
+  const baseUrl = getBaseUrl() || window.location.origin;
+  const apiUrl = `${baseUrl}/api/chat`;
+  
   // 如果agent不存在，使用占位的agent_id
   const thread = useStream<{
     messages: Message[];
   }>({
-    apiUrl: getBaseUrl() 
-      ? `${getBaseUrl()}/api/chat`
-      : '/api/chat',
+    apiUrl: apiUrl,
     assistantId: getAgentId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),
