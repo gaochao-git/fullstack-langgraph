@@ -150,16 +150,19 @@ export default function ChatEngine({
       // 智能体可用模型列表
       
       // 设置默认选中当前使用的模型
-      const currentModelName = agent.llm_info?.model_name;
-      if (currentModelName) {
-        setCurrentModel(currentModelName);
-      } else if (models.length > 0 && !currentModel) {
-        setCurrentModel(models[0].type);
+      // 只在 currentModel 未设置时才设置默认值
+      if (!currentModel) {
+        const currentModelName = agent.llm_info?.model_name;
+        if (currentModelName) {
+          setCurrentModel(currentModelName);
+        } else if (models.length > 0) {
+          setCurrentModel(models[0].type);
+        }
       }
     } catch (error) {
       // 处理agent配置信息失败
     }
-  }, [agent, currentModel]);
+  }, [agent]); // 移除 currentModel 依赖，避免循环更新
 
   // 当新线程创建时，将线程ID同步到URL
   useEffect(() => {

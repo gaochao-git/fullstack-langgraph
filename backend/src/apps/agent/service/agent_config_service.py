@@ -8,6 +8,9 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from src.shared.core.dependencies import get_sync_db
 from src.apps.agent.models import AgentConfig
+from src.shared.core.logging import get_logger
+
+logger = get_logger(__name__)
 from src.apps.ai_model.models import AIModelConfig
 
 
@@ -130,7 +133,7 @@ class AgentConfigService:
         # Use selected_model if provided, otherwise use configured model
         model_name = selected_model or llm_config.get('model_name', 'deepseek-chat')
         
-        print(f"🔧 模型选择逻辑: selected_model={selected_model}, configured_model={llm_config.get('model_name')}, final_model={model_name}")
+        logger.info(f"模型选择逻辑: selected_model={selected_model}, configured_model={llm_config.get('model_name')}, final_model={model_name}")
         
         # Get model info from database (includes endpoint_url and api_key)
         model_info = AgentConfigService._get_model_info_from_db(model_name, db)

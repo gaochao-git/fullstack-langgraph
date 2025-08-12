@@ -11,6 +11,9 @@ from .configuration import Configuration
 from .state import AgentState
 from .utils import compile_graph_with_checkpointer
 from .tools import get_generic_agent_tools
+from src.shared.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def create_main_graph():
@@ -30,7 +33,7 @@ def create_main_graph():
         # 获取agent_id，必须存在，不使用默认值
         agent_id = configurable.get("agent_id")
         if not agent_id: raise RuntimeError("配置中缺少必需的agent_id参数")
-        print(f"🚀完整智能体配置: {dict(config) if config else 'None'}")
+        logger.info(f"完整智能体配置: {dict(config) if config else 'None'}")
         
         # 获取LLM实例
         llm = get_llm_from_config(config)
@@ -42,9 +45,9 @@ def create_main_graph():
         # 获取系统提示词（必须从数据库获取）
         try:
             system_prompt = get_system_prompt(agent_id)
-            print(f"✅ 成功获取智能体 '{agent_id}' 的系统提示词")
+            logger.info(f"成功获取智能体 '{agent_id}' 的系统提示词")
         except ValueError as e:
-            print(f"❌ 获取智能体系统提示词失败: {e}")
+            logger.error(f"获取智能体系统提示词失败: {e}")
             # 抛出异常，让上层处理，不允许使用空提示词运行
             raise RuntimeError(f"智能体 '{agent_id}' 配置错误: {e}")
         
