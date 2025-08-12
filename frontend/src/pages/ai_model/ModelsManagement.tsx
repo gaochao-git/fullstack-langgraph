@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/ThemeContext';
 import { getBaseUrl } from '@/utils/base_api';
 import { 
+  App,
   Card, 
   Row, 
   Col, 
@@ -13,7 +14,6 @@ import {
   Form, 
   Input, 
   Select, 
-  message,
   Table,
   Badge,
   Popconfirm,
@@ -89,7 +89,7 @@ const API_BASE_URL = getBaseUrl();
 const fetchModels = async (): Promise<ModelConfig[]> => {
   const response = await fetch(`${API_BASE_URL}/api/v1/ai-models`);
   const data = await response.json();
-  if (data.code === 200) {
+  if (data.status === 'ok') {
     return data.data.items.map((item: any) => ({
       id: item.id,
       name: item.name,
@@ -103,7 +103,7 @@ const fetchModels = async (): Promise<ModelConfig[]> => {
       updatedAt: item.updatedAt
     }));
   }
-  throw new Error(data.message || '获取模型列表失败');
+  throw new Error(data.msg || '获取模型列表失败');
 };
 
 const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig> => {
@@ -120,7 +120,7 @@ const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig
     })
   });
   const data = await response.json();
-  if (data.code === 200) {
+  if (data.status === 'ok') {
     const item = data.data;
     return {
       id: item.id,
@@ -135,7 +135,7 @@ const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig
       updatedAt: item.updatedAt
     };
   }
-  throw new Error(data.message || '创建模型失败');
+  throw new Error(data.msg || '创建模型失败');
 };
 
 const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Promise<ModelConfig> => {
@@ -153,7 +153,7 @@ const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Pr
     })
   });
   const data = await response.json();
-  if (data.code === 200) {
+  if (data.status === 'ok') {
     const item = data.data;
     return {
       id: item.id,
@@ -168,7 +168,7 @@ const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Pr
       updatedAt: item.updatedAt
     };
   }
-  throw new Error(data.message || '更新模型失败');
+  throw new Error(data.msg || '更新模型失败');
 };
 
 const deleteModel = async (modelId: string): Promise<void> => {
@@ -176,8 +176,8 @@ const deleteModel = async (modelId: string): Promise<void> => {
     method: 'DELETE'
   });
   const data = await response.json();
-  if (data.code !== 200) {
-    throw new Error(data.message || '删除模型失败');
+  if (data.status !== 'ok') {
+    throw new Error(data.msg || '删除模型失败');
   }
 };
 
@@ -215,10 +215,10 @@ const discoverOllamaModels = async (endpoint: string): Promise<string[]> => {
       })
     });
     const data = await response.json();
-    if (data.code === 200) {
+    if (data.status === 'ok') {
       return data.data.models;
     }
-    throw new Error(data.message || '发现模型失败');
+    throw new Error(data.msg || '发现模型失败');
   } catch (error) {
     console.error('发现Ollama模型失败:', error);
     throw error;
@@ -227,6 +227,7 @@ const discoverOllamaModels = async (endpoint: string): Promise<string[]> => {
 
 const ModelsManagement = () => {
   const { isDark } = useTheme();
+  const { message } = App.useApp();
   const [models, setModels] = useState<ModelConfig[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
@@ -447,6 +448,8 @@ const ModelsManagement = () => {
       form.resetFields();
       setFormTestStatus('idle');
       setDiscoveredModels([]);
+      // 重新加载模型列表以显示最新数据
+      loadModels();
     } catch (error) {
       console.error('保存模型失败:', error);
       message.error('保存模型失败');
