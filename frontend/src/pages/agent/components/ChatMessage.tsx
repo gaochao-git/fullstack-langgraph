@@ -1232,22 +1232,12 @@ function ChatMessages({
               >
                 {availableModels.length > 0 ? (
                   availableModels.map((model) => {
-                    // 简化模型名称显示
-                    const getShortName = (name: string) => {
-                      if (name.includes('deepseek')) return 'DeepSeek';
-                      if (name.includes('qwen2.5')) return 'Qwen2.5';
-                      if (name.includes('qwen')) return 'Qwen';
-                      if (name.includes('gpt')) return 'GPT';
-                      if (name.includes('claude')) return 'Claude';
-                      return name.substring(0, 10);
-                    };
-                    
                     return (
                       <option 
                         key={model.id} 
                         value={model.type}
                       >
-                        {getShortName(model.name)}
+                        {model.name}
                       </option>
                     );
                   })
