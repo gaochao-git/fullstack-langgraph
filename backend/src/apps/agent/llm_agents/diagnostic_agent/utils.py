@@ -32,5 +32,6 @@ def compile_graph_with_checkpointer(builder, checkpointer_type=None):
     """
     # 只保留PostgreSQL分支
     graph = builder.compile(name="diagnostic-agent")
-    save_graph_image(graph)
+    # 开发环境下保存图结构图像
+    # save_graph_image(graph)
     return graph
