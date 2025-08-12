@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import ReactEcharts from 'echarts-for-react';
+import { theme } from 'antd';
 
 // 使用React.memo包装组件，避免不必要的重渲染
 const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
+    const { token } = theme.useToken();
     // 确保数据存在且有效
     if (!Array.isArray(data) || data.length === 0) {
         return <div>No data available</div>;
@@ -56,7 +58,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 axisPointer: {
                     type: 'line',
                     lineStyle: {
-                        color: '#FBBF24',
+                        color: token.colorWarning,
                         type: 'dashed'
                     }
                 }
@@ -73,7 +75,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 data: times,
                 axisLabel: {
                     rotate: 45,
-                    color: '#E5E7EB',
+                    color: token.colorText,
                     fontSize: 11,
                     formatter: function(value) {
                         // 只显示时间部分，如果需要
@@ -82,12 +84,12 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 },
                 axisLine: {
                     lineStyle: {
-                        color: '#60A5FA'
+                        color: token.colorBorder
                     }
                 },
                 axisTick: {
                     lineStyle: {
-                        color: '#60A5FA'
+                        color: token.colorBorder
                     }
                 },
                 splitLine: {
@@ -98,7 +100,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 type: 'value',
                 min: yAxisMin,
                 axisLabel: {
-                    color: '#E5E7EB',
+                    color: token.colorText,
                     fontSize: 11,
                     formatter: (value) => {
                         const numValue = parseFloat(value);
@@ -116,19 +118,19 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 },
                 axisLine: {
                     lineStyle: {
-                        color: '#60A5FA'
+                        color: token.colorBorder
                     }
                 },
                 axisTick: {
                     lineStyle: {
-                        color: '#60A5FA'
+                        color: token.colorBorder
                     }
                 },
                 splitLine: {
                     show: true,
                     lineStyle: {
                         type: 'dashed',
-                        color: '#64748B'
+                        color: token.colorBorderSecondary
                     }
                 }
             },
@@ -156,10 +158,10 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 sampling: 'lttb',
                 lineStyle: {
                     width: 2,
-                    color: '#06D6A0'
+                    color: token.colorSuccess
                 },
                 itemStyle: {
-                    color: '#06D6A0'
+                    color: token.colorSuccess
                 },
                 areaStyle: {
                     color: {
@@ -170,16 +172,16 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                         y2: 1,
                         colorStops: [{
                             offset: 0,
-                            color: 'rgba(6,214,160,0.3)'
+                            color: `${token.colorSuccess}33`
                         }, {
                             offset: 1,
-                            color: 'rgba(6,214,160,0.05)'
+                            color: `${token.colorSuccess}0D`
                         }]
                     }
                 }
             }]
         };
-    }, [data, showHeader]); // 只有当data或showHeader变化时才重新计算
+    }, [data, showHeader, token]); // 只有当data、showHeader或主题变化时才重新计算
 
     // 计算统计信息用于底部显示
     const statsInfo = useMemo(() => {
@@ -220,7 +222,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                     top: '5px',
                     left: '10px',
                     zIndex: 10,
-                    color: '#FCD34D',
+                    color: token.colorWarning,
                     fontSize: '13px',
                     fontWeight: 'bold',
                     maxWidth: 'calc(100% - 20px)',
@@ -248,13 +250,13 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
             {/* 统计信息显示在图表下方 */}
             {statsInfo && (
                 <div style={{ 
-                    color: '#FCD34D', 
+                    color: token.colorWarning, 
                     fontSize: '11px', 
                     fontWeight: 'bold',
                     textAlign: 'center',
                     marginTop: '2px',
                     padding: '2px 8px',
-                    background: 'rgba(59, 130, 246, 0.1)',
+                    background: token.colorPrimaryBg,
                     borderRadius: '4px'
                 }}>
                     最大值: {statsInfo.max} {statsInfo.units} | 

@@ -1,5 +1,6 @@
 import React from 'react';
 import ZabbixChart from './ZabbixChart';
+import { theme } from 'antd';
 
 // 检测是否为Zabbix监控数据
 const isZabbixMetricsData = (data: any): boolean => {
@@ -35,17 +36,21 @@ const isZabbixMetricsListData = (data: any): boolean => {
 
 // 渲染Zabbix指标列表
 const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
+  const { token } = theme.useToken();
   const categories = data.metrics_by_category || {};
   
   return (
-    <div className="border-2 border-cyan-400 rounded-xl p-4 my-3 shadow-lg" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
+    <div className="rounded-xl p-4 my-3 shadow-lg" style={{ 
+      border: `2px solid ${token.colorPrimary}`,
+      background: token.colorPrimaryBg
+    }}>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-cyan-300">📊</span>
-        <h4 className="font-semibold text-cyan-100">Zabbix 监控指标列表</h4>
+        <span style={{ color: token.colorPrimary }}>📊</span>
+        <h4 className="font-semibold" style={{ color: token.colorText }}>Zabbix 监控指标列表</h4>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-        <div className="space-y-2 text-cyan-100">
+        <div className="space-y-2" style={{ color: token.colorText }}>
           <p><strong>输入主机:</strong> {data.input_hostname}</p>
           <p><strong>实际主机:</strong> {data.actual_hostname}</p>
           <p><strong>主机名称:</strong> {data.host_name}</p>
@@ -53,11 +58,11 @@ const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
         </div>
         
         <div className="space-y-2">
-          <h5 className="font-medium text-yellow-400">指标分类统计:</h5>
+          <h5 className="font-medium" style={{ color: token.colorWarning }}>指标分类统计:</h5>
           {Object.entries(categories).map(([category, metrics]: [string, any]) => (
             <div key={category} className="flex justify-between">
-              <span className="text-cyan-200">{category}:</span>
-              <span className="font-medium text-yellow-400">{metrics.length}个</span>
+              <span style={{ color: token.colorText }}>{category}:</span>
+              <span className="font-medium" style={{ color: token.colorWarning }}>{metrics.length}个</span>
             </div>
           ))}
         </div>
@@ -65,20 +70,23 @@ const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
       
       <div className="mt-4">
         <details className="cursor-pointer">
-          <summary className="text-sm font-medium text-cyan-300 hover:text-cyan-200">
+          <summary className="text-sm font-medium" style={{ color: token.colorPrimary }}>
             📋 查看详细指标列表
           </summary>
           <div className="mt-2 max-h-60 overflow-y-auto space-y-3">
             {Object.entries(categories).map(([category, metrics]: [string, any]) => (
-              <div key={category} className="border-l-2 border-cyan-400 pl-3">
-                <h6 className="font-medium text-yellow-400 mb-1">{category} ({metrics.length}个)</h6>
+              <div key={category} className="pl-3" style={{ borderLeft: `2px solid ${token.colorPrimary}` }}>
+                <h6 className="font-medium mb-1" style={{ color: token.colorWarning }}>{category} ({metrics.length}个)</h6>
                 <div className="space-y-1 text-xs">
                   {metrics.map((metric: any, index: number) => (
                     <div key={index} className="flex justify-between items-start">
-                      <code className="text-cyan-300 bg-gray-900 px-1 rounded mr-2 flex-shrink-0">
+                      <code className="px-1 rounded mr-2 flex-shrink-0" style={{ 
+                        color: token.colorPrimary,
+                        backgroundColor: token.colorFillTertiary 
+                      }}>
                         {metric.key}
                       </code>
-                      <span className="text-cyan-200 text-right">{metric.name}</span>
+                      <span className="text-right" style={{ color: token.colorText }}>{metric.name}</span>
                     </div>
                   ))}
                 </div>
@@ -93,6 +101,7 @@ const ZabbixMetricsList: React.FC<{ data: any }> = ({ data }) => {
 
 // 渲染Zabbix监控数据图表
 const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
+  const { token } = theme.useToken();
   const metrics = data.metrics || {};
   const metricsEntries = Object.entries(metrics);
   
@@ -111,9 +120,12 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
           
           if (chartData.length === 0) {
             return (
-              <div key={metricKey} className="border border-cyan-500 rounded-lg p-2" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
-                <h5 className="font-medium text-cyan-100 mb-2">{metricData.name}</h5>
-                <div className="text-center text-cyan-200 py-4">
+              <div key={metricKey} className="rounded-lg p-2" style={{ 
+                border: `1px solid ${token.colorPrimary}`,
+                background: token.colorPrimaryBg 
+              }}>
+                <h5 className="font-medium mb-2" style={{ color: token.colorText }}>{metricData.name}</h5>
+                <div className="text-center py-4" style={{ color: token.colorTextSecondary }}>
                   <p>当前值: {metricData.current_value} {metricData.units}</p>
                   <p className="text-sm">暂无历史数据</p>
                 </div>
@@ -122,7 +134,10 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
           }
           
           return (
-            <div key={metricKey} className="border border-cyan-500 rounded-lg p-2" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+            <div key={metricKey} className="rounded-lg p-2" style={{ 
+              border: `1px solid ${token.colorPrimary}`,
+              background: token.colorPrimaryBg 
+            }}>
               <ZabbixChart 
                 data={chartData}
                 showHeader={true}
