@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getBaseUrl } from '@/utils/base_api';
 import { 
   Card, 
   Button, 
@@ -26,7 +27,7 @@ import { renderIcon, getIconBackgroundColor } from './components/AgentIconSystem
 
 const { Search } = Input;
 const { Option } = Select;
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = getBaseUrl();
 
 // 智能体分类选项
 const AGENT_TYPES = [

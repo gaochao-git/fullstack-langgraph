@@ -19,8 +19,8 @@ export const globalLoadingController = {
   }
 };
 
-// 获取基础URL
-const getBaseUrl = (): string => {
+// 获取基础URL - 导出以供其他模块使用
+export const getBaseUrl = (): string => {
   return import.meta.env.VITE_API_BASE_URL || '';
 };
 

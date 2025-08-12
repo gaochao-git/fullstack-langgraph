@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/ThemeContext';
+import { getBaseUrl } from '@/utils/base_api';
 import { 
   Card, 
   Table, 
@@ -69,7 +70,7 @@ interface MCPServer {
 
 
 // API基础URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = getBaseUrl();
 
 // 将后端数据转换为前端格式
 const transformServerFromAPI = (apiServer: any): MCPServer => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/ThemeContext';
+import { getBaseUrl } from '@/utils/base_api';
 import { 
   Card, 
   Row, 
@@ -82,7 +83,7 @@ interface ModelConfig {
 }
 
 // API配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = getBaseUrl();
 
 // API调用函数
 const fetchModels = async (): Promise<ModelConfig[]> => {

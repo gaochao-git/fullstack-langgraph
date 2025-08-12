@@ -6,7 +6,7 @@ import ChatMessages, { type ProcessedEvent } from "./ChatMessage";
 import { Drawer } from "antd";
 import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";
-import { omind_get } from "@/utils/base_api";
+import { omind_get, getBaseUrl } from "@/utils/base_api";
 import { type Agent } from "@/services/agentApi";
 
 // 历史会话类型定义
@@ -91,9 +91,9 @@ export default function ChatEngine({
   const thread = useStream<{
     messages: Message[];
   }>({
-    apiUrl: import.meta.env.VITE_API_BASE_URL 
-      ? `${import.meta.env.VITE_API_BASE_URL}/api/chat`
-      : `${window.location.origin}/api/chat`,
+    apiUrl: getBaseUrl() 
+      ? `${getBaseUrl()}/api/chat`
+      : '/api/chat',
     assistantId: getAgentId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),

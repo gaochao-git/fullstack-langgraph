@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getBaseUrl } from '@/utils/base_api';
 import { 
   Card, 
   Table, 
@@ -46,7 +47,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 // API基础URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = getBaseUrl();
 
 // MCP Gateway配置类型定义
 interface MCPGatewayConfig {

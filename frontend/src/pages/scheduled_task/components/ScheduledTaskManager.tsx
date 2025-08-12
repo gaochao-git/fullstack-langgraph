@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getBaseUrl } from '@/utils/base_api';
 import {
   Table,
   Button,
@@ -45,7 +46,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const [editForm] = Form.useForm();
   
   const { message, modal } = App.useApp();
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const API_BASE_URL = getBaseUrl();
 
   // 获取任务列表
   const fetchTasks = async () => {
