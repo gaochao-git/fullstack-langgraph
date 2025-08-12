@@ -2,7 +2,6 @@ import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, Plus, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/utils/lib-utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
@@ -10,6 +9,8 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import DiagnosticAgentWelcome from "./components/DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./components/ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
+import { theme } from 'antd';
+import type { GlobalToken } from 'antd/es/theme/interface';
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -57,11 +58,15 @@ interface ToolCallProps {
   onApprove?: () => void; // 确认回调
   onReject?: () => void; // 拒绝回调
   toolCount?: number; // 新增：工具调用总数
+  token?: GlobalToken; // 主题token
 }
 
 // 工具调用组件
-const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject, toolCount }) => {
+const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject, toolCount, token }) => {
   const [isExpanded, setIsExpanded] = useState(isPending || false); // 待确认状态默认展开
+  
+  // 如果没有传入token，使用默认的
+  const themeToken = token || theme.useToken().token;
   
   // 当工具变为待审批状态时，自动展开
   useEffect(() => {
@@ -76,16 +81,21 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-100 to-yellow-100' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
+    <div 
+      className="border rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden"
+      style={{ 
+        borderColor: isPending ? themeToken.colorWarning : themeToken.colorPrimary,
+        background: isPending ? themeToken.colorWarningBg : themeToken.colorPrimaryBg
+      }}>
       {/* 工具调用头部（合并描述和折叠按钮） */}
       <div 
-        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-200 hover:to-yellow-200' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
+        className="flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 hover:opacity-90"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Wrench className={`h-5 w-5 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
-          <span className={`font-mono text-sm font-semibold truncate ${isPending ? 'text-orange-800' : 'text-yellow-400'}`}>{toolName}</span>
-          <span className={`ml-2 text-xs font-bold flex-shrink-0 ${isPending ? 'text-orange-700' : 'text-yellow-400'}`}>工具调用（{toolCount || 1}）</span>
+          <Wrench className="h-5 w-5" style={{ color: isPending ? themeToken.colorWarning : themeToken.colorPrimary }} />
+          <span className="font-mono text-sm font-semibold truncate" style={{ color: isPending ? themeToken.colorWarning : themeToken.colorWarningText }}>{toolName}</span>
+          <span className="ml-2 text-xs font-bold flex-shrink-0" style={{ color: isPending ? themeToken.colorWarning : themeToken.colorWarningText }}>工具调用（{toolCount || 1}）</span>
         </div>
         
         {/* 待确认状态的操作按钮 - 放在头部 */}
@@ -187,7 +197,10 @@ interface SOPExecutionApprovalProps {
   };
   
   return (
-    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
+    <div className="border rounded-lg p-4" style={{ 
+      borderColor: token.colorWarning,
+      backgroundColor: token.colorWarningBg
+    }}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-orange-800 mb-2">
           SOP执行确认
@@ -256,10 +269,11 @@ interface ToolCallsProps {
   allMessages: Message[];
   interrupt?: any; // 添加interrupt数据
   onInterruptResume?: (approved: boolean | string[]) => void; // 添加interrupt处理函数
+  token?: GlobalToken; // 主题token
 }
 
 // 工具调用列表组件
-const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, onInterruptResume }) => {
+const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, onInterruptResume, token }) => {
   const allToolCalls = (message as any).tool_calls || [];
   
   // 使用全局定义的黑名单过滤工具调用
@@ -321,6 +335,7 @@ const ToolCalls: React.FC<ToolCallsProps> = ({ message, allMessages, interrupt, 
               key={toolCall.id || index} 
               toolCall={toolCall}
               toolResult={toolResult}
+              token={token}
               isPending={isPending}
               onApprove={() => {
                 console.log(`🔧 确认工具: ${toolCall.name}`, toolCall.args);
@@ -432,7 +447,10 @@ interface BatchToolApprovalProps {
   };
   
   return (
-    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
+    <div className="border rounded-lg p-4" style={{ 
+      borderColor: token.colorWarning,
+      backgroundColor: token.colorWarningBg
+    }}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-orange-800">
           批量工具审批 ({pendingTools.length} 个待审批)
@@ -609,7 +627,10 @@ interface SingleToolApprovalProps {
   };
   
   return (
-    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
+    <div className="border rounded-lg p-4" style={{ 
+      borderColor: token.colorWarning,
+      backgroundColor: token.colorWarningBg
+    }}>
       <div className="mb-4">
         <h3 className="text-lg font-semibold text-orange-800 mb-2">
           工具审批
@@ -738,6 +759,7 @@ export function DiagnosticChatView({
   agent,
 }: DiagnosticChatViewProps) {
   const { isDark } = useTheme();
+  const { token } = theme.useToken();
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
@@ -829,7 +851,7 @@ export function DiagnosticChatView({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col h-full relative w-full overflow-x-hidden" style={{ minHeight: 0, background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 50%, #1E3A8A 100%)' }}>
+    <div className="flex flex-col h-full relative w-full overflow-x-hidden" style={{ minHeight: 0 }}>
       <style>
         {`
           @keyframes buttonSpin {
@@ -923,12 +945,16 @@ export function DiagnosticChatView({
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6 pl-4">
                 <div className="flex items-center gap-2 justify-end max-w-[90%] w-full">
-                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2 border border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
+                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 pt-3 pb-2" style={{ 
+                    backgroundColor: token.colorPrimary,
+                    borderColor: token.colorPrimary,
+                    border: '1px solid'
+                  }}>
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>
                   </div>
-                  <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#1E3A8A' }}>
+                  <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: token.colorPrimary }}>
                     <User className="h-5 w-5 text-blue-200" />
                   </div>
                 </div>
@@ -961,10 +987,13 @@ export function DiagnosticChatView({
               })() && (
                 <div className="flex flex-col items-start mb-6 mr-2">
                   <div className="flex items-start gap-2 w-full">
-                    <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
+                    <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: token.colorTextQuaternary }}>
                       <Bot className="h-5 w-5 text-blue-200" />
                     </div>
-                    <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border border-cyan-400" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
+                    <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden" style={{ 
+                      border: `1px solid ${token.colorPrimary}`,
+                      background: token.colorBgContainer
+                    }}>
                       {(() => {
                         // 按时间顺序渲染所有消息和图表
                         const renderItems: React.ReactNode[] = [];
@@ -1000,7 +1029,8 @@ export function DiagnosticChatView({
                                       <ToolCalls 
                                         key={msg.id || i} 
                                         message={msg} 
-                                        allMessages={messages} 
+                                        allMessages={messages}
+                                        token={token} 
                                         interrupt={interrupt}
                                         onInterruptResume={onInterruptResume}
                                       />
