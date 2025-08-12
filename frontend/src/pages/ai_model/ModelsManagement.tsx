@@ -669,15 +669,35 @@ const ModelsManagement = () => {
             </Select>
           </Form.Item>
 
-          <Form.Item label="端点地址" required>
+          <Form.Item 
+            label="端点地址" 
+            required
+          >
             <Row gutter={8} align="middle" wrap={false}>
               <Col flex="auto">
                 <Form.Item
                   name="endpoint"
                   noStyle
-                  rules={[{ required: true, message: '请输入端点地址' }]}
+                  rules={[
+                    { required: true, message: '请输入端点地址' },
+                    {
+                      validator: (_, value) => {
+                        if (form.getFieldValue('provider') === 'openai-compatible' && 
+                            value && value.includes('/chat/completions')) {
+                          return Promise.reject(new Error('OpenAI兼容模式的URL不应包含 /chat/completions'));
+                        }
+                        return Promise.resolve();
+                      }
+                    }
+                  ]}
                 >
-                  <Input placeholder="https://api.example.com" />
+                  <Input 
+                    placeholder={
+                      form.getFieldValue('provider') === 'openai-compatible' 
+                        ? "https://api.siliconflow.cn/v1" 
+                        : "https://api.example.com"
+                    } 
+                  />
                 </Form.Item>
               </Col>
               <Col>

@@ -309,6 +309,7 @@ class AIModelService:
                 
             elif provider in ["openai-compatible", "deepseek", "qwen"]:
                 # OpenAI兼容API测试（包括DeepSeek、Qwen等）
+                # 用户应该输入基础URL，系统自动添加/chat/completions
                 test_url = f"{endpoint_url.rstrip('/')}/chat/completions"
                 payload = {
                     "model": model_type,

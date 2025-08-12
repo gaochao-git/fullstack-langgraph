@@ -138,6 +138,10 @@ class AgentConfigService:
         # Get model info from database (includes endpoint_url and api_key)
         model_info = AgentConfigService._get_model_info_from_db(model_name, db)
         
+        # 直接使用用户输入的endpoint_url
+        # 前端已经确保OpenAI兼容模式不会包含/chat/completions
+        base_url = model_info.get('endpoint_url', 'https://api.deepseek.com')
+        
         result = {
             'model_name': model_name,
             'temperature': temperature,
@@ -146,7 +150,7 @@ class AgentConfigService:
             'frequency_penalty': frequency_penalty,
             'presence_penalty': presence_penalty,
             'available_models': llm_config.get('available_models', ['deepseek-chat']),
-            'base_url': model_info.get('endpoint_url', 'https://api.deepseek.com')
+            'base_url': base_url
         }
         
         # Add API key if found in database

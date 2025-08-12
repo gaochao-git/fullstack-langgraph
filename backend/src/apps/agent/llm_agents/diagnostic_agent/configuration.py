@@ -6,6 +6,9 @@ from langchain_core.runnables import RunnableConfig
 from src.apps.agent.service.agent_config_service import AgentConfigService
 from src.shared.db.config import get_sync_db
 from langchain_openai import ChatOpenAI
+from src.shared.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Configuration(BaseModel):
@@ -63,12 +66,12 @@ class Configuration(BaseModel):
         actual_model = model_name or self.query_generator_model
         actual_temperature = temperature if temperature is not None else self.model_temperature
         
-        # 打印模型使用信息
-        print(f"🤖 创建LLM实例:")
-        print(f"   模型: {actual_model}")
-        print(f"   温度: {actual_temperature}")
-        print(f"   API端点: {self.model_base_url}")
-        print(f"   API密钥: {self.get_api_key()[:15]}..." if self.get_api_key() else "   API密钥: 未设置")
+        # 记录模型使用信息
+        logger.info(f"创建LLM实例: 模型={actual_model}, 温度={actual_temperature}, API端点={self.model_base_url}")
+        if self.get_api_key():
+            logger.debug(f"API密钥: {self.get_api_key()[:15]}...")
+        else:
+            logger.warning("API密钥: 未设置")
         
         return ChatOpenAI(
             model=actual_model,

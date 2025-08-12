@@ -205,3 +205,66 @@ nginx -t
 nginx -s reload
 
 
+
+curl --request POST \
+  --url https://api.siliconflow.cn/v1/chat/completions \
+  --header 'Authorization: Bearer sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "model": "Qwen/QwQ-32B",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    }
+  ]
+}'
+
+
+curl --request POST \
+  --url https://api.siliconflow.cn/v1/chat/completions \
+  --header 'Authorization: Bearer sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    }
+  ]
+}'
+
+
+
+
+
+
+curl --request POST \
+  --url https://api.siliconflow.cn/v1/chat/completions \
+  --header 'Authorization: Bearer sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "model": "deepseek-ai/DeepSeek-R1",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    }
+  ]
+}'
+
+
+curl --request POST \
+  --url https://api.siliconflow.cn/v1/chat/completions \
+  --header 'Authorization: Bearer sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm' \
+  --header 'Content-Type: application/json' \
+  --data '{
+  "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好"
+    }
+  ]
+}'

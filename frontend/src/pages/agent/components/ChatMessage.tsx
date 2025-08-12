@@ -1225,8 +1225,10 @@ function ChatMessages({
                 onChange={(e) => onModelChange?.(e.target.value)}
                 className={cn(
                   "bg-transparent text-sm font-medium cursor-pointer focus:outline-none",
+                  "max-w-[120px] sm:max-w-[150px] truncate", // 设置最大宽度并添加截断
                   isDark ? "text-gray-200" : "text-gray-700"
                 )}
+                style={{ width: '120px' }} // 固定宽度
                 disabled={isLoading || !!interrupt || availableModels.length === 0}
                 title={availableModels.length > 0 ? `当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}` : '正在加载模型...'}
               >
@@ -1236,6 +1238,7 @@ function ChatMessages({
                       <option 
                         key={model.id} 
                         value={model.type}
+                        title={model.name} // 添加 title 以显示完整名称
                       >
                         {model.name}
                       </option>
