@@ -1,4 +1,4 @@
-import { Typography } from 'antd';
+import { Typography, theme } from 'antd';
 import React from 'react';
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
@@ -12,188 +12,22 @@ const md: MarkdownIt = new MarkdownIt({
     if (lang && hljs.getLanguage(lang)) {
       try {
         const highlighted = hljs.highlight(str, { language: lang }).value;
-        return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs md:text-sm my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
-               `<code class="hljs language-${lang}">` +
-               highlighted +
-               '</code></pre>';
+        return `<pre class="markdown-code-block"><code class="hljs language-${lang}">${highlighted}</code></pre>`;
       } catch (__) {}
     }
     // 自动检测语言
     try {
       const highlighted = hljs.highlightAuto(str).value;
-      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs md:text-sm my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
-             '<code class="hljs">' +
-             highlighted +
-             '</code></pre>';
+      return `<pre class="markdown-code-block"><code class="hljs">${highlighted}</code></pre>`;
     } catch (__) {
       // 如果高亮失败，返回原始代码
-      return '<pre class="p-3 rounded-md overflow-x-auto font-mono text-xs md:text-sm my-2" style="background-color: #0d1117; border: 1px solid #30363d;">' +
-             '<code style="color: #e6edf3;">' +
-             md.utils.escapeHtml(str) +
-             '</code></pre>';
+      return `<pre class="markdown-code-block"><code>${md.utils.escapeHtml(str)}</code></pre>`;
     }
   }
 });
 
-// 自定义渲染规则
-md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="border-collapse w-full">';
-md.renderer.rules.table_close = () => '</table></div>';
-md.renderer.rules.th_open = () => '<th class="px-4 py-2 text-left font-bold" style="border: 1px solid #93C5FD; background-color: #3B82F6; color: #FFFFFF;">';
-md.renderer.rules.td_open = () => '<td class="px-4 py-2" style="border: 1px solid #93C5FD; color: #1F2937;">';
+// 注意：这些规则会在组件内部根据主题动态更新
 
-// 添加自定义样式
-const markdownStyles = `
-  .markdown-body {
-    color: #E5E7EB;
-    line-height: 1.5;
-    white-space: normal;
-    word-break: normal;
-    overflow-wrap: break-word;
-    max-width: 100%;
-    word-wrap: break-word;
-  }
-  .markdown-body h1 { 
-    @apply text-base md:text-xl font-bold mt-3 mb-2;
-    color: #FBBF24;
-    border-bottom: 2px solid #3B82F6;
-    padding-bottom: 4px;
-  }
-  .markdown-body h2 { 
-    @apply text-sm md:text-lg font-bold mt-3 mb-2;
-    color: #FCD34D;
-    border-bottom: 1px solid #D1D5DB;
-    padding-bottom: 2px;
-  }
-  .markdown-body h3 { 
-    @apply text-xs md:text-base font-bold mt-2 mb-1;
-    color: #FDE68A;
-  }
-  .markdown-body h4 { 
-    @apply text-xs md:text-sm font-bold mt-2 mb-1;
-    color: #FDE68A;
-  }
-  .markdown-body p { 
-    @apply mb-2 leading-relaxed text-sm md:text-base;
-    color: #E5E7EB;
-    white-space: normal;
-    word-break: normal;
-    overflow-wrap: break-word;
-    hyphens: auto;
-  }
-  .markdown-body a {
-    color: #2563EB;
-    text-decoration: underline;
-  }
-  .markdown-body a:hover {
-    color: #1D4ED8;
-  }
-  .markdown-body code:not(pre code) { 
-    background-color: transparent;
-    color: inherit;
-    padding: 0;
-    border-radius: 0;
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 0.7rem;
-    border: none;
-    white-space: nowrap;
-    overflow-wrap: break-word;
-  }
-  .markdown-body pre { 
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    overflow-x: auto;
-    margin: 8px 0;
-    white-space: pre;
-    word-break: normal;
-  }
-  .markdown-body pre code {
-    font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 0.7rem;
-    background: transparent;
-    padding: 0;
-    border: none;
-    white-space: pre;
-    word-break: normal;
-  }
-  .markdown-body .hljs {
-    background: transparent !important;
-    padding: 8px !important;
-  }
-  .markdown-body ul {
-    @apply list-disc list-inside mb-2 text-sm md:text-base;
-    color: #E5E7EB;
-    padding-left: 12px;
-  }
-  .markdown-body ol {
-    @apply list-decimal list-inside mb-2 text-sm md:text-base;
-    color: #E5E7EB;
-    padding-left: 12px;
-  }
-  .markdown-body li {
-    @apply mb-1 text-sm md:text-base;
-    color: #E5E7EB;
-  }
-  .markdown-body blockquote {
-    border-left: 4px solid #3B82F6;
-    padding-left: 12px;
-    margin: 8px 0;
-    color: #1E3A8A;
-    font-style: italic;
-    background-color: #DBEAFE;
-    padding: 8px 12px;
-    border-radius: 4px;
-  }
-  .markdown-body hr {
-    border: none;
-    height: 1px;
-    background-color: #93C5FD;
-    margin: 12px 0;
-  }
-  .markdown-body table { 
-    @apply border-collapse w-full my-2;
-    border: 1px solid #93C5FD;
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  .markdown-body th { 
-    background-color: #3B82F6;
-    color: #FFFFFF;
-    padding: 8px 12px;
-    text-align: left;
-    font-weight: 600;
-    border-bottom: 2px solid #2563EB;
-  }
-  .markdown-body td { 
-    color: #1F2937;
-    padding: 8px 12px;
-    border-bottom: 1px solid #93C5FD;
-  }
-  .markdown-body tr:last-child td {
-    border-bottom: none;
-  }
-  .markdown-body tr:nth-child(even) {
-    background-color: #F8FAFC;
-  }
-  .markdown-body tr:nth-child(even) td {
-    color: #1F2937;
-  }
-  .markdown-body tr:nth-child(odd) {
-    background-color: #FFFFFF;
-  }
-  .markdown-body tr:nth-child(odd) td {
-    color: #1F2937;
-  }
-  .markdown-body strong {
-    color: #FBBF24;
-    font-weight: 600;
-  }
-  .markdown-body em {
-    color: #A78BFA;
-    font-style: italic;
-  }
-`;
 
 interface MarkdownRendererProps {
   content: string;
@@ -218,6 +52,199 @@ const isToolOutput = (content: string): boolean => {
 };
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+  const { token } = theme.useToken();
+  
+  // 根据主题动态设置表格渲染规则
+  md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="markdown-table">';
+  md.renderer.rules.table_close = () => '</table></div>';
+  md.renderer.rules.th_open = () => '<th class="markdown-th">';
+  md.renderer.rules.td_open = () => '<td class="markdown-td">';
+  
+  // 动态生成 Markdown 样式
+  const markdownStyles = `
+    .markdown-body {
+      color: ${token.colorText};
+      line-height: 1.5;
+      white-space: normal;
+      word-break: normal;
+      overflow-wrap: break-word;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+    .markdown-body h1 { 
+      font-size: 1.25rem;
+      font-weight: bold;
+      margin-top: 0.75rem;
+      margin-bottom: 0.5rem;
+      color: ${token.colorTextHeading};
+      border-bottom: 2px solid ${token.colorPrimary};
+      padding-bottom: 4px;
+    }
+    .markdown-body h2 { 
+      font-size: 1.125rem;
+      font-weight: bold;
+      margin-top: 0.75rem;
+      margin-bottom: 0.5rem;
+      color: ${token.colorTextHeading};
+      border-bottom: 1px solid ${token.colorBorder};
+      padding-bottom: 2px;
+    }
+    .markdown-body h3 { 
+      font-size: 1rem;
+      font-weight: bold;
+      margin-top: 0.5rem;
+      margin-bottom: 0.25rem;
+      color: ${token.colorTextHeading};
+    }
+    .markdown-body h4 { 
+      font-size: 0.875rem;
+      font-weight: bold;
+      margin-top: 0.5rem;
+      margin-bottom: 0.25rem;
+      color: ${token.colorTextHeading};
+    }
+    .markdown-body p { 
+      margin-bottom: 0.5rem;
+      line-height: 1.75;
+      font-size: 1rem;
+      color: ${token.colorText};
+      white-space: normal;
+      word-break: normal;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
+    .markdown-body a {
+      color: ${token.colorPrimary};
+      text-decoration: underline;
+    }
+    .markdown-body a:hover {
+      color: ${token.colorPrimaryHover};
+    }
+    .markdown-body code:not(pre code) { 
+      background-color: ${token.colorFillTertiary};
+      color: ${token.colorText};
+      padding: 0.125rem 0.25rem;
+      border-radius: 4px;
+      font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+      font-size: 0.875rem;
+      border: none;
+      white-space: nowrap;
+      overflow-wrap: break-word;
+    }
+    .markdown-body pre { 
+      background-color: ${token.colorBgContainer};
+      border: 1px solid ${token.colorBorder};
+      border-radius: 6px;
+      padding: 0;
+      overflow-x: auto;
+      margin: 8px 0;
+      white-space: pre;
+      word-break: normal;
+    }
+    .markdown-body pre code {
+      font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+      font-size: 0.875rem;
+      background: transparent;
+      padding: 0;
+      border: none;
+      white-space: pre;
+      word-break: normal;
+    }
+    .markdown-body .hljs {
+      background: transparent !important;
+      padding: 8px !important;
+    }
+    .markdown-body .markdown-code-block {
+      background-color: ${token.colorFillTertiary};
+      border: 1px solid ${token.colorBorder};
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: 8px 0;
+      font-size: 0.875rem;
+    }
+    .markdown-body .markdown-code-block code {
+      color: ${token.colorText};
+      background: transparent;
+      padding: 0;
+    }
+    .markdown-body ul {
+      list-style: disc;
+      list-style-position: inside;
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+      color: ${token.colorText};
+      padding-left: 12px;
+    }
+    .markdown-body ol {
+      list-style: decimal;
+      list-style-position: inside;
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+      color: ${token.colorText};
+      padding-left: 12px;
+    }
+    .markdown-body li {
+      margin-bottom: 0.25rem;
+      font-size: 1rem;
+      color: ${token.colorText};
+    }
+    .markdown-body blockquote {
+      border-left: 4px solid ${token.colorPrimary};
+      padding-left: 12px;
+      margin: 8px 0;
+      color: ${token.colorTextSecondary};
+      font-style: italic;
+      background-color: ${token.colorFillQuaternary};
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
+    .markdown-body hr {
+      border: none;
+      height: 1px;
+      background-color: ${token.colorBorder};
+      margin: 12px 0;
+    }
+    .markdown-body .markdown-table { 
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.5rem 0;
+      border: 1px solid ${token.colorBorder};
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .markdown-body .markdown-th { 
+      background-color: ${token.colorFillAlter};
+      color: ${token.colorText};
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      border: 1px solid ${token.colorBorder};
+    }
+    .markdown-body .markdown-td { 
+      color: ${token.colorText};
+      padding: 8px 12px;
+      border: 1px solid ${token.colorBorderSecondary};
+    }
+    .markdown-body tr:last-child td {
+      border-bottom: none;
+    }
+    .markdown-body tr:nth-child(even) {
+      background-color: ${token.colorFillQuaternary};
+    }
+    .markdown-body tr:nth-child(odd) {
+      background-color: ${token.colorBgContainer};
+    }
+    .markdown-body strong {
+      color: ${token.colorTextHeading};
+      font-weight: 600;
+    }
+    .markdown-body em {
+      color: ${token.colorTextSecondary};
+      font-style: italic;
+    }
+  `;
+  
   // 处理工具调用和输出内容
   let processedContent = content;
   

@@ -10,6 +10,7 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import DiagnosticAgentWelcome from "./DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
+import { theme } from "antd";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -61,6 +62,7 @@ interface ToolCallProps {
 
 // 工具调用组件
 const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, onApprove, onReject, toolCount }) => {
+  const { token } = theme.useToken();
   const [isExpanded, setIsExpanded] = useState(isPending || false); // 待确认状态默认展开
   
   // 当工具变为待审批状态时，自动展开
@@ -76,16 +78,36 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
   
   
   return (
-    <div className={`border rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden ${isPending ? 'border-orange-400 bg-gradient-to-r from-orange-100 to-yellow-100' : 'border-cyan-400 bg-gradient-to-r from-blue-800 to-blue-900'}`}>
+    <div 
+      className="border rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden"
+      style={{
+        borderColor: isPending ? token.colorWarningBorder : token.colorPrimaryBorder,
+        backgroundColor: isPending ? token.colorWarningBg : token.colorPrimaryBg,
+        backgroundImage: isPending 
+          ? `linear-gradient(135deg, ${token.colorWarningBg} 0%, ${token.colorWarningBgHover} 100%)`
+          : `linear-gradient(135deg, ${token.colorPrimaryBg} 0%, ${token.colorPrimaryBgHover} 100%)`
+      }}
+    >
       {/* 工具调用头部（合并描述和折叠按钮） */}
       <div 
-        className={`flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200 ${isPending ? 'hover:bg-gradient-to-r hover:from-orange-200 hover:to-yellow-200' : 'hover:bg-gradient-to-r hover:from-blue-700 hover:to-blue-800'}`}
+        className="flex items-center justify-between px-3 py-1.5 cursor-pointer transition-all duration-200"
+        style={{
+          ':hover': {
+            backgroundColor: isPending ? token.colorWarningBgHover : token.colorPrimaryBgHover
+          }
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = isPending ? token.colorWarningBgHover : token.colorPrimaryBgHover;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Wrench className={`h-5 w-5 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
-          <span className={`font-mono text-sm font-semibold truncate ${isPending ? 'text-orange-800' : 'text-yellow-400'}`}>{toolName}</span>
-          <span className={`ml-2 text-xs font-bold flex-shrink-0 ${isPending ? 'text-orange-700' : 'text-yellow-400'}`}>工具调用（{toolCount || 1}）</span>
+          <Wrench className="h-5 w-5" style={{ color: isPending ? token.colorWarning : token.colorPrimary }} />
+          <span className="font-mono text-sm font-semibold truncate" style={{ color: token.colorText }}>{toolName}</span>
+          <span className="ml-2 text-xs font-bold flex-shrink-0" style={{ color: token.colorTextSecondary }}>工具调用（{toolCount || 1}）</span>
         </div>
         
         {/* 待确认状态的操作按钮 - 放在头部 */}
@@ -118,19 +140,29 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
         )}
         
         {isExpanded ? (
-          <ChevronDown className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
+          <ChevronDown className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
         ) : (
-          <ChevronRight className={`h-4 w-4 ${isPending ? 'text-orange-600' : 'text-cyan-300'}`} />
+          <ChevronRight className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
         )}
       </div>
       
       {/* 展开的内容 */}
       {isExpanded && (
-        <div className={`border-t-2 p-3 space-y-3 overflow-x-auto ${isPending ? 'border-orange-400' : 'border-cyan-400'}`}>
+        <div 
+          className="border-t p-3 space-y-3 overflow-x-auto"
+          style={{ borderTopColor: token.colorBorderSecondary }}
+        >
           {/* 参数 */}
           <div className="min-w-fit max-w-full">
-            <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-cyan-300' : 'text-cyan-300'}`}>参数:</h4>
-            <pre className={`p-3 rounded-lg text-xs overflow-x-auto whitespace-pre max-w-full border ${isPending ? 'bg-gray-900 text-cyan-300 border-cyan-500' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
+            <h4 className="text-sm font-bold mb-2" style={{ color: token.colorTextHeading }}>参数:</h4>
+            <pre 
+              className="p-3 rounded-lg text-xs overflow-x-auto whitespace-pre max-w-full border"
+              style={{ 
+                backgroundColor: token.colorFillTertiary,
+                color: token.colorText,
+                borderColor: token.colorBorder
+              }}
+            >
               {JSON.stringify(toolArgs, null, 2)}
             </pre>
           </div>
@@ -140,10 +172,17 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           {/* 输出结果 */}
           {toolResultContent && (
             <div className="min-w-fit max-w-full">
-              <h4 className={`text-sm font-bold mb-2 ${isPending ? 'text-cyan-300' : 'text-cyan-300'}`}>输出:</h4>
+              <h4 className="text-sm font-bold mb-2" style={{ color: token.colorTextHeading }}>输出:</h4>
               
               {/* 工具展开后只显示原始JSON数据 */}
-              <pre className={`p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre max-w-full border ${isPending ? 'bg-gray-900 text-cyan-300 border-cyan-500' : 'bg-gray-900 text-cyan-300 border-cyan-500'}`}>
+              <pre 
+                className="p-3 rounded-lg text-xs overflow-x-auto max-h-48 overflow-y-auto whitespace-pre max-w-full border"
+                style={{ 
+                  backgroundColor: token.colorFillTertiary,
+                  color: token.colorText,
+                  borderColor: token.colorBorder
+                }}
+              >
                 {typeof toolResultContent === 'string' 
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}
@@ -746,6 +785,7 @@ function ChatMessages({
   agent,
 }: ChatMessagesProps) {
   const { isDark } = useTheme();
+  const { token } = theme.useToken();
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
@@ -932,13 +972,23 @@ function ChatMessages({
               {/* 用户消息 */}
               <div className="flex flex-col items-end mb-6 pl-4">
                 <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
-                  <div className="text-white rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 py-2.5 border border-cyan-400" style={{ backgroundColor: '#1D4ED8' }}>
+                  <div 
+                    className="rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 py-2.5 border"
+                    style={{ 
+                      backgroundColor: token.colorPrimary,
+                      borderColor: token.colorPrimaryBorder,
+                      color: token.colorTextLightSolid
+                    }}
+                  >
                     <span className="whitespace-pre-wrap">
                       {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
                     </span>
                   </div>
-                  <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#1E3A8A' }}>
-                    <User className="h-5 w-5 text-blue-200" />
+                  <div 
+                    className="rounded-full p-2 flex-shrink-0 flex items-center justify-center"
+                    style={{ backgroundColor: token.colorFillSecondary }}
+                  >
+                    <User className="h-5 w-5" style={{ color: token.colorPrimary }} />
                   </div>
                 </div>
               </div>
@@ -970,10 +1020,19 @@ function ChatMessages({
               })() && (
                 <div className="flex flex-col items-start mb-6 mr-2">
                   <div className="flex items-start w-full" style={{ gap: '5px' }}>
-                    <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
-                      <Bot className="h-5 w-5 text-blue-200" />
+                    <div 
+                      className="rounded-full p-2 flex-shrink-0 flex items-center justify-center"
+                      style={{ backgroundColor: token.colorFillSecondary }}
+                    >
+                      <Bot className="h-5 w-5" style={{ color: token.colorPrimary }} />
                     </div>
-                    <div className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border border-cyan-400" style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #3730A3 100%)' }}>
+                    <div 
+                      className="relative flex flex-col rounded-xl p-4 shadow-lg min-w-0 flex-1 overflow-hidden border"
+                      style={{ 
+                        backgroundColor: token.colorBgContainer,
+                        borderColor: token.colorBorder
+                      }}
+                    >
                       {(() => {
                         // 按时间顺序渲染所有消息和图表
                         const renderItems: React.ReactNode[] = [];
@@ -1116,10 +1175,13 @@ function ChatMessages({
           })() && (
             <div className="flex flex-col items-start mb-6 mr-2">
               <div className="flex items-start gap-2 w-full">
-                <div className="rounded-full p-2 flex-shrink-0 flex items-center justify-center" style={{ backgroundColor: '#374151' }}>
-                  <Bot className="h-5 w-5 text-blue-200" />
+                <div 
+                  className="rounded-full p-2 flex-shrink-0 flex items-center justify-center"
+                  style={{ backgroundColor: token.colorFillSecondary }}
+                >
+                  <Bot className="h-5 w-5" style={{ color: token.colorPrimary }} />
                 </div>
-                <div className="flex items-center gap-2 text-gray-300">
+                <div className="flex items-center gap-2" style={{ color: token.colorTextDescription }}>
                   <Loader2 className="h-4 w-4 animate-spin" />
                   诊断中...
                 </div>
