@@ -72,7 +72,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       word-wrap: break-word;
     }
     .markdown-body h1 { 
-      font-size: 1.25rem;
       font-weight: bold;
       margin-top: 0.75rem;
       margin-bottom: 0.5rem;
@@ -81,7 +80,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       padding-bottom: 4px;
     }
     .markdown-body h2 { 
-      font-size: 1.125rem;
       font-weight: bold;
       margin-top: 0.75rem;
       margin-bottom: 0.5rem;
@@ -90,14 +88,12 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       padding-bottom: 2px;
     }
     .markdown-body h3 { 
-      font-size: 1rem;
       font-weight: bold;
       margin-top: 0.5rem;
       margin-bottom: 0.25rem;
       color: ${token.colorTextHeading};
     }
     .markdown-body h4 { 
-      font-size: 0.875rem;
       font-weight: bold;
       margin-top: 0.5rem;
       margin-bottom: 0.25rem;
@@ -106,7 +102,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     .markdown-body p { 
       margin-bottom: 0.5rem;
       line-height: 1.75;
-      font-size: 1rem;
       color: ${token.colorText};
       white-space: normal;
       word-break: normal;
@@ -126,7 +121,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       padding: 0.125rem 0.25rem;
       border-radius: 4px;
       font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-      font-size: 0.875rem;
       border: none;
       white-space: nowrap;
       overflow-wrap: break-word;
@@ -143,7 +137,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     }
     .markdown-body pre code {
       font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
-      font-size: 0.875rem;
       background: transparent;
       padding: 0;
       border: none;
@@ -161,7 +154,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       padding: 12px;
       overflow-x: auto;
       margin: 8px 0;
-      font-size: 0.875rem;
     }
     .markdown-body .markdown-code-block code {
       color: ${token.colorText};
@@ -172,7 +164,6 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       list-style: disc;
       list-style-position: inside;
       margin-bottom: 0.5rem;
-      font-size: 1rem;
       color: ${token.colorText};
       padding-left: 12px;
     }
@@ -180,13 +171,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       list-style: decimal;
       list-style-position: inside;
       margin-bottom: 0.5rem;
-      font-size: 1rem;
       color: ${token.colorText};
       padding-left: 12px;
     }
     .markdown-body li {
       margin-bottom: 0.25rem;
-      font-size: 1rem;
       color: ${token.colorText};
     }
     .markdown-body blockquote {
