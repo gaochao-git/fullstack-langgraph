@@ -254,7 +254,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
     
     form.setFieldsValue({
       name: config.name,
-      tenant: config.tenant,
+      tenant: 'default',  // 始终使用 default
       routers: config.routers || [],
       servers: config.servers || [],
       tools: processedTools,
@@ -610,12 +610,12 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                 <Form.Item
                   label="租户名称"
                   name="tenant"
+                  initialValue="default"
                   rules={[
-                    { required: true, message: '请输入租户名称' },
-                    { max: 50, message: '租户名称不能超过50个字符' }
+                    { required: true, message: '请输入租户名称' }
                   ]}
                 >
-                  <Input placeholder="default" />
+                  <Input value="default" disabled placeholder="default" />
                 </Form.Item>
               </Col>
             </Row>
