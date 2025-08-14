@@ -7,15 +7,10 @@ SOP Tools MCP Server
 import json
 import logging
 from typing import Dict, Any, Optional, List
-import sys
 import os
-
-# 添加父目录到系统路径
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
-from fastmcp import FastMCP
 import pymysql
-from load_config import get_sop_config
+from fastmcp import FastMCP
+from base_config import MCPServerConfig
 
 # 配置日志
 logging.basicConfig(
@@ -27,24 +22,24 @@ logger = logging.getLogger(__name__)
 # 创建MCP服务器实例
 mcp = FastMCP("SOP Tools Server")
 
+# 加载配置
+config = MCPServerConfig('sop_server')
+
 def _create_mysql_connection():
     """创建新的MySQL连接，每次调用都重新连接"""
-    # 从统一配置获取SOP数据库配置
-    sop_config = get_sop_config()
-    
     try:
         connection_config = {
-            'host': sop_config['host'],
-            'port': sop_config['port'],
-            'user': sop_config['username'],
-            'password': sop_config['password'],
+            'host': config.get('host'),
+            'port': config.get('port'),
+            'user': config.get('username'),
+            'password': config.get('password'),
             'charset': 'utf8mb4',
             'autocommit': True,
-            'database': sop_config.get('database', 'omind')
+            'database': config.get('database', 'omind')
         }
         
         connection = pymysql.connect(**connection_config)
-        logger.info(f"MySQL连接成功，主机: {sop_config['host']}, 数据库: {sop_config.get('database')}")
+        logger.info(f"MySQL连接成功，主机: {config.get('host')}, 数据库: {config.get('database')}")
         return connection
         
     except Exception as e:
@@ -313,5 +308,19 @@ async def search_sops(keyword: str) -> str:
         }, ensure_ascii=False)
 
 if __name__ == "__main__":
+    # 获取端口（从环境变量或配置）
+    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    
+    logger.info(f"Starting {config.display_name} on port {port}")
+    logger.info(f"SOP database config: host={config.get('host')}, database={config.get('database', 'omind')}")
+    
+    # 测试数据库连接
+    try:
+        conn = _create_mysql_connection()
+        conn.close()
+        logger.info("SOP数据库连接测试成功")
+    except Exception as e:
+        logger.error(f"SOP数据库连接测试失败: {e}")
+    
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=3005)
+    mcp.run(transport="streamable-http", port=port)

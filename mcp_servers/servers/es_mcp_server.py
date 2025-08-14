@@ -9,14 +9,9 @@ import requests
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
-import sys
 import os
-
-# 添加父目录到系统路径
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
 from fastmcp import FastMCP
-from load_config import get_es_config
+from base_config import MCPServerConfig
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -25,10 +20,15 @@ logger = logging.getLogger(__name__)
 # 创建MCP服务器实例
 mcp = FastMCP("Elasticsearch Tools Server")
 
-# 从统一配置获取ES配置
-es_config = get_es_config()
-ES_BASE_URL = f"{es_config['protocol']}://{es_config['host']}:{es_config['port']}"
-ES_TIMEOUT = es_config['timeout']
+# 加载配置
+config = MCPServerConfig('es_search')
+
+# 构建ES基础URL
+protocol = config.get('protocol', 'http')
+host = config.get('host')
+port = config.get('port', 9200)
+ES_BASE_URL = f"{protocol}://{host}:{port}"
+ES_TIMEOUT = config.get('timeout', 30)
 
 def _es_request(method: str, endpoint: str, data: Dict = None, params: Dict = None) -> Dict:
     """执行ES REST API请求"""
@@ -320,5 +320,17 @@ async def get_es_indices() -> str:
         return json.dumps({"error": f"Failed to get ES indices: {str(e)}"})
 
 if __name__ == "__main__":
+    # 获取端口（从环境变量或配置）
+    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    
+    logger.info(f"Starting {config.display_name} on port {port}")
+    logger.info(f"ES config: {ES_BASE_URL}, timeout={ES_TIMEOUT}s")
+    
+    # 测试ES连接
+    if _test_es_connection():
+        logger.info("Elasticsearch连接测试成功")
+    else:
+        logger.warning("Elasticsearch连接测试失败")
+    
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=3003)
+    mcp.run(transport="streamable-http", port=port)

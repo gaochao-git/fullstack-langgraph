@@ -9,14 +9,9 @@ import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import logging
-import sys
 import os
-
-# 添加父目录到系统路径
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
-
 from fastmcp import FastMCP
-from load_config import get_zabbix_config
+from base_config import MCPServerConfig
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -25,22 +20,22 @@ logger = logging.getLogger(__name__)
 # 创建MCP服务器实例
 mcp = FastMCP("Zabbix Tools Server")
 
+# 加载配置
+config = MCPServerConfig('zabbix_monitor')
+
 def _create_zabbix_session():
     """创建新的Zabbix会话，每次调用都重新认证"""
-    # 从统一配置获取Zabbix配置
-    zabbix_config = get_zabbix_config()
-    
     try:
         session = requests.Session()
-        url = zabbix_config["url"].rstrip('/')
+        url = config.get("url").rstrip('/')
         
         # 认证获取token
         payload = {
             "jsonrpc": "2.0",
             "method": "user.login",
             "params": {
-                "user": zabbix_config["username"],
-                "password": zabbix_config["password"]
+                "user": config.get("username"),
+                "password": config.get("password")
             },
             "id": 1
         }
@@ -343,5 +338,19 @@ async def get_zabbix_metrics(hostname: str = None) -> str:
         return json.dumps({"error": f"Failed to get zabbix metrics: {str(e)}"})
 
 if __name__ == "__main__":
+    # 获取端口（从环境变量或配置）
+    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    
+    logger.info(f"Starting {config.display_name} on port {port}")
+    logger.info(f"Zabbix config: url={config.get('url')}, user={config.get('username')}")
+    
+    # 测试Zabbix连接
+    try:
+        session, token, url = _create_zabbix_session()
+        session.close()
+        logger.info("Zabbix连接测试成功")
+    except Exception as e:
+        logger.warning(f"Zabbix连接测试失败: {e}")
+    
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="streamable-http", host="0.0.0.0", port=3004)
+    mcp.run(transport="streamable-http", port=port)
