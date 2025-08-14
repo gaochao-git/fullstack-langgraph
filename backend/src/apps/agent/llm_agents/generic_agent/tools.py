@@ -7,7 +7,7 @@ import asyncio
 from typing import List, Any
 from src.shared.core.logging import get_logger
 from src.apps.agent.tools import general_tool
-from ..tools_utils import get_tools_config_from_db
+from ..agent_utils import get_tools_config_from_db
 from src.apps.mcp.service.mcp_service import mcp_service
 from src.shared.db.config import get_sync_db
 from langchain_mcp_adapters.client import MultiServerMCPClient

@@ -1,9 +1,9 @@
 """智能运维助手图定义"""
 
-import logging
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph
 from langchain_core.runnables import RunnableConfig
+from langchain_openai import ChatOpenAI
 
 from .configuration import Configuration
 from .state import DiagnosticState
@@ -17,10 +17,6 @@ logger = get_logger(__name__)
 def create_main_graph(enable_tool_approval: bool = False):
     """创建主图"""
     
-    def get_llm_from_config(config: RunnableConfig):
-        configurable = Configuration.from_runnable_config(config)
-        return configurable.create_llm(model_name=configurable.query_generator_model, temperature=configurable.model_temperature)
-    
     async def create_agent(state: DiagnosticState, config: RunnableConfig):
         # 参数验证
         configurable = config.get("configurable", {}) if config else {}
@@ -28,8 +24,14 @@ def create_main_graph(enable_tool_approval: bool = False):
         if not agent_id:
             raise ValueError("配置中缺少必需的agent_id参数")
         
-        # 初始化所有资源
-        llm = get_llm_from_config(config)
+        # 获取配置
+        configuration = Configuration.from_runnable_config(config)
+        llm_config = configuration.get_llm_config()
+        
+        # 在图中创建LLM实例
+        llm = ChatOpenAI(**llm_config)
+        
+        # 获取工具和提示词
         tools = await get_diagnostic_tools(agent_id)
         system_prompt = get_system_prompt(agent_id)  # 直接调用，让异常自然传播
         
