@@ -3,11 +3,9 @@ from pydantic import BaseModel, Field
 from typing import Any, Optional
 
 from langchain_core.runnables import RunnableConfig
-from src.apps.agent.service.agent_config_service import AgentConfigService
 from src.shared.db.config import get_sync_db
-from langchain_openai import ChatOpenAI
 from src.shared.core.logging import get_logger
-import httpx
+from ..llm_utils import get_model_config, get_prompt_config, create_llm
 
 logger = get_logger(__name__)
 
@@ -31,59 +29,20 @@ class Configuration(BaseModel):
     max_research_loops: int = Field(default=2,metadata={"description": "The maximum number of research loops to perform."})
     max_diagnosis_steps: int = Field(default=10,metadata={"description": "The maximum number of diagnosis steps to perform."})
 
-    def get_api_key(self) -> str:
-        """Get the API key from configuration or environment."""
-        if self.model_api_key:
-            return self.model_api_key   
-        
-        # Try different environment variables based on base_url
-        api_key = None
-        match self.model_base_url:
-            case url if "deepseek.com" in url:
-                api_key = os.environ.get("DEEPSEEK_API_KEY")
-            case url if "openai.com" in url or "api.openai.com" in url:
-                api_key = os.environ.get("OPENAI_API_KEY")
-            case url if "anthropic.com" in url:
-                api_key = os.environ.get("ANTHROPIC_API_KEY")
-            case url if "zhipuai.cn" in url:
-                api_key = os.environ.get("ZHIPUAI_API_KEY")
-            case url if "moonshot.cn" in url:
-                api_key = os.environ.get("MOONSHOT_API_KEY")
-            case url if "dashscope.aliyuncs.com" in url:
-                api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("ALIBABA_CLOUD_API_KEY")
-            case _:
-                # Default fallback
-                api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
-        
-        if not api_key:
-            raise ValueError(f"No API key found for {self.model_base_url}. Please set the appropriate environment variable or configure model_api_key.")
-        
-        return api_key
-
-    def create_llm(self, model_name: str = None, temperature: float = None) -> 'ChatOpenAI':
-        """Create a ChatOpenAI instance with the configured settings."""
+    def create_llm(self, model_name: str = None, temperature: float = None):
+        """创建LLM实例，使用公共方法"""
+        from ..llm_utils import create_llm as create_llm_util
         
         # 确定实际使用的模型和参数
         actual_model = model_name or self.query_generator_model
         actual_temperature = temperature if temperature is not None else self.model_temperature
         
-        # 记录模型使用信息
-        logger.info(f"创建LLM实例: 模型={actual_model}, 温度={actual_temperature}, API端点={self.model_base_url}")
-        if self.get_api_key():
-            logger.debug(f"API密钥: {self.get_api_key()[:15]}...")
-        else:
-            logger.warning("API密钥: 未设置")
-        
-        # 创建自定义 httpx 客户端，忽略 SSL 验证
-        http_client = httpx.Client(verify=False)
-        
-        return ChatOpenAI(
-            model=actual_model,
+        return create_llm_util(
+            model_name=actual_model,
             temperature=actual_temperature,
             max_retries=self.model_max_retries,
-            api_key=self.get_api_key(),
             base_url=self.model_base_url,
-            http_client=http_client  # 使用自定义 HTTP 客户端
+            api_key=self.model_api_key
         )
 
     @classmethod
@@ -95,20 +54,18 @@ class Configuration(BaseModel):
             config["configurable"] if config and "configurable" in config else {}
         )
 
-        # Try to load configuration from database first
         # 优先从configurable获取agent_id
-        agent_name = configurable.get("agent_id") 
-        if not agent_name:
-            # 如果没有agent_id，则使用默认值（用于向后兼容）
-            agent_name = "diagnostic_agent"
-        
+        agent_name = configurable.get("agent_id", "diagnostic_agent")
         selected_model = configurable.get("selected_model")
+        
+        # 使用公共方法获取配置
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
-            db_config = AgentConfigService.get_model_config_from_agent(agent_name, db, selected_model)
+            db_config = get_model_config(agent_name, db, selected_model)
         finally:
             db.close()
+            
         # Get raw values from database, environment, or config (in that order)
         raw_values: dict[str, Any] = {}
         for name in cls.model_fields.keys():
@@ -141,7 +98,7 @@ class Configuration(BaseModel):
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
-            db_config = AgentConfigService.get_model_config_from_agent(agent_name, db, selected_model)
+            db_config = get_model_config(agent_name, db, selected_model)
         finally:
             db.close()
         

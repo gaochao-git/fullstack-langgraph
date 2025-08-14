@@ -67,8 +67,8 @@ def create_main_graph():
 
 def create_graph():
     """创建并编译图"""
-    workflow = create_main_graph()
-    return compile_graph_with_checkpointer(workflow)
+    builder = create_main_graph()
+    return compile_graph_with_checkpointer(builder)
 
 
 # 创建默认图实例
