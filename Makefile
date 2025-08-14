@@ -49,7 +49,7 @@ dev-backend:
 # Development MCP servers
 dev-mcp:
 	@echo "🔧 Starting MCP servers..."
-	@cd mcp_servers && ./manage.sh start
+	@. ./venv/bin/activate && cd mcp_servers && python manage.py start
 
 # Run all development servers concurrently
 dev:
