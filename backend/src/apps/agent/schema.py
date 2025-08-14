@@ -11,7 +11,7 @@ class AgentBase(BaseModel):
     """Agent基础模型"""
     agent_name: str = Field(..., min_length=1, max_length=100, description="智能体名称")
     agent_type: Optional[str] = Field(default="故障诊断", max_length=32, description="智能体分类")
-    description: Optional[str] = Field(None, max_length=500, description="智能体描述")
+    agent_description: Optional[str] = Field(None, max_length=500, description="智能体描述")
     agent_capabilities: Optional[List[str]] = Field(default_factory=list, description="智能体能力列表")
     agent_status: Optional[str] = Field(default="stopped", pattern=r'^(running|stopped|error)$', description="智能体状态")
     agent_enabled: Optional[str] = Field(default="yes", pattern=r'^(yes|no)$', description="是否启用")
@@ -40,7 +40,7 @@ class AgentUpdate(BaseModel):
     """更新Agent请求模型"""
     agent_name: Optional[str] = Field(None, min_length=1, max_length=100, description="智能体名称")
     agent_type: Optional[str] = Field(None, max_length=32, description="智能体分类")
-    description: Optional[str] = Field(None, max_length=500, description="智能体描述")
+    agent_description: Optional[str] = Field(None, max_length=500, description="智能体描述")
     agent_capabilities: Optional[List[str]] = Field(None, description="智能体能力列表")
     agent_status: Optional[str] = Field(None, pattern=r'^(running|stopped|error)$', description="智能体状态")
     agent_enabled: Optional[str] = Field(None, pattern=r'^(yes|no)$', description="是否启用")

@@ -10,34 +10,21 @@ import {
   Col, 
   Tree, 
   Space, 
-  Tooltip, 
-  message,
+  Tooltip,
   App
 } from 'antd';
 import { 
   ToolOutlined, 
   ApiOutlined, 
-  ClockCircleOutlined,
-  RobotOutlined,
-  SettingOutlined,
-  UserOutlined,
-  DatabaseOutlined,
-  BulbOutlined,
-  HeartOutlined,
-  BookOutlined,
-  CodeOutlined,
-  CustomerServiceOutlined
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { 
-  categoryColors,
   iconConfig,
-  renderIcon,
-  getIconsByCategory,
-  getIconBackgroundColor
+  renderIcon
 } from './AgentIconSystem';
 import ScheduledTaskManager from './ScheduledTaskManager';
 import type { DataNode } from 'antd/es/tree';
-import { agentApi, type CreateAgentRequest, type UpdateAgentRequest } from '@/services/agentApi';
+import { agentApi } from '@/services/agentApi';
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -78,6 +65,28 @@ interface LocalAgent {
     enabledServers: string[];
     selectedTools: string[];
     totalTools: number;
+  };
+  llm_info?: {
+    model_name?: string;
+    available_models?: string[];
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+  };
+  prompt_info?: {
+    system_prompt?: string;
+    user_prompt_template?: string;
+    assistant_prompt_template?: string;
+  };
+  tools_info?: {
+    system_tools?: string[];
+    mcp_tools?: Array<{
+      server_id: string;
+      server_name: string;
+      tools: string[];
+    }>;
   };
 }
 
@@ -252,7 +261,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         key: `server-${server.id}`,
         disabled: false, // 移除状态判断，所有服务器都可用
         children: (server.tools || []).map(tool => {
-          const { summary, args, returns } = formatToolDescription(tool.description);
+          const { args, returns } = formatToolDescription(tool.description);
           
           return {
             title: tool.name,
@@ -307,7 +316,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     setEditSystemCheckedKeys(stringKeys);
     
     const selectedTools = stringKeys
-      .filter(key => key.startsWith('system-') && !key.endsWith('-detail'))
+      .filter(key => key.startsWith('system-') && !key.endsWith('-detail') && key !== 'system-root')
       .map(key => key.replace('system-', ''));
     
     setEditSystemTools(selectedTools);
@@ -397,40 +406,68 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       if (response.status === 'ok' && response.data) {
         const fullAgent = response.data;
         
-        // 直接设置表单值，不使用setTimeout避免覆盖用户正在编辑的内容
-        form.setFieldsValue({
+        // 直接设置表单值，只设置实际存在的值，避免默认值覆盖
+        const formValues: any = {
           agent_id: fullAgent.agent_id,
           agent_name: fullAgent.agent_name,
-          agent_type: fullAgent.agent_type || '办公',
+          agent_type: fullAgent.agent_type,
           agent_description: fullAgent.agent_description,
           agent_capabilities: fullAgent.agent_capabilities,
-          agent_icon: fullAgent.agent_icon || 'Bot',
-          available_models: fullAgent.llm_info?.available_models || [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
-          temperature: fullAgent.llm_info?.temperature || 0.7,
-          max_tokens: fullAgent.llm_info?.max_tokens || 2000,
-          top_p: fullAgent.llm_info?.top_p || 1.0,
-          frequency_penalty: fullAgent.llm_info?.frequency_penalty || 0.0,
-          presence_penalty: fullAgent.llm_info?.presence_penalty || 0.0,
-          system_prompt: fullAgent.prompt_info?.system_prompt || `你是${fullAgent.agent_name}，请根据用户需求提供专业的帮助。`,
-          user_prompt_template: fullAgent.prompt_info?.user_prompt_template || '',
-          assistant_prompt_template: fullAgent.prompt_info?.assistant_prompt_template || ''
-        });
+          agent_icon: fullAgent.agent_icon,
+        };
+
+        // LLM 配置 - 只设置实际存在的值
+        if (fullAgent.llm_info) {
+          if (fullAgent.llm_info.available_models) {
+            formValues.available_models = fullAgent.llm_info.available_models;
+          }
+          if (fullAgent.llm_info.temperature !== undefined) {
+            formValues.temperature = fullAgent.llm_info.temperature;
+          }
+          if (fullAgent.llm_info.max_tokens !== undefined) {
+            formValues.max_tokens = fullAgent.llm_info.max_tokens;
+          }
+          if (fullAgent.llm_info.top_p !== undefined) {
+            formValues.top_p = fullAgent.llm_info.top_p;
+          }
+          if (fullAgent.llm_info.frequency_penalty !== undefined) {
+            formValues.frequency_penalty = fullAgent.llm_info.frequency_penalty;
+          }
+          if (fullAgent.llm_info.presence_penalty !== undefined) {
+            formValues.presence_penalty = fullAgent.llm_info.presence_penalty;
+          }
+        }
+
+        // 提示词配置 - 只设置实际存在的值
+        if (fullAgent.prompt_info) {
+          if (fullAgent.prompt_info.system_prompt) {
+            formValues.system_prompt = fullAgent.prompt_info.system_prompt;
+          }
+          if (fullAgent.prompt_info.user_prompt_template) {
+            formValues.user_prompt_template = fullAgent.prompt_info.user_prompt_template;
+          }
+          if (fullAgent.prompt_info.assistant_prompt_template) {
+            formValues.assistant_prompt_template = fullAgent.prompt_info.assistant_prompt_template;
+          }
+        }
+
+        form.setFieldsValue(formValues);
         
         // 处理工具配置
         if (fullAgent.tools_info) {
           // 处理系统工具
           const systemToolsFromAgent = fullAgent.tools_info.system_tools || [];
           setEditSystemTools(systemToolsFromAgent);
-          setEditSystemCheckedKeys(systemToolsFromAgent.map(name => `system-${name}`));
+          setEditSystemCheckedKeys(systemToolsFromAgent.map((name: string) => `system-${name}`));
           
           // 处理MCP工具
           const mcpToolsFromAgent = fullAgent.tools_info.mcp_tools || [];
-          const mcpToolNames = mcpToolsFromAgent.flatMap(mcpTool => mcpTool.tools || []);
+          const mcpToolNames = mcpToolsFromAgent.flatMap((mcpTool: any) => mcpTool.tools || []);
           setEditMCPTools(mcpToolNames);
-          setEditCheckedKeys(mcpToolNames.map(name => `tool-${name}`));
+          setEditCheckedKeys(mcpToolNames.map((name: string) => `tool-${name}`));
           
           // 展开已选中工具的服务器
-          const selectedServerIds = mcpToolsFromAgent.map(mcpTool => `server-${mcpTool.server_id}`);
+          const selectedServerIds = mcpToolsFromAgent.map((mcpTool: any) => `server-${mcpTool.server_id}`);
           setEditExpandedKeys(selectedServerIds);
         }
       } else if (response.status === 'error') {
@@ -460,23 +497,52 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     };
 
     // 构建LLM配置
-    const availableModelsList = values.available_models || ['gpt-4'];
-    const llmConfig = {
-      available_models: availableModelsList,
-      model_name: availableModelsList[0],
-      temperature: values.temperature || 0.7,
-      max_tokens: values.max_tokens || 2000,
-      top_p: values.top_p || 1.0,
-      frequency_penalty: values.frequency_penalty || 0.0,
-      presence_penalty: values.presence_penalty || 0.0
-    };
+    const llmConfig: any = {};
+    
+    // 如果是编辑模式，先复制原有的配置
+    if (!isCreating && agent?.llm_info) {
+      // 保留原有的所有配置，特别是 model_name
+      Object.assign(llmConfig, agent.llm_info);
+    }
+    
+    // 然后只更新表单中实际修改的字段
+    if (values.available_models) {
+      llmConfig.available_models = values.available_models;
+    }
+    if (values.temperature !== undefined) {
+      llmConfig.temperature = values.temperature;
+    }
+    if (values.max_tokens !== undefined) {
+      llmConfig.max_tokens = values.max_tokens;
+    }
+    if (values.top_p !== undefined) {
+      llmConfig.top_p = values.top_p;
+    }
+    if (values.frequency_penalty !== undefined) {
+      llmConfig.frequency_penalty = values.frequency_penalty;
+    }
+    if (values.presence_penalty !== undefined) {
+      llmConfig.presence_penalty = values.presence_penalty;
+    }
 
     // 构建提示词配置
-    const promptConfig = {
-      system_prompt: values.system_prompt || `你是${values.agent_name}，请根据用户需求提供专业的帮助。`,
-      user_prompt_template: values.user_prompt_template || '',
-      assistant_prompt_template: values.assistant_prompt_template || ''
-    };
+    const promptConfig: any = {};
+    
+    // 如果是编辑模式，先复制原有的配置
+    if (!isCreating && agent?.prompt_info) {
+      Object.assign(promptConfig, agent.prompt_info);
+    }
+    
+    // 然后只更新表单中实际修改的字段
+    if (values.system_prompt !== undefined) {
+      promptConfig.system_prompt = values.system_prompt;
+    }
+    if (values.user_prompt_template !== undefined) {
+      promptConfig.user_prompt_template = values.user_prompt_template;
+    }
+    if (values.assistant_prompt_template !== undefined) {
+      promptConfig.assistant_prompt_template = values.assistant_prompt_template;
+    }
 
     const formData = {
       ...values,

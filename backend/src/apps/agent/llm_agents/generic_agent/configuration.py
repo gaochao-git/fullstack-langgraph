@@ -54,6 +54,11 @@ class Configuration(BaseModel):
         default=3,
         metadata={"description": "模型调用最大重试次数"}
     )
+    
+    model_base_url: Optional[str] = Field(
+        default=None,
+        metadata={"description": "模型API端点URL"}
+    )
 
     # === 工作流配置 ===
     workflow_type: str = Field(
@@ -151,12 +156,18 @@ class Configuration(BaseModel):
         
         # 获取agent_id，优先使用configurable中的值
         agent_id = configurable.get("agent_id", "generic_agent")
+        selected_model = configurable.get("selected_model")
         
-        # 从数据库加载配置
+        # 从数据库加载模型配置（使用与diagnostic_agent相同的方法）
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
-            db_config = AgentConfigService.get_agent_config(agent_id, db)
+            # 获取完整的agent配置
+            agent_config = AgentConfigService.get_agent_config(agent_id, db)
+            # 获取模型配置（包含model_name, base_url, api_key等）
+            model_config = AgentConfigService.get_model_config_from_agent(agent_id, db, selected_model)
+            # 获取提示词配置
+            prompt_config = AgentConfigService.get_prompt_config_from_agent(agent_id, db)
         finally:
             db.close()
         
@@ -186,8 +197,41 @@ class Configuration(BaseModel):
                     raw_values[name] = env_value
         
         # 3. 应用数据库配置
-        if db_config:
-            raw_values.update(db_config)
+        if agent_config:
+            # 基础信息
+            raw_values["agent_id"] = agent_id
+            raw_values["agent_name"] = agent_config.get("agent_name", "通用智能体")
+            raw_values["agent_description"] = agent_config.get("description", "")
+            
+            # 模型配置 - 从model_config获取
+            if model_config:
+                raw_values["model_name"] = model_config.get("model_name", "deepseek-chat")
+                raw_values["model_temperature"] = model_config.get("temperature", 0.1)
+                raw_values["model_max_tokens"] = model_config.get("max_tokens", 4000)
+                raw_values["model_base_url"] = model_config.get("base_url", "https://api.deepseek.com")
+                # 如果有API key，保存到内部字段
+                if model_config.get("api_key"):
+                    raw_values["_db_api_key"] = model_config.get("api_key")
+                
+                # 根据base_url推断provider
+                base_url = model_config.get("base_url", "")
+                if "deepseek.com" in base_url:
+                    raw_values["model_provider"] = "deepseek"
+                elif "openai.com" in base_url:
+                    raw_values["model_provider"] = "openai"
+                else:
+                    raw_values["model_provider"] = "deepseek"  # 默认
+            
+            # 提示词配置
+            if prompt_config:
+                raw_values["system_prompt_template"] = prompt_config.get("system_prompt", "")
+                raw_values["role_description"] = prompt_config.get("system_prompt", raw_values.get("role_description", ""))
+            
+            # 工具配置
+            tools_config = agent_config.get("tools_config", {})
+            if isinstance(tools_config, dict):
+                mcp_tools = tools_config.get("mcp_tools", [])
+                raw_values["enable_mcp_tools"] = len(mcp_tools) > 0
         
         # 4. 应用运行时configurable配置
         raw_values.update(configurable)
@@ -195,23 +239,51 @@ class Configuration(BaseModel):
         # 过滤None值
         values = {k: v for k, v in raw_values.items() if v is not None}
         
-        return cls(**values)
+        # 创建实例
+        instance = cls(**values)
+        
+        # 保存数据库中的API key（如果有）
+        if "_db_api_key" in raw_values:
+            instance._db_api_key = raw_values["_db_api_key"]
+        
+        return instance
     
     def get_api_key(self) -> str:
         """获取API密钥，参考diagnostic_agent的实现"""
-        # 这里简化处理，主要使用环境变量
+        # 优先使用数据库中的API key
+        if hasattr(self, '_db_api_key') and self._db_api_key:
+            return self._db_api_key
+        
+        # 然后尝试环境变量
         api_key = None
         
-        if self.model_provider.lower() == "deepseek":
-            api_key = os.environ.get("DEEPSEEK_API_KEY")
-        elif self.model_provider.lower() == "openai":
-            api_key = os.environ.get("OPENAI_API_KEY")
-        else:
-            # 默认尝试DEEPSEEK_API_KEY
-            api_key = os.environ.get("DEEPSEEK_API_KEY")
+        # 根据base_url判断使用哪个环境变量
+        if hasattr(self, 'model_base_url') and self.model_base_url:
+            if "deepseek.com" in self.model_base_url:
+                api_key = os.environ.get("DEEPSEEK_API_KEY")
+            elif "openai.com" in self.model_base_url:
+                api_key = os.environ.get("OPENAI_API_KEY")
+            elif "anthropic.com" in self.model_base_url:
+                api_key = os.environ.get("ANTHROPIC_API_KEY")
+            elif "zhipuai.cn" in self.model_base_url:
+                api_key = os.environ.get("ZHIPUAI_API_KEY")
+            elif "moonshot.cn" in self.model_base_url:
+                api_key = os.environ.get("MOONSHOT_API_KEY")
+            elif "dashscope.aliyuncs.com" in self.model_base_url:
+                api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("ALIBABA_CLOUD_API_KEY")
+        
+        # 如果没有匹配的，根据provider尝试
+        if not api_key:
+            if self.model_provider.lower() == "deepseek":
+                api_key = os.environ.get("DEEPSEEK_API_KEY")
+            elif self.model_provider.lower() == "openai":
+                api_key = os.environ.get("OPENAI_API_KEY")
+            else:
+                # 默认尝试DEEPSEEK_API_KEY
+                api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
         
         if not api_key:
-            raise ValueError(f"No API key found for provider {self.model_provider}. Please set the appropriate environment variable.")
+            raise ValueError(f"No API key found for provider {self.model_provider} with base_url {getattr(self, 'model_base_url', 'N/A')}. Please set the appropriate environment variable.")
         
         return api_key
 
@@ -222,14 +294,18 @@ class Configuration(BaseModel):
         actual_model = model_name or self.model_name
         actual_temp = temperature if temperature is not None else self.model_temperature
         
-        # 获取base_url - 根据provider设置默认值
-        base_url = "https://api.deepseek.com" if self.model_provider.lower() == "deepseek" else "https://api.openai.com/v1"
+        # 使用配置的base_url，如果有model_base_url属性则使用它
+        base_url = getattr(self, 'model_base_url', None)
+        if not base_url:
+            # 如果没有配置，根据provider设置默认值
+            base_url = "https://api.deepseek.com" if self.model_provider.lower() == "deepseek" else "https://api.openai.com/v1"
         
         logger.info(f"创建通用Agent LLM实例:")
         logger.info(f"   提供商: {self.model_provider}")
         logger.info(f"   模型: {actual_model}")
         logger.info(f"   温度: {actual_temp}")
         logger.info(f"   API端点: {base_url}")
+        logger.info(f"   最大Token: {self.model_max_tokens}")
         
         # 创建自定义 httpx 客户端，忽略 SSL 验证
         http_client = httpx.Client(verify=False)
