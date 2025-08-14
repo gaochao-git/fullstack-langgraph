@@ -1,53 +1,65 @@
-# MCP服务器配置文件模板
-# 复制此文件为 config.yaml 并修改相应的配置
+# MCP服务器配置文件
+# 新格式：所有配置集中管理
 
-# 服务启用开关
-# 设置为 false 可以禁用对应的服务
-services:
-  mysql: true        # MySQL数据库服务
-  ssh: true          # SSH远程连接服务
-  elasticsearch: true # Elasticsearch搜索服务
-  zabbix: true       # Zabbix监控服务
-  sop: true          # SOP标准操作程序服务
-
-# MySQL配置（当 services.mysql = true 时需要）
-mysql:
-  host: 82.156.146.51
-  port: 3306
-  username: gaochao      # 直接使用 username，不是 configs 数组
-  password: "fffjjj"     # 直接使用 password
-  database: information_schema  # 可选，默认数据库
-
-# SSH配置（当 services.ssh = true 时需要）
-ssh:
-  host: 82.156.146.51
-  port: 22
-  configs:
-    # 密码认证方式
-    - username: root
-      password: "123456"
-    # 密钥认证方式（无密码保护）
-    - username: gaochao
-      key_file: ~/.ssh/id_rsa      # 私钥文件路径
-
-# Elasticsearch配置（当 services.elasticsearch = true 时需要）
-elasticsearch:
-  host: 82.156.146.51
-  port: 9200
-  protocol: http
-  timeout: 30
-
-# Zabbix配置（当 services.zabbix = true 时需要）
-zabbix:
-  url: http://82.156.146.51:8080/zabbix/api_jsonrpc.php
-  username: Admin
-  password: zabbix
-  default_host_ip: 127.0.0.1
-
-# SOP配置（当 services.sop = true 时需要）
-sop:
-  host: 82.156.146.51
-  port: 3306
-  username: gaochao
-  password: "fffjjj"
-  database: omind  # SOP数据库名称
+servers:
+  db_query:
+    enabled: true
+    port: 3001
+    script: "servers/db_mcp_server.py"
+    display_name: "MySQL数据库服务"
+    config:
+      host: 82.156.146.51
+      port: 3306
+      username: gaochao
+      password: "fffjjj"
+      database: information_schema
+      
+  ssh_exec:
+    enabled: true
+    port: 3002
+    script: "servers/ssh_mcp_server.py"
+    display_name: "SSH远程连接服务"
+    config:
+      host: 82.156.146.51
+      port: 22
+      configs:
+        - username: root
+          password: "123456"
+        - username: gaochao
+          key_file: "/Users/gaochao/.ssh/id_rsa"
+          
+  es_search:
+    enabled: true
+    port: 3003
+    script: "servers/es_mcp_server.py"
+    display_name: "Elasticsearch搜索服务"
+    config:
+      protocol: "http"
+      host: "82.156.146.51"
+      port: 9200
+      timeout: 30
+      username: ""
+      password: ""
+      verify_ssl: false
+      
+  zabbix_monitor:
+    enabled: true
+    port: 3004
+    script: "servers/zabbix_mcp_server.py"
+    display_name: "Zabbix监控服务"
+    config:
+      url: "http://82.156.146.51:60080"
+      username: "Admin"
+      password: "zabbix"
+      
+  sop_server:
+    enabled: true
+    port: 3005
+    script: "servers/sop_mcp_server.py"
+    display_name: "SOP标准操作程序服务"
+    config:
+      host: 82.156.146.51
+      port: 3306
+      username: gaochao
+      password: "fffjjj"
+      database: omind  # SOP数据库名称

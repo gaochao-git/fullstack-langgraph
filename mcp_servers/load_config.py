@@ -1,112 +1,131 @@
 #!/usr/bin/env python3
 """
-MCP服务器统一配置文件
-必须使用 config.yaml 配置文件
+MCP服务器统一配置文件 - 支持新旧两种格式
 """
 
 import os
 import sys
 import yaml
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+
+# 缓存配置
+_CONFIG: Optional[Dict[str, Any]] = None
+_CONFIG_FORMAT: Optional[str] = None  # 'old' or 'new'
 
 def load_config(verbose=True) -> Dict[str, Any]:
     """
-    从配置文件加载配置，配置文件必须存在
+    从配置文件加载配置，自动识别新旧格式
     
     Args:
         verbose: 是否打印详细信息
     
     Returns:
-        Dict: 配置字典
-    
-    Raises:
-        SystemExit: 如果配置文件不存在或加载失败
+        Dict: 配置字典（始终返回旧格式以保持兼容）
     """
+    global _CONFIG, _CONFIG_FORMAT
+    
+    if _CONFIG is not None:
+        return _CONFIG
+    
     config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
     
     if not os.path.exists(config_file):
         print(f"❌ 错误：配置文件不存在: {config_file}")
-        print(f"📝 请执行以下命令创建配置文件：")
-        print(f"   cd {os.path.dirname(__file__)}")
-        print(f"   cp config.yaml.template config.yaml")
-        print(f"   vim config.yaml  # 编辑配置文件")
         sys.exit(1)
     
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
+            raw_config = yaml.safe_load(f)
             
             if verbose:
                 print(f"✅ 成功加载配置文件: {config_file}")
             
-            # 检查是否有服务配置
-            if 'services' not in config:
+            # 检测配置格式
+            if 'servers' in raw_config and isinstance(raw_config['servers'], dict):
+                # 新格式：servers 下是服务器配置
+                _CONFIG_FORMAT = 'new'
+                _CONFIG = convert_new_to_old_format(raw_config)
                 if verbose:
-                    print(f"⚠️  警告：配置文件缺少 services 配置，默认启用所有服务")
-                config['services'] = {
-                    'mysql': True,
-                    'ssh': True,
-                    'elasticsearch': True,
-                    'zabbix': True
-                }
+                    print("📋 检测到新配置格式")
+            else:
+                # 旧格式：services 下是 enabled/disabled
+                _CONFIG_FORMAT = 'old'
+                _CONFIG = raw_config
+                if verbose:
+                    print("📋 检测到旧配置格式")
             
             # 显示启用的服务
             if verbose:
-                enabled_services = [name for name, enabled in config.get('services', {}).items() if enabled]
+                enabled_services = [name for name, enabled in _CONFIG.get('services', {}).items() if enabled]
                 print(f"📋 启用的服务: {', '.join(enabled_services)}")
             
-            # 只验证启用的服务的配置
-            enabled_services = [name for name, enabled in config.get('services', {}).items() if enabled]
-            for service in enabled_services:
-                if service not in config:
-                    print(f"❌ 错误：服务 {service} 已启用但缺少配置")
-                    sys.exit(1)
+            return _CONFIG
             
-            return config
-    except yaml.YAMLError as e:
-        print(f"❌ 错误：配置文件格式错误: {e}")
-        print(f"📝 请检查 YAML 格式是否正确")
-        sys.exit(1)
     except Exception as e:
-        print(f"❌ 错误：加载配置文件失败: {e}")
+        print(f"❌ 加载配置文件失败: {e}")
         sys.exit(1)
 
-# 加载配置（只在模块导入时打印一次）
-# 检查是否是主进程还是子进程
-_is_main_process = os.environ.get('MCP_CONFIG_LOADED') != '1'
-if _is_main_process:
-    os.environ['MCP_CONFIG_LOADED'] = '1'
+def convert_new_to_old_format(new_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    将新格式配置转换为旧格式
     
-_CONFIG = load_config(verbose=_is_main_process)
+    新格式:
+    servers:
+      db_query:
+        enabled: true
+        port: 3001
+        config:
+          host: xxx
+          
+    旧格式:
+    services:
+      mysql: true
+    mysql:
+      host: xxx
+    """
+    old_config = {
+        'services': {}
+    }
+    
+    # 服务名映射
+    service_name_map = {
+        'db_query': 'mysql',
+        'ssh_exec': 'ssh',
+        'es_search': 'elasticsearch',
+        'zabbix_monitor': 'zabbix',
+        'sop_server': 'sop'
+    }
+    
+    servers = new_config.get('servers', {})
+    
+    for server_id, server_config in servers.items():
+        # 获取对应的服务名
+        service_name = service_name_map.get(server_id, server_id)
+        
+        # 设置服务启用状态
+        old_config['services'][service_name] = server_config.get('enabled', True)
+        
+        # 复制服务配置
+        if 'config' in server_config:
+            old_config[service_name] = server_config['config']
+    
+    return old_config
 
 def get_config() -> Dict[str, Any]:
-    """
-    获取配置
-    
-    Returns:
-        Dict: 配置字典
-    """
+    """获取完整配置（兼容旧代码）"""
+    global _CONFIG
+    if _CONFIG is None:
+        load_config(verbose=False)
     return _CONFIG
 
 def is_service_enabled(service_name: str) -> bool:
-    """
-    检查服务是否启用
-    
-    Args:
-        service_name: 服务名称 (mysql, ssh, elasticsearch, zabbix)
-    
-    Returns:
-        bool: 服务是否启用
-    """
+    """检查服务是否启用"""
+    if _CONFIG is None:
+        load_config(verbose=False)
     return _CONFIG.get('services', {}).get(service_name, True)
 
 def get_enabled_services() -> List[str]:
-    """
-    获取所有启用的服务列表
-    
-    Returns:
-        List[str]: 启用的服务名称列表
-    """
+    """获取所有启用的服务列表"""
     return [name for name, enabled in _CONFIG.get('services', {}).items() if enabled]
 
 def get_mysql_config() -> Dict[str, Any]:
@@ -139,8 +158,46 @@ def get_sop_config() -> Dict[str, Any]:
         raise RuntimeError("SOP服务未启用")
     return get_config()['sop']
 
+# 从环境变量获取服务器信息（用于新的manage.py）
+def get_current_server_config() -> Optional[Dict[str, Any]]:
+    """
+    获取当前服务器的配置（通过环境变量）
+    由 manage.py 设置的环境变量：
+    - MCP_SERVER_NAME: 服务器名称
+    - MCP_SERVER_PORT: 服务器端口
+    """
+    server_name = os.environ.get('MCP_SERVER_NAME')
+    if not server_name:
+        return None
+    
+    # 如果是新格式，直接返回对应的配置
+    if _CONFIG_FORMAT == 'new':
+        raw_config = load_raw_config()
+        servers = raw_config.get('servers', {})
+        if server_name in servers:
+            return servers[server_name].get('config', {})
+    
+    return None
+
+def load_raw_config() -> Dict[str, Any]:
+    """加载原始配置（不转换格式）"""
+    config_file = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    with open(config_file, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
+
+# 初始化配置
+MCP_ENV = os.environ.get('MCP_ENV', 'production')
+
 # 打印当前配置信息（调试用）
 if __name__ == "__main__":
     import json
     print(f"当前环境: {MCP_ENV}")
-    print(f"配置内容: {json.dumps(get_config(), indent=2, ensure_ascii=False)}")
+    config = load_config(verbose=True)
+    print(f"配置内容（转换后）: {json.dumps(config, indent=2, ensure_ascii=False)}")
+    
+    # 如果设置了服务器名称，显示当前服务器配置
+    if os.environ.get('MCP_SERVER_NAME'):
+        print(f"\n当前服务器: {os.environ.get('MCP_SERVER_NAME')}")
+        server_config = get_current_server_config()
+        if server_config:
+            print(f"服务器配置: {json.dumps(server_config, indent=2, ensure_ascii=False)}")
