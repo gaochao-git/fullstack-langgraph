@@ -50,10 +50,10 @@ class AuthService:
             
             try:
                 # 查找用户 (使用异步查询)
-                stmt = select(RbacUser).where(or_(RbacUser.user_name == request.username,RbacUser.email == request.username))
+                stmt = select(RbacUser).where(RbacUser.user_name == request.username)
                 result = await self.db.execute(stmt)
                 rbac_user = result.scalar_one_or_none()      
-                if not rbac_user: raise BusinessException("用户名或密码错误",ResponseCode.UNAUTHORIZED)
+                if not rbac_user: raise BusinessException("用户不存在",ResponseCode.UNAUTHORIZED)
                 
                 # 检查用户是否激活
                 if rbac_user.is_active != 1: raise BusinessException("账户已被禁用",ResponseCode.FORBIDDEN)

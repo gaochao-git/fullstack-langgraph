@@ -43,7 +43,7 @@ async def login(
     """
     用户名密码登录
     
-    - **username**: 用户名或邮箱
+    - **username**: 用户名
     - **password**: 密码
     - **mfa_code**: MFA验证码（如果启用了MFA）
     - **device_id**: 设备ID（可选）
