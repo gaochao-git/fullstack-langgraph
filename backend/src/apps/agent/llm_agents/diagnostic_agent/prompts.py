@@ -2,8 +2,11 @@
 提示词管理模块
 专门管理智能运维助手的提示词
 """
-
+import logging
+from src.shared.core.logging import get_logger
 from ..prompt_utils import get_system_prompt_from_db
+
+logger = get_logger(__name__)
 
 def get_system_prompt(agent_name: str = "diagnostic_agent") -> str:
     """
@@ -27,7 +30,7 @@ def _get_default_system_prompt():
     try:
         return get_system_prompt()
     except Exception as e:
-        print(f"Warning: 无法获取系统提示词，使用空字符串: {e}")
+        logger.warning(f"Warning: 无法获取系统提示词，使用空字符串: {e}")
         return ""
 
 # 保持向后兼容性 - 但现在从数据库动态获取
