@@ -3,14 +3,18 @@
 用于FastAPI路由的认证和授权
 """
 
+import os
+import json
+import traceback
+import jwt
+from datetime import datetime, timezone
 from typing import Optional, List, Annotated
 from fastapi import Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-
 from src.shared.db.config import get_async_db
-from src.apps.auth.utils import JWTUtils, TokenBlacklist, APIKeyUtils
+from src.apps.auth.utils import JWTUtils, TokenBlacklist, APIKeyUtils, SECRET_KEY, ALGORITHM
 from src.apps.auth.models import AuthToken, AuthApiKey
 from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.shared.core.exceptions import BusinessException
@@ -30,9 +34,6 @@ async def get_current_user_optional(
     获取当前用户（可选）
     支持JWT Token和API Key两种认证方式
     """
-    from src.apps.auth.utils import SECRET_KEY, ALGORITHM
-    import jwt
-    
     try:
         # 尝试Bearer Token认证
         if credentials:
@@ -56,13 +57,11 @@ async def get_current_user_optional(
                     return None
                 
                 # 检查是否过期
-                from datetime import datetime, timezone
                 if api_key_record.expires_at and api_key_record.expires_at < datetime.now(timezone.utc):
                     return None
                 
                 # 检查IP白名单
                 if api_key_record.allowed_ips:
-                    import json
                     allowed_ips = json.loads(api_key_record.allowed_ips)
                     client_ip = request.client.host if request.client else None
                     if allowed_ips and client_ip not in allowed_ips:
@@ -124,7 +123,6 @@ async def get_current_user_optional(
     except Exception as e:
         # 认证失败时返回None而不是抛出异常，但打印错误用于调试
         print(f"认证异常: {e}")
-        import traceback
         traceback.print_exc()
         pass
     
@@ -141,7 +139,6 @@ async def get_current_user(
     🔧 开发模式：临时返回mock admin用户
     """
     # 🔧 临时Mock：开发模式下返回gaochao用户，跳过认证
-    import os
     if os.getenv("AUTH_MOCK", "").lower() == "true":
         print("🔧 开发模式：使用Mock gaochao用户")
         return {
@@ -248,7 +245,3 @@ is_user = RoleChecker(["user", "admin", "super_admin"])
 CurrentUser = Annotated[dict, Depends(get_current_user)]
 CurrentActiveUser = Annotated[RbacUser, Depends(get_current_active_user)]
 OptionalUser = Annotated[Optional[dict], Depends(get_current_user_optional)]
-
-
-# 导入json（在使用前）
-import json
