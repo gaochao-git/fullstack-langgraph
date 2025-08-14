@@ -467,4 +467,4 @@ if __name__ == "__main__":
     logger.info(f"SSH config: host={config.get('host')}, configs={len(config.get('configs', []))} users")
     
     # 使用SSE传输方式启动服务器
-    mcp.run(transport="streamable-http", port=port)
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
