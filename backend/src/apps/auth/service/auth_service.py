@@ -50,27 +50,13 @@ class AuthService:
             
             try:
                 # 查找用户 (使用异步查询)
-                stmt = select(RbacUser).where(
-                    or_(
-                        RbacUser.user_name == request.username,
-                        RbacUser.email == request.username
-                    )
-                )
+                stmt = select(RbacUser).where(or_(RbacUser.user_name == request.username,RbacUser.email == request.username))
                 result = await self.db.execute(stmt)
-                rbac_user = result.scalar_one_or_none()
-                
-                if not rbac_user:
-                    raise BusinessException(
-                        "用户名或密码错误",
-                        ResponseCode.UNAUTHORIZED
-                    )
+                rbac_user = result.scalar_one_or_none()      
+                if not rbac_user: raise BusinessException("用户名或密码错误",ResponseCode.UNAUTHORIZED)
                 
                 # 检查用户是否激活
-                if rbac_user.is_active != 1:
-                    raise BusinessException(
-                        "账户已被禁用",
-                        ResponseCode.FORBIDDEN
-                    )
+                if rbac_user.is_active != 1: raise BusinessException("账户已被禁用",ResponseCode.FORBIDDEN)
                 
                 # 获取认证信息 (使用异步查询)
                 stmt = select(AuthUser).where(AuthUser.user_id == rbac_user.user_id)
@@ -79,25 +65,17 @@ class AuthService:
                 
                 if not auth_user:
                     # 首次登录，创建认证记录
-                    auth_user = AuthUser(
-                        user_id=rbac_user.user_id,
-                        create_time=datetime.now(timezone.utc)
-                    )
+                    auth_user = AuthUser(user_id=rbac_user.user_id,create_time=datetime.now(timezone.utc))
                     self.db.add(auth_user)
                     await self.db.flush()
                 
                 # 检查账户是否被锁定
                 if auth_user.locked_until and auth_user.locked_until > datetime.now(timezone.utc):
                     remaining_minutes = (auth_user.locked_until - datetime.now(timezone.utc)).seconds // 60
-                    raise BusinessException(
-                        f"账户已被锁定，请{remaining_minutes}分钟后再试",
-                        ResponseCode.FORBIDDEN
-                    )
+                    raise BusinessException(f"账户已被锁定，请{remaining_minutes}分钟后再试",ResponseCode.FORBIDDEN)
                 
                 # 验证密码
-                if not auth_user.password_hash or not PasswordUtils.verify_password(
-                    request.password, auth_user.password_hash
-                ):
+                if not auth_user.password_hash or not PasswordUtils.verify_password(request.password, auth_user.password_hash):
                     # 增加失败次数
                     auth_user.login_attempts += 1
                     
@@ -107,30 +85,18 @@ class AuthService:
                             minutes=self.lockout_duration
                         )
                         await self.db.flush()
-                        raise BusinessException(
-                            f"登录失败次数过多，账户已被锁定{self.lockout_duration}分钟",
-                            ResponseCode.FORBIDDEN
-                        )
+                        raise BusinessException(f"登录失败次数过多，账户已被锁定{self.lockout_duration}分钟",ResponseCode.FORBIDDEN)
                     
                     await self.db.flush()
-                    raise BusinessException(
-                        "用户名或密码错误",
-                        ResponseCode.UNAUTHORIZED
-                    )
+                    raise BusinessException("用户名或密码错误",ResponseCode.UNAUTHORIZED)
                 
                 # 检查MFA
                 if auth_user.mfa_enabled:
                     if not request.mfa_code:
-                        raise BusinessException(
-                            "需要MFA验证码",
-                            ResponseCode.FORBIDDEN
-                        )
+                        raise BusinessException("需要MFA验证码",ResponseCode.FORBIDDEN)
                     
                     if not MFAUtils.verify_totp(auth_user.mfa_secret, request.mfa_code):
-                        raise BusinessException(
-                            "MFA验证码错误",
-                            ResponseCode.UNAUTHORIZED
-                        )
+                        raise BusinessException("MFA验证码错误",ResponseCode.UNAUTHORIZED)
                 
                 # 登录成功，重置失败次数
                 auth_user.login_attempts = 0
