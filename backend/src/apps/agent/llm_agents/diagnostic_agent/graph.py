@@ -37,7 +37,7 @@ def create_main_graph(enable_tool_approval: bool = False):
         logger.debug(f"[Agent请求] agent_id: {agent_id}")
         logger.debug(f"[Agent请求] LLM配置: {llm.__class__.__name__}, model={getattr(llm, 'model_name', 'unknown')}")
         logger.debug(f"[Agent请求] 工具数量: {len(tools)}, 工具列表: {[tool.name if hasattr(tool, 'name') else str(tool) for tool in tools]}")
-        logger.debug(f"[Agent请求] 系统提示词: {system_prompt.messages[0].content if system_prompt.messages else 'N/A'}")
+        logger.debug(f"[Agent请求] 系统提示词: {system_prompt[:100] if system_prompt else 'N/A'}...")
         
         # 创建并执行智能体
         agent = create_react_agent(model=llm, tools=tools, prompt=system_prompt)
