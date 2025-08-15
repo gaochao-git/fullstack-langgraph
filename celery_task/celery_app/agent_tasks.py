@@ -9,12 +9,11 @@ from datetime import datetime
 from celery_app.celery import app
 from celery_app.models import get_session, PeriodicTaskRun, PeriodicTask
 from celery_app.logger import get_logger
-from celery_app.config import AGENT_API_BASE_URL
+from celery_app.config import AGENT_API_BASE_URL, DB_RETRY_MAX
 
 # 添加 backend 项目路径到 Python 路径
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
-if backend_path not in sys.path:
-    sys.path.insert(0, backend_path)
+if backend_path not in sys.path: sys.path.insert(0, backend_path)
 
 # 使用统一的日志配置
 logger = get_logger(__name__)
@@ -383,10 +382,9 @@ def execute_agent_periodic_task(self, task_config_id):
 
 def record_agent_task_result(task_id, agent_id, status, result_data):
     """记录智能体任务执行结果到数据库"""
-    max_retries = 3
     retry_count = 0
     
-    while retry_count < max_retries:
+    while retry_count < DB_RETRY_MAX:
         session = get_session()
         try:
             task_run = PeriodicTaskRun(
@@ -404,9 +402,9 @@ def record_agent_task_result(task_id, agent_id, status, result_data):
             break
         except Exception as e:
             retry_count += 1
-            logger.warning(f"记录智能体任务结果失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
+            logger.warning(f"记录智能体任务结果失败 (尝试 {retry_count}/{DB_RETRY_MAX}): {str(e)}")
             session.rollback()
-            if retry_count >= max_retries:
+            if retry_count >= DB_RETRY_MAX:
                 logger.error(f"记录智能体任务结果最终失败: {str(e)}")
         finally:
             session.close()
@@ -414,10 +412,9 @@ def record_agent_task_result(task_id, agent_id, status, result_data):
 
 def record_periodic_task_result(task_name, execution_time, status, result_data):
     """记录定时任务执行结果到数据库"""
-    max_retries = 3
     retry_count = 0
     
-    while retry_count < max_retries:
+    while retry_count < DB_RETRY_MAX:
         session = get_session()
         try:
             task_run = PeriodicTaskRun(
@@ -435,9 +432,9 @@ def record_periodic_task_result(task_name, execution_time, status, result_data):
             break
         except Exception as e:
             retry_count += 1
-            logger.warning(f"记录定时任务结果失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
+            logger.warning(f"记录定时任务结果失败 (尝试 {retry_count}/{DB_RETRY_MAX}): {str(e)}")
             session.rollback()
-            if retry_count >= max_retries:
+            if retry_count >= DB_RETRY_MAX:
                 logger.error(f"记录定时任务结果最终失败: {str(e)}")
         finally:
             session.close()

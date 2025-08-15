@@ -5,6 +5,7 @@ from celery import current_app
 from celery.schedules import crontab, schedule
 from celery_app.models import get_session, PeriodicTask
 from celery_app.logger import get_logger
+from celery_app.config import DB_RETRY_MAX
 
 logger = get_logger(__name__)
 
@@ -21,10 +22,9 @@ class DatabaseScheduler(Scheduler):
     
     def update_from_database(self):
         """从数据库更新定时任务"""
-        max_retries = 3
         retry_count = 0
         
-        while retry_count < max_retries:
+        while retry_count < DB_RETRY_MAX:
             session = get_session()
             try:
                 db_tasks = session.query(PeriodicTask).filter_by(task_enabled=True).all()
@@ -44,7 +44,6 @@ class DatabaseScheduler(Scheduler):
                             extra_config = json.loads(task.task_extra_config)
                             task_type = extra_config.get('task_type', 'http')
                             agent_id = extra_config.get('agent_id')
-                            task_timeout = extra_config.get('task_timeout')
                         except json.JSONDecodeError:
                             logger.warning(f"任务 {task.task_name} 的 task_extra_config JSON 解析失败，跳过该任务")
                             continue
@@ -52,7 +51,6 @@ class DatabaseScheduler(Scheduler):
                         # 没有额外配置，使用默认值
                         task_type = 'http'
                         agent_id = None
-                        task_timeout = None
                         extra_config = {}
                     
                     # 根据任务类型动态设置任务路径和参数
@@ -75,7 +73,7 @@ class DatabaseScheduler(Scheduler):
                         method = extra_config.get('method', kwargs.get('method', 'GET'))
                         headers = extra_config.get('headers', kwargs.get('headers', None))
                         data = extra_config.get('data', kwargs.get('data', None))
-                        timeout = extra_config.get('timeout', task_timeout)
+                        timeout = extra_config.get('timeout', None)
                         # 可扩展配置：认证、代理等
                         auth = extra_config.get('auth', None)
                         verify_ssl = extra_config.get('verify_ssl', True)
@@ -164,8 +162,8 @@ class DatabaseScheduler(Scheduler):
                 
             except Exception as e:
                 retry_count += 1
-                logger.error(f"更新定时任务时出错 (尝试 {retry_count}/{max_retries}): {e}")
-                if retry_count >= max_retries:
+                logger.error(f"更新定时任务时出错 (尝试 {retry_count}/{DB_RETRY_MAX}): {e}")
+                if retry_count >= DB_RETRY_MAX:
                     logger.error(f"更新定时任务最终失败，使用空调度: {e}")
                     self._schedule = {}
                     self._last_timestamp = datetime.now()
