@@ -82,27 +82,24 @@ class AuthToken(BaseModel):
 
 
 class AuthSession(BaseModel):
-    """SSO会话管理表 - 对应auth_sessions表
-    用于管理SSO登录会话
+    """CAS会话管理表 - 对应auth_sessions表
+    用于管理CAS登录会话（纯Session模式，不涉及令牌）
     """
     __tablename__ = "auth_sessions"
     __table_args__ = (
         Index('idx_auth_sessions_session_id', 'session_id'),
         Index('idx_auth_sessions_user_id', 'user_id'),
-        Index('idx_auth_sessions_sso_provider', 'sso_provider'),
         Index('idx_auth_sessions_expires_at', 'expires_at'),
+        Index('idx_auth_sessions_is_active', 'is_active'),
     )
 
     id = Column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, index=True, autoincrement=True)
-    session_id = Column(String(255), unique=True, nullable=False, comment="会话ID")
+    session_id = Column(String(255), unique=True, nullable=False, comment="会话ID（系统生成）")
     user_id = Column(String(64), nullable=False, comment="用户ID")
     
-    # SSO相关信息
-    sso_provider = Column(String(50), nullable=False, comment="SSO提供商")
-    sso_session_id = Column(String(255), nullable=True, comment="SSO提供商的会话ID")
-    sso_access_token = Column(Text, nullable=True, comment="SSO访问令牌（加密存储）")
-    sso_refresh_token = Column(Text, nullable=True, comment="SSO刷新令牌（加密存储）")
-    sso_id_token = Column(Text, nullable=True, comment="SSO ID令牌")
+    # CAS相关信息
+    sso_provider = Column(String(50), nullable=False, default='cas', comment="SSO提供商")
+    sso_session_id = Column(String(255), nullable=True, comment="CAS票据（用于关联）")
     
     # 会话信息
     created_at = Column(DateTime, default=now_shanghai, nullable=False, comment="创建时间")

@@ -1,24 +1,30 @@
 """
 CAS (Central Authentication Service) 集成服务
+使用python-cas库简化集成
 """
 
 import secrets
-import httpx
-import xml.etree.ElementTree as ET
 from typing import Dict, Any, Optional
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
+from datetime import timedelta
+
+try:
+    from cas import CASClient
+except ImportError:
+    # 如果没有安装python-cas，使用自定义实现
+    CASClient = None
+    import httpx
+    import xml.etree.ElementTree as ET
 
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.logging import get_logger
 from src.shared.core.config import settings
-from src.apps.auth.models import AuthUser
+from src.apps.auth.models import AuthSession
 from src.apps.user.models import RbacUser
-from src.apps.auth.utils import JWTUtils
 from src.apps.auth.utils import CASAttributeParser
-from src.apps.auth.schema import LoginResponse
 from src.shared.db.models import now_shanghai
 
 logger = get_logger(__name__)
@@ -41,6 +47,16 @@ class CASService:
         
         # 初始化CAS属性解析器（使用YAML配置）
         self.attribute_parser = CASAttributeParser()
+        
+        # 初始化CAS客户端（如果安装了python-cas）
+        if CASClient:
+            self.cas_client = CASClient(
+                version=int(self.cas_version) if self.cas_version else 3,
+                service_url=self.service_url,
+                server_url=self.cas_server_url
+            )
+        else:
+            self.cas_client = None
         
     def get_login_url(self) -> str:
         """获取CAS登录URL"""
@@ -68,6 +84,45 @@ class CASService:
         Returns:
             包含用户信息的字典
         """
+        if self.cas_client:
+            # 使用python-cas库
+            try:
+                # python-cas是同步的，需要在异步环境中调用
+                import asyncio
+                loop = asyncio.get_event_loop()
+                
+                # 在线程池中执行同步操作
+                user, attributes, pgtiou = await loop.run_in_executor(
+                    None,
+                    self.cas_client.verify_ticket,
+                    ticket
+                )
+                
+                if not user:
+                    raise BusinessException(
+                        "CAS票据验证失败",
+                        ResponseCode.UNAUTHORIZED
+                    )
+                
+                logger.info(f"CAS validation successful for user: {user}")
+                
+                return {
+                    'username': user,
+                    'attributes': attributes or {}
+                }
+                
+            except Exception as e:
+                logger.error(f"CAS validation error: {e}")
+                raise BusinessException(
+                    "CAS验证失败",
+                    ResponseCode.UNAUTHORIZED
+                )
+        else:
+            # 使用自定义实现（原有代码）
+            return await self._validate_ticket_custom(ticket)
+    
+    async def _validate_ticket_custom(self, ticket: str) -> Dict[str, Any]:
+        """自定义的票据验证实现（备用）"""
         # 构建验证URL
         if self.cas_version == '3':
             validate_url = f"{self.cas_server_url}/p3/serviceValidate"
@@ -152,15 +207,17 @@ class CASService:
                 ResponseCode.INTERNAL_ERROR
             )
             
-    async def process_cas_login(self, ticket: str) -> LoginResponse:
+    async def process_cas_login(self, ticket: str, ip_address: str = None, user_agent: str = None) -> Dict[str, Any]:
         """
-        处理CAS登录
+        处理CAS登录 - 纯Session模式
         
         Args:
             ticket: CAS票据
+            ip_address: 客户端IP
+            user_agent: 客户端UA
             
         Returns:
-            登录响应
+            CAS会话信息（不发放JWT）
         """
         # 验证票据
         cas_data = await self.validate_ticket(ticket)
@@ -202,16 +259,8 @@ class CASService:
             self.db.add(user)
             await self.db.flush()
             
-            # 创建认证记录
-            auth_user = AuthUser(
-                user_id=user.user_id,
-                auth_type='cas',
-                password_hash='',  # CAS用户不需要密码
-                created_at=now_shanghai(),
-                updated_at=now_shanghai()
-            )
-            self.db.add(auth_user)
-            await self.db.flush()
+            # CAS用户不创建auth_user记录（可选）
+            # 因为CAS用户不需要密码，认证完全依赖CAS Server
             
             logger.info(f"Created new user from CAS: {username}")
         else:
@@ -229,29 +278,48 @@ class CASService:
             user.update_by = 'CAS'
             await self.db.flush()
             
-        # 生成JWT token
-        token_data = {
-            "sub": user.user_id,
-            "username": user.user_name,
-            "roles": [],  # TODO: 从用户角色关系中获取
-            "permissions": []  # TODO: 从角色权限中获取
-        }
+        # 创建CAS Session（纯Session管理，不涉及JWT）
+        from src.apps.auth.models import AuthSession
+        cas_session = AuthSession(
+            session_id=secrets.token_urlsafe(32),
+            user_id=user.user_id,
+            sso_provider='cas',
+            sso_session_id=ticket,  # 保存CAS票据作为关联
+            expires_at=now_shanghai() + timedelta(hours=self.session_timeout/3600),  # session_timeout是秒，转换为小时
+            ip_address=ip_address,
+            user_agent=user_agent,
+            created_at=now_shanghai(),
+            last_accessed_at=now_shanghai()
+        )
+        self.db.add(cas_session)
+        await self.db.flush()
         
-        access_token = JWTUtils.create_access_token(token_data)
-        refresh_token = JWTUtils.create_refresh_token({"sub": user.user_id})
+        # 记录登录历史
+        from src.apps.auth.models import AuthLoginHistory
+        login_history = AuthLoginHistory(
+            user_id=user.user_id,
+            username=user.user_name,
+            login_type="sso",
+            success=True,
+            sso_provider="cas",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            login_time=now_shanghai()
+        )
+        self.db.add(login_history)
         
         await self.db.commit()
         
-        return LoginResponse(
-            access_token=access_token,
-            refresh_token=refresh_token,
-            token_type="bearer",
-            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            user={
+        # 返回Session信息（不返回JWT）
+        return {
+            "session_id": cas_session.session_id,
+            "expires_in": self.session_timeout * 3600,  # 转换为秒
+            "user": {
                 "user_id": user.user_id,
                 "username": user.user_name,
                 "display_name": user.display_name,
                 "email": user.email,
-                "roles": []  # TODO: 返回实际角色
+                "department": user.department_name,
+                "auth_type": "cas"
             }
-        )
+        }

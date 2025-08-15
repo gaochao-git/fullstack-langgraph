@@ -22,8 +22,19 @@ class RbacUser(BaseModel):
     group_name = Column(String(50), nullable=False, comment="组名")
     email = Column(String(100), nullable=False, comment="邮箱")
     mobile = Column(String(20), nullable=False, comment="手机号")
-    user_source = Column(Integer, default=3, nullable=False, comment="用户来源")
-    is_active = Column(Integer, default=1, nullable=False, comment="是否激活")
+    user_source = Column(Integer, default=3, nullable=False, comment="用户来源：1=cas,2=jwt,3=手动添加")
+    
+    # 认证相关字段（本地用户使用）
+    locked_until = Column(DateTime, nullable=True, comment="账户锁定到期时间")
+    login_attempts = Column(Integer, default=0, nullable=False, comment="登录失败次数")
+    last_login = Column(DateTime, nullable=True, comment="最后登录时间")
+    mfa_enabled = Column(Boolean, default=False, nullable=False, comment="是否启用MFA")
+    mfa_secret = Column(String(255), nullable=True, comment="MFA密钥")
+    password_hash = Column(String(255), nullable=True, comment="密码哈希（本地认证用）")
+    
+    is_active = Column(Integer, default=1, nullable=False, comment="用户是否活跃,1活跃,0冻结")
+    is_deleted = Column(Integer, default=0, nullable=False, comment="是否删除:0未删除,1已删除")
+    
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
     create_by = Column(String(50), nullable=False, comment="创建人")

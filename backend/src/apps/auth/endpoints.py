@@ -254,45 +254,9 @@ async def sso_callback(
     )
 
 
-# ============= CAS认证 =============
-
-@router.get("/cas/login", summary="获取CAS登录URL")
-async def get_cas_login_url(
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取CAS登录URL"""
-    from .service import CASService
-    service = CASService(db)
-    return {"url": service.get_login_url()}
-
-
-@router.get("/cas/logout", summary="获取CAS登出URL")
-async def get_cas_logout_url(
-    redirect_url: Optional[str] = None,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取CAS登出URL"""
-    from .service import CASService
-    service = CASService(db)
-    return {"url": service.get_logout_url(redirect_url)}
-
-
-@router.get("/cas/callback", response_model=LoginResponse, summary="CAS回调处理")
-async def cas_callback(
-    ticket: str,
-    req: Request,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    处理CAS票据验证
-    
-    - **ticket**: CAS票据
-    """
-    from .service import CASService
-    service = CASService(db)
-    
-    # 处理CAS登录
-    return await service.process_cas_login(ticket)
+# ============= CAS认证 - 已移至cas_endpoints.py =============
+# CAS相关端点已经独立到 cas_endpoints.py 中
+# 使用 /api/v1/cas/* 路径访问
 
 
 # ============= 密码管理 =============
@@ -770,13 +734,13 @@ async def init_admin(
     初始化管理员账户（仅在没有管理员时可用）
     """
     from src.apps.user.models import RbacUser
-    from src.apps.auth.models import AuthUser
     from src.apps.auth.utils import PasswordUtils
+    from sqlalchemy import select
     
     # 检查是否已有管理员
-    admin_exists = db.query(RbacUser).filter(
-        RbacUser.user_name == "admin"
-    ).first()
+    stmt = select(RbacUser).where(RbacUser.user_name == "admin")
+    result = await db.execute(stmt)
+    admin_exists = result.scalar_one_or_none()
     
     if admin_exists:
         raise BusinessException(
@@ -793,20 +757,14 @@ async def init_admin(
         group_name="管理组",
         email="admin@example.com",
         mobile="13800138000",
-        user_source=1,
+        password_hash=PasswordUtils.hash_password(password),  # 直接存储密码
+        user_source=2,  # JWT本地用户
         is_active=1,
         create_by="system",
         update_by="system"
     )
     db.add(admin_user)
     
-    # 创建认证信息
-    auth_user = AuthUser(
-        user_id="admin",
-        password_hash=PasswordUtils.hash_password(password)
-    )
-    db.add(auth_user)
-    
-    # 注意：事务将由FastAPI自动提交
+    await db.commit()
     
     return {"message": "管理员账户创建成功"}

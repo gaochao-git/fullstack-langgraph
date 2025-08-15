@@ -13,7 +13,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.future import select
 
 from src.apps.auth.models import (
-    AuthUser, AuthToken, AuthSession, AuthLoginHistory, 
+    AuthToken, AuthSession, AuthLoginHistory, 
     AuthApiKey, AuthSSOProvider
 )
 from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
@@ -58,30 +58,23 @@ class AuthService:
                 # 检查用户是否激活
                 if rbac_user.is_active != 1: raise BusinessException("账户已被禁用",ResponseCode.FORBIDDEN)
                 
-                # 获取认证信息 (使用异步查询)
-                stmt = select(AuthUser).where(AuthUser.user_id == rbac_user.user_id)
-                result = await self.db.execute(stmt)
-                auth_user = result.scalar_one_or_none()
-                
-                if not auth_user:
-                    # 首次登录，创建认证记录
-                    auth_user = AuthUser(user_id=rbac_user.user_id,create_time=datetime.now(timezone.utc))
-                    self.db.add(auth_user)
-                    await self.db.flush()
+                # 直接从rbac_user检查密码（不再需要auth_user表）
+                if not rbac_user.password_hash:
+                    raise BusinessException("该用户未设置密码", ResponseCode.UNAUTHORIZED)
                 
                 # 检查账户是否被锁定
-                if auth_user.locked_until and auth_user.locked_until > datetime.now(timezone.utc):
-                    remaining_minutes = (auth_user.locked_until - datetime.now(timezone.utc)).seconds // 60
+                if rbac_user.locked_until and rbac_user.locked_until > datetime.now(timezone.utc):
+                    remaining_minutes = (rbac_user.locked_until - datetime.now(timezone.utc)).seconds // 60
                     raise BusinessException(f"账户已被锁定，请{remaining_minutes}分钟后再试",ResponseCode.FORBIDDEN)
                 
                 # 验证密码
-                if not auth_user.password_hash or not PasswordUtils.verify_password(request.password, auth_user.password_hash):
+                if not PasswordUtils.verify_password(request.password, rbac_user.password_hash):
                     # 增加失败次数
-                    auth_user.login_attempts += 1
+                    rbac_user.login_attempts += 1
                     
                     # 检查是否需要锁定账户
-                    if auth_user.login_attempts >= self.max_login_attempts:
-                        auth_user.locked_until = datetime.now(timezone.utc) + timedelta(
+                    if rbac_user.login_attempts >= self.max_login_attempts:
+                        rbac_user.locked_until = datetime.now(timezone.utc) + timedelta(
                             minutes=self.lockout_duration
                         )
                         await self.db.flush()
@@ -91,17 +84,16 @@ class AuthService:
                     raise BusinessException("用户名或密码错误",ResponseCode.UNAUTHORIZED)
                 
                 # 检查MFA
-                if auth_user.mfa_enabled:
+                if rbac_user.mfa_enabled:
                     if not request.mfa_code:
                         raise BusinessException("需要MFA验证码",ResponseCode.FORBIDDEN)
                     
-                    if not MFAUtils.verify_totp(auth_user.mfa_secret, request.mfa_code):
+                    if not MFAUtils.verify_totp(rbac_user.mfa_secret, request.mfa_code):
                         raise BusinessException("MFA验证码错误",ResponseCode.UNAUTHORIZED)
                 
                 # 登录成功，重置失败次数
-                auth_user.login_attempts = 0
-                auth_user.last_login = datetime.now(timezone.utc)
-                auth_user.last_login_ip = None  # 应从请求中获取
+                rbac_user.login_attempts = 0
+                rbac_user.last_login = datetime.now(timezone.utc)
                 
                 # 获取用户角色和权限
                 user_roles = await self._get_user_roles(rbac_user.user_id)
@@ -153,6 +145,10 @@ class AuthService:
                 login_history.success = True
                 
                 self.db.add(login_history)
+                
+                # 更新用户最后登录时间
+                rbac_user.last_login = datetime.now(timezone.utc)
+                
                 await self.db.flush()
                 
                 # 构建用户信息
@@ -216,7 +212,8 @@ class AuthService:
             # 生成用户ID
             user_id = f"user_{int(datetime.now().timestamp())}"
             
-            # 创建RBAC用户
+            # 创建RBAC用户（包含密码）
+            password_hash = PasswordUtils.hash_password(request.password)
             rbac_user = RbacUser(
                 user_id=user_id,
                 user_name=request.username,
@@ -225,21 +222,13 @@ class AuthService:
                 mobile="",
                 department_name="默认部门",
                 group_name="普通用户",
-                user_source=3,  # 手动注册
+                user_source=2,  # JWT本地用户
                 is_active=1,    # 默认激活，可根据需求改为需要审核
+                password_hash=password_hash,  # 直接存储密码
                 create_by="system",
                 update_by="system"
             )
             self.db.add(rbac_user)
-            
-            # 创建认证用户
-            password_hash = PasswordUtils.hash_password(request.password)
-            auth_user = AuthUser(
-                user_id=user_id,
-                password_hash=password_hash,
-                require_password_change=False
-            )
-            self.db.add(auth_user)
             
             # 记录注册历史
             login_history = AuthLoginHistory(
@@ -425,21 +414,28 @@ class AuthService:
     async def change_password(self, user_id: str, old_password: str, new_password: str):
         """修改密码"""
         async with self.db.begin():
-            # 获取认证信息
-            stmt = select(AuthUser).where(
-                AuthUser.user_id == user_id
+            # 获取用户信息
+            stmt = select(RbacUser).where(
+                RbacUser.user_id == user_id
             )
             result = await self.db.execute(stmt)
-            auth_user = result.scalar_one_or_none()
+            user = result.scalar_one_or_none()
             
-            if not auth_user:
+            if not user:
                 raise BusinessException(
                     "用户不存在",
                     ResponseCode.NOT_FOUND
                 )
             
+            # 检查是否是本地用户
+            if not user.password_hash:
+                raise BusinessException(
+                    "非本地用户无法修改密码",
+                    ResponseCode.FORBIDDEN
+                )
+            
             # 验证旧密码
-            if not PasswordUtils.verify_password(old_password, auth_user.password_hash):
+            if not PasswordUtils.verify_password(old_password, user.password_hash):
                 raise BusinessException(
                     "原密码错误",
                     ResponseCode.UNAUTHORIZED
@@ -454,9 +450,11 @@ class AuthService:
                 )
             
             # 更新密码
-            auth_user.password_hash = PasswordUtils.hash_password(new_password)
-            auth_user.password_changed_at = datetime.now(timezone.utc)
-            auth_user.require_password_change = False
+            user.password_hash = PasswordUtils.hash_password(new_password)
+            user.update_time = datetime.now(timezone.utc)
+            
+            # 撤销所有token
+            await self._revoke_all_user_tokens(user_id, "密码已修改")
             
             await self.db.flush()
     
