@@ -1,7 +1,6 @@
 import json
 from datetime import datetime, timedelta
 from celery.beat import Scheduler, ScheduleEntry
-from celery import current_app
 from celery.schedules import crontab, schedule
 from celery_app.models import get_session, PeriodicTask
 from celery_app.logger import get_logger
@@ -44,6 +43,7 @@ class DatabaseScheduler(Scheduler):
                             extra_config = json.loads(task.task_extra_config)
                             task_type = extra_config.get('task_type', 'http')
                             agent_id = extra_config.get('agent_id')
+                            task_timeout = extra_config.get('task_timeout')
                         except json.JSONDecodeError:
                             logger.warning(f"任务 {task.task_name} 的 task_extra_config JSON 解析失败，跳过该任务")
                             continue
@@ -51,6 +51,7 @@ class DatabaseScheduler(Scheduler):
                         # 没有额外配置，使用默认值
                         task_type = 'http'
                         agent_id = None
+                        task_timeout = None
                         extra_config = {}
                     
                     # 根据任务类型动态设置任务路径和参数
@@ -73,10 +74,10 @@ class DatabaseScheduler(Scheduler):
                         method = extra_config.get('method', kwargs.get('method', 'GET'))
                         headers = extra_config.get('headers', kwargs.get('headers', None))
                         data = extra_config.get('data', kwargs.get('data', None))
-                        timeout = extra_config.get('timeout', None)
+                        timeout = extra_config.get('timeout', task_timeout)
                         # 可扩展配置：认证、代理等
                         auth = extra_config.get('auth', None)
-                        verify_ssl = extra_config.get('verify_ssl', True)
+                        verify_ssl = extra_config.get('verify_ssl', False)
                         
                         # 重新构造参数
                         args = [url, method, headers, data]

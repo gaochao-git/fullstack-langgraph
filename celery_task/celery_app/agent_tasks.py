@@ -19,7 +19,7 @@ if backend_path not in sys.path: sys.path.insert(0, backend_path)
 logger = get_logger(__name__)
 
 
-def call_agent_task(agent_id, message, user_name="system", conversation_id=None):
+def call_agent_task(agent_id, message, user_name="system", conversation_id=None, timeout=300):
     """
     调用智能体的异步任务,参数从celery_periodic_task_configs表里获取的
     
@@ -74,16 +74,8 @@ def call_agent_task(agent_id, message, user_name="system", conversation_id=None)
         api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{conversation_id}/runs/stream"
         logger.info(f"调用智能体对话API: {api_url}")
         
-        # 根据消息复杂度动态调整超时时间
-        message_length = len(message)
-        if message_length < 50:
-            timeout = 120  # 简单消息2分钟
-        elif message_length < 200:
-            timeout = 180  # 中等消息3分钟
-        else:
-            timeout = 300  # 复杂消息5分钟
-        
-        logger.info(f"消息长度: {message_length}, 设置超时: {timeout}秒")
+        # 使用配置的超时时间
+        logger.info(f"使用超时时间: {timeout}秒")
         
         response = requests.post(
             api_url,
@@ -265,7 +257,7 @@ def periodic_agent_health_check():
 
 
 
-@app.task(bind=True, max_retries=0, soft_time_limit=300, time_limit=360)
+@app.task(bind=True, soft_time_limit=300, time_limit=360)
 def execute_agent_periodic_task(self, task_config_id):
     """
     通用的智能体定时任务执行函数
@@ -337,12 +329,14 @@ def execute_agent_periodic_task(self, task_config_id):
         message = extra_config.get('message', '执行定时任务')
         user_name = extra_config.get('user', 'system')
         conversation_id = extra_config.get('conversation_id')
+        task_timeout = extra_config.get('task_timeout', 300)
+        max_retries = extra_config.get('max_retries', 3)
 
         
         logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
         
-        # 直接调用智能体函数
-        agent_result = call_agent_task(agent_id, message, user_name, conversation_id)
+        # 直接调用智能体函数，传入超时时间
+        agent_result = call_agent_task(agent_id, message, user_name, conversation_id, task_timeout)
         
         if agent_result and agent_result.get('status') == 'SUCCESS':
             success_result = {'task_id': task_id,'task_config_id': task_config_id,'task_name': task_config.task_name,'agent_id': agent_id,'agent_result': agent_result,'status': 'SUCCESS','execution_time': execution_time.isoformat()}
@@ -370,9 +364,9 @@ def execute_agent_periodic_task(self, task_config_id):
         record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
         
         # 重试机制
-        if self.request.retries < self.max_retries:
-            logger.info(f"任务失败，将在60秒后重试 (第{self.request.retries + 1}次重试)")
-            raise self.retry(countdown=60, exc=exc)
+        if self.request.retries < max_retries:
+            logger.info(f"任务失败，将在60秒后重试 (第{self.request.retries + 1}/{max_retries}次重试)")
+            raise self.retry(countdown=60, exc=exc, max_retries=max_retries)
         
         return error_result
     

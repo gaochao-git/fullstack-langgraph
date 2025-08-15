@@ -97,11 +97,11 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       const extraConfig = {
         task_type: 'agent',
         agent_id: agentId,
-        agent_url: values.agent_url,
         message: values.task_message || '执行定时任务',
         user: 'zhangsan123',
         task_timeout: values.task_timeout || 300,
-        max_retries: 3
+        max_retries: values.max_retries || 3,
+        queue: 'priority_low'  // 可选，默认 priority_low
       };
       
       const taskData = {
@@ -158,9 +158,9 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
     const formValues: any = {
       task_name: task.task_name,
       task_description: task.task_description,
-      agent_url: extraConfig.agent_url || '',
       task_message: extraConfig.message || '执行定时任务',
       task_timeout: extraConfig.task_timeout || 300,
+      max_retries: extraConfig.max_retries || 3,
       schedule_type: task.task_interval ? 'interval' : 'crontab',
       task_interval: task.task_interval,
       task_crontab_minute: task.task_crontab_minute,
@@ -183,11 +183,11 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       const extraConfig = {
         task_type: 'agent',
         agent_id: agentId,
-        agent_url: values.agent_url,
         message: values.task_message || '执行定时任务',
         user: 'zhangsan123',
         task_timeout: values.task_timeout || 300,
-        max_retries: 3
+        max_retries: values.max_retries || 3,
+        queue: 'priority_low'  // 可选，默认 priority_low
       };
       
       const taskData = {
@@ -326,29 +326,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       ellipsis: true,
     },
     {
-      title: 'API地址',
-      key: 'agent_url',
-      width: 200,
-      ellipsis: true,
-      render: (_: any, record: any) => {
-        let url = '-';
-        try {
-          if (record.task_extra_config) {
-            const config = JSON.parse(record.task_extra_config);
-            url = config.agent_url || '-';
-          }
-        } catch (error) {
-          // 解析任务配置失败
-        }
-        
-        return (
-          <span className="text-xs" title={url}>
-            {url === '-' ? url : url.length > 30 ? `${url.substring(0, 30)}...` : url}
-          </span>
-        );
-      }
-    },
-    {
       title: '调度配置',
       key: 'schedule',
       width: 120,
@@ -455,18 +432,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         </Form.Item>
 
         <Form.Item
-          label="智能体API地址"
-          name="agent_url"
-          rules={[
-            { required: true, message: '请输入智能体API地址' },
-            { type: 'url', message: '请输入有效的URL' }
-          ]}
-          tooltip="智能体服务的API调用地址"
-        >
-          <Input placeholder="http://localhost:8000/api/chat/stream" />
-        </Form.Item>
-
-        <Form.Item
           label="执行消息"
           name="task_message"
           rules={[{ required: true, message: '请输入执行消息' }]}
@@ -479,8 +444,20 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           label="超时时间（秒）"
           name="task_timeout"
           initialValue={300}
+          rules={[{ required: true, message: '请输入超时时间' }]}
+          tooltip="任务执行的最大等待时间"
         >
-          <Input type="number" min={30} max={3600} placeholder="300" />
+          <Input type="number" min={60} max={3600} placeholder="300" />
+        </Form.Item>
+
+        <Form.Item
+          label="最大重试次数"
+          name="max_retries"
+          initialValue={3}
+          rules={[{ required: true, message: '请输入最大重试次数' }]}
+          tooltip="任务失败后的最大重试次数"
+        >
+          <Input type="number" min={0} max={10} placeholder="3" />
         </Form.Item>
 
         <Row gutter={16}>
