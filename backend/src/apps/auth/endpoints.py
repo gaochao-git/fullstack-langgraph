@@ -4,9 +4,10 @@
 
 import json
 from typing import Annotated, Optional, List
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone
 
 from src.shared.db.config import get_async_db
 from src.apps.auth.service import AuthService, SSOService
@@ -254,9 +255,171 @@ async def sso_callback(
     )
 
 
-# ============= CAS认证 - 已移至cas_endpoints.py =============
-# CAS相关端点已经独立到 cas_endpoints.py 中
-# 使用 /api/v1/cas/* 路径访问
+# ============= CAS认证 =============
+
+@router.get("/cas/login", summary="获取CAS登录URL")
+async def get_cas_login_url(
+    next_url: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取CAS登录URL"""
+    from .service import CASService
+    service = CASService(db)
+    login_url = service.get_login_url()
+    
+    return success_response({
+        "login_url": login_url
+    })
+
+
+@router.get("/cas/callback", summary="CAS登录回调")
+async def cas_callback(
+    ticket: str,
+    req: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """处理CAS登录回调"""
+    from .service import CASService
+    service = CASService(db)
+    
+    ip_address = req.client.host
+    user_agent = req.headers.get("user-agent")
+    
+    cas_result = await service.process_cas_login(ticket, ip_address, user_agent)
+    
+    response.set_cookie(
+        key="cas_session_id",
+        value=cas_result["session_id"],
+        max_age=cas_result["expires_in"],
+        httponly=True,
+        secure=req.url.scheme == "https",
+        samesite="lax"
+    )
+    
+    return success_response({
+        "message": "CAS登录成功",
+        "user": cas_result["user"],
+        "expires_in": cas_result["expires_in"]
+    })
+
+
+@router.post("/cas/logout", summary="CAS登出")
+async def cas_logout(
+    response: Response,
+    cas_session_id: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """处理CAS登出"""
+    if cas_session_id:
+        from sqlalchemy import select
+        from .models import AuthSession
+        
+        stmt = select(AuthSession).where(
+            AuthSession.session_id == cas_session_id,
+            AuthSession.is_active == True
+        )
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        
+        if session:
+            session.is_active = False
+            session.terminated_at = datetime.now(timezone.utc)
+            session.termination_reason = "用户主动登出"
+            await db.commit()
+    
+    response.delete_cookie("cas_session_id")
+    
+    from .service import CASService
+    service = CASService(db)
+    logout_url = service.get_logout_url()
+    
+    return success_response({
+        "message": "登出成功",
+        "logout_url": logout_url,
+        "redirect_required": True
+    })
+
+
+# ============= 统一认证接口 =============
+
+@router.get("/me", summary="获取当前用户信息")
+async def get_current_user_info(
+    request: Request,
+    cas_session_id: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取当前登录用户信息
+    支持JWT和CAS两种认证方式
+    """
+    # 1. 检查JWT认证
+    if hasattr(request.state, "current_user"):
+        return success_response({
+            "user": request.state.current_user,
+            "auth_type": "jwt"
+        })
+    
+    # 2. 检查CAS认证
+    if cas_session_id:
+        from sqlalchemy import select
+        from .models import AuthSession
+        from src.apps.user.models import RbacUser
+        
+        stmt = select(AuthSession).where(
+            AuthSession.session_id == cas_session_id,
+            AuthSession.is_active == True
+        )
+        result = await db.execute(stmt)
+        session = result.scalar_one_or_none()
+        
+        if session and session.expires_at > datetime.now(timezone.utc):
+            # 获取用户信息
+            user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
+            user_result = await db.execute(user_stmt)
+            user = user_result.scalar_one_or_none()
+            
+            if user:
+                return success_response({
+                    "user": {
+                        "user_id": user.user_id,
+                        "username": user.user_name,
+                        "display_name": user.display_name,
+                        "email": user.email
+                    },
+                    "auth_type": "cas"
+                })
+    
+    raise BusinessException(
+        "未登录",
+        ResponseCode.UNAUTHORIZED
+    )
+
+
+@router.get("/check", summary="检查登录状态")
+async def check_auth_status(
+    request: Request,
+    cas_session_id: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    检查用户登录状态
+    不需要登录也能调用
+    """
+    # 复用get_current_user_info的逻辑，但不抛出异常
+    try:
+        result = await get_current_user_info(request, cas_session_id, db)
+        return success_response({
+            "authenticated": True,
+            "auth_type": result["data"]["auth_type"],
+            "user": result["data"]["user"]
+        })
+    except:
+        return success_response({
+            "authenticated": False,
+            "auth_type": None,
+            "user": None
+        })
 
 
 # ============= 密码管理 =============
@@ -768,3 +931,56 @@ async def init_admin(
     await db.commit()
     
     return {"message": "管理员账户创建成功"}
+
+
+# ============= CAS会话管理 =============
+
+@router.get("/cas/sessions/active", summary="获取用户活跃会话")
+async def get_active_sessions(
+    cas_session_id: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取当前用户的所有活跃CAS会话"""
+    if not cas_session_id:
+        raise BusinessException("需要CAS认证", ResponseCode.UNAUTHORIZED)
+    
+    from sqlalchemy import select
+    from .models import AuthSession
+    
+    # 获取当前会话
+    current_session = await db.execute(
+        select(AuthSession).where(
+            AuthSession.session_id == cas_session_id,
+            AuthSession.is_active == True
+        )
+    )
+    current = current_session.scalar_one_or_none()
+    
+    if not current:
+        raise BusinessException("会话无效", ResponseCode.UNAUTHORIZED)
+    
+    # 获取用户所有会话
+    stmt = select(AuthSession).where(
+        AuthSession.user_id == current.user_id,
+        AuthSession.sso_provider == "cas",
+        AuthSession.is_active == True
+    ).order_by(AuthSession.created_at.desc())
+    
+    result = await db.execute(stmt)
+    sessions = result.scalars().all()
+    
+    session_list = []
+    for session in sessions:
+        session_list.append({
+            "session_id": session.session_id,
+            "created_at": session.created_at.isoformat(),
+            "expires_at": session.expires_at.isoformat(),
+            "last_accessed_at": session.last_accessed_at.isoformat() if session.last_accessed_at else None,
+            "ip_address": session.ip_address,
+            "is_current": session.session_id == cas_session_id
+        })
+    
+    return success_response({
+        "sessions": session_list,
+        "total": len(session_list)
+    })
