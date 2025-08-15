@@ -87,7 +87,7 @@ class AgentService:
         search: Optional[str] = None,
         status: Optional[str] = None,
         enabled_only: bool = False,
-        include_builtin: bool = True
+        create_by: Optional[str] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
         """获取智能体列表"""
         offset = (page - 1) * size
@@ -99,23 +99,29 @@ class AgentService:
             filters['is_active'] = True
         if status:
             filters['agent_status'] = status
+        if create_by:
+            filters['create_by'] = create_by
         
         # 获取数据库中的智能体
         if search:
-            query = select(AgentConfig).where(
-                AgentConfig.agent_name.contains(search)
-            )
+            conditions = [AgentConfig.agent_name.contains(search)]
             if enabled_only:
-                query = query.where(
-                    and_(
-                        AgentConfig.agent_enabled == 'yes',
-                        AgentConfig.is_active == True
-                    )
-                )
+                conditions.extend([
+                    AgentConfig.agent_enabled == 'yes',
+                    AgentConfig.is_active == True
+                ])
+            if create_by:
+                conditions.append(AgentConfig.create_by == create_by)
+            
+            query = select(AgentConfig).where(and_(*conditions))
+            
+            # 计算总数
+            count_result = await db.execute(select(func.count(AgentConfig.id)).where(and_(*conditions)))
+            total = count_result.scalar()
+            
             query = query.offset(offset).limit(size)
             result = await db.execute(query)
             db_agents = list(result.scalars().all())
-            total = len(db_agents)
         else:
             query = select(AgentConfig)
             if filters:

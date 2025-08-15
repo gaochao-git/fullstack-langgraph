@@ -11,7 +11,8 @@ import {
   Row,
   Col,
   Switch,
-  Modal
+  Modal,
+  Radio
 } from 'antd';
 import { 
   RobotOutlined,
@@ -24,6 +25,7 @@ import AgentDetailModal from './components/AgentDetailModal';
 import AgentEditModal from './components/AgentEditModal';
 import { agentApi, type Agent, type MCPServer, type CreateAgentRequest, type UpdateAgentRequest } from '@/services/agentApi';
 import { renderIcon, getIconBackgroundColor } from './components/AgentIconSystem';
+import { useAuth } from '@/hooks/useAuth';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -114,6 +116,7 @@ const AgentManagement: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all'); // 新增：所有/我的筛选
   
   // 模态框状态
   const [agentDetailModal, setAgentDetailModal] = useState(false);
@@ -132,6 +135,7 @@ const AgentManagement: React.FC = () => {
   
   
   const { message } = App.useApp();
+  const { user } = useAuth(); // 获取当前用户信息
 
   // 加载可用模型
   const loadAvailableModels = async () => {
@@ -161,7 +165,13 @@ const AgentManagement: React.FC = () => {
   // 数据加载 - 只加载智能体列表
   const loadData = async () => {
     try {
-      const response = await agentApi.getAllAgents();
+      // 根据筛选条件构建参数
+      const params: any = { size: 100 };
+      if (ownerFilter === 'mine' && user?.username) {
+        params.create_by = user.username;
+      }
+      
+      const response = await agentApi.getAgents(params);
       
       // 处理业务逻辑错误
       if (response.status === 'error') {
@@ -218,6 +228,11 @@ const AgentManagement: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+  
+  // 当筛选条件变化时重新加载数据
+  useEffect(() => {
+    loadData();
+  }, [ownerFilter]);
 
 
   // 过滤智能体

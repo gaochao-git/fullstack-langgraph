@@ -141,7 +141,7 @@ class AgentApiService {
     search?: string;
     status?: string;
     enabled_only?: boolean;
-    include_builtin?: boolean;
+    create_by?: string;
   }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', params.page.toString());
@@ -149,7 +149,7 @@ class AgentApiService {
     if (params?.search) searchParams.set('search', params.search);
     if (params?.status) searchParams.set('status', params.status);
     if (params?.enabled_only) searchParams.set('enabled_only', params.enabled_only.toString());
-    if (params?.include_builtin !== undefined) searchParams.set('include_builtin', params.include_builtin.toString());
+    if (params?.create_by) searchParams.set('create_by', params.create_by);
 
     const url = `/api/v1/agents${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
     return await omind_get(url);

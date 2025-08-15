@@ -16,6 +16,7 @@ from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
 )
 from src.shared.core.exceptions import BusinessException
+from src.apps.auth.dependencies import get_current_user_optional
 
 # 导入LLM路由功能
 from .service.streaming import stream_run_standard, RunCreate
@@ -26,9 +27,18 @@ router = APIRouter(tags=["Agent Management"])
 
 
 @router.post("/v1/agents", response_model=UnifiedResponse)
-async def create_agent(agent_data: AgentCreate,db: AsyncSession = Depends(get_async_db)):
+async def create_agent(
+    agent_data: AgentCreate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     """创建智能体"""
     agent_dict = agent_data.model_dump(exclude_none=True)
+    # 设置创建者
+    if current_user:
+        agent_dict['create_by'] = current_user.get('username', 'system')
+    else:
+        agent_dict['create_by'] = 'system'
     agent = await agent_service.create_agent(db, agent_dict)
     return success_response(data=agent,msg="智能体创建成功",code=ResponseCode.CREATED)
 
@@ -40,11 +50,11 @@ async def list_agents(
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
     status: Optional[str] = Query(None, description="状态过滤"),
     enabled_only: bool = Query(False, description="仅显示启用的智能体"),
-    include_builtin: bool = Query(True, description="包含内置智能体"),
+    create_by: Optional[str] = Query(None, description="创建者过滤"),
     db: AsyncSession = Depends(get_async_db)
 ):
     """查询智能体列表"""
-    agents, total = await agent_service.list_agents(db, page, size, search, status, enabled_only, include_builtin)
+    agents, total = await agent_service.list_agents(db, page, size, search, status, enabled_only, create_by)
     return paginated_response(items=agents,total=total,page=page,size=size,msg="查询智能体列表成功")
 
 
