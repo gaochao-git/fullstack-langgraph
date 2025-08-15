@@ -114,4 +114,15 @@ def update_task_status(task_id, status):
     finally:
         session.close()
 
-# execute_agent_task 已删除，请使用 call_agent_task 替代 
+# execute_agent_task 已删除，请使用 call_agent_task 替代
+
+@app.task
+def execute_http_task(url, method='GET', headers=None, body=None):
+    """执行HTTP任务（占位函数）"""
+    logger.warning(f"HTTP任务功能未实现: {method} {url}")
+    return {
+        'status': 'SKIPPED',
+        'message': 'HTTP任务功能暂未实现',
+        'url': url,
+        'method': method
+    } 

@@ -52,7 +52,6 @@ task_queues = (
 task_routes = {
     # 系统维护任务 → system队列
     'celery_app.tasks.*': {'queue': 'system'},
-    'celery_app.dynamic_scheduler.*': {'queue': 'system'},
     'celery_app.agent_tasks.periodic_agent_health_check': {'queue': 'system'},
 }
 
