@@ -52,7 +52,7 @@ export function LoginPage() {
             onChange={(key) => setActiveTab(key as 'jwt' | 'sso')}
             centered
           >
-            <TabPane tab="账号密码登录" key="jwt">
+            <TabPane tab="本地登录" key="jwt">
               <Form
                 name="jwt-login"
                 className="login-form"
@@ -122,7 +122,7 @@ export function LoginPage() {
             <div className="login-tips">
               <p>提示：</p>
               <ul>
-                <li>本地登录：使用用户名密码认证</li>
+                <li>本地登录：使用本地用户名密码认证</li>
                 <li>SSO登录：使用企业统一身份认证</li>
               </ul>
             </div>
