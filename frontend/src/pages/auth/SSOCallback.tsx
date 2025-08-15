@@ -4,6 +4,7 @@ import { Spin, message } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/services/authApi';
 import { tokenManager } from '@/utils/tokenManager';
+import { MenuApiService } from '@/services/menuApi';
 
 export function SSOCallback() {
   const [searchParams] = useSearchParams();
@@ -26,26 +27,51 @@ export function SSOCallback() {
           
           // CAS使用session认证，不返回JWT token
           if (response?.data?.user) {
-            // 保存CAS用户信息到localStorage，标记为CAS认证
-            localStorage.setItem('auth_type', 'cas');
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            localStorage.setItem('isAuthenticated', 'true');
-            
-            // 使用set方法更新Zustand store，确保触发重新渲染
-            const { checkAuth } = useAuth.getState();
-            // 先更新状态
-            useAuth.setState({
-              user: response.data.user,
-              isAuthenticated: true,
-              loading: false
-            });
+            // 使用统一的updateAuthState方法更新状态
+            const { updateAuthState } = useAuth.getState();
+            updateAuthState(response.data.user, 'cas');
             
             message.success(response.data.message || 'CAS登录成功');
             
-            // 稍微延迟跳转，确保状态更新完成
-            setTimeout(() => {
-              // 跳转到智能体广场页面（或其他有权限的页面）
-              navigate('/service/agents', { replace: true });
+            // 获取用户首个可访问的页面路径
+            const getFirstAccessiblePath = async () => {
+              try {
+                // 获取用户菜单
+                const userMenuPermission = await MenuApiService.getUserMenus();
+                const menus = userMenuPermission.menus || [];
+                
+                // 递归查找第一个有路径的菜单
+                const findFirstPath = (menuList: any[]): string | null => {
+                  for (const menu of menuList) {
+                    if (menu.route_path && menu.show_menu === 1 && menu.menu_component) {
+                      return menu.route_path;
+                    }
+                    if (menu.children && menu.children.length > 0) {
+                      const childPath = findFirstPath(menu.children);
+                      if (childPath) return childPath;
+                    }
+                  }
+                  return null;
+                };
+                
+                const firstPath = findFirstPath(menus);
+                if (!firstPath) {
+                  // 如果用户没有任何可访问的菜单，跳转到一个无权限页面
+                  message.warning('您暂无可访问的页面，请联系管理员分配权限');
+                  return '/no-permission';
+                }
+                return firstPath;
+              } catch (error) {
+                console.error('Failed to get user menus:', error);
+                message.error('获取用户菜单失败');
+                return '/';
+              }
+            };
+            
+            // 延迟跳转，确保状态更新完成
+            setTimeout(async () => {
+              const targetPath = await getFirstAccessiblePath();
+              navigate(targetPath, { replace: true });
             }, 100);
           } else {
             throw new Error('CAS响应格式错误');

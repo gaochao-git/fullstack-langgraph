@@ -1,5 +1,6 @@
 import { message } from 'antd';
 import { tokenManager } from '@/utils/tokenManager';
+import { useAuth } from '@/hooks/useAuth';
 
 // 存储原始fetch
 const originalFetch = window.fetch;
@@ -42,37 +43,57 @@ window.fetch = async function(...args) {
     // 处理401未授权错误
     const isRetry = init && init.headers && (init.headers as any)['X-No-Retry'];
     if (response.status === 401 && !isRetry) {
-      // 尝试刷新token
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        try {
-          await tokenManager.refreshAccessToken();
-          
-          // 用新token重试原请求
-          const newToken = localStorage.getItem('token');
-          if (newToken) {
-            init = init || {};
-            init.headers = {
-              ...init.headers,
-              'Authorization': `Bearer ${newToken}`,
-              'X-No-Retry': 'true' // 标记避免递归重试
-            };
-            response = await originalFetch(resource, init);
-          }
-        } catch (refreshError) {
-          // refresh失败，tokenManager已经处理了清理和跳转
-          return response;
-        }
-      } else {
-        // 没有refresh token，直接清理并跳转
-        tokenManager.clearTokens();
-        message.error('登录已过期，请重新登录');
-        
+      const authState = useAuth.getState();
+      
+      // 根据认证类型处理
+      if (authState.authType === 'cas') {
+        // CAS认证失败：会话过期
+        message.warning('CAS会话已过期，请重新登录');
+        // CAS不清除本地状态，保留用户信息以便重新登录
         if (config.onUnauthorized) {
           config.onUnauthorized();
         } else {
+          // 跳转到登录页，用户可以选择SSO登录
           window.location.href = '/login';
         }
+      } else if (authState.authType === 'jwt') {
+        // JWT认证失败：尝试刷新token
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          try {
+            await tokenManager.refreshAccessToken();
+            
+            // 用新token重试原请求
+            const newToken = localStorage.getItem('token');
+            if (newToken) {
+              init = init || {};
+              init.headers = {
+                ...init.headers,
+                'Authorization': `Bearer ${newToken}`,
+                'X-No-Retry': 'true' // 标记避免递归重试
+              };
+              response = await originalFetch(resource, init);
+            }
+          } catch (refreshError) {
+            // refresh失败，tokenManager已经处理了清理和跳转
+            return response;
+          }
+        } else {
+          // 没有refresh token，直接清理并跳转
+          tokenManager.clearTokens();
+          authState.updateAuthState(null, null);
+          message.error('登录已过期，请重新登录');
+          
+          if (config.onUnauthorized) {
+            config.onUnauthorized();
+          } else {
+            window.location.href = '/login';
+          }
+        }
+      } else {
+        // 无认证信息
+        message.error('请先登录');
+        window.location.href = '/login';
       }
     }
 

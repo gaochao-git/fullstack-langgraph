@@ -5,12 +5,14 @@ import { ThemeProvider, useTheme } from "@/hooks/ThemeContext";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { SSOCallback } from "@/pages/auth/SSOCallback";
+import { NoPermission } from "@/pages/common/NoPermission";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { configureAuthInterceptor } from "@/utils/authInterceptor";
 import MenuLayout from "@/components/MenuLayout";
 import { DynamicRouter } from "@/components/DynamicRouter";
 import GlobalLoading from "@/components/GlobalLoading";
+import { AuthErrorBoundary } from "@/components/AuthErrorBoundary";
 
 
 // 主应用组件（包装在主题提供者内部）
@@ -34,11 +36,13 @@ function AppContent() {
     <ConfigProvider theme={antdTheme}>
       <AntdApp>
         <GlobalLoading />
-        <Routes>
+        <AuthErrorBoundary>
+          <Routes>
           {/* 公开路由 */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/sso/callback" element={<SSOCallback />} />
+          <Route path="/no-permission" element={<NoPermission />} />
           
           {/* 受保护的路由 - 使用 MenuLayout 包裹 */}
           <Route path="/*" element={
@@ -48,7 +52,8 @@ function AppContent() {
               </MenuLayout>
             </ProtectedRoute>
           } />
-        </Routes>
+          </Routes>
+        </AuthErrorBoundary>
       </AntdApp>
     </ConfigProvider>
   );

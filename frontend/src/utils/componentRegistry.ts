@@ -34,6 +34,9 @@ export const componentRegistry = {
     default: () => React.createElement('div', { style: { padding: '20px', textAlign: 'center' } }, '首页 - 待开发')
   })),
   'TasksManagement': lazy(() => import('../pages/scheduled_task').then(m => ({ default: m.TasksManagement }))),
+  
+  // 通用页面
+  'NoPermission': lazy(() => import('../pages/common/NoPermission').then(m => ({ default: m.NoPermission }))),
 };
 
 // 获取组件

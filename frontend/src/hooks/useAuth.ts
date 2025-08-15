@@ -25,21 +25,100 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
+  authType: 'jwt' | 'cas' | null;
   login: (username: string, password: string) => Promise<void>;
   ssoLogin: () => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   switchRole: (roleId: string) => Promise<void>;
+  // 新增：统一的状态更新方法
+  updateAuthState: (user: User | null, authType: 'jwt' | 'cas' | null) => void;
 }
 
-export const useAuth = create<AuthState>((set) => ({
-  user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token') || localStorage.getItem('isAuthenticated') === 'true',
-  loading: true,
+// 辅助函数：从localStorage恢复认证状态
+const getInitialAuthState = () => {
+  const authType = localStorage.getItem('auth_type');
+  const token = localStorage.getItem('token');
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const userStr = localStorage.getItem('user');
+  
+  let user = null;
+  if (userStr) {
+    try {
+      user = JSON.parse(userStr);
+    } catch (e) {
+      console.error('Failed to parse user from localStorage:', e);
+    }
+  }
+  
+  return {
+    user,
+    token,
+    isAuthenticated: !!token || isAuthenticated,
+    authType: (authType as 'jwt' | 'cas' | null) || (token ? 'jwt' : null),
+    loading: false
+  };
+};
+
+const initialState = getInitialAuthState();
+
+export const useAuth = create<AuthState>((set, get) => ({
+  ...initialState,
+  loading: true, // 初始加载状态
+
+  // 统一的状态更新方法
+  updateAuthState: (user: User | null, authType: 'jwt' | 'cas' | null) => {
+    // 统一清理旧数据
+    const clearAuthData = () => {
+      localStorage.removeItem('auth_type');
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+    };
+    
+    if (!user || !authType) {
+      // 清空认证
+      clearAuthData();
+      set({
+        user: null,
+        authType: null,
+        isAuthenticated: false,
+        token: null,
+        loading: false
+      });
+      return;
+    }
+    
+    // 根据认证类型保存数据
+    if (authType === 'cas') {
+      // CAS认证：基于会话
+      localStorage.setItem('auth_type', 'cas');
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('user', JSON.stringify(user));
+      // CAS不使用token
+      localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+    } else if (authType === 'jwt') {
+      // JWT认证：基于令牌
+      localStorage.setItem('auth_type', 'jwt');
+      localStorage.setItem('user', JSON.stringify(user));
+      // JWT不使用isAuthenticated标记
+      localStorage.removeItem('isAuthenticated');
+    }
+    
+    // 更新状态
+    set({
+      user,
+      authType,
+      isAuthenticated: true,
+      loading: false
+    });
+  },
 
   login: async (username: string, password: string) => {
     try {
+      set({ loading: true });
       const response = await authApi.login({ username, password });
       
       // 处理业务逻辑错误
@@ -54,12 +133,9 @@ export const useAuth = create<AuthState>((set) => ({
       // 使用tokenManager保存tokens并启动自动刷新
       tokenManager.saveTokens(access_token, refresh_token);
       
-      set({ 
-        user, 
-        token: access_token, 
-        isAuthenticated: true,
-        loading: false 
-      });
+      // 更新认证状态
+      get().updateAuthState(user, 'jwt');
+      set({ token: access_token });
     } catch (error) {
       set({ loading: false });
       throw error;
@@ -83,13 +159,11 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    const authType = localStorage.getItem('auth_type');
+    const { authType } = get();
     
     if (authType === 'cas') {
-      // CAS登出：清理本地存储并调用CAS登出接口
-      localStorage.removeItem('auth_type');
-      localStorage.removeItem('user');
-      localStorage.removeItem('isAuthenticated');
+      // CAS登出：清理本地存储
+      get().updateAuthState(null, null);
       
       try {
         // 调用CAS登出接口获取登出URL
@@ -104,66 +178,65 @@ export const useAuth = create<AuthState>((set) => ({
       }
     }
     
-    // JWT Token登出
+    // JWT Token登出或CAS登出失败的fallback
     tokenManager.clearTokens();
-    set({ 
-      user: null, 
-      token: null, 
-      isAuthenticated: false,
-      loading: false 
-    });
+    get().updateAuthState(null, null);
+    set({ token: null });
+    
     // 跳转到登录页
     window.location.href = '/login';
   },
 
   checkAuth: async () => {
     const authType = localStorage.getItem('auth_type');
-    
-    // CAS认证检查
-    if (authType === 'cas') {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      const userStr = localStorage.getItem('user');
-      
-      if (isAuthenticated && userStr) {
-        try {
-          const user = JSON.parse(userStr);
-          set({ 
-            user, 
-            isAuthenticated: true,
-            loading: false 
-          });
-          return;
-        } catch (error) {
-          // 清理无效的CAS会话
-          localStorage.removeItem('auth_type');
-          localStorage.removeItem('user');
-          localStorage.removeItem('isAuthenticated');
-        }
-      }
-    }
-    
-    // JWT Token认证检查
     const token = localStorage.getItem('token');
-    if (!token) {
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    const userStr = localStorage.getItem('user');
+    
+    // 无认证信息
+    if (!authType && !token && !isAuthenticated) {
       set({ loading: false, isAuthenticated: false });
       return;
     }
-
+    
     try {
-      const user = await authApi.getCurrentUser();
-      set({ 
-        user, 
-        isAuthenticated: true,
-        loading: false 
-      });
+      // CAS认证检查
+      if (authType === 'cas' && isAuthenticated && userStr) {
+        // 尝试验证CAS会话是否仍然有效
+        try {
+          const currentUser = await authApi.getCurrentUser();
+          // 如果能获取到用户信息，说明CAS会话有效
+          get().updateAuthState(currentUser, 'cas');
+        } catch (error) {
+          // CAS会话可能已过期，保持本地状态但标记需要重新认证
+          const user = JSON.parse(userStr);
+          set({
+            user,
+            authType: 'cas',
+            isAuthenticated: true,
+            loading: false
+          });
+        }
+        return;
+      }
+      
+      // JWT Token认证检查
+      if (token) {
+        const user = await authApi.getCurrentUser();
+        get().updateAuthState(user, 'jwt');
+        set({ token });
+        return;
+      }
+      
+      // 其他情况，清空认证
+      get().updateAuthState(null, null);
     } catch (error) {
-      tokenManager.clearTokens();
-      set({ 
-        user: null, 
-        token: null, 
-        isAuthenticated: false,
-        loading: false 
-      });
+      console.error('Auth check failed:', error);
+      // 根据认证类型处理错误
+      if (authType === 'jwt') {
+        tokenManager.clearTokens();
+      }
+      get().updateAuthState(null, null);
     }
   },
 
