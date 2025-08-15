@@ -268,6 +268,10 @@ def execute_agent_periodic_task(self, task_config_id):
     task_id = self.request.id
     execution_time = datetime.now()
     
+    # 默认值，避免except块中变量未定义
+    max_retries = 3
+    task_config_id_str = str(task_config_id)
+    
     session = get_session()
     
     try:
@@ -354,14 +358,35 @@ def execute_agent_periodic_task(self, task_config_id):
             error_msg = f"智能体任务执行失败: {agent_result}"
             logger.error(error_msg)
             error_result = {'task_id': task_id,'task_config_id': task_config_id,'task_name': task_config.task_name,'agent_id': agent_id,'error': error_msg,'agent_result': agent_result,'status': 'FAILED','execution_time': execution_time.isoformat()}
+            
+            # 先回滚事务
+            session.rollback()
+            
+            # 再记录失败结果
             record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
+            
+            # 重试机制
+            if self.request.retries < max_retries:
+                logger.info(f"任务失败，将在60秒后重试 (第{self.request.retries + 1}/{max_retries}次重试)")
+                raise self.retry(countdown=60, exc=exc, max_retries=max_retries)
+            
             return error_result
     
     except Exception as exc:
         error_msg = f"智能体定时任务执行异常: {str(exc)}"
-        logger.error(error_msg)
-        error_result = {'task_id': task_id,'task_config_id': task_config_id,'error': error_msg,'status': 'FAILED','execution_time': execution_time.isoformat()}
-        record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
+        logger.error(error_msg, exc_info=True)  # 记录完整的异常栈
+        
+        # 回滚事务
+        try:
+            session.rollback()
+        except:
+            pass
+        
+        error_result = {'task_id': task_id,'task_config_id': task_config_id_str,'error': error_msg,'status': 'FAILED','execution_time': execution_time.isoformat()}
+        
+        # 只在最后一次重试时记录失败结果，避免重复记录
+        if self.request.retries >= max_retries - 1:
+            record_periodic_task_result(f'execute_agent_{task_config_id_str}', execution_time, 'FAILED', error_result)
         
         # 重试机制
         if self.request.retries < max_retries:
@@ -371,7 +396,10 @@ def execute_agent_periodic_task(self, task_config_id):
         return error_result
     
     finally:
-        session.close()
+        try:
+            session.close()
+        except:
+            pass
 
 
 def record_agent_task_result(task_id, agent_id, status, result_data):
