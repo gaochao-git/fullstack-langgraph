@@ -1,7 +1,7 @@
 # Broker 设置 - 使用 Redis 作为消息代理
 # 使用新的配置名称 broker_url 替代 BROKER_URL
 # 格式: redis://:password@host:port/db
-broker_url = 'redis://:your_redis_password@82.156.146.51:6379/0'
+broker_url = 'redis://:fffjjj@82.156.146.51:6379/0'
 
 # Backend 设置 - 使用 MySQL 存储任务结果
 # 格式: mysql://用户名:密码@主机:端口/数据库名
