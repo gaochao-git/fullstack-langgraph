@@ -325,28 +325,15 @@ def execute_agent_periodic_task(self, task_config_id):
         if extra_config.get('task_type') != 'agent':
             error_msg = f"不是智能体任务类型: {extra_config.get('task_type')}"
             logger.error(error_msg)
-            return {
-                'task_id': task_id,
-                'error': error_msg,
-                'status': 'FAILED',
-                'execution_time': execution_time.isoformat()
-            }
+            return {'task_id': task_id,'error': error_msg,'status': 'FAILED','execution_time': execution_time.isoformat()}
         
         # 获取智能体配置
         agent_id = extra_config.get('agent_id')
         if not agent_id:
             error_msg = "缺少智能体ID配置"
             logger.error(error_msg)
-            record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', {
-                'error': error_msg,
-                'task_config_id': task_config_id
-            })
-            return {
-                'task_id': task_id,
-                'error': error_msg,
-                'status': 'FAILED',
-                'execution_time': execution_time.isoformat()
-            }
+            record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', {'error': error_msg,'task_config_id': task_config_id})
+            return {'task_id': task_id,'error': error_msg,'status': 'FAILED','execution_time': execution_time.isoformat()}
         
         message = extra_config.get('message', '执行定时任务')
         user_name = extra_config.get('user', 'system')
@@ -359,15 +346,7 @@ def execute_agent_periodic_task(self, task_config_id):
         agent_result = call_agent_task(agent_id, message, user_name, conversation_id)
         
         if agent_result and agent_result.get('status') == 'SUCCESS':
-            success_result = {
-                'task_id': task_id,
-                'task_config_id': task_config_id,
-                'task_name': task_config.task_name,
-                'agent_id': agent_id,
-                'agent_result': agent_result,
-                'status': 'SUCCESS',
-                'execution_time': execution_time.isoformat()
-            }
+            success_result = {'task_id': task_id,'task_config_id': task_config_id,'task_name': task_config.task_name,'agent_id': agent_id,'agent_result': agent_result,'status': 'SUCCESS','execution_time': execution_time.isoformat()}
             
             # 更新任务最后运行时间和运行次数
             task_config.task_last_run_time = execution_time
@@ -381,33 +360,14 @@ def execute_agent_periodic_task(self, task_config_id):
         else:
             error_msg = f"智能体任务执行失败: {agent_result}"
             logger.error(error_msg)
-            
-            error_result = {
-                'task_id': task_id,
-                'task_config_id': task_config_id,
-                'task_name': task_config.task_name,
-                'agent_id': agent_id,
-                'error': error_msg,
-                'agent_result': agent_result,
-                'status': 'FAILED',
-                'execution_time': execution_time.isoformat()
-            }
-            
+            error_result = {'task_id': task_id,'task_config_id': task_config_id,'task_name': task_config.task_name,'agent_id': agent_id,'error': error_msg,'agent_result': agent_result,'status': 'FAILED','execution_time': execution_time.isoformat()}
             record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
             return error_result
     
     except Exception as exc:
         error_msg = f"智能体定时任务执行异常: {str(exc)}"
         logger.error(error_msg)
-        
-        error_result = {
-            'task_id': task_id,
-            'task_config_id': task_config_id,
-            'error': error_msg,
-            'status': 'FAILED',
-            'execution_time': execution_time.isoformat()
-        }
-        
+        error_result = {'task_id': task_id,'task_config_id': task_config_id,'error': error_msg,'status': 'FAILED','execution_time': execution_time.isoformat()}
         record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', error_result)
         
         # 重试机制
