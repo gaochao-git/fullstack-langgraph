@@ -14,19 +14,15 @@ import {
   Col,
   Modal,
   Form,
-  message as antdMessage,
   Tabs,
   Collapse,
-  Divider,
-  Switch,
-  InputNumber
+  Switch
 } from 'antd';
 import { dump } from 'js-yaml';
 import { 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined, 
-  SearchOutlined,
+  DeleteOutlined,
   ReloadOutlined,
   EyeOutlined,
   SettingOutlined,
@@ -268,7 +264,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   const handleSaveConfig = async (values: any) => {
     try {
       // 处理工具配置中的headers字段，将字符串转换为对象
-      const processedTools = (values.tools || []).map(tool => ({
+      const processedTools = (values.tools || []).map((tool: any) => ({
         ...tool,
         headers: tool.headers && typeof tool.headers === 'string' 
           ? (() => {
@@ -283,7 +279,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       
       const configData = {
         name: values.name,
-        tenant: values.tenant || 'default',
+        tenant: 'default',  // Always use 'default'
         routers: values.routers || [],
         servers: values.servers || [],
         tools: processedTools,
