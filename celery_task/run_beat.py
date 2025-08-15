@@ -83,7 +83,7 @@ def test_redis():
     
     try:
         import redis
-        r = redis.Redis(host='82.156.146.51', port=6379, db=0)
+        r = redis.Redis(host='82.156.146.51', port=6379, db=0, password='fffjjj')
         r.ping()
         logger.info("✅ Redis 连接成功")
         return True

@@ -1,6 +1,7 @@
 # Broker 设置 - 使用 Redis 作为消息代理
 # 使用新的配置名称 broker_url 替代 BROKER_URL
-broker_url = 'redis://82.156.146.51:6379/0'
+# 格式: redis://:password@host:port/db
+broker_url = 'redis://:your_redis_password@82.156.146.51:6379/0'
 
 # Backend 设置 - 使用 MySQL 存储任务结果
 # 格式: mysql://用户名:密码@主机:端口/数据库名
@@ -86,4 +87,4 @@ beat_schedule = {
 # 1. 数据库中配置智能体任务参数（agent_id, message, interval等）
 # 2. agent_scheduler_task 每分钟检查并执行到期的任务
 # 3. 支持动态添加/修改/删除任务，立即生效
-# 4. 多线程并发执行，性能更好 
+# 4. 多线程并发执行，性能更好
