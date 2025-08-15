@@ -1,0 +1,22 @@
+# CAS 用户属性配置
+# 为测试用户添加 LDAP 风格的属性
+
+# 禁用SSL（仅用于测试）
+server.ssl.enabled=false
+
+# 设置响应编码
+server.servlet.encoding.charset=UTF-8
+server.servlet.encoding.enabled=true
+server.servlet.encoding.force=true
+
+# zhangsan attributes
+cas.authn.attribute-repository.stub.attributes.zhangsan.display_name=Zhang San
+cas.authn.attribute-repository.stub.attributes.zhangsan.email=zhangsan@taobao.com
+cas.authn.attribute-repository.stub.attributes.zhangsan.group_name=CN=Zhang San,OU=Development,OU=Technology,OU=Taobao,DC=taobao,DC=COM
+cas.authn.attribute-repository.stub.attributes.zhangsan.username=zhangsan
+
+# admin attributes  
+cas.authn.attribute-repository.stub.attributes.admin.display_name=Administrator
+cas.authn.attribute-repository.stub.attributes.admin.email=admin@taobao.com
+cas.authn.attribute-repository.stub.attributes.admin.group_name=CN=Administrator,OU=Operations,OU=Technology,OU=Taobao,DC=taobao,DC=COM
+cas.authn.attribute-repository.stub.attributes.admin.username=admin
