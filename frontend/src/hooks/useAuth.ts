@@ -35,7 +35,7 @@ interface AuthState {
 export const useAuth = create<AuthState>((set) => ({
   user: null,
   token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  isAuthenticated: !!localStorage.getItem('token') || localStorage.getItem('isAuthenticated') === 'true',
   loading: true,
 
   login: async (username: string, password: string) => {
@@ -69,16 +69,42 @@ export const useAuth = create<AuthState>((set) => ({
   ssoLogin: async () => {
     try {
       // 使用CAS登录
-      const { url } = await authApi.getCASLoginUrl();
+      const response = await authApi.getCASLoginUrl();
+      // 从响应中提取login_url
+      const loginUrl = response?.data?.login_url;
+      if (!loginUrl) {
+        throw new Error('无法获取CAS登录URL');
+      }
       // 重定向到CAS登录页面
-      window.location.href = url;
+      window.location.href = loginUrl;
     } catch (error) {
       throw error;
     }
   },
 
-  logout: () => {
-    // 使用tokenManager清除tokens并停止自动刷新
+  logout: async () => {
+    const authType = localStorage.getItem('auth_type');
+    
+    if (authType === 'cas') {
+      // CAS登出：清理本地存储并调用CAS登出接口
+      localStorage.removeItem('auth_type');
+      localStorage.removeItem('user');
+      localStorage.removeItem('isAuthenticated');
+      
+      try {
+        // 调用CAS登出接口获取登出URL
+        const response = await authApi.casLogout();
+        if (response?.data?.logout_url) {
+          // 重定向到CAS登出页面
+          window.location.href = response.data.logout_url;
+          return;
+        }
+      } catch (error) {
+        console.error('CAS logout failed:', error);
+      }
+    }
+    
+    // JWT Token登出
     tokenManager.clearTokens();
     set({ 
       user: null, 
@@ -91,6 +117,32 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   checkAuth: async () => {
+    const authType = localStorage.getItem('auth_type');
+    
+    // CAS认证检查
+    if (authType === 'cas') {
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      const userStr = localStorage.getItem('user');
+      
+      if (isAuthenticated && userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          set({ 
+            user, 
+            isAuthenticated: true,
+            loading: false 
+          });
+          return;
+        } catch (error) {
+          // 清理无效的CAS会话
+          localStorage.removeItem('auth_type');
+          localStorage.removeItem('user');
+          localStorage.removeItem('isAuthenticated');
+        }
+      }
+    }
+    
+    // JWT Token认证检查
     const token = localStorage.getItem('token');
     if (!token) {
       set({ loading: false, isAuthenticated: false });

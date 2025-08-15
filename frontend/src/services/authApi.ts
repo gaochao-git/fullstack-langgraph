@@ -166,6 +166,13 @@ class AuthApi {
   async casCallback(ticket: string): Promise<LoginResponse> {
     return await omind_get(`${this.baseUrl}/cas/callback?ticket=${ticket}`);
   }
+
+  /**
+   * CAS登出
+   */
+  async casLogout(): Promise<{ logout_url: string }> {
+    return await omind_get(`${this.baseUrl}/cas/logout`);
+  }
 }
 
 export const authApi = new AuthApi();

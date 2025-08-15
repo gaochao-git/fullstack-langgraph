@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spin, message } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,25 +10,46 @@ export function SSOCallback() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const auth = useAuth();
+  const isProcessing = useRef(false);
 
   useEffect(() => {
     const handleCallback = async () => {
+      // 防止重复处理
+      if (isProcessing.current) return;
+      isProcessing.current = true;
       // 检查是否是CAS回调（有ticket参数）
       const ticket = searchParams.get('ticket');
       if (ticket) {
         // 处理CAS回调
         try {
           const response = await authApi.casCallback(ticket);
-          const { access_token, refresh_token, user } = response;
           
-          // 使用tokenManager保存tokens
-          tokenManager.saveTokens(access_token, refresh_token);
-          auth.user = user;
-          auth.token = access_token;
-          auth.isAuthenticated = true;
-          
-          message.success('CAS登录成功');
-          navigate('/', { replace: true });
+          // CAS使用session认证，不返回JWT token
+          if (response?.data?.user) {
+            // 保存CAS用户信息到localStorage，标记为CAS认证
+            localStorage.setItem('auth_type', 'cas');
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            localStorage.setItem('isAuthenticated', 'true');
+            
+            // 使用set方法更新Zustand store，确保触发重新渲染
+            const { checkAuth } = useAuth.getState();
+            // 先更新状态
+            useAuth.setState({
+              user: response.data.user,
+              isAuthenticated: true,
+              loading: false
+            });
+            
+            message.success(response.data.message || 'CAS登录成功');
+            
+            // 稍微延迟跳转，确保状态更新完成
+            setTimeout(() => {
+              // 跳转到智能体广场页面（或其他有权限的页面）
+              navigate('/service/agents', { replace: true });
+            }, 100);
+          } else {
+            throw new Error('CAS响应格式错误');
+          }
         } catch (err: any) {
           setError(err.message || 'CAS登录处理失败');
           message.error('CAS登录失败');
@@ -77,7 +98,7 @@ export function SSOCallback() {
     };
 
     handleCallback();
-  }, [searchParams, navigate, auth]);
+  }, []); // 空依赖数组，只在组件挂载时执行一次
 
   return (
     <div style={{

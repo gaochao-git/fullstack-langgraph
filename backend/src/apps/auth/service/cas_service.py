@@ -252,15 +252,36 @@ class CASService:
                 is_active=parsed_attrs.get('is_active', 1),
                 is_deleted=parsed_attrs.get('is_deleted', 0),
                 create_by=parsed_attrs.get('create_by', 'CAS'),
-                update_by=parsed_attrs.get('update_by', 'CAS'),
-                created_at=now_shanghai(),
-                updated_at=now_shanghai()
+                update_by=parsed_attrs.get('update_by', 'CAS')
             )
             self.db.add(user)
             await self.db.flush()
             
             # CAS用户不创建auth_user记录（可选）
             # 因为CAS用户不需要密码，认证完全依赖CAS Server
+            
+            # 为新CAS用户分配默认角色
+            from src.apps.user.models import RbacRole, RbacUsersRoles
+            # 查找默认角色（假设有一个名为"普通用户"的角色）
+            result = await self.db.execute(
+                select(RbacRole).where(
+                    RbacRole.role_name == "普通用户"
+                )
+            )
+            default_role = result.scalar_one_or_none()
+            
+            if default_role:
+                user_role = RbacUsersRoles(
+                    user_id=user.user_id,
+                    role_id=default_role.role_id,
+                    create_by='CAS',
+                    update_by='CAS'
+                )
+                self.db.add(user_role)
+                await self.db.flush()
+                logger.info(f"Assigned default role '{default_role.role_name}' to CAS user: {username}")
+            else:
+                logger.warning(f"No default role found for CAS user: {username}")
             
             logger.info(f"Created new user from CAS: {username}")
         else:
@@ -288,7 +309,6 @@ class CASService:
             expires_at=now_shanghai() + timedelta(hours=self.session_timeout/3600),  # session_timeout是秒，转换为小时
             ip_address=ip_address,
             user_agent=user_agent,
-            created_at=now_shanghai(),
             last_accessed_at=now_shanghai()
         )
         self.db.add(cas_session)

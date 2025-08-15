@@ -72,6 +72,7 @@ export async function omind_fetch(url: string, config: RequestConfig = {}): Prom
   const fetchConfig: RequestInit = {
     method,
     headers: defaultHeaders,
+    credentials: 'include', // 包含Cookie，支持CAS session认证
   };
 
   // 添加请求体（GET请求不需要）
@@ -194,6 +195,7 @@ export async function omind_fetch_stream(url: string, config: StreamConfig = {})
   const fetchConfig: RequestInit = {
     method,
     headers: defaultHeaders,
+    credentials: 'include', // 包含Cookie，支持CAS session认证
   };
 
   // 添加请求体

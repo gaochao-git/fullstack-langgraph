@@ -47,6 +47,7 @@ def get_login_page(service: str = "", error: str = "") -> str:
 <head>
     <meta charset="UTF-8">
     <title>CAS Mock 登录</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'none'; object-src 'none';">
     <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }}
         .login-box {{ background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 20px rgba(0,0,0,0.1); width: 360px; }}

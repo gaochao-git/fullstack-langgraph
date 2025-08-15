@@ -32,10 +32,37 @@ async def get_current_user_optional(
 ) -> Optional[dict]:
     """
     获取当前用户（可选）
-    支持JWT Token和API Key两种认证方式
+    支持JWT Token、API Key和CAS Session三种认证方式
     """
     try:
-        # 尝试Bearer Token认证
+        # 1. 首先尝试CAS Session认证
+        cas_session_id = request.cookies.get("cas_session_id")
+        if cas_session_id:
+            from src.apps.auth.models import AuthSession
+            # 查询session
+            stmt = select(AuthSession).where(
+                AuthSession.session_id == cas_session_id,
+                AuthSession.expires_at > datetime.now(timezone.utc)
+            )
+            result = await db.execute(stmt)
+            session = result.scalar_one_or_none()
+            
+            if session and session.is_active:
+                # 查询用户信息
+                stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
+                result = await db.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                if user and user.is_active:
+                    return {
+                        "sub": user.user_id,
+                        "username": user.user_name,
+                        "email": user.email,
+                        "display_name": user.display_name,
+                        "token_type": "cas_session"
+                    }
+        
+        # 2. 尝试Bearer Token认证
         if credentials:
             token = credentials.credentials
             

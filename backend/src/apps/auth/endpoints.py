@@ -26,7 +26,7 @@ from src.apps.auth.schema import (
 from src.apps.auth.service import menu_service
 from src.apps.auth.dependencies import get_current_user, require_auth, require_roles
 from src.shared.core.exceptions import BusinessException
-from src.shared.schemas.response import ResponseCode
+from src.shared.schemas.response import ResponseCode, success_response
 
 
 router = APIRouter(prefix="/v1/auth", tags=["认证"])
