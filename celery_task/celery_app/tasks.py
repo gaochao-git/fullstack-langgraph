@@ -1,17 +1,13 @@
 import time
-import logging
 import json
 from datetime import datetime
 from celery_app.celery import app
 from celery_app.models import get_session, Task, PeriodicTaskRun
 from celery.signals import task_prerun, task_postrun, task_failure
+from celery_app.logger import get_logger
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# 使用统一的日志配置
+logger = get_logger(__name__)
 
 # 任务开始前的处理
 @task_prerun.connect

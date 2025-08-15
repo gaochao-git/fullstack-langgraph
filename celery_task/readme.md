@@ -64,9 +64,17 @@ supervisorctl -c supervisord.conf shutdown
 ```
 
 ### 日志文件位置
-- Beat 日志: `/tmp/celery-beat.log`
-- Worker 日志: `/tmp/celery-worker.log`
-- Supervisor 日志: `/tmp/supervisord.log`
+
+#### Celery应用日志（统一管理）
+- 位置: `logs/celery_YYYYMMDD.log`
+- 格式: 时间戳 - 模块名 - 级别 - [文件:行号] - 消息
+- 轮转: 单文件最大50MB，保留30个历史文件
+- 级别: 通过环境变量 `CELERY_LOG_LEVEL` 设置（默认INFO）
+
+#### Supervisor进程管理日志
+- Beat 进程日志: `logs/supervisor_beat.log`
+- Worker 进程日志: `logs/supervisor_worker.log`
+- Supervisor 主日志: `/tmp/supervisord.log`
 
 ## 运行机制
 
@@ -108,10 +116,13 @@ supervisorctl -c supervisord.conf shutdown
 ## 主要文件
 
 - `config.py`: Celery配置(Redis、MySQL、队列)
+- `logger.py`: 统一日志配置模块
 - `scheduler.py`: 动态数据库调度器
 - `agent_tasks.py`: 智能体任务执行逻辑
-- `run_worker.py`: Worker启动脚本
-- `run_beat.py`: Beat启动脚本
+- `tasks.py`: 通用任务和信号处理
+- `models.py`: 数据库模型定义
+- `conf/celery_beat.conf`: Supervisor Beat配置
+- `conf/celery_worker.conf`: Supervisor Worker配置
 
 ## 环境要求
 

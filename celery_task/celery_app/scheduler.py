@@ -4,6 +4,9 @@ from celery.beat import Scheduler, ScheduleEntry
 from celery import current_app
 from celery.schedules import crontab, schedule
 from celery_app.models import get_session, PeriodicTask
+from celery_app.logger import get_logger
+
+logger = get_logger(__name__)
 
 class DatabaseScheduler(Scheduler):
     """从数据库加载定时任务的调度器"""
@@ -28,7 +31,7 @@ class DatabaseScheduler(Scheduler):
                 
                 self._schedule = {}
                 
-                print(f"数据库调度器: 加载了 {len(db_tasks)} 个启用的任务")
+                logger.info(f"数据库调度器: 加载了 {len(db_tasks)} 个启用的任务")
                 
                 for task in db_tasks:
                     # 解析参数
@@ -43,7 +46,7 @@ class DatabaseScheduler(Scheduler):
                             agent_id = extra_config.get('agent_id')
                             task_timeout = extra_config.get('task_timeout')
                         except json.JSONDecodeError:
-                            print(f"⚠️ 任务 {task.task_name} 的 task_extra_config JSON 解析失败，跳过该任务")
+                            logger.warning(f"任务 {task.task_name} 的 task_extra_config JSON 解析失败，跳过该任务")
                             continue
                     else:
                         # 没有额外配置，使用默认值
@@ -61,7 +64,7 @@ class DatabaseScheduler(Scheduler):
                         args = [task.id]  # 传递任务ID，函数内部读取配置
                         kwargs = {}
                         
-                        print(f"🤖 智能体任务: {task.task_name} -> Agent: {agent_id}")
+                        logger.info(f"智能体任务: {task.task_name} -> Agent: {agent_id}")
                         
                     elif task_type == 'http':
                         # HTTP任务：使用HTTP任务执行器
@@ -81,7 +84,7 @@ class DatabaseScheduler(Scheduler):
                         args = [url, method, headers, data]
                         kwargs = {'timeout': timeout} if timeout else {}
                         
-                        print(f"🌐 HTTP任务: {task.task_name} -> URL: {url}")
+                        logger.info(f"HTTP任务: {task.task_name} -> URL: {url}")
                         
                     else:
                         # system 或其他类型：使用原始任务路径
@@ -91,7 +94,7 @@ class DatabaseScheduler(Scheduler):
                         if extra_config:
                             kwargs.update(extra_config)
                             
-                        print(f"⚙️ 系统任务: {task.task_name} -> Path: {task_path}")
+                        logger.info(f"系统任务: {task.task_name} -> Path: {task_path}")
                     
                     # 创建调度
                     if task.task_interval is not None:
@@ -123,13 +126,13 @@ class DatabaseScheduler(Scheduler):
                             # 验证队列名称是否有效
                             valid_queues = ['system', 'priority_high', 'priority_low']
                             if queue_name not in valid_queues:
-                                print(f"⚠️ 任务 {task.task_name} 配置了无效队列 {queue_name}，使用默认队列 priority_low")
+                                logger.warning(f"任务 {task.task_name} 配置了无效队列 {queue_name}，使用默认队列 priority_low")
                                 queue_name = 'priority_low'
                             else:
-                                print(f"✅ 任务 {task.task_name} 将路由到队列: {queue_name}")
+                                logger.info(f"任务 {task.task_name} 将路由到队列: {queue_name}")
                                 
                         except json.JSONDecodeError:
-                            print(f"⚠️ 任务 {task.task_name} 的task_extra_config解析失败，使用默认队列")
+                            logger.warning(f"任务 {task.task_name} 的task_extra_config解析失败，使用默认队列")
                     
                     # 创建ScheduleEntry对象，添加队列配置
                     entry = ScheduleEntry(
@@ -147,11 +150,11 @@ class DatabaseScheduler(Scheduler):
                         total_run_count=task.task_run_count
                     )
                     
-                    print(f"📋 加载任务: {task.task_name}")
-                    print(f"   上次运行: {task.task_last_run_time}")
-                    print(f"   运行次数: {task.task_run_count}")
-                    print(f"   间隔: {task.task_interval}秒")
-                    print(f"   当前时间(UTC): {datetime.now()}")
+                    logger.debug(f"加载任务: {task.task_name}")
+                    logger.debug(f"   上次运行: {task.task_last_run_time}")
+                    logger.debug(f"   运行次数: {task.task_run_count}")
+                    logger.debug(f"   间隔: {task.task_interval}秒")
+                    logger.debug(f"   当前时间(UTC): {datetime.now()}")
                     
                     # 添加到调度中
                     self._schedule[task.task_name] = entry
@@ -161,9 +164,9 @@ class DatabaseScheduler(Scheduler):
                 
             except Exception as e:
                 retry_count += 1
-                print(f"更新定时任务时出错 (尝试 {retry_count}/{max_retries}): {e}")
+                logger.error(f"更新定时任务时出错 (尝试 {retry_count}/{max_retries}): {e}")
                 if retry_count >= max_retries:
-                    print(f"更新定时任务最终失败，使用空调度: {e}")
+                    logger.error(f"更新定时任务最终失败，使用空调度: {e}")
                     self._schedule = {}
                     self._last_timestamp = datetime.now()
             finally:
@@ -179,10 +182,10 @@ class DatabaseScheduler(Scheduler):
         # 通过检查数据库时间戳来判断是否需要重新加载
         try:
             if self._should_reload_schedule():
-                print("🔄 发现配置变化，重新加载任务...")
+                logger.info("发现配置变化，重新加载任务...")
                 self.update_from_database()
         except Exception as e:
-            print(f"⚠️ 检查配置更新失败: {str(e)}")
+            logger.error(f"检查配置更新失败: {str(e)}")
         
         return super(DatabaseScheduler, self).tick(*args, **kwargs)
     
@@ -207,8 +210,7 @@ class DatabaseScheduler(Scheduler):
             
             return False
         except Exception as e:
-            print(f"⚠️ 检查数据库变化失败: {str(e)}")
+            logger.error(f"检查数据库变化失败: {str(e)}")
             return False
         finally:
-            session.close() 
-        
+            session.close()
