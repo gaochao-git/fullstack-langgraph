@@ -31,6 +31,7 @@ DATABASE_CONFIG = {
     'user': 'gaochao',
     'password': 'fffjjj',
     'database': 'celery_tasks',
+    'charset': 'utf8mb4'
 }
 
 # ========== 队列配置 ==========
@@ -57,24 +58,11 @@ task_routes = {
 
 # 默认队列：智能体任务的兜底队列
 task_default_queue = 'priority_low'
-task_default_exchange = 'default'
-task_default_exchange_type = 'direct'
-task_default_routing_key = 'default'
 
-# ========== 智能体调度器配置 ==========
-# 新的优雅方案：固定调度任务 + 动态配置读取
-# 每分钟执行一次agent_scheduler_task，动态读取数据库配置并执行
-
+# ========== 定时任务配置 ==========
 from celery.schedules import crontab
 
 beat_schedule = {
-    # 智能体调度器 - 每分钟执行一次
-    'agent-scheduler': {
-        'task': 'celery_app.agent_scheduler.agent_scheduler_task',
-        'schedule': crontab(minute='*'),  # 每分钟执行
-        'options': {'queue': 'system'},   # 在system队列执行
-    },
-    
     # 健康检查任务 - 每30分钟执行一次
     'health-check': {
         'task': 'celery_app.agent_tasks.periodic_agent_health_check',
@@ -84,7 +72,6 @@ beat_schedule = {
 }
 
 # ========== 配置说明 ==========
-# 1. 数据库中配置智能体任务参数（agent_id, message, interval等）
-# 2. agent_scheduler_task 每分钟检查并执行到期的任务
-# 3. 支持动态添加/修改/删除任务，立即生效
-# 4. 多线程并发执行，性能更好
+# 1. 使用DatabaseScheduler从数据库动态加载定时任务
+# 2. 支持动态添加/修改/删除任务，立即生效
+# 3. 任务配置存储在celery_periodic_task_configs表中
