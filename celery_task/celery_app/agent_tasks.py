@@ -9,6 +9,7 @@ from datetime import datetime
 from celery_app.celery import app
 from celery_app.models import get_session, PeriodicTaskRun, PeriodicTask
 from celery_app.logger import get_logger
+from celery_app.config import AGENT_API_BASE_URL
 
 # 添加 backend 项目路径到 Python 路径
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
@@ -17,9 +18,6 @@ if backend_path not in sys.path:
 
 # 使用统一的日志配置
 logger = get_logger(__name__)
-
-# 智能体 API 配置
-AGENT_API_BASE_URL = os.getenv('AGENT_API_BASE_URL', 'http://172.20.10.2:8000')
 
 
 def call_agent_task(agent_id, message, user_name="system", conversation_id=None):
