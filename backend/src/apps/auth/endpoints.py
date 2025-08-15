@@ -2,8 +2,7 @@
 认证相关的API路由
 """
 
-import json
-from typing import Annotated, Optional, List
+from typing import Optional, List
 from fastapi import APIRouter, Depends, Request, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -152,12 +151,12 @@ async def logout(
     return {"message": "登出成功"}
 
 
-@router.get("/me", response_model=UserProfile, summary="获取当前用户信息")
+@router.get("/me/profile", response_model=UserProfile, summary="获取当前用户详细信息")
 async def get_current_user_profile(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """获取当前登录用户的详细信息"""
+    """获取当前登录用户的详细信息（JWT认证）"""
     service = AuthService(db)
     return await service.get_user_profile(current_user["sub"])
 
@@ -565,14 +564,14 @@ async def list_api_keys(
             key_name=key.key_name,
             key_prefix=key.key_prefix,
             mark_comment=key.mark_comment,
-            scopes=json.loads(key.scopes) if key.scopes else [],
+            scopes=key.scopes.split(',') if key.scopes and isinstance(key.scopes, str) else [],
             is_active=bool(key.is_active),
             last_used_at=key.last_used_at,
             expires_at=key.expires_at,
             revoked_at=key.revoked_at,
             revoke_reason=key.revoke_reason,
             created_at=key.issued_at or key.create_time,
-            allowed_ips=json.loads(key.allowed_ips) if key.allowed_ips else [],
+            allowed_ips=key.allowed_ips.split(',') if key.allowed_ips and isinstance(key.allowed_ips, str) else [],
             create_by=key.create_by,
             update_by=key.update_by
         )

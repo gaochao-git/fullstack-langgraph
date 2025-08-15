@@ -6,10 +6,10 @@ import os
 import secrets
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any
 from passlib.context import CryptContext
 import jwt
-from jwt import PyJWTError as JWTError
+# JWT错误处理
 import pyotp
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
@@ -117,7 +117,7 @@ class JWTUtils:
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             return payload
-        except JWTError as e:
+        except jwt.exceptions.PyJWTError as e:
             raise BusinessException(
                 "无效的认证凭据",
                 ResponseCode.UNAUTHORIZED

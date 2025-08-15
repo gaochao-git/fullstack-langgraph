@@ -32,7 +32,10 @@ async def get_current_user_optional(
 ) -> Optional[dict]:
     """
     获取当前用户（可选）
-    支持JWT Token、API Key和CAS Session三种认证方式
+    支持三种认证方式：
+    1. CAS Session认证（SSO用户）
+    2. JWT Token认证（本地用户）  
+    3. API Key认证（系统集成）
     """
     try:
         # 1. 首先尝试CAS Session认证
@@ -59,7 +62,7 @@ async def get_current_user_optional(
                         "username": user.user_name,
                         "email": user.email,
                         "display_name": user.display_name,
-                        "token_type": "cas_session"
+                        "auth_type": "cas"
                     }
         
         # 2. 尝试Bearer Token认证
@@ -119,7 +122,7 @@ async def get_current_user_optional(
                         "scopes": scopes
                     }
             else:
-                # JWT认证
+                # 本地用户的JWT Token认证
                 # 解码token
                 payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
                 
@@ -143,7 +146,7 @@ async def get_current_user_optional(
                         "username": user.user_name,
                         "email": user.email,
                         "display_name": user.display_name,
-                        "token_type": "jwt"
+                        "auth_type": "local"
                     }
         
             
@@ -173,7 +176,7 @@ async def get_current_user(
             "username": "gaochao", 
             "email": "gaochao@example.com",
             "display_name": "高超",
-            "token_type": "mock",
+            "auth_type": "mock",
             "roles": ["super_admin"],  # 所有权限
             "permissions": ["*"]  # 所有权限
         }
@@ -193,13 +196,22 @@ async def get_current_active_user(
     db: AsyncSession = Depends(get_async_db)
 ) -> RbacUser:
     """
-    获取当前活跃用户的完整信息
+    获取当前活跃用户的完整信息（包含角色和权限）
     """
-    # TODO: 实现异步查询
-    raise BusinessException(
-        "功能未实现",
-        ResponseCode.NOT_IMPLEMENTED
+    stmt = select(RbacUser).where(
+        RbacUser.user_id == current_user["sub"],
+        RbacUser.is_active == 1
     )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise BusinessException(
+            "用户不存在或已禁用",
+            ResponseCode.NOT_FOUND
+        )
+    
+    return user
 
 
 def require_auth(func):
@@ -215,13 +227,29 @@ def require_auth(func):
 def require_roles(*required_roles: str):
     """
     依赖项工厂：要求特定角色
-    暂时简化实现
     """
     async def role_checker(
         current_user: dict = Depends(get_current_user),
         db: AsyncSession = Depends(get_async_db)
     ):
-        # TODO: 实现角色检查
+        # 查询用户角色
+        stmt = select(RbacRole).join(
+            RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+        ).where(
+            RbacUsersRoles.user_id == current_user["sub"],
+            RbacRole.is_active == 1
+        )
+        result = await db.execute(stmt)
+        user_roles = result.scalars().all()
+        
+        # 检查是否有所需角色
+        user_role_codes = {role.role_code for role in user_roles}
+        if not user_role_codes.intersection(set(required_roles)):
+            raise BusinessException(
+                f"需要角色: {', '.join(required_roles)}",
+                ResponseCode.FORBIDDEN
+            )
+        
         return True
     
     return role_checker
@@ -230,37 +258,79 @@ def require_roles(*required_roles: str):
 def require_permissions(*required_permissions: str):
     """
     依赖项工厂：要求特定权限
-    暂时简化实现
     """
     async def permission_checker(
         current_user: dict = Depends(get_current_user),
         request: Request = None,
         db: AsyncSession = Depends(get_async_db)
     ):
-        # TODO: 实现权限检查
+        from src.apps.user.models import RbacPermission, RbacRolesPermissions
+        
+        # 查询用户的所有权限（通过角色）
+        stmt = select(RbacPermission).join(
+            RbacRolesPermissions, RbacRolesPermissions.permission_id == RbacPermission.permission_id
+        ).join(
+            RbacRole, RbacRole.role_id == RbacRolesPermissions.role_id
+        ).join(
+            RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+        ).where(
+            RbacUsersRoles.user_id == current_user["sub"],
+            RbacRole.is_active == 1,
+            RbacPermission.is_active == 1
+        )
+        result = await db.execute(stmt)
+        user_permissions = result.scalars().all()
+        
+        # 检查是否有所需权限
+        user_permission_codes = {perm.permission_code for perm in user_permissions}
+        missing_permissions = set(required_permissions) - user_permission_codes
+        
+        if missing_permissions:
+            raise BusinessException(
+                f"缺少权限: {', '.join(missing_permissions)}",
+                ResponseCode.FORBIDDEN
+            )
+        
         return True
     
     return permission_checker
 
 
-# 简化的类实现，先保证能启动
 class RoleChecker:
+    """角色检查器类"""
     def __init__(self, allowed_roles: List[str]):
         self.allowed_roles = allowed_roles
     
-    def __call__(self, current_user: dict = Depends(get_current_user)):
-        # TODO: 实现角色检查
-        return True
+    async def __call__(
+        self, 
+        current_user: dict = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_db)
+    ):
+        # 复用require_roles的逻辑
+        checker = require_roles(*self.allowed_roles)
+        return await checker(current_user, db)
 
 
 class PermissionChecker:
+    """权限检查器类"""
     def __init__(self, required_permission: str, check_method: bool = True):
         self.required_permission = required_permission
         self.check_method = check_method
     
-    def __call__(self, current_user: dict = Depends(get_current_user)):
-        # TODO: 实现权限检查
-        return True
+    async def __call__(
+        self,
+        current_user: dict = Depends(get_current_user),
+        request: Request = None,
+        db: AsyncSession = Depends(get_async_db)
+    ):
+        # 如果需要检查HTTP方法，构造权限代码
+        if self.check_method and request:
+            permission_code = f"{request.method}:{self.required_permission}"
+        else:
+            permission_code = self.required_permission
+            
+        checker = require_permissions(permission_code)
+        return await checker(current_user, request, db)
 
 
 # 预定义的角色检查器
