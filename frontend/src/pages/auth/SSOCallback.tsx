@@ -13,6 +13,31 @@ export function SSOCallback() {
 
   useEffect(() => {
     const handleCallback = async () => {
+      // 检查是否是CAS回调（有ticket参数）
+      const ticket = searchParams.get('ticket');
+      if (ticket) {
+        // 处理CAS回调
+        try {
+          const response = await authApi.casCallback(ticket);
+          const { access_token, refresh_token, user } = response;
+          
+          // 使用tokenManager保存tokens
+          tokenManager.saveTokens(access_token, refresh_token);
+          auth.user = user;
+          auth.token = access_token;
+          auth.isAuthenticated = true;
+          
+          message.success('CAS登录成功');
+          navigate('/', { replace: true });
+        } catch (err: any) {
+          setError(err.message || 'CAS登录处理失败');
+          message.error('CAS登录失败');
+          setTimeout(() => navigate('/login'), 3000);
+        }
+        return;
+      }
+
+      // 处理其他SSO回调（OAuth2等）
       const code = searchParams.get('code');
       const state = searchParams.get('state');
       const error = searchParams.get('error');

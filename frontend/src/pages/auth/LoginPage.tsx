@@ -4,7 +4,6 @@ import { Form, Input, Button, Card, Tabs, Divider, Space, App } from 'antd';
 import { UserOutlined, LockOutlined, GlobalOutlined } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/ThemeContext';
-import { DevLoginHint } from '@/components/DevLoginHint';
 import './LoginPage.css';
 
 const { TabPane } = Tabs;
@@ -133,7 +132,6 @@ export function LoginPage() {
           </Space>
         </Card>
       </div>
-      <DevLoginHint />
     </div>
   );
 }

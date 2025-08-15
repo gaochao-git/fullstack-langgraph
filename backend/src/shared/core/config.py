@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     # 报警服务配置
     ALARM_API_URL: Optional[str] = None  # 报警数据获取接口URL，从.env文件读取
 
+    # CAS认证配置
+    CAS_SERVER_URL: str = "http://localhost:5555/cas"
+    CAS_VERSION: str = "3"
+    CAS_VERIFY_SSL: bool = False
+    CAS_APPLY_ATTRIBUTES: bool = True
+    CAS_SESSION_TIMEOUT: int = 36000
+    CAS_CHECK_NEXT: bool = True
+    CAS_SERVICE_URL: str = "http://localhost:3000/sso/callback"
+    CAS_SINGLE_LOGOUT_ENABLED: bool = True
+
     AUTH_MOCK: str = False
     NO_PROXY: str = ""  # 结局claude 本地开proxy影响httpx调用其他接口
     class Config:

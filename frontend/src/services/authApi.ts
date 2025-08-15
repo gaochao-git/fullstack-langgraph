@@ -144,6 +144,28 @@ class AuthApi {
   }> {
     return await omind_get(`${this.baseUrl}/password-policy`);
   }
+
+  /**
+   * 获取CAS登录URL
+   */
+  async getCASLoginUrl(): Promise<{ url: string }> {
+    return await omind_get(`${this.baseUrl}/cas/login`);
+  }
+
+  /**
+   * 获取CAS登出URL
+   */
+  async getCASLogoutUrl(redirectUrl?: string): Promise<{ url: string }> {
+    const params = redirectUrl ? `?redirect_url=${encodeURIComponent(redirectUrl)}` : '';
+    return await omind_get(`${this.baseUrl}/cas/logout${params}`);
+  }
+
+  /**
+   * 处理CAS回调
+   */
+  async casCallback(ticket: string): Promise<LoginResponse> {
+    return await omind_get(`${this.baseUrl}/cas/callback?ticket=${ticket}`);
+  }
 }
 
 export const authApi = new AuthApi();

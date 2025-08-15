@@ -68,9 +68,9 @@ export const useAuth = create<AuthState>((set) => ({
 
   ssoLogin: async () => {
     try {
-      // 获取SSO登录URL
-      const { url } = await authApi.getSSOUrl();
-      // 重定向到SSO登录页面
+      // 使用CAS登录
+      const { url } = await authApi.getCASLoginUrl();
+      // 重定向到CAS登录页面
       window.location.href = url;
     } catch (error) {
       throw error;

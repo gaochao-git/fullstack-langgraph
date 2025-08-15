@@ -254,6 +254,47 @@ async def sso_callback(
     )
 
 
+# ============= CAS认证 =============
+
+@router.get("/cas/login", summary="获取CAS登录URL")
+async def get_cas_login_url(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取CAS登录URL"""
+    from .service import CASService
+    service = CASService(db)
+    return {"url": service.get_login_url()}
+
+
+@router.get("/cas/logout", summary="获取CAS登出URL")
+async def get_cas_logout_url(
+    redirect_url: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取CAS登出URL"""
+    from .service import CASService
+    service = CASService(db)
+    return {"url": service.get_logout_url(redirect_url)}
+
+
+@router.get("/cas/callback", response_model=LoginResponse, summary="CAS回调处理")
+async def cas_callback(
+    ticket: str,
+    req: Request,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    处理CAS票据验证
+    
+    - **ticket**: CAS票据
+    """
+    from .service import CASService
+    service = CASService(db)
+    
+    # 处理CAS登录
+    return await service.process_cas_login(ticket)
+
+
 # ============= 密码管理 =============
 
 @router.post("/change-password", summary="修改密码")
