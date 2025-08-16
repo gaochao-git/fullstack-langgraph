@@ -262,112 +262,99 @@ const AgentMarketplace = () => {
       style={{ 
         height: "100%", 
         cursor: "pointer",
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: 'hidden'
       }}
       onClick={() => handleAgentClick(agent.agent_id)}
-      bodyStyle={{ padding: 20 }}
+      bodyStyle={{ padding: 16 }}
     >
       <Card.Meta
         title={
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div
                 style={{
-                  width: 42,
-                  height: 42,
+                  width: 32,
+                  height: 32,
                   borderRadius: '50%',
                   backgroundColor: getAgentBackgroundColor(agent),
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0
                 }}
               >
-                {getAgentIcon(agent)}
+                {renderIcon(agent.agent_icon || 'Bot', 16)}
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ 
-                  fontWeight: 600, 
-                  fontSize: 18, 
-                  color: isDark ? '#ffffff' : '#262626',
-                  marginBottom: 4
-                }}>
-                  {agent.agent_name}
-                </div>
-                <Tag 
-                  style={{ fontSize: 12 }}
-                >
-                  {agent.agent_type || '未分类'}
-                </Tag>
+              <div style={{ 
+                fontWeight: 500, 
+                fontSize: 16,
+                color: isDark ? '#ffffff' : '#262626'
+              }}>
+                {agent.agent_name}
               </div>
-              {/* 收藏按钮 */}
-              <Button
-                type="text"
-                icon={agent.is_favorited ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
-                onClick={(e) => handleToggleFavorite(e, agent)}
-                style={{ fontSize: 20 }}
-              />
             </div>
+            {/* 收藏按钮 */}
+            <Button
+              type="text"
+              size="small"
+              icon={agent.is_favorited ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
+              onClick={(e) => handleToggleFavorite(e, agent)}
+            />
           </div>
         }
         description={
-          <div>
+          <div className="space-y-2">
+            {/* 描述文本 */}
             <Paragraph 
               ellipsis={{ rows: 2, expandable: false }} 
               style={{ 
-                marginBottom: 12,
-                fontSize: 14,
-                lineHeight: 1.6,
+                marginBottom: 8,
+                fontSize: 13,
+                lineHeight: 1.5,
                 color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)'
               }}
             >
               {agent.agent_description || '智能助手，能够帮助您完成各种任务'}
             </Paragraph>
-            <div style={{ marginBottom: 12 }}>
-              {getAgentTags(agent).slice(0, 3).map((tag: string) => (
-                <Tag 
-                  key={tag} 
-                  style={{ 
-                    marginBottom: 4,
-                    marginRight: 4,
-                    fontSize: 12,
-                    borderRadius: 4
-                  }}
-                >
-                  {tag}
-                </Tag>
-              ))}
-              {getAgentTags(agent).length > 3 && (
-                <Tag style={{ fontSize: 12, borderRadius: 4 }}>+{getAgentTags(agent).length - 3}</Tag>
+            
+            {/* 标签行 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tag 
+                color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'} 
+                className="text-xs"
+              >
+                {agent.agent_type || '未分类'}
+              </Tag>
+              {agent.is_builtin === 'yes' && (
+                <Tag color="gold" className="text-xs">内置</Tag>
               )}
             </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                paddingTop: 12,
-                borderTop: '1px solid rgba(0,0,0,0.06)',
-              }}
-            >
-              <Space size={16}>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  <ToolOutlined style={{ marginRight: 4 }} />
-                  {agent.mcp_config?.total_tools || 0} 个工具
-                </Text>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {agent.llm_info?.model_name || '默认模型'}
-                </Text>
-              </Space>
-              <Tag 
-                color={agent.is_builtin === 'yes' ? 'gold' : 'default'} 
-                style={{ fontSize: 11, margin: 0 }}
-              >
-                {agent.is_builtin === 'yes' ? '内置' : '自定义'}
-              </Tag>
+
+            {/* 统计信息 */}
+            <div className="flex items-center gap-3 text-gray-500" style={{ fontSize: 11 }}>
+              <span>
+                <ToolOutlined style={{ fontSize: 11, marginRight: 2 }} />
+                {agent.mcp_config?.total_tools || 0} 个工具
+              </span>
+              <span>
+                {agent.llm_info?.model_name || '默认模型'}
+              </span>
             </div>
+
+            {/* 能力标签 */}
+            {getAgentTags(agent).length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {getAgentTags(agent).slice(0, 2).map((tag: string) => (
+                  <Tag key={tag} color="blue" className="text-xs">
+                    {tag}
+                  </Tag>
+                ))}
+                {getAgentTags(agent).length > 2 && (
+                  <Tag className="text-xs">+{getAgentTags(agent).length - 2}</Tag>
+                )}
+              </div>
+            )}
           </div>
         }
       />
