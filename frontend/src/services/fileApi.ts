@@ -47,14 +47,17 @@ export const fileApi = {
       // 不要设置 Content-Type，让浏览器自动设置 multipart/form-data
     });
     
+    const result = await response.json();
+    
     if (!response.ok) {
-      throw new Error(`上传失败: ${response.statusText}`);
+      // 如果HTTP状态码不是2xx，使用返回的错误消息
+      throw new Error(result.msg || `上传失败: ${response.statusText}`);
     }
     
-    const result = await response.json();
     if (result.status === 'ok' && result.data) {
       return result.data;
     } else {
+      // 业务错误，使用返回的错误消息
       throw new Error(result.msg || '上传失败');
     }
   },

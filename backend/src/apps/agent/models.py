@@ -2,7 +2,8 @@
 Agent Configuration Model
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, BigInteger, Index, Enum as SQLEnum
+from sqlalchemy.sql import func
 from src.shared.db.models import JSONType, now_shanghai, BaseModel
 
 
@@ -81,3 +82,67 @@ class AgentConfig(BaseModel):
             return json.loads(value) if isinstance(value, str) else []
         except:
             return []
+
+
+class AgentDocumentUpload(BaseModel):
+    """智能体文档上传表"""
+    __tablename__ = "agent_document_upload"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID，自增")
+    file_id = Column(String(36), nullable=False, unique=True, comment="文件唯一标识符")
+    file_name = Column(String(255), nullable=False, comment="原始文件名")
+    file_size = Column(BigInteger, nullable=False, comment="文件大小(字节)")
+    file_type = Column(String(10), nullable=False, comment="文件扩展名")
+    file_path = Column(String(500), nullable=False, comment="文件存储路径")
+    
+    # 文档处理相关
+    process_status = Column(Integer, nullable=False, default=0, comment="处理状态:0->uploaded,1->processing,2->ready,3->failed")
+    error_message = Column(Text, comment="错误信息")
+    
+    # 文档内容和元数据
+    doc_content = Column(Text, comment="提取的文档内容(限制长度)")
+    doc_chunks = Column(Text, comment="文档分块内容")
+    doc_metadata = Column(Text, comment="文档元数据(字符数、分块数等)")
+    
+    # 处理时间
+    upload_time = Column(DateTime, server_default=func.now(), comment="上传时间")
+    process_start_time = Column(DateTime, comment="处理开始时间")
+    process_end_time = Column(DateTime, comment="处理结束时间")
+    
+    # 标准字段
+    create_by = Column(String(100), nullable=False, default='', comment="创建人用户名")
+    update_by = Column(String(100), nullable=False, default='', comment="最后更新人用户名")
+    create_time = Column(DateTime, nullable=False, server_default=func.now(), comment="创建时间")
+    update_time = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    
+    # 索引
+    __table_args__ = (
+        Index('idx_doc_file_id', 'file_id'),
+        Index('idx_doc_create_by', 'create_by'),
+        Index('idx_doc_status', 'process_status'),
+        Index('idx_doc_create_time', 'create_time'),
+    )
+
+
+class AgentDocumentSession(BaseModel):
+    """智能体会话文档关联表"""
+    __tablename__ = "agent_document_session"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID，自增")
+    thread_id = Column(String(36), nullable=False, comment="会话线程ID")
+    file_id = Column(String(36), nullable=False, comment="文件ID")
+    agent_id = Column(String(36), nullable=False, comment="智能体ID")
+    
+    # 标准字段
+    create_by = Column(String(100), nullable=False, default='system', comment="创建人用户名")
+    update_by = Column(String(100), comment="最后更新人用户名")
+    create_time = Column(DateTime, nullable=False, server_default=func.now(), comment="创建时间")
+    update_time = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    
+    # 索引
+    __table_args__ = (
+        Index('idx_session_thread', 'thread_id'),
+        Index('idx_session_file', 'file_id'),
+        Index('idx_session_agent', 'agent_id'),
+        Index('idx_session_thread_file', 'thread_id', 'file_id', unique=True),
+    )

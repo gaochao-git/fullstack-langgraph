@@ -289,6 +289,7 @@ async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int
 @router.post("/v1/agents/files/upload", response_model=UnifiedResponse)
 async def upload_file(
     file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """上传文档文件"""
@@ -300,6 +301,7 @@ async def upload_file(
     
     # 上传文件
     file_info = await document_service.upload_file(
+        db=db,
         file_content=file_content,
         filename=file.filename,
         user_id=user_id
@@ -314,10 +316,11 @@ async def upload_file(
 @router.get("/v1/agents/files/{file_id}/content", response_model=UnifiedResponse)
 async def get_document_content(
     file_id: str,
+    db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取文档内容"""
-    content = await document_service.get_document_content(file_id)
+    content = await document_service.get_document_content(db, file_id)
     if not content:
         raise BusinessException("文档不存在或正在处理中", ResponseCode.NOT_FOUND)
     
@@ -330,10 +333,11 @@ async def get_document_content(
 @router.get("/v1/agents/files/{file_id}/status", response_model=UnifiedResponse)
 async def get_file_status(
     file_id: str,
+    db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取文件处理状态"""
-    status = await document_service.get_file_status(file_id)
+    status = await document_service.get_file_status(db, file_id)
     if not status:
         raise BusinessException("文件不存在", ResponseCode.NOT_FOUND)
     

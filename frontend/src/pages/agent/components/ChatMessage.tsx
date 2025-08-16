@@ -13,7 +13,7 @@ import { useTheme } from "@/hooks/ThemeContext";
 import { theme } from "antd";
 import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
 import { fileApi } from "@/services/fileApi";
-import { message } from "antd";
+import { App } from "antd";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -789,6 +789,7 @@ function ChatMessages({
 }: ChatMessagesProps) {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
+  const { message } = App.useApp();
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
@@ -877,16 +878,25 @@ function ChatMessages({
           return updated;
         });
         
-        message.error(`文件 ${file.name} 上传失败: ${error.message}`);
+        const errorMsg = error instanceof Error ? error.message : '未知错误';
+        message.error(`文件 ${file.name} 上传失败: ${errorMsg}`);
         throw error;
       }
     });
     
     try {
-      await Promise.allSettled(uploadPromises);
-      const successCount = uploadedFiles.filter(f => f.status === 'success').length;
-      if (successCount > 0) {
+      const results = await Promise.allSettled(uploadPromises);
+      
+      // 统计成功和失败的数量
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const failedCount = results.filter(r => r.status === 'rejected').length;
+      
+      if (successCount > 0 && failedCount === 0) {
         message.success(`成功上传 ${successCount} 个文件`);
+      } else if (successCount > 0 && failedCount > 0) {
+        message.warning(`${successCount} 个文件上传成功，${failedCount} 个文件上传失败`);
+      } else if (failedCount > 0 && successCount === 0) {
+        message.error(`所有文件上传失败`);
       }
     } finally {
       setIsUploading(false);

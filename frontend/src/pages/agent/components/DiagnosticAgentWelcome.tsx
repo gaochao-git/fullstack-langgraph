@@ -14,7 +14,7 @@ import {
 import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
 import SOPApi from '@/services/sopApi';
-import { message, Tag } from 'antd';
+import { Tag, App } from 'antd';
 
 // 故障类型定义
 type FaultSeverity = "warning" | "error" | "critical";
@@ -127,6 +127,7 @@ interface DiagnosticAgentWelcomeProps {
 
 export default function DiagnosticAgentWelcome({ onSwitchToChat }: DiagnosticAgentWelcomeProps) {
   const { isDark } = useTheme();
+  const { message } = App.useApp();
   const [severityFilter, setSeverityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
