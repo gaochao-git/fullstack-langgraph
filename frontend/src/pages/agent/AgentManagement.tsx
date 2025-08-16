@@ -401,6 +401,14 @@ const AgentManagement: React.FC = () => {
         title="智能体管理"
         extra={
           <Space>
+            <Radio.Group 
+              value={ownerFilter} 
+              onChange={(e) => setOwnerFilter(e.target.value)}
+              buttonStyle="solid"
+            >
+              <Radio.Button value="all">所有</Radio.Button>
+              <Radio.Button value="mine">我的</Radio.Button>
+            </Radio.Group>
             <Search
               placeholder="搜索智能体名称、描述"
               allowClear
