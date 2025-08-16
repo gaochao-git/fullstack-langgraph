@@ -27,19 +27,20 @@ from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.db.models import now_shanghai
+from src.shared.core.config import settings
 from ..models import AgentDocumentUpload
 
 logger = get_logger(__name__)
 
-# 文件存储路径
-UPLOAD_DIR = Path("uploads/documents")
+# 从配置中获取文件存储路径
+UPLOAD_DIR = Path(settings.UPLOAD_DIR)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-# 支持的文件类型
-SUPPORTED_FILE_TYPES = ['.pdf', '.docx', '.txt', '.md']  # 暂时移除 .doc，因为需要额外的库
+# 从配置中获取支持的文件类型
+SUPPORTED_FILE_TYPES = settings.UPLOAD_ALLOWED_EXTENSIONS
 
-# 文件大小限制（10MB）
-MAX_FILE_SIZE = 10 * 1024 * 1024
+# 从配置中获取文件大小限制
+MAX_FILE_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 # 处理状态枚举
 class ProcessStatus:
@@ -68,7 +69,7 @@ class DocumentService:
         # 检查文件大小
         if len(file_content) > MAX_FILE_SIZE:
             raise BusinessException(
-                f"文件大小超过限制（最大{MAX_FILE_SIZE/1024/1024}MB）",
+                f"文件大小超过限制（最大{settings.MAX_UPLOAD_SIZE_MB}MB）",
                 ResponseCode.BAD_REQUEST
             )
         
@@ -82,7 +83,9 @@ class DocumentService:
         
         # 生成文件ID和保存路径
         file_id = str(uuid.uuid4())
-        file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
+        # 安全处理：只使用生成的文件ID和扩展名，避免路径遍历
+        safe_filename = f"{file_id}{file_ext}"
+        file_path = UPLOAD_DIR / safe_filename
         
         # 保存文件
         import aiofiles
@@ -111,7 +114,10 @@ class DocumentService:
         
         # 异步处理文档 - 使用后台任务，避免事务冲突
         import asyncio
-        asyncio.create_task(self._process_document_async(file_id))
+        # 创建任务并保存引用，避免任务丢失
+        task = asyncio.create_task(self._process_document_async(file_id))
+        # 添加错误处理回调
+        task.add_done_callback(lambda t: logger.error(f"文档处理任务异常: {t.exception()}") if t.exception() else None)
         
         return {
             "file_id": file_id,
@@ -254,20 +260,26 @@ class DocumentService:
                     doc_upload.process_end_time = now_shanghai()
                     await error_db.commit()
     
-    async def get_document_content(self, db: AsyncSession, file_id: str) -> Optional[Dict[str, Any]]:
+    async def get_document_content(self, db: AsyncSession, file_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         获取文档内容
         
         Args:
             db: 数据库会话
             file_id: 文件ID
+            user_id: 用户ID（用于权限检查）
             
         Returns:
             文档内容
         """
-        result = await db.execute(
-            select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
-        )
+        # 查询文档
+        query = select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
+        
+        # 如果提供了用户ID，检查所有权
+        if user_id:
+            query = query.where(AgentDocumentUpload.create_by == user_id)
+        
+        result = await db.execute(query)
         doc_upload = result.scalar_one_or_none()
         
         if not doc_upload:

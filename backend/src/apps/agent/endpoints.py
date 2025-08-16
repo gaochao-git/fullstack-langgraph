@@ -293,6 +293,20 @@ async def upload_file(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """上传文档文件"""
+    # 验证文件名是否为空
+    if not file.filename:
+        raise BusinessException("文件名不能为空", ResponseCode.BAD_REQUEST)
+    
+    # 检查文件大小（如果有size属性）
+    if hasattr(file, 'size') and file.size:
+        from src.shared.core.config import settings
+        max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if file.size > max_size:
+            raise BusinessException(
+                f"文件大小超过限制（最大{settings.MAX_UPLOAD_SIZE_MB}MB）",
+                ResponseCode.BAD_REQUEST
+            )
+    
     # 读取文件内容
     file_content = await file.read()
     
@@ -320,9 +334,12 @@ async def get_document_content(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取文档内容"""
-    content = await document_service.get_document_content(db, file_id)
+    # 获取当前用户ID用于权限检查
+    user_id = current_user.get('username') if current_user else None
+    
+    content = await document_service.get_document_content(db, file_id, user_id)
     if not content:
-        raise BusinessException("文档不存在或正在处理中", ResponseCode.NOT_FOUND)
+        raise BusinessException("文档不存在、正在处理中或无权访问", ResponseCode.NOT_FOUND)
     
     return success_response(
         data=DocumentContent(**content).model_dump(),

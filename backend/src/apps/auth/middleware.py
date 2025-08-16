@@ -37,6 +37,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/api/v1/auth/check",
             "/api/v1/auth/admin/menus",  # 菜单列表（公开）
             "/api/v1/auth/init",
+            "/api/v1/config/system",  # 系统配置（公开）
             "/docs",
             "/redoc",
             "/openapi.json",

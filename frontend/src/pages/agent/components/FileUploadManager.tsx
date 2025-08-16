@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import { cn } from '@/utils/lib-utils';
+import { configService, UploadConfig } from '@/services/configApi';
 
 interface FileUploadManagerProps {
   selectedFiles: File[];
@@ -18,11 +19,46 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
   disabled = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadConfig, setUploadConfig] = useState<UploadConfig | null>(null);
+  
+  useEffect(() => {
+    // 获取上传配置
+    configService.getUploadConfig().then(config => {
+      setUploadConfig(config);
+    }).catch(err => {
+      console.error('获取上传配置失败:', err);
+      // 使用默认配置
+      setUploadConfig({
+        max_upload_size_mb: 10,
+        allowed_extensions: ['.pdf', '.docx', '.txt', '.md']
+      });
+    });
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    if (files.length > 0) {
-      onFilesSelect(files);
+    if (files.length > 0 && uploadConfig) {
+      // 前端预检查文件大小
+      const MAX_SIZE = uploadConfig.max_upload_size_mb * 1024 * 1024;
+      const validFiles = files.filter(file => {
+        if (file.size > MAX_SIZE) {
+          console.warn(`文件 ${file.name} 超过 ${uploadConfig.max_upload_size_mb}MB 限制，大小为 ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+          // TODO: 可以通过props传递错误处理回调
+          return false;
+        }
+        return true;
+      });
+      
+      if (validFiles.length > 0) {
+        onFilesSelect(validFiles);
+      }
+      
+      if (validFiles.length < files.length) {
+        // 有文件被过滤，可以显示提示
+        const filtered = files.length - validFiles.length;
+        console.error(`${filtered} 个文件因超过大小限制被过滤`);
+      }
+      
       // 清空 input 的值，以便可以再次选择相同的文件
       e.target.value = '';
     }
@@ -37,7 +73,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
         multiple
         onChange={handleFileSelect}
         className="hidden"
-        accept=".pdf,.docx,.txt,.md"
+        accept={uploadConfig?.allowed_extensions.join(',') || '.pdf,.docx,.txt,.md'}
         disabled={disabled}
       />
       
@@ -54,7 +90,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
               ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
               : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
         )}
-        title="上传文件"
+        title={uploadConfig ? `上传文件（最大 ${uploadConfig.max_upload_size_mb}MB）` : '上传文件'}
       >
         <Paperclip className="h-4 w-4" />
       </button>

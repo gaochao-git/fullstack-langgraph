@@ -147,6 +147,11 @@ fullstack-langgraph/
 - `LLM_TYPE`: 使用的LLM类型（deepseek/openai等）
 - `LLM_API_KEY`: LLM API密钥
 
+文件上传相关配置：
+- `MAX_UPLOAD_SIZE_MB`: 最大上传文件大小（MB），默认10
+- `UPLOAD_ALLOWED_EXTENSIONS`: 允许的文件扩展名，默认[".pdf",".docx",".txt",".md"]
+- `UPLOAD_DIR`: 文件存储目录，默认uploads/documents
+
 ### 开发注意事项
 
 1. **LangGraph状态管理**: Agent模块使用LangGraph的状态管理，注意checkpoint的配置

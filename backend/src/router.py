@@ -13,11 +13,13 @@ from .apps.ai_model import router as ai_models_router
 from .apps.scheduled_task import router as scheduled_tasks_router
 from .apps.user import router as rbac_router
 from .apps.auth import router as auth_router
+from .shared.core.endpoints import router as common_router
 
 # 创建主API路由器
 api_router = APIRouter()
 
 # 注册各个子路由
+api_router.include_router(common_router, tags=["common"])
 api_router.include_router(auth_router, tags=["auth"])
 api_router.include_router(agents_router, tags=["agents"])
 api_router.include_router(sop_router, tags=["sop"])

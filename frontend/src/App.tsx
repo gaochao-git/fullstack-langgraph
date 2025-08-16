@@ -13,6 +13,7 @@ import MenuLayout from "@/components/MenuLayout";
 import { DynamicRouter } from "@/components/DynamicRouter";
 import GlobalLoading from "@/components/GlobalLoading";
 import { AuthErrorBoundary } from "@/components/AuthErrorBoundary";
+import { configService } from "@/services/configApi";
 
 
 // 主应用组件（包装在主题提供者内部）
@@ -29,7 +30,10 @@ function AppContent() {
       }
     });
     
-    // 不再需要启动定时器
+    // 预加载系统配置
+    configService.getSystemConfig().catch(err => {
+      console.warn('预加载系统配置失败:', err);
+    });
   }, []);
 
   return (
