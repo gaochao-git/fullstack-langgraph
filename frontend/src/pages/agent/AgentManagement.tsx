@@ -117,6 +117,7 @@ const AgentManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all'); // 新增：所有/我的筛选
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // 模态框状态
   const [agentDetailModal, setAgentDetailModal] = useState(false);
@@ -233,6 +234,16 @@ const AgentManagement: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [ownerFilter]);
+  
+  // 监听窗口大小变化
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
 
   // 过滤智能体
@@ -396,61 +407,148 @@ const AgentManagement: React.FC = () => {
 
 
   return (
-    <div>
+    <div className="agent-management-container">
+      <style>{`
+        @media (max-width: 768px) {
+          .agent-management-card .ant-card-head {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .agent-management-card .ant-card-head-title {
+            margin-bottom: 8px;
+          }
+          .agent-management-card .ant-card-extra {
+            width: 100%;
+            margin-left: 0;
+          }
+        }
+      `}</style>
       <Card 
         title="智能体管理"
+        className="agent-management-card"
+        bodyStyle={{ padding: isMobile ? '12px' : '24px' }}
+        headStyle={isMobile ? { padding: '12px 16px' } : undefined}
         extra={
-          <Space>
-            <Radio.Group 
-              value={ownerFilter} 
-              onChange={(e) => setOwnerFilter(e.target.value)}
-              buttonStyle="solid"
-            >
-              <Radio.Button value="all">所有</Radio.Button>
-              <Radio.Button value="mine">我的</Radio.Button>
-            </Radio.Group>
-            <Search
-              placeholder="搜索智能体名称、描述"
-              allowClear
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              style={{ width: 240 }}
-            />
-            <Select
-              placeholder="分类筛选"
-              allowClear
-              style={{ width: 120 }}
-              value={typeFilter}
-              onChange={setTypeFilter}
-            >
-              {AGENT_TYPES.map(type => (
-                <Option key={type.value} value={type.value}>{type.label}</Option>
-              ))}
-            </Select>
-            <Select
-              placeholder="状态筛选"
-              allowClear
-              style={{ width: 120 }}
-              value={statusFilter}
-              onChange={setStatusFilter}
-            >
-              <Option value="enabled">已启用</Option>
-              <Option value="disabled">已禁用</Option>
-            </Select>
-            <Button 
-              icon={<ReloadOutlined />}
-              onClick={loadData}
-            >
-              刷新
-            </Button>
-            <Button 
-              type="primary"
-              icon={<RobotOutlined />}
-              onClick={handleCreateAgent}
-            >
-              新建智能体
-            </Button>
-          </Space>
+          <div style={{ 
+            width: isMobile ? '100%' : 'auto',
+            marginTop: isMobile ? '12px' : 0
+          }}>
+            {isMobile ? (
+              // 移动端布局 - 多行显示
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <Radio.Group 
+                    value={ownerFilter} 
+                    onChange={(e) => setOwnerFilter(e.target.value)}
+                    buttonStyle="solid"
+                    size="small"
+                  >
+                    <Radio.Button value="all">所有</Radio.Button>
+                    <Radio.Button value="mine">我的</Radio.Button>
+                  </Radio.Group>
+                  <Button 
+                    type="primary"
+                    icon={<RobotOutlined />}
+                    onClick={handleCreateAgent}
+                    size="small"
+                  >
+                    新建
+                  </Button>
+                </div>
+                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                  <Search
+                    placeholder="搜索"
+                    allowClear
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    style={{ flex: 1, minWidth: '100px' }}
+                    size="small"
+                  />
+                  <Select
+                    placeholder="分类"
+                    allowClear
+                    style={{ width: '70px' }}
+                    value={typeFilter}
+                    onChange={setTypeFilter}
+                    size="small"
+                  >
+                    {AGENT_TYPES.map(type => (
+                      <Option key={type.value} value={type.value}>{type.label}</Option>
+                    ))}
+                  </Select>
+                  <Select
+                    placeholder="状态"
+                    allowClear
+                    style={{ width: '70px' }}
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    size="small"
+                  >
+                    <Option value="enabled">启用</Option>
+                    <Option value="disabled">禁用</Option>
+                  </Select>
+                  <Button 
+                    icon={<ReloadOutlined />}
+                    onClick={loadData}
+                    size="small"
+                  />
+                </div>
+              </>
+            ) : (
+              // 桌面端布局 - 单行显示
+              <Space>
+                <Radio.Group 
+                  value={ownerFilter} 
+                  onChange={(e) => setOwnerFilter(e.target.value)}
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="all">所有</Radio.Button>
+                  <Radio.Button value="mine">我的</Radio.Button>
+                </Radio.Group>
+                <Search
+                  placeholder="搜索智能体名称、描述"
+                  allowClear
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  style={{ width: 240 }}
+                />
+                <Select
+                  placeholder="分类筛选"
+                  allowClear
+                  style={{ width: 120 }}
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                >
+                  {AGENT_TYPES.map(type => (
+                    <Option key={type.value} value={type.value}>{type.label}</Option>
+                  ))}
+                </Select>
+                <Select
+                  placeholder="状态筛选"
+                  allowClear
+                  style={{ width: 120 }}
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                >
+                  <Option value="enabled">已启用</Option>
+                  <Option value="disabled">已禁用</Option>
+                </Select>
+                <Button 
+                  icon={<ReloadOutlined />}
+                  onClick={loadData}
+                >
+                  刷新
+                </Button>
+                <Button 
+                  type="primary"
+                  icon={<RobotOutlined />}
+                  onClick={handleCreateAgent}
+                >
+                  新建智能体
+                </Button>
+              </Space>
+            )}
+          </div>
         }
       >
         {/* 智能体卡片列表 */}

@@ -23,7 +23,7 @@ from src.apps.auth.schema import (
     MenuTreeResponse, MenuListResponse, UserMenuResponse
 )
 from src.apps.auth.service import menu_service
-from src.apps.auth.dependencies import get_current_user, require_auth, require_roles
+from src.apps.auth.dependencies import get_current_user, get_current_user_optional, require_auth, require_roles
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode, success_response
 
@@ -345,6 +345,7 @@ async def cas_logout(
 @router.get("/me", summary="获取当前用户信息")
 async def get_current_user_info(
     request: Request,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
     cas_session_id: Optional[str] = Cookie(None),
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -352,11 +353,11 @@ async def get_current_user_info(
     获取当前登录用户信息
     支持JWT和CAS两种认证方式
     """
-    # 1. 检查JWT认证
-    if hasattr(request.state, "current_user"):
+    # 1. 优先使用依赖注入的用户信息（兼容各种认证方式）
+    if current_user:
         return success_response({
-            "user": request.state.current_user,
-            "auth_type": "jwt"
+            "user": current_user,
+            "auth_type": current_user.get("auth_type", "jwt")
         })
     
     # 2. 检查CAS认证

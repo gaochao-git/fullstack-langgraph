@@ -32,12 +32,16 @@ async def get_current_user_optional(
 ) -> Optional[dict]:
     """
     获取当前用户（可选）
-    支持三种认证方式：
-    1. CAS Session认证（SSO用户）
-    2. JWT Token认证（本地用户）  
-    3. API Key认证（系统集成）
+    支持四种认证方式：
+    1. 中间件认证（优先）
+    2. CAS Session认证（SSO用户）
+    3. JWT Token认证（本地用户）  
+    4. API Key认证（系统集成）
     """
     try:
+        # 0. 优先从中间件获取（如果启用了认证中间件）
+        if hasattr(request.state, "current_user"):
+            return request.state.current_user
         # 1. 首先尝试CAS Session认证
         cas_session_id = request.cookies.get("cas_session_id")
         if cas_session_id:
@@ -177,7 +181,7 @@ async def get_current_user(
             "email": "gaochao@example.com",
             "display_name": "高超",
             "auth_type": "mock",
-            "roles": ["super_admin"],  # 所有权限
+            "roles": ["admin"],  # 管理员权限
             "permissions": ["*"]  # 所有权限
         }
     
@@ -334,8 +338,8 @@ class PermissionChecker:
 
 
 # 预定义的角色检查器
-is_admin = RoleChecker(["admin", "super_admin"])
-is_user = RoleChecker(["user", "admin", "super_admin"])
+is_admin = RoleChecker(["admin"])
+is_user = RoleChecker(["user", "admin"])
 
 
 # 类型别名，方便使用

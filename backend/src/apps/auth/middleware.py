@@ -9,7 +9,7 @@ from fastapi.security.utils import get_authorization_scheme_param
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.db.config import get_async_db, async_session_maker
+from src.shared.db.config import get_async_db, AsyncSessionLocal
 from src.apps.auth.utils import JWTUtils, TokenBlacklist
 from src.apps.auth.service.rbac_service import RBACService
 from src.shared.core.exceptions import BusinessException
@@ -19,19 +19,26 @@ from src.shared.schemas.response import ResponseCode
 class AuthMiddleware(BaseHTTPMiddleware):
     """
     认证中间件
-    自动验证JWT令牌
+    支持JWT和CAS双重认证
     """
     
     def __init__(self, app, exclude_paths: Optional[List[str]] = None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or [
             "/api/v1/auth/login",
+            "/api/v1/auth/register",
             "/api/v1/auth/sso",
+            "/api/v1/auth/cas",
             "/api/v1/auth/forgot-password",
+            "/api/v1/auth/password-policy",
+            "/api/v1/auth/check",
+            "/api/v1/auth/admin/menus",  # 菜单列表（公开）
+            "/api/v1/auth/init",
             "/docs",
             "/redoc",
             "/openapi.json",
             "/health",
+            "/api/health",
         ]
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -40,48 +47,77 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(excluded) for excluded in self.exclude_paths):
             return await call_next(request)
         
-        # 获取Authorization头
-        authorization = request.headers.get("Authorization")
-        if not authorization:
-            # 检查API Key
-            api_key = request.headers.get("X-API-Key")
-            if not api_key:
-                raise BusinessException(
-                    "未提供认证凭据",
-                    ResponseCode.UNAUTHORIZED
-                )
+        # 尝试获取认证信息
+        user_info = None
+        auth_type = None
         
-        # 解析Bearer Token
+        # 1. 检查JWT认证（Authorization头）
+        authorization = request.headers.get("Authorization")
         if authorization:
             scheme, token = get_authorization_scheme_param(authorization)
-            if scheme.lower() != "bearer":
-                raise BusinessException(
-                    "无效的认证方案",
-                    ResponseCode.UNAUTHORIZED
-                )
-            
-            try:
-                # 验证JWT
-                payload = JWTUtils.decode_token(token)
-                
-                # 检查黑名单
-                jti = payload.get("jti")
-                if jti and TokenBlacklist.is_blacklisted(jti):
-                    raise BusinessException(
-                        "令牌已失效",
-                        ResponseCode.UNAUTHORIZED
+            if scheme.lower() == "bearer":
+                try:
+                    # 验证JWT
+                    payload = JWTUtils.decode_token(token)
+                    
+                    # 检查黑名单
+                    jti = payload.get("jti")
+                    if jti and TokenBlacklist.is_blacklisted(jti):
+                        raise BusinessException(
+                            "令牌已失效",
+                            ResponseCode.UNAUTHORIZED
+                        )
+                    
+                    user_info = payload
+                    auth_type = "jwt"
+                    
+                except Exception:
+                    # JWT验证失败，继续尝试其他认证方式
+                    pass
+        
+        # 2. 检查CAS认证（Cookie）
+        if not user_info:
+            cas_session_id = request.cookies.get("cas_session_id")
+            if cas_session_id:
+                # 创建数据库会话检查CAS session
+                async with AsyncSessionLocal() as db:
+                    from sqlalchemy import select
+                    from src.apps.auth.models import AuthSession
+                    from datetime import datetime, timezone
+                    
+                    stmt = select(AuthSession).where(
+                        AuthSession.session_id == cas_session_id,
+                        AuthSession.is_active == True
                     )
-                
-                # 将用户信息添加到请求状态
-                request.state.user = payload
-                
-            except BusinessException:
-                raise
-            except Exception:
-                raise BusinessException(
-                    "令牌验证失败",
-                    ResponseCode.UNAUTHORIZED
-                )
+                    result = await db.execute(stmt)
+                    session = result.scalar_one_or_none()
+                    
+                    if session and session.expires_at > datetime.now(timezone.utc):
+                        user_info = {
+                            "sub": session.user_id,
+                            "username": session.user_id,  # CAS可能没有username，使用user_id
+                            "auth_type": "cas",
+                            "session_id": session.session_id
+                        }
+                        auth_type = "cas"
+        
+        # 3. 检查API Key认证
+        if not user_info:
+            api_key = request.headers.get("X-API-Key")
+            if api_key:
+                # TODO: 实现API Key验证
+                pass
+        
+        # 如果没有任何有效的认证信息
+        if not user_info:
+            raise BusinessException(
+                "未提供有效的认证凭据",
+                ResponseCode.UNAUTHORIZED
+            )
+        
+        # 将用户信息和认证类型添加到请求状态
+        request.state.current_user = user_info
+        request.state.auth_type = auth_type
         
         # 继续处理请求
         response = await call_next(request)
@@ -121,9 +157,9 @@ class RBACMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         # 获取用户信息（由AuthMiddleware设置）
-        user = getattr(request.state, "user", None)
+        user = getattr(request.state, "current_user", None)
         if not user:
-            # 如果没有用户信息，说明是公开接口
+            # 如果没有用户信息，说明是公开接口或认证中间件没有正确设置
             return await call_next(request)
         
         # 检查权限
@@ -131,12 +167,17 @@ class RBACMiddleware(BaseHTTPMiddleware):
         method = request.method
         
         # 创建数据库会话
-        async with async_session_maker() as db:
+        async with AsyncSessionLocal() as db:
             service = RBACService(db)
             
             # 检查是否有访问权限
             has_permission = await service.check_permission(user_id, path, method)
             if not has_permission:
+                # 记录权限拒绝日志
+                from src.shared.core.logging import get_logger
+                logger = get_logger(__name__)
+                logger.warning(f"Permission denied for user {user_id}: {method} {path}")
+                
                 raise BusinessException(
                     f"没有访问权限: {method} {path}",
                     ResponseCode.FORBIDDEN
@@ -181,6 +222,10 @@ def setup_auth_middleware(app):
     """
     设置认证相关的中间件
     
+    注意：中间件的添加顺序很重要
+    - 后添加的中间件先执行
+    - 认证必须在权限检查之前
+    
     使用示例:
     ```python
     from fastapi import FastAPI
@@ -190,14 +235,45 @@ def setup_auth_middleware(app):
     setup_auth_middleware(app)
     ```
     """
-    # 添加审计中间件（最外层）
-    app.add_middleware(AuditMiddleware, log_requests=True)
+    # 添加RBAC权限中间件（需要认证信息）
+    app.add_middleware(
+        RBACMiddleware, 
+        check_permissions=True,
+        exclude_paths=[
+            "/api/v1/auth",
+            "/api/v1/agent/ws",  # WebSocket不需要权限检查
+            "/api/v1/agent/sse",  # SSE流式接口
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+            "/health",
+            "/api/health",
+        ]
+    )
     
-    # 添加RBAC权限中间件
-    app.add_middleware(RBACMiddleware, check_permissions=True)
+    # 添加认证中间件（必须在权限中间件之前）
+    app.add_middleware(
+        AuthMiddleware,
+        exclude_paths=[
+            "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/sso",
+            "/api/v1/auth/cas",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/password-policy",
+            "/api/v1/auth/check",
+            "/api/v1/auth/admin/menus",  # 菜单列表（公开）
+            "/api/v1/auth/init",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+            "/health",
+            "/api/health",
+        ]
+    )
     
-    # 添加认证中间件
-    app.add_middleware(AuthMiddleware)
+    # 添加审计中间件（最内层，可选）
+    # app.add_middleware(AuditMiddleware, log_requests=True)
 
 
 # 动态权限检查装饰器

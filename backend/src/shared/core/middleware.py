@@ -3,6 +3,7 @@ FastAPI中间件模块
 提供请求日志、性能监控、错误处理等中间件
 """
 
+import os
 import time
 import json
 import logging
@@ -293,5 +294,15 @@ def setup_middlewares(app):
     # API指标中间件
     app.add_middleware(APIMetricsMiddleware)
     
-    logger = get_logger(__name__)
+    # 认证和权限中间件（可选）
+    # 如果启用了AUTH_MOCK，则不启用认证中间件
+    if os.getenv("AUTH_MOCK", "").lower() == "true":
+        logger = get_logger(__name__)
+        logger.info("Auth middlewares disabled due to AUTH_MOCK=true")
+    else:
+        from src.apps.auth.middleware import setup_auth_middleware
+        setup_auth_middleware(app)
+        logger = get_logger(__name__)
+        logger.info("Auth middlewares enabled")
+    
     logger.info("All middlewares configured successfully")

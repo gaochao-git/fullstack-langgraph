@@ -229,8 +229,7 @@ class MenuService:
         admin_roles_stmt = select(RbacRole).where(
             and_(
                 RbacRole.role_id.in_(role_ids),
-                RbacRole.role_code.in_(['super_admin', 'admin']),
-                RbacRole.is_active == 1
+                RbacRole.role_name == '超级管理员'
             )
         )
         admin_roles_result = await db.execute(admin_roles_stmt)

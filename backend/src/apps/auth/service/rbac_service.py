@@ -111,6 +111,13 @@ class RBACService:
         Returns:
             bool: 是否有权限
         """
+        # 检查是否是超级管理员
+        roles = await self.get_user_roles(user_id)
+        for role in roles:
+            if role.role_name == '超级管理员':
+                return True  # 管理员有所有权限
+        
+        # 获取用户权限
         permissions = await self.get_user_permissions(user_id)
         
         for perm in permissions:
@@ -119,11 +126,16 @@ class RBACService:
                 continue
             
             # 检查HTTP方法
-            if perm.http_method != "*" and perm.http_method != action:
+            if perm.http_method != "*" and perm.http_method.upper() != action.upper():
                 continue
             
-            # 检查资源路径（支持通配符）
-            if self._match_resource(perm.permission_name, resource):
+            # 检查资源路径
+            # permission_api_url 存储的是 API 路径
+            if hasattr(perm, 'permission_api_url') and perm.permission_api_url:
+                if self._match_resource(perm.permission_api_url, resource):
+                    return True
+            # 兼容旧数据，也检查 permission_name
+            elif self._match_resource(perm.permission_name, resource):
                 return True
         
         return False
@@ -198,16 +210,11 @@ class RBACService:
             default_roles = [
                 {
                     "role_id": 1,
-                    "role_name": "super_admin",
-                    "description": "超级管理员",
-                },
-                {
-                    "role_id": 2,
                     "role_name": "admin",
                     "description": "管理员",
                 },
                 {
-                    "role_id": 3,
+                    "role_id": 2,
                     "role_name": "user",
                     "description": "普通用户",
                 }
