@@ -15,7 +15,7 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { menus, loading: menuLoading, breadcrumb } = useMenus();
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout, switchRole, checkAuth } = useAuth();
   const { isDark } = useTheme();
   const {
     token: { colorBgContainer, borderRadiusLG },
@@ -27,6 +27,14 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const [openKeys, setOpenKeys] = useState<string[]>([]);
+
+  // 组件挂载时检查用户状态
+  useEffect(() => {
+    // 如果用户信息不存在，尝试重新获取
+    if (!user) {
+      checkAuth();
+    }
+  }, [user, checkAuth]);
 
   // 检测屏幕尺寸
   useEffect(() => {

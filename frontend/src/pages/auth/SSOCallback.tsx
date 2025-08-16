@@ -70,6 +70,8 @@ export function SSOCallback() {
             
             // 延迟跳转，确保状态更新完成
             setTimeout(async () => {
+              // 再次调用checkAuth确保用户信息同步
+              await useAuth.getState().checkAuth();
               const targetPath = await getFirstAccessiblePath();
               navigate(targetPath, { replace: true });
             }, 100);
