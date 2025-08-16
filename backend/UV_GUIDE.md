@@ -4,6 +4,16 @@ UV 是一个极快的 Python 包和项目管理器，用 Rust 编写。
 
 ## 快速开始
 
+### 安装uv
+```bash
+# 安装uv
+pip install uv
+pip3.12 install uv-0.8.11-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl 
+
+# 验证安装
+uv --version
+```
+
 ### 初始化项目
 ```bash
 # 在项目目录初始化
