@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Tabs, Radio } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Select, Input, Button } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
   SettingOutlined, 
   UserOutlined,
-  ToolOutlined
+  ToolOutlined,
+  TeamOutlined,
+  ApartmentOutlined,
+  GlobalOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  ReloadOutlined
 } from "@ant-design/icons";
 import { 
   categoryColors,
@@ -24,18 +30,26 @@ type Agent = ApiAgent;
 
 // 智能体分类选项
 const AGENT_TYPES = [
-  { value: 'all', label: '全部', color: 'default' },
-  { value: '日志分析', label: '日志分析', color: 'blue' },
-  { value: '监控告警', label: '监控告警', color: 'orange' },
-  { value: '故障诊断', label: '故障诊断', color: 'red' },
-  { value: '性能优化', label: '性能优化', color: 'green' },
-  { value: '资源管理', label: '资源管理', color: 'purple' },
-  { value: '运维部署', label: '运维部署', color: 'cyan' },
-  { value: '安全防护', label: '安全防护', color: 'volcano' },
-  { value: '合规审计', label: '合规审计', color: 'magenta' },
-  { value: '合同履约', label: '合同履约', color: 'gold' },
-  { value: '变更管理', label: '变更管理', color: 'lime' },
-  { value: '其他', label: '其他', color: 'default' },
+  { value: 'all', label: '全部类型', icon: <RobotOutlined /> },
+  { value: '日志分析', label: '日志分析', icon: <DatabaseOutlined /> },
+  { value: '监控告警', label: '监控告警', icon: <SettingOutlined /> },
+  { value: '故障诊断', label: '故障诊断', icon: <ToolOutlined /> },
+  { value: '性能优化', label: '性能优化', icon: <RobotOutlined /> },
+  { value: '资源管理', label: '资源管理', icon: <DatabaseOutlined /> },
+  { value: '运维部署', label: '运维部署', icon: <SettingOutlined /> },
+  { value: '安全防护', label: '安全防护', icon: <UserOutlined /> },
+  { value: '合规审计', label: '合规审计', icon: <DatabaseOutlined /> },
+  { value: '合同履约', label: '合同履约', icon: <RobotOutlined /> },
+  { value: '变更管理', label: '变更管理', icon: <ToolOutlined /> },
+  { value: '其他', label: '其他', icon: <RobotOutlined /> },
+];
+
+// 归属过滤选项
+const OWNER_FILTERS = [
+  { value: 'all', label: '所有', icon: <GlobalOutlined /> },
+  { value: 'mine', label: '我的', icon: <UserOutlined /> },
+  { value: 'team', label: '我的团队', icon: <TeamOutlined /> },
+  { value: 'department', label: '我的部门', icon: <ApartmentOutlined /> },
 ];
 
 const AgentMarketplace = () => {
@@ -44,16 +58,41 @@ const AgentMarketplace = () => {
   const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all');
+  const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [searchText, setSearchText] = useState<string>('');
   
-  // 根据类型和所有者过滤智能体
+  // 根据类型、所有者和搜索关键词过滤智能体
   const filteredAgents = agents
     .filter(agent => {
       // 类型过滤
       const matchType = selectedType === 'all' || agent.agent_type === selectedType;
-      // 所有者过滤
-      const matchOwner = ownerFilter === 'all' || (ownerFilter === 'mine' && agent.create_by === user?.username);
-      return matchType && matchOwner;
+      
+      // 归属过滤
+      let matchOwner = true;
+      switch (ownerFilter) {
+        case 'mine':
+          matchOwner = agent.create_by === user?.username;
+          break;
+        case 'team':
+          // TODO: 需要后端支持团队信息
+          matchOwner = true; // 暂时显示所有
+          break;
+        case 'department':
+          // TODO: 需要后端支持部门信息
+          matchOwner = true; // 暂时显示所有
+          break;
+        case 'all':
+        default:
+          matchOwner = true;
+          break;
+      }
+      
+      // 搜索过滤
+      const matchSearch = !searchText || 
+        agent.agent_name?.toLowerCase().includes(searchText.toLowerCase()) ||
+        agent.agent_description?.toLowerCase().includes(searchText.toLowerCase());
+      
+      return matchType && matchOwner && matchSearch;
     });
 
   // 获取智能体数据
@@ -214,7 +253,6 @@ const AgentMarketplace = () => {
                   {agent.agent_name}
                 </div>
                 <Tag 
-                  color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'}
                   style={{ fontSize: 12 }}
                 >
                   {agent.agent_type || '未分类'}
@@ -288,52 +326,94 @@ const AgentMarketplace = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: 24 }}>
-        {/* 所有/我的过滤按钮 */}
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Radio.Group 
-            value={ownerFilter} 
-            onChange={(e) => setOwnerFilter(e.target.value)}
-            buttonStyle="solid"
-          >
-            <Radio.Button value="all">所有</Radio.Button>
-            <Radio.Button value="mine">我的</Radio.Button>
-          </Radio.Group>
+      {/* 头部过滤卡片 */}
+      <Card 
+        style={{ 
+          marginBottom: 24,
+          borderRadius: 8,
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
+        }}
+        bodyStyle={{ padding: '16px 20px' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          {/* 归属过滤按钮组 */}
+          <Button.Group>
+            <Button 
+              type={ownerFilter === 'all' ? 'primary' : 'default'}
+              onClick={() => setOwnerFilter('all')}
+            >
+              全部
+            </Button>
+            <Button 
+              type={ownerFilter === 'mine' ? 'primary' : 'default'}
+              onClick={() => setOwnerFilter('mine')}
+            >
+              我的
+            </Button>
+            <Button 
+              type={ownerFilter === 'team' ? 'primary' : 'default'}
+              onClick={() => setOwnerFilter('team')}
+            >
+              我的团队
+            </Button>
+            <Button 
+              type={ownerFilter === 'department' ? 'primary' : 'default'}
+              onClick={() => setOwnerFilter('department')}
+            >
+              我的部门
+            </Button>
+          </Button.Group>
+          
+          {/* 类型筛选下拉 */}
+          <Select
+            value={selectedType}
+            onChange={setSelectedType}
+            style={{ width: 150 }}
+            placeholder="选择类型"
+            options={AGENT_TYPES.map(type => ({
+              value: type.value,
+              label: type.label
+            }))}
+          />
+          
+          {/* 搜索框 */}
+          <Input
+            prefix={<SearchOutlined />}
+            placeholder="搜索智能体名称、描述"
+            value={searchText}
+            onChange={e => setSearchText(e.target.value)}
+            style={{ width: 300 }}
+            allowClear
+          />
         </div>
-        
-        {/* 分类选择器 */}
-        <Tabs 
-          activeKey={selectedType}
-          onChange={setSelectedType}
-          size="large"
-          items={AGENT_TYPES.map(type => ({
-            key: type.value,
-            label: type.label
-          }))}
-        />
-      </div>
+      </Card>
       
       {filteredAgents.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '50px' }}>
           <RobotOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
           <div style={{ marginTop: 16 }}>
             <Text type="secondary">
-              {ownerFilter === 'mine' && selectedType === 'all'
-                ? '您还没有创建任何智能体' 
-                : ownerFilter === 'mine' && selectedType !== 'all'
-                ? `您还没有创建${selectedType}类型的智能体`
-                : selectedType === 'all' 
-                ? '暂无可用的智能体' 
-                : `暂无${selectedType}类型的智能体`}
+              {(() => {
+                const ownerLabel = OWNER_FILTERS.find(f => f.value === ownerFilter)?.label || '所选';
+                const typeLabel = AGENT_TYPES.find(t => t.value === selectedType)?.label || '所选类型';
+                
+                if (ownerFilter !== 'all' && selectedType !== 'all') {
+                  return `暂无${ownerLabel}的${typeLabel}智能体`;
+                } else if (ownerFilter !== 'all') {
+                  return `暂无${ownerLabel}的智能体`;
+                } else if (selectedType !== 'all') {
+                  return `暂无${typeLabel}的智能体`;
+                } else {
+                  return '暂无可用的智能体';
+                }
+              })()}
             </Text>
           </div>
           <div style={{ marginTop: 8 }}>
             <Text type="secondary">
               {ownerFilter === 'mine'
                 ? '请前往智能体管理创建您的智能体'
-                : selectedType === 'all'
-                ? '请在智能体管理中创建并启用智能体'
-                : '请尝试查看其他分类或创建新的智能体'}
+                : '请调整筛选条件或前往智能体管理创建新的智能体'}
             </Text>
           </div>
         </div>
