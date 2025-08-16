@@ -191,8 +191,8 @@ export default function ChatEngine({
   }, [thread.messages, thread.isLoading, processedEventsTimeline]);
 
   const handleSubmit = useCallback(
-    (submittedInputValue: string) => {
-      if (!submittedInputValue.trim()) return;
+    (submittedInputValue: string, fileIds?: string[]) => {
+      if (!submittedInputValue.trim() && !fileIds?.length) return;
       setProcessedEventsTimeline([]);
       hasFinalizeEventOccurredRef.current = false;
 
@@ -211,14 +211,10 @@ export default function ChatEngine({
         user_name: "zhangsan123", // 临时固定用户名，后续可从用户系统获取
       };
       
-      const submitConfig = currentModel ? {
+      const submitConfig = {
         configurable: {
-          selected_model: currentModel
-          // 移除agent_id，因为已经通过assistantId传递
-        }
-      } : {
-        configurable: {
-          // 空配置，agent信息通过assistantId传递
+          ...(currentModel && { selected_model: currentModel }),
+          ...(fileIds && fileIds.length > 0 && { file_ids: fileIds })
         }
       };
       

@@ -37,7 +37,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
         multiple
         onChange={handleFileSelect}
         className="hidden"
-        accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.gif"
+        accept=".pdf,.docx,.txt,.md"
         disabled={disabled}
       />
       
@@ -63,7 +63,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
 };
 
 interface FileListDisplayProps {
-  files: File[];
+  files: Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed' }>;
   onRemove: (index: number) => void;
   isDark: boolean;
 }
@@ -81,31 +81,41 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
       isDark ? "border-gray-700" : "border-gray-200"
     )}>
       <div className="flex flex-wrap gap-2">
-        {files.map((file, index) => (
+        {files.map((item, index) => (
           <div
             key={index}
             className={cn(
               "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
-              isDark
-                ? "bg-gray-700 text-gray-200"
-                : "bg-gray-100 text-gray-700"
+              item.status === 'uploading' 
+                ? (isDark ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-700")
+                : item.status === 'success'
+                  ? (isDark ? "bg-green-900 text-green-200" : "bg-green-100 text-green-700")
+                  : (isDark ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700")
             )}
           >
-            <Paperclip className="h-3 w-3" />
-            <span className="max-w-[200px] truncate" title={file.name}>
-              {file.name}
-            </span>
-            <button
-              type="button"
-              onClick={() => onRemove(index)}
-              className={cn(
-                "ml-1 hover:text-red-500 transition-colors",
-                isDark ? "text-gray-400" : "text-gray-500"
-              )}
-              aria-label={`删除文件 ${file.name}`}
-            >
+            {item.status === 'uploading' ? (
+              <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+            ) : item.status === 'success' ? (
+              <Paperclip className="h-3 w-3" />
+            ) : (
               <X className="h-3 w-3" />
-            </button>
+            )}
+            <span className="max-w-[200px] truncate" title={item.file.name}>
+              {item.file.name}
+            </span>
+            {item.status !== 'uploading' && (
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className={cn(
+                  "ml-1 hover:text-red-500 transition-colors",
+                  isDark ? "text-gray-400" : "text-gray-500"
+                )}
+                aria-label={`删除文件 ${item.file.name}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -133,16 +143,12 @@ export const fileUploadUtils = {
   isValidFileType: (file: File): boolean => {
     const validTypes = [
       'application/pdf',
-      'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
-      'text/markdown',
-      'image/png',
-      'image/jpeg',
-      'image/gif'
+      'text/markdown'
     ];
     return validTypes.includes(file.type) || 
-           ['pdf', 'doc', 'docx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif']
+           ['pdf', 'docx', 'txt', 'md']
              .includes(getFileExtension(file.name).toLowerCase());
   },
 

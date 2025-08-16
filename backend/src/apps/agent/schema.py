@@ -187,4 +187,34 @@ class AgentStatistics(BaseModel):
     enabled: int = Field(..., description="启用数量")
     running: int = Field(..., description="运行中数量")
     builtin: int = Field(..., description="内置智能体数量")
-    custom: int = Field(..., description="自定义智能体数量")
+
+
+# ============= 文档上传相关 Schema =============
+
+class FileUploadResponse(BaseModel):
+    """文件上传响应"""
+    file_id: str
+    file_name: str
+    file_size: int
+    file_type: str
+    upload_time: str
+    status: str = "uploaded"  # uploaded, processing, ready, failed
+    message: Optional[str] = None
+
+
+class DocumentContent(BaseModel):
+    """文档内容"""
+    file_id: str
+    file_name: str
+    content: str  # 提取的文本内容
+    metadata: Optional[Dict[str, Any]] = None  # 页数、作者等元信息
+    chunks: Optional[List[Dict[str, Any]]] = None  # 分块内容（用于大文档）
+
+
+class FileProcessStatus(BaseModel):
+    """文件处理状态"""
+    file_id: str
+    status: str
+    progress: Optional[float] = None
+    message: Optional[str] = None
+    processed_at: Optional[str] = None

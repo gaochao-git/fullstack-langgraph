@@ -12,6 +12,8 @@ import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 import { theme } from "antd";
 import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
+import { fileApi } from "@/services/fileApi";
+import { message } from "antd";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -752,7 +754,7 @@ interface WelcomeComponentProps {
 interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
-  onSubmit: (input: string) => void;
+  onSubmit: (input: string, fileIds?: string[]) => void;
   onCancel: () => void;
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
@@ -794,6 +796,8 @@ function ChatMessages({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed' }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
   
   // 处理故障诊断开始 - 将诊断消息设置到输入框
   const handleStartDiagnosis = (message: string) => {
@@ -809,27 +813,89 @@ function ChatMessages({
     } catch {}
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim() || selectedFiles.length > 0) {
-      // TODO: 处理文件上传逻辑
-      if (selectedFiles.length > 0) {
-        console.log('准备上传文件:', selectedFiles);
-      }
-      onSubmit(inputValue.trim());
+    
+    // 获取成功上传的文件ID
+    const successFileIds = uploadedFiles
+      .filter(f => f.status === 'success' && f.fileId)
+      .map(f => f.fileId);
+    
+    if (inputValue.trim() || successFileIds.length > 0) {
+      // 提交消息和文件ID
+      onSubmit(inputValue.trim(), successFileIds.length > 0 ? successFileIds : undefined);
       setInputValue("");
-      setSelectedFiles([]); // 清空已选文件
+      setUploadedFiles([]); // 清空已上传文件
     }
   };
 
-  // 处理文件选择
-  const handleFilesSelect = (files: File[]) => {
-    setSelectedFiles(prevFiles => [...prevFiles, ...files]);
+  // 处理文件选择 - 选择后立即上传
+  const handleFilesSelect = async (files: File[]) => {
+    // 为每个文件创建上传状态
+    const newUploadedFiles = files.map(file => ({
+      file,
+      fileId: '',
+      status: 'uploading' as const
+    }));
+    
+    setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
+    setIsUploading(true);
+    
+    // 并行上传所有文件
+    const uploadPromises = files.map(async (file, index) => {
+      const currentIndex = uploadedFiles.length + index;
+      try {
+        const result = await fileApi.uploadFile(file);
+        
+        // 等待文件处理完成
+        await fileApi.waitForFileReady(result.file_id);
+        
+        // 更新状态为成功
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          if (updated[currentIndex]) {
+            updated[currentIndex] = {
+              ...updated[currentIndex],
+              fileId: result.file_id,
+              status: 'success'
+            };
+          }
+          return updated;
+        });
+        
+        return result.file_id;
+      } catch (error) {
+        // 更新状态为失败
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          if (updated[currentIndex]) {
+            updated[currentIndex] = {
+              ...updated[currentIndex],
+              status: 'failed'
+            };
+          }
+          return updated;
+        });
+        
+        message.error(`文件 ${file.name} 上传失败: ${error.message}`);
+        throw error;
+      }
+    });
+    
+    try {
+      await Promise.allSettled(uploadPromises);
+      const successCount = uploadedFiles.filter(f => f.status === 'success').length;
+      if (successCount > 0) {
+        message.success(`成功上传 ${successCount} 个文件`);
+      }
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // 移除选中的文件
   const handleRemoveFile = (index: number) => {
-    setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+    setUploadedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
   // 滚动到底部
@@ -1222,9 +1288,9 @@ function ChatMessages({
             : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
         )}
       >
-        {/* 已选择文件显示区域 */}
+        {/* 已上传文件显示区域 */}
         <FileListDisplay 
-          files={selectedFiles}
+          files={uploadedFiles}
           onRemove={handleRemoveFile}
           isDark={isDark}
         />
@@ -1288,7 +1354,7 @@ function ChatMessages({
                   ? "text-gray-100 placeholder-gray-400" 
                   : "text-gray-900 placeholder-gray-500"
               )}
-              disabled={isLoading || !!interrupt}
+              disabled={isLoading || !!interrupt || isUploading}
             />
             
             {/* 操作按钮区域 - 包含上传文件和发送按钮 */}
@@ -1301,7 +1367,7 @@ function ChatMessages({
               {/* 上传文件按钮 */}
               {!(isLoading || interrupt) && (
                 <FileUploadManager
-                  selectedFiles={selectedFiles}
+                  selectedFiles={uploadedFiles.map(f => f.file)}
                   onFilesSelect={handleFilesSelect}
                   onFileRemove={handleRemoveFile}
                   isDark={isDark}
@@ -1350,7 +1416,7 @@ function ChatMessages({
               ) : (
                 <button
                   type="submit"
-                  disabled={!inputValue.trim() && selectedFiles.length === 0}
+                  disabled={(!inputValue.trim() && selectedFiles.length === 0) || isUploading}
                   className={cn(
                     "p-2 rounded transition-colors duration-200 mr-1",
                     !inputValue.trim() && selectedFiles.length === 0

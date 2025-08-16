@@ -65,6 +65,7 @@ class RunCreate(BaseModel):
     command: Optional[Dict[str, Any]] = None
     checkpoint: Optional[Dict[str, Any]] = None
     user_name: Optional[str] = None  # 用户名，用于线程关联
+    file_ids: Optional[List[str]] = None  # 关联的文件ID列表
 
 async def process_stream_chunk(chunk, event_id, thread_id):
     """处理单个流式数据块"""    
@@ -129,6 +130,28 @@ async def process_stream_chunk(chunk, event_id, thread_id):
 async def stream_with_graph_postgres(graph, request_body, thread_id):
     """PostgreSQL模式专用的图流媒体处理函数"""
     config, graph_input, stream_modes, checkpoint = prepare_graph_config(request_body, thread_id)
+    
+    # 从 configurable 中获取 file_ids
+    file_ids = None
+    if request_body.config and request_body.config.get("configurable"):
+        file_ids = request_body.config["configurable"].get("file_ids")
+    
+    # 如果有关联的文档，将文档内容添加到消息上下文中
+    if file_ids and graph_input and "messages" in graph_input:
+        logger.info(f"📄 检测到关联文档: {file_ids}")
+        from .document_service import document_service
+        
+        # 获取文档上下文
+        doc_context = document_service.get_document_context(file_ids)
+        if doc_context:
+            # 在用户消息前插入文档上下文作为系统消息
+            doc_message = {
+                "type": "system",
+                "content": f"请参考以下文档内容回答用户问题：\n\n{doc_context}"
+            }
+            graph_input["messages"].insert(0, doc_message)
+            logger.info(f"✅ 已添加文档上下文，长度: {len(doc_context)} 字符")
+    
     logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
     
     event_id = 0

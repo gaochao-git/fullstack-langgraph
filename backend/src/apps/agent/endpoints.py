@@ -1,7 +1,7 @@
 """Agent API routes - 使用全局统一响应格式"""
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -9,7 +9,7 @@ from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
     AgentCreate, AgentUpdate, AgentQueryParams, MCPConfigUpdate,
     AgentStatusUpdate, AgentStatisticsUpdate, AgentResponse, AgentStatistics,
-    AgentOwnerTransfer
+    AgentOwnerTransfer, FileUploadResponse, DocumentContent, FileProcessStatus
 )
 from src.apps.agent.service.agent_service import agent_service
 from src.shared.core.logging import get_logger
@@ -22,6 +22,7 @@ from src.apps.auth.dependencies import get_current_user_optional
 # 导入LLM路由功能
 from .service.streaming import stream_run_standard, RunCreate
 from .service.threads import create_thread, get_thread_history_post, ThreadCreate, ThreadResponse
+from .service.document_service import document_service
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["Agent Management"])
@@ -281,3 +282,62 @@ async def get_user_threads_endpoint(user_name: str, limit: int = 10, offset: int
     from .service.user_threads_db import get_user_threads
     threads = await get_user_threads(user_name, limit, offset)
     return {"user_name": user_name, "threads": threads, "total": len(threads)}
+
+
+# ==================== 文档上传和处理路由 ====================
+
+@router.post("/v1/agents/files/upload", response_model=UnifiedResponse)
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """上传文档文件"""
+    # 读取文件内容
+    file_content = await file.read()
+    
+    # 获取用户ID
+    user_id = current_user.get('username') if current_user else 'anonymous'
+    
+    # 上传文件
+    file_info = await document_service.upload_file(
+        file_content=file_content,
+        filename=file.filename,
+        user_id=user_id
+    )
+    
+    return success_response(
+        data=FileUploadResponse(**file_info).model_dump(),
+        msg="文件上传成功"
+    )
+
+
+@router.get("/v1/agents/files/{file_id}/content", response_model=UnifiedResponse)
+async def get_document_content(
+    file_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取文档内容"""
+    content = await document_service.get_document_content(file_id)
+    if not content:
+        raise BusinessException("文档不存在或正在处理中", ResponseCode.NOT_FOUND)
+    
+    return success_response(
+        data=DocumentContent(**content).model_dump(),
+        msg="获取文档内容成功"
+    )
+
+
+@router.get("/v1/agents/files/{file_id}/status", response_model=UnifiedResponse)
+async def get_file_status(
+    file_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取文件处理状态"""
+    status = await document_service.get_file_status(file_id)
+    if not status:
+        raise BusinessException("文件不存在", ResponseCode.NOT_FOUND)
+    
+    return success_response(
+        data=FileProcessStatus(**status).model_dump(),
+        msg="获取文件状态成功"
+    )

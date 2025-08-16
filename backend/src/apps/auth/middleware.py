@@ -14,6 +14,9 @@ from src.apps.auth.utils import JWTUtils, TokenBlacklist
 from src.apps.auth.service.rbac_service import RBACService
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
+from src.shared.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
