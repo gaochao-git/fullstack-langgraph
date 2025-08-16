@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -11,6 +11,7 @@ import DiagnosticAgentWelcome from "./DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 import { theme } from "antd";
+import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -792,6 +793,7 @@ function ChatMessages({
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
   // 处理故障诊断开始 - 将诊断消息设置到输入框
   const handleStartDiagnosis = (message: string) => {
@@ -809,10 +811,25 @@ function ChatMessages({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
+    if (inputValue.trim() || selectedFiles.length > 0) {
+      // TODO: 处理文件上传逻辑
+      if (selectedFiles.length > 0) {
+        console.log('准备上传文件:', selectedFiles);
+      }
       onSubmit(inputValue.trim());
       setInputValue("");
+      setSelectedFiles([]); // 清空已选文件
     }
+  };
+
+  // 处理文件选择
+  const handleFilesSelect = (files: File[]) => {
+    setSelectedFiles(prevFiles => [...prevFiles, ...files]);
+  };
+
+  // 移除选中的文件
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
   // 滚动到底部
@@ -1205,6 +1222,13 @@ function ChatMessages({
             : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
         )}
       >
+        {/* 已选择文件显示区域 */}
+        <FileListDisplay 
+          files={selectedFiles}
+          onRemove={handleRemoveFile}
+          isDark={isDark}
+        />
+        
         <form onSubmit={handleSubmit} style={{ paddingLeft: '5px', paddingRight: '5px', paddingTop: '5px', paddingBottom: '5px' }}>
           {/* 地址栏样式的输入容器 */}
           <div className={cn(
@@ -1267,13 +1291,33 @@ function ChatMessages({
               disabled={isLoading || !!interrupt}
             />
             
-            {/* 发送/取消按钮 - 作为地址栏的操作部分 */}
+            {/* 操作按钮区域 - 包含上传文件和发送按钮 */}
             <div className={cn(
-              "flex items-center border-l px-2",
+              "flex items-center border-l",
               isDark 
                 ? "border-gray-600" 
                 : "border-gray-300"
             )}>
+              {/* 上传文件按钮 */}
+              {!(isLoading || interrupt) && (
+                <FileUploadManager
+                  selectedFiles={selectedFiles}
+                  onFilesSelect={handleFilesSelect}
+                  onFileRemove={handleRemoveFile}
+                  isDark={isDark}
+                  disabled={isLoading || !!interrupt}
+                />
+              )}
+              
+              {/* 分隔线 */}
+              {!(isLoading || interrupt) && (
+                <div className={cn(
+                  "h-6 w-px mx-1",
+                  isDark ? "bg-gray-600" : "bg-gray-300"
+                )} />
+              )}
+              
+              {/* 发送/取消按钮 */}
               {(isLoading || interrupt) ? (
                 <button
                   type="button"
@@ -1283,7 +1327,7 @@ function ChatMessages({
                     onCancel();
                   }}
                   className={cn(
-                    "p-2 rounded hover:bg-opacity-80 transition-colors duration-200 flex items-center gap-1",
+                    "p-2 rounded hover:bg-opacity-80 transition-colors duration-200 flex items-center gap-1 mx-1",
                     "text-orange-500 hover:bg-orange-100"
                   )}
                   style={{
@@ -1306,18 +1350,16 @@ function ChatMessages({
               ) : (
                 <button
                   type="submit"
-                  disabled={!inputValue.trim()}
+                  disabled={!inputValue.trim() && selectedFiles.length === 0}
                   className={cn(
-                    "p-2 rounded transition-colors duration-200 flex items-center gap-1",
-                    !inputValue.trim()
+                    "p-2 rounded transition-colors duration-200 mr-1",
+                    !inputValue.trim() && selectedFiles.length === 0
                       ? "text-gray-400 cursor-not-allowed"
                       : "text-cyan-500 hover:bg-cyan-50 hover:text-cyan-600"
                   )}
+                  title="发送消息"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                  </svg>
-                  <span className="hidden sm:inline text-sm">发送</span>
+                  <Send className="h-4 w-4" />
                 </button>
               )}
             </div>

@@ -1,0 +1,158 @@
+import React, { useRef } from 'react';
+import { Paperclip, X } from 'lucide-react';
+import { cn } from '@/utils/lib-utils';
+
+interface FileUploadManagerProps {
+  selectedFiles: File[];
+  onFilesSelect: (files: File[]) => void;
+  onFileRemove: (index: number) => void;
+  isDark: boolean;
+  disabled?: boolean;
+}
+
+export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
+  selectedFiles,
+  onFilesSelect,
+  onFileRemove,
+  isDark,
+  disabled = false
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      onFilesSelect(files);
+      // 清空 input 的值，以便可以再次选择相同的文件
+      e.target.value = '';
+    }
+  };
+
+  return (
+    <>
+      {/* 隐藏的文件输入 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        onChange={handleFileSelect}
+        className="hidden"
+        accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg,.gif"
+        disabled={disabled}
+      />
+      
+      {/* 上传按钮 */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={disabled}
+        className={cn(
+          "p-2 rounded transition-colors duration-200",
+          disabled
+            ? "cursor-not-allowed opacity-50"
+            : isDark
+              ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+        )}
+        title="上传文件"
+      >
+        <Paperclip className="h-4 w-4" />
+      </button>
+    </>
+  );
+};
+
+interface FileListDisplayProps {
+  files: File[];
+  onRemove: (index: number) => void;
+  isDark: boolean;
+}
+
+export const FileListDisplay: React.FC<FileListDisplayProps> = ({
+  files,
+  onRemove,
+  isDark
+}) => {
+  if (files.length === 0) return null;
+
+  return (
+    <div className={cn(
+      "px-4 py-2 border-b",
+      isDark ? "border-gray-700" : "border-gray-200"
+    )}>
+      <div className="flex flex-wrap gap-2">
+        {files.map((file, index) => (
+          <div
+            key={index}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
+              isDark
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-100 text-gray-700"
+            )}
+          >
+            <Paperclip className="h-3 w-3" />
+            <span className="max-w-[200px] truncate" title={file.name}>
+              {file.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => onRemove(index)}
+              className={cn(
+                "ml-1 hover:text-red-500 transition-colors",
+                isDark ? "text-gray-400" : "text-gray-500"
+              )}
+              aria-label={`删除文件 ${file.name}`}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// 文件上传相关的工具函数
+export const fileUploadUtils = {
+  // 格式化文件大小
+  formatFileSize: (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  },
+
+  // 获取文件扩展名
+  getFileExtension: (filename: string): string => {
+    return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2);
+  },
+
+  // 验证文件类型
+  isValidFileType: (file: File): boolean => {
+    const validTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+      'text/markdown',
+      'image/png',
+      'image/jpeg',
+      'image/gif'
+    ];
+    return validTypes.includes(file.type) || 
+           ['pdf', 'doc', 'docx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif']
+             .includes(getFileExtension(file.name).toLowerCase());
+  },
+
+  // 验证文件大小（默认最大 10MB）
+  isValidFileSize: (file: File, maxSizeInMB: number = 10): boolean => {
+    return file.size <= maxSizeInMB * 1024 * 1024;
+  }
+};
+
+// 获取文件扩展名的辅助函数
+function getFileExtension(filename: string): string {
+  return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2);
+}
