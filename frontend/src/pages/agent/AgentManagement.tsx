@@ -11,8 +11,7 @@ import {
   Row,
   Col,
   Switch,
-  Modal,
-  Radio
+  Modal
 } from 'antd';
 import { 
   RobotOutlined,
@@ -44,6 +43,19 @@ const AGENT_TYPES = [
   { value: '合同履约', label: '合同履约', color: 'gold' },
   { value: '变更管理', label: '变更管理', color: 'lime' },
   { value: '其他', label: '其他', color: 'default' },
+];
+
+// 状态过滤选项
+const STATUS_FILTERS = [
+  { value: 'enabled', label: '已启用' },
+  { value: 'disabled', label: '已禁用' },
+];
+
+// 归属过滤选项
+const OWNER_FILTERS = [
+  { value: 'mine', label: '我的' },
+  { value: 'team', label: '我的团队' },
+  { value: 'department', label: '我的部门' },
 ];
 
 
@@ -114,9 +126,9 @@ const AgentManagement: React.FC = () => {
   const [mcpServers, setMcpServers] = useState<LocalMCPServer[]>([]);
   const [availableModels, setAvailableModels] = useState<any[]>([]);
   const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
-  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all'); // 新增：所有/我的筛选
+  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined);
+  const [ownerFilter, setOwnerFilter] = useState<string | undefined>(undefined); // 归属过滤：我的/我的团队/我的部门
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // 模态框状态
@@ -168,8 +180,24 @@ const AgentManagement: React.FC = () => {
     try {
       // 根据筛选条件构建参数
       const params: any = { size: 100 };
-      if (ownerFilter === 'mine' && user?.username) {
-        params.create_by = user.username;
+      
+      // 根据归属过滤设置参数
+      if (ownerFilter) {
+        switch (ownerFilter) {
+          case 'mine':
+            if (user?.username) {
+              params.create_by = user.username;
+            }
+            break;
+          case 'team':
+            // TODO: 需要后端支持团队信息
+            // params.team_id = user?.team_id;
+            break;
+          case 'department':
+            // TODO: 需要后端支持部门信息
+            // params.department_id = user?.department_id;
+            break;
+        }
       }
       
       const response = await agentApi.getAgents(params);
@@ -437,15 +465,18 @@ const AgentManagement: React.FC = () => {
               // 移动端布局 - 多行显示
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <Radio.Group 
-                    value={ownerFilter} 
-                    onChange={(e) => setOwnerFilter(e.target.value)}
-                    buttonStyle="solid"
+                  <Select
+                    value={ownerFilter}
+                    onChange={setOwnerFilter}
+                    style={{ width: 100 }}
                     size="small"
-                  >
-                    <Radio.Button value="all">所有</Radio.Button>
-                    <Radio.Button value="mine">我的</Radio.Button>
-                  </Radio.Group>
+                    allowClear
+                    placeholder="归属"
+                    options={OWNER_FILTERS.map(filter => ({
+                      value: filter.value,
+                      label: filter.label
+                    }))}
+                  />
                   <Button 
                     type="primary"
                     icon={<RobotOutlined />}
@@ -479,13 +510,14 @@ const AgentManagement: React.FC = () => {
                   <Select
                     placeholder="状态"
                     allowClear
-                    style={{ width: '70px' }}
+                    style={{ width: '80px' }}
                     value={statusFilter}
                     onChange={setStatusFilter}
                     size="small"
                   >
-                    <Option value="enabled">启用</Option>
-                    <Option value="disabled">禁用</Option>
+                    {STATUS_FILTERS.map(status => (
+                      <Option key={status.value} value={status.value}>{status.label}</Option>
+                    ))}
                   </Select>
                   <Button 
                     icon={<ReloadOutlined />}
@@ -497,20 +529,16 @@ const AgentManagement: React.FC = () => {
             ) : (
               // 桌面端布局 - 单行显示
               <Space>
-                <Radio.Group 
-                  value={ownerFilter} 
-                  onChange={(e) => setOwnerFilter(e.target.value)}
-                  buttonStyle="solid"
-                >
-                  <Radio.Button value="all">所有</Radio.Button>
-                  <Radio.Button value="mine">我的</Radio.Button>
-                </Radio.Group>
-                <Search
-                  placeholder="搜索智能体名称、描述"
+                <Select
+                  value={ownerFilter}
+                  onChange={setOwnerFilter}
+                  style={{ width: 120 }}
                   allowClear
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  style={{ width: 240 }}
+                  placeholder="归属筛选"
+                  options={OWNER_FILTERS.map(filter => ({
+                    value: filter.value,
+                    label: filter.label
+                  }))}
                 />
                 <Select
                   placeholder="分类筛选"
@@ -530,9 +558,17 @@ const AgentManagement: React.FC = () => {
                   value={statusFilter}
                   onChange={setStatusFilter}
                 >
-                  <Option value="enabled">已启用</Option>
-                  <Option value="disabled">已禁用</Option>
+                  {STATUS_FILTERS.map(status => (
+                    <Option key={status.value} value={status.value}>{status.label}</Option>
+                  ))}
                 </Select>
+                <Search
+                  placeholder="搜索智能体名称、描述"
+                  allowClear
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  style={{ width: 240 }}
+                />
                 <Button 
                   icon={<ReloadOutlined />}
                   onClick={loadData}

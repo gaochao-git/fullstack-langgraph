@@ -1,17 +1,12 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Select, Input, Button } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Select, Input } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
   SettingOutlined, 
   UserOutlined,
   ToolOutlined,
-  TeamOutlined,
-  ApartmentOutlined,
-  GlobalOutlined,
-  SearchOutlined,
-  PlusOutlined,
-  ReloadOutlined
+  SearchOutlined
 } from "@ant-design/icons";
 import { 
   categoryColors,
@@ -30,26 +25,24 @@ type Agent = ApiAgent;
 
 // 智能体分类选项
 const AGENT_TYPES = [
-  { value: 'all', label: '全部类型', icon: <RobotOutlined /> },
-  { value: '日志分析', label: '日志分析', icon: <DatabaseOutlined /> },
-  { value: '监控告警', label: '监控告警', icon: <SettingOutlined /> },
-  { value: '故障诊断', label: '故障诊断', icon: <ToolOutlined /> },
-  { value: '性能优化', label: '性能优化', icon: <RobotOutlined /> },
-  { value: '资源管理', label: '资源管理', icon: <DatabaseOutlined /> },
-  { value: '运维部署', label: '运维部署', icon: <SettingOutlined /> },
-  { value: '安全防护', label: '安全防护', icon: <UserOutlined /> },
-  { value: '合规审计', label: '合规审计', icon: <DatabaseOutlined /> },
-  { value: '合同履约', label: '合同履约', icon: <RobotOutlined /> },
-  { value: '变更管理', label: '变更管理', icon: <ToolOutlined /> },
-  { value: '其他', label: '其他', icon: <RobotOutlined /> },
+  { value: '日志分析', label: '日志分析' },
+  { value: '监控告警', label: '监控告警' },
+  { value: '故障诊断', label: '故障诊断' },
+  { value: '性能优化', label: '性能优化' },
+  { value: '资源管理', label: '资源管理' },
+  { value: '运维部署', label: '运维部署' },
+  { value: '安全防护', label: '安全防护' },
+  { value: '合规审计', label: '合规审计' },
+  { value: '合同履约', label: '合同履约' },
+  { value: '变更管理', label: '变更管理' },
+  { value: '其他', label: '其他' },
 ];
 
 // 归属过滤选项
 const OWNER_FILTERS = [
-  { value: 'all', label: '所有', icon: <GlobalOutlined /> },
-  { value: 'mine', label: '我的', icon: <UserOutlined /> },
-  { value: 'team', label: '我的团队', icon: <TeamOutlined /> },
-  { value: 'department', label: '我的部门', icon: <ApartmentOutlined /> },
+  { value: 'mine', label: '我的' },
+  { value: 'team', label: '我的团队' },
+  { value: 'department', label: '我的部门' },
 ];
 
 const AgentMarketplace = () => {
@@ -57,34 +50,32 @@ const AgentMarketplace = () => {
   const { isDark } = useTheme();
   const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string | undefined>(undefined);
+  const [ownerFilter, setOwnerFilter] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState<string>('');
   
   // 根据类型、所有者和搜索关键词过滤智能体
   const filteredAgents = agents
     .filter(agent => {
       // 类型过滤
-      const matchType = selectedType === 'all' || agent.agent_type === selectedType;
+      const matchType = !selectedType || agent.agent_type === selectedType;
       
       // 归属过滤
       let matchOwner = true;
-      switch (ownerFilter) {
-        case 'mine':
-          matchOwner = agent.create_by === user?.username;
-          break;
-        case 'team':
-          // TODO: 需要后端支持团队信息
-          matchOwner = true; // 暂时显示所有
-          break;
-        case 'department':
-          // TODO: 需要后端支持部门信息
-          matchOwner = true; // 暂时显示所有
-          break;
-        case 'all':
-        default:
-          matchOwner = true;
-          break;
+      if (ownerFilter) {
+        switch (ownerFilter) {
+          case 'mine':
+            matchOwner = agent.create_by === user?.username;
+            break;
+          case 'team':
+            // TODO: 需要后端支持团队信息
+            matchOwner = true; // 暂时显示所有
+            break;
+          case 'department':
+            // TODO: 需要后端支持部门信息
+            matchOwner = true; // 暂时显示所有
+            break;
+        }
       }
       
       // 搜索过滤
@@ -336,40 +327,26 @@ const AgentMarketplace = () => {
         bodyStyle={{ padding: '16px 20px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          {/* 归属过滤按钮组 */}
-          <Button.Group>
-            <Button 
-              type={ownerFilter === 'all' ? 'primary' : 'default'}
-              onClick={() => setOwnerFilter('all')}
-            >
-              全部
-            </Button>
-            <Button 
-              type={ownerFilter === 'mine' ? 'primary' : 'default'}
-              onClick={() => setOwnerFilter('mine')}
-            >
-              我的
-            </Button>
-            <Button 
-              type={ownerFilter === 'team' ? 'primary' : 'default'}
-              onClick={() => setOwnerFilter('team')}
-            >
-              我的团队
-            </Button>
-            <Button 
-              type={ownerFilter === 'department' ? 'primary' : 'default'}
-              onClick={() => setOwnerFilter('department')}
-            >
-              我的部门
-            </Button>
-          </Button.Group>
+          {/* 归属过滤下拉 */}
+          <Select
+            value={ownerFilter}
+            onChange={setOwnerFilter}
+            style={{ width: 120 }}
+            placeholder="归属筛选"
+            allowClear
+            options={OWNER_FILTERS.map(filter => ({
+              value: filter.value,
+              label: filter.label
+            }))}
+          />
           
           {/* 类型筛选下拉 */}
           <Select
             value={selectedType}
             onChange={setSelectedType}
-            style={{ width: 150 }}
-            placeholder="选择类型"
+            style={{ width: 120 }}
+            placeholder="类型筛选"
+            allowClear
             options={AGENT_TYPES.map(type => ({
               value: type.value,
               label: type.label
@@ -394,14 +371,14 @@ const AgentMarketplace = () => {
           <div style={{ marginTop: 16 }}>
             <Text type="secondary">
               {(() => {
-                const ownerLabel = OWNER_FILTERS.find(f => f.value === ownerFilter)?.label || '所选';
-                const typeLabel = AGENT_TYPES.find(t => t.value === selectedType)?.label || '所选类型';
+                const ownerLabel = OWNER_FILTERS.find(f => f.value === ownerFilter)?.label || '';
+                const typeLabel = AGENT_TYPES.find(t => t.value === selectedType)?.label || '';
                 
-                if (ownerFilter !== 'all' && selectedType !== 'all') {
+                if (ownerFilter && selectedType) {
                   return `暂无${ownerLabel}的${typeLabel}智能体`;
-                } else if (ownerFilter !== 'all') {
+                } else if (ownerFilter) {
                   return `暂无${ownerLabel}的智能体`;
-                } else if (selectedType !== 'all') {
+                } else if (selectedType) {
                   return `暂无${typeLabel}的智能体`;
                 } else {
                   return '暂无可用的智能体';
