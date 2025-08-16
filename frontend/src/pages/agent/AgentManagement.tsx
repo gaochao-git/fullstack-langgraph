@@ -289,11 +289,17 @@ const AgentManagement: React.FC = () => {
       if (typeFilter) matchType = agent.agent_type === typeFilter;
       return matchSearch && matchStatus && matchType;
     })
-    // 内置智能体排前面
+    // 按调用次数排序（从多到少）
     .sort((a, b) => {
-      if (a.is_builtin === 'yes' && b.is_builtin !== 'yes') return -1;
-      if (a.is_builtin !== 'yes' && b.is_builtin === 'yes') return 1;
-      return 0;
+      // 获取调用次数
+      const usageA = a.total_queries || 0;
+      const usageB = b.total_queries || 0;
+      
+      // 按调用次数降序排列
+      if (usageA !== usageB) return usageB - usageA;
+      
+      // 调用次数相同时，按名称字母顺序
+      return (a.agent_name || '').localeCompare(b.agent_name || '');
     });
 
   // 切换智能体启用状态

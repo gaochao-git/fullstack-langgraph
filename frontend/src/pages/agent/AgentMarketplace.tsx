@@ -84,6 +84,18 @@ const AgentMarketplace = () => {
         agent.agent_description?.toLowerCase().includes(searchText.toLowerCase());
       
       return matchType && matchOwner && matchSearch;
+    })
+    // 按调用次数排序（从多到少）
+    .sort((a, b) => {
+      // 获取调用次数
+      const usageA = a.total_queries || 0;
+      const usageB = b.total_queries || 0;
+      
+      // 按调用次数降序排列
+      if (usageA !== usageB) return usageB - usageA;
+      
+      // 调用次数相同时，按名称字母顺序
+      return (a.agent_name || '').localeCompare(b.agent_name || '');
     });
 
   // 获取智能体数据
