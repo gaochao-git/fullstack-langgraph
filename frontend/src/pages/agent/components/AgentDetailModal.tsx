@@ -19,7 +19,10 @@ import {
   DatabaseOutlined,
   MonitorOutlined,
   CloudOutlined,
-  GlobalOutlined
+  GlobalOutlined,
+  LockOutlined,
+  TeamOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 
 interface LocalAgent {
@@ -41,6 +44,10 @@ interface LocalAgent {
     selectedTools: string[];
     totalTools: number;
   };
+  agent_owner?: string;
+  visibility_type?: string;
+  visibility_additional_users?: string[];
+  create_by?: string;
 }
 
 interface LocalMCPServer {
@@ -140,6 +147,49 @@ const AgentDetailModal: React.FC<AgentDetailModalProps> = ({
             <Descriptions.Item label="描述" span={2}>
               {agent.agent_description}
             </Descriptions.Item>
+            <Descriptions.Item label="所有者">
+              <Space>
+                <UserOutlined />
+                {agent.agent_owner || agent.create_by || 'system'}
+              </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="可见性权限">
+              <Space>
+                {agent.visibility_type === 'private' && (
+                  <>
+                    <LockOutlined />
+                    <Tag color="red">仅自己可见</Tag>
+                  </>
+                )}
+                {agent.visibility_type === 'team' && (
+                  <>
+                    <TeamOutlined />
+                    <Tag color="orange">团队可见</Tag>
+                  </>
+                )}
+                {agent.visibility_type === 'department' && (
+                  <>
+                    <TeamOutlined />
+                    <Tag color="blue">部门可见</Tag>
+                  </>
+                )}
+                {agent.visibility_type === 'public' && (
+                  <>
+                    <GlobalOutlined />
+                    <Tag color="green">所有人可见</Tag>
+                  </>
+                )}
+              </Space>
+            </Descriptions.Item>
+            {agent.visibility_additional_users && agent.visibility_additional_users.length > 0 && (
+              <Descriptions.Item label="额外授权用户" span={2}>
+                <Space wrap>
+                  {agent.visibility_additional_users.map(user => (
+                    <Tag key={user} icon={<UserOutlined />}>{user}</Tag>
+                  ))}
+                </Space>
+              </Descriptions.Item>
+            )}
           </Descriptions>
           
           <Divider>运行统计</Divider>

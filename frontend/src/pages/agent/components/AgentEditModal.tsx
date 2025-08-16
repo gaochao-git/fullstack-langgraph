@@ -11,12 +11,18 @@ import {
   Tree, 
   Space, 
   Tooltip,
-  App
+  App,
+  Radio,
+  Tag
 } from 'antd';
 import { 
   ToolOutlined, 
   ApiOutlined, 
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  LockOutlined,
+  TeamOutlined,
+  GlobalOutlined,
+  UserOutlined
 } from '@ant-design/icons';
 import { 
   iconConfig,
@@ -366,7 +372,9 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           presence_penalty: 0.0,
           system_prompt: '',
           user_prompt_template: '',
-          assistant_prompt_template: ''
+          assistant_prompt_template: '',
+          visibility_type: 'private',
+          visibility_additional_users: []
         });
       } else if (agent) {
         // 编辑时的初始化
@@ -414,6 +422,8 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           agent_description: fullAgent.agent_description,
           agent_capabilities: fullAgent.agent_capabilities,
           agent_icon: fullAgent.agent_icon,
+          visibility_type: fullAgent.visibility_type || 'private',
+          visibility_additional_users: fullAgent.visibility_additional_users || [],
         };
 
         // LLM 配置 - 只设置实际存在的值
@@ -716,6 +726,61 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
                   </Select.OptGroup>
                 ))}
               </Select>
+            </Form.Item>
+
+            {/* 权限配置 */}
+            <Form.Item
+              label="可见性权限"
+              name="visibility_type"
+              rules={[{ required: true, message: '请选择可见性权限' }]}
+              initialValue="private"
+              extra="设置谁可以看到并使用这个智能体"
+            >
+              <Radio.Group>
+                <Space direction="vertical">
+                  <Radio value="private">
+                    <Space>
+                      <LockOutlined />
+                      <span>仅自己可见</span>
+                      <Tag color="red">私有</Tag>
+                    </Space>
+                  </Radio>
+                  <Radio value="team">
+                    <Space>
+                      <TeamOutlined />
+                      <span>团队可见</span>
+                      <Tag color="orange">团队共享</Tag>
+                    </Space>
+                  </Radio>
+                  <Radio value="department">
+                    <Space>
+                      <TeamOutlined />
+                      <span>部门可见</span>
+                      <Tag color="blue">部门共享</Tag>
+                    </Space>
+                  </Radio>
+                  <Radio value="public">
+                    <Space>
+                      <GlobalOutlined />
+                      <span>所有人可见</span>
+                      <Tag color="green">公开</Tag>
+                    </Space>
+                  </Radio>
+                </Space>
+              </Radio.Group>
+            </Form.Item>
+
+            <Form.Item
+              label="额外授权用户"
+              name="visibility_additional_users"
+              extra="输入用户名，按回车添加。这些用户将获得访问权限"
+            >
+              <Select
+                mode="tags"
+                placeholder="输入用户名并按回车"
+                style={{ width: '100%' }}
+                tokenSeparators={[',']}
+              />
             </Form.Item>
           </TabPane>
 

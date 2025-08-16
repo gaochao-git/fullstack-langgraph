@@ -18,7 +18,10 @@ import {
   SettingOutlined,
   EyeOutlined,
   ReloadOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  LockOutlined,
+  TeamOutlined,
+  GlobalOutlined
 } from '@ant-design/icons';
 import AgentDetailModal from './components/AgentDetailModal';
 import AgentEditModal from './components/AgentEditModal';
@@ -666,14 +669,27 @@ const AgentManagement: React.FC = () => {
                   }
                   description={
                     <div className="space-y-2 mt-1">
-                      {/* 分类标签 */}
-                      <div>
+                      {/* 分类标签和权限标签 */}
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Tag 
                           color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'} 
                           className="text-xs"
                         >
                           {agent.agent_type || '未分类'}
                         </Tag>
+                        {/* 权限标签 */}
+                        {agent.visibility_type === 'private' && (
+                          <Tag icon={<LockOutlined />} color="red" className="text-xs">私有</Tag>
+                        )}
+                        {agent.visibility_type === 'team' && (
+                          <Tag icon={<TeamOutlined />} color="orange" className="text-xs">团队</Tag>
+                        )}
+                        {agent.visibility_type === 'department' && (
+                          <Tag icon={<TeamOutlined />} color="blue" className="text-xs">部门</Tag>
+                        )}
+                        {agent.visibility_type === 'public' && (
+                          <Tag icon={<GlobalOutlined />} color="green" className="text-xs">公开</Tag>
+                        )}
                       </div>
 
                       {/* 运行统计和MCP工具统计合并 */}
