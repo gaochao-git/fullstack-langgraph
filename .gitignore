@@ -40,7 +40,8 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 *$py.class
-uv.lock
+# uv.lock should be committed to ensure consistent dependencies
+# uv.lock
 
 # C extensions
 *.so
