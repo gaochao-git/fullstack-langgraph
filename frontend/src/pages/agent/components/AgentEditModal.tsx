@@ -558,7 +558,10 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       ...values,
       tools_info: toolsConfig,
       llm_info: llmConfig,
-      prompt_info: promptConfig
+      prompt_info: promptConfig,
+      // 确保权限字段被包含
+      visibility_type: values.visibility_type || 'private',
+      visibility_additional_users: values.visibility_additional_users || []
     };
 
 

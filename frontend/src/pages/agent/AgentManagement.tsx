@@ -390,7 +390,9 @@ const AgentManagement: React.FC = () => {
           agent_icon: values.agent_icon || 'Bot',
           tools_info: values.tools_info,
           llm_info: values.llm_info,
-          prompt_info: values.prompt_info
+          prompt_info: values.prompt_info,
+          visibility_type: values.visibility_type || 'private',
+          visibility_additional_users: values.visibility_additional_users || []
         };
 
         const response = await agentApi.createAgent(newAgentData);
@@ -414,7 +416,9 @@ const AgentManagement: React.FC = () => {
           agent_icon: values.agent_icon,
           tools_info: values.tools_info,
           llm_info: values.llm_info,
-          prompt_info: values.prompt_info
+          prompt_info: values.prompt_info,
+          visibility_type: values.visibility_type || 'private',
+          visibility_additional_users: values.visibility_additional_users || []
         };
 
         const response = await agentApi.updateAgent(editingAgent.agent_id, updateData);
@@ -640,25 +644,26 @@ const AgentManagement: React.FC = () => {
                 ]}
               >
                 <Card.Meta
-                  avatar={
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '50%',
-                        backgroundColor: agent.agent_icon ? getIconBackgroundColor(agent.agent_icon, '20') : '#1677ff20',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      {agent.agent_icon ? renderIcon(agent.agent_icon, 18) : <RobotOutlined style={{ fontSize: 18 }} />}
-                    </div>
-                  }
                   title={
-                    <div className="flex items-center justify-between">
-                      <div className="text-base font-medium flex items-center gap-2" style={{ color: agent.is_builtin === 'yes' ? '#faad14' : undefined }}>
-                        {agent.displayName}
+                    <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '50%',
+                            backgroundColor: agent.agent_icon ? getIconBackgroundColor(agent.agent_icon, '20') : '#1677ff20',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                        >
+                          {agent.agent_icon ? renderIcon(agent.agent_icon, 16) : <RobotOutlined style={{ fontSize: 16 }} />}
+                        </div>
+                        <div className="text-base font-medium" style={{ color: agent.is_builtin === 'yes' ? '#faad14' : undefined }}>
+                          {agent.displayName}
+                        </div>
                       </div>
                       <Switch
                         size="small"
@@ -668,7 +673,7 @@ const AgentManagement: React.FC = () => {
                     </div>
                   }
                   description={
-                    <div className="space-y-2 mt-1">
+                    <div className="space-y-2">
                       {/* 分类标签和权限标签 */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <Tag 
@@ -692,21 +697,21 @@ const AgentManagement: React.FC = () => {
                         )}
                       </div>
 
-                      {/* 运行统计和MCP工具统计合并 */}
-                      <div className="text-sm space-y-1">
-                        <div><span className="text-gray-500">运行次数: </span><span className="font-semibold text-gray-800">{agent.totalRuns}</span></div>
-                        <div className="flex flex-wrap gap-x-4">
-                          <span><span className="text-gray-500">服务器: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.enabledServers.length}</span></span>
-                          <span><span className="text-gray-500">工具: </span><span className="font-semibold text-gray-800">{agent.mcpConfig.selectedTools.length}</span></span>
-                        </div>
+                      {/* 运行统计和MCP工具统计合并为一行 */}
+                      <div className="flex items-center gap-3 text-xs">
+                        <span className="text-gray-500">运行: <span className="font-semibold text-gray-700">{agent.totalRuns}</span></span>
+                        <span className="text-gray-500">服务器: <span className="font-semibold text-gray-700">{agent.mcpConfig.enabledServers.length}</span></span>
+                        <span className="text-gray-500">工具: <span className="font-semibold text-gray-700">{agent.mcpConfig.selectedTools.length}</span></span>
                       </div>
 
                       {/* 核心能力 */}
-                      <div className="flex flex-wrap gap-1">
-                        {(agent.agent_capabilities || []).slice(0, 3).map(capability => (
-                          <Tag key={capability} color="blue" className="text-xs">{capability}</Tag>
-                        ))}
-                      </div>
+                      {agent.agent_capabilities && agent.agent_capabilities.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {agent.agent_capabilities.slice(0, 3).map(capability => (
+                            <Tag key={capability} color="blue" className="text-xs">{capability}</Tag>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   }
                 />

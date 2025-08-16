@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_, func, case, text
 import uuid
+import json
 
 from src.apps.agent.models import AgentConfig
 from src.shared.core.logging import get_logger
@@ -50,6 +51,17 @@ class AgentService:
             agent_data.setdefault('update_time', now_shanghai()) 
             # 处理capabilities字段映射
             if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):agent_data['agent_capabilities'] = agent_data.pop('capabilities')
+            
+            # 处理JSON字段 - 转换为JSON字符串
+            if 'visibility_additional_users' in agent_data:
+                if isinstance(agent_data['visibility_additional_users'], list):
+                    agent_data['visibility_additional_users'] = json.dumps(agent_data['visibility_additional_users'])
+                elif agent_data['visibility_additional_users'] is None:
+                    agent_data['visibility_additional_users'] = json.dumps([])
+            
+            # 设置默认的权限相关字段
+            agent_data.setdefault('agent_owner', 'system')
+            agent_data.setdefault('visibility_type', 'public')
             
             logger.info(f"Creating agent: {agent_data['agent_id']}")
             instance = AgentConfig(**agent_data)
@@ -231,6 +243,13 @@ class AgentService:
             # 处理capabilities字段映射
             if 'capabilities' in update_data and isinstance(update_data['capabilities'], list): 
                 update_data['agent_capabilities'] = update_data.pop('capabilities')
+            
+            # 处理JSON字段 - 转换为JSON字符串
+            if 'visibility_additional_users' in update_data:
+                if isinstance(update_data['visibility_additional_users'], list):
+                    update_data['visibility_additional_users'] = json.dumps(update_data['visibility_additional_users'])
+                elif update_data['visibility_additional_users'] is None:
+                    update_data['visibility_additional_users'] = json.dumps([])
             
             logger.info(f"Updating agent: {agent_id}")
             await db.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
@@ -441,7 +460,6 @@ class AgentService:
                     logger.info(f"User {username} unfavorited agent {agent_id}")
             
             # 更新收藏列表
-            import json
             await db.execute(
                 update(AgentConfig)
                 .where(AgentConfig.agent_id == agent_id)

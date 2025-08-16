@@ -94,6 +94,9 @@ export interface CreateAgentRequest {
     selected_tools: string[];
     servers: string[];
   };
+  // 权限相关字段
+  visibility_type?: string;
+  visibility_additional_users?: string[];
 }
 
 export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {}
