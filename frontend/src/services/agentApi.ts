@@ -59,6 +59,12 @@ export interface Agent {
   total_queries?: number;
   success_queries?: number;
   failed_queries?: number;
+  // 权限相关字段
+  agent_owner?: string;
+  visibility_type?: string;
+  visibility_additional_users?: string[];
+  favorite_users?: string[];
+  is_favorited?: boolean; // 当前用户是否收藏
 }
 
 export interface CreateAgentRequest {
@@ -142,6 +148,7 @@ class AgentApiService {
     status?: string;
     enabled_only?: boolean;
     create_by?: string;
+    owner_filter?: string;
   }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', params.page.toString());
@@ -150,6 +157,7 @@ class AgentApiService {
     if (params?.status) searchParams.set('status', params.status);
     if (params?.enabled_only) searchParams.set('enabled_only', params.enabled_only.toString());
     if (params?.create_by) searchParams.set('create_by', params.create_by);
+    if (params?.owner_filter) searchParams.set('owner_filter', params.owner_filter);
 
     const url = `/api/v1/agents${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
     return await omind_get(url);
@@ -273,6 +281,38 @@ class AgentApiService {
    */
   async getAgentAvailableModels(agentId: string) {
     return await omind_get(`/api/v1/agents/${agentId}/available-models`);
+  }
+
+  /**
+   * 切换智能体收藏状态
+   */
+  async toggleFavorite(agentId: string, isFavorite: boolean) {
+    return await omind_post(`/api/v1/agents/${agentId}/favorite?is_favorite=${isFavorite}`);
+  }
+
+  /**
+   * 获取用户收藏的智能体列表
+   */
+  async getFavoriteAgents(params?: {
+    page?: number;
+    size?: number;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.size) searchParams.set('size', params.size.toString());
+
+    const url = `/api/v1/agents/favorites${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+
+  /**
+   * 转移智能体所有权
+   */
+  async transferOwnership(agentId: string, newOwner: string, reason?: string) {
+    return await omind_post(`/api/v1/agents/${agentId}/transfer-ownership`, {
+      new_owner: newOwner,
+      reason: reason
+    });
   }
 }
 

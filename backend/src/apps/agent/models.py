@@ -32,6 +32,11 @@ class AgentConfig(BaseModel):
     # 系统字段
     config_version = Column(String(20), default='1.0', nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    # 权限相关字段
+    agent_owner = Column(String(100), nullable=False, default='system')  # 智能体所有者
+    visibility_type = Column(String(100), nullable=False, default='public')  # 可见权限级别
+    visibility_additional_users = Column(Text, nullable=True)  # 额外授权用户列表(JSON)
+    favorite_users = Column(Text, nullable=True)  # 主动收藏该智能体的人员列表(JSON)
     create_by = Column(String(100), nullable=False, default='system')
     update_by = Column(String(100), nullable=True)
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
@@ -52,3 +57,27 @@ class AgentConfig(BaseModel):
     def _process_prompt_info(self, value):
         """自定义处理prompt_info字段 - 解析为Python字典"""
         return self._parse_json_field(value, default={})
+    
+    def _process_visibility_additional_users(self, value):
+        """自定义处理visibility_additional_users字段 - 解析为Python列表"""
+        import json
+        if value is None or value == '':
+            return []
+        if isinstance(value, list):
+            return value
+        try:
+            return json.loads(value) if isinstance(value, str) else []
+        except:
+            return []
+    
+    def _process_favorite_users(self, value):
+        """自定义处理favorite_users字段 - 解析为Python列表"""
+        import json
+        if value is None or value == '':
+            return []
+        if isinstance(value, list):
+            return value
+        try:
+            return json.loads(value) if isinstance(value, str) else []
+        except:
+            return []

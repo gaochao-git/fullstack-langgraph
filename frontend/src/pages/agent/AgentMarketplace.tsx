@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Select, Input } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Select, Input, Button } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
   SettingOutlined, 
   UserOutlined,
   ToolOutlined,
-  SearchOutlined
+  SearchOutlined,
+  StarOutlined,
+  StarFilled
 } from "@ant-design/icons";
 import { 
   categoryColors,
@@ -53,6 +55,7 @@ const AgentMarketplace = () => {
   const [selectedType, setSelectedType] = useState<string | undefined>(undefined);
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState<string>('');
+  const [showFavorites, setShowFavorites] = useState<boolean>(false);
   
   // 根据类型、所有者和搜索关键词过滤智能体
   const filteredAgents = agents
@@ -62,7 +65,10 @@ const AgentMarketplace = () => {
       
       // 归属过滤
       let matchOwner = true;
-      if (ownerFilter) {
+      if (showFavorites) {
+        // 如果选中了"我的收藏"，只显示收藏的智能体
+        matchOwner = agent.is_favorited === true;
+      } else if (ownerFilter) {
         switch (ownerFilter) {
           case 'mine':
             matchOwner = agent.create_by === user?.username;
@@ -128,6 +134,34 @@ const AgentMarketplace = () => {
 
   const handleAgentClick = (agentId: string) => {
     navigate(`/service/agents/${agentId}`);
+  };
+
+  const handleToggleFavorite = async (e: React.MouseEvent, agent: Agent) => {
+    e.stopPropagation(); // 阻止卡片点击事件
+    
+    try {
+      const newFavoriteStatus = !agent.is_favorited;
+      const response = await agentApi.toggleFavorite(agent.agent_id, newFavoriteStatus);
+      
+      if (response.status === 'error') {
+        message.error(response.msg || '操作失败');
+        return;
+      }
+      
+      // 更新本地状态
+      setAgents(prevAgents => 
+        prevAgents.map(a => 
+          a.agent_id === agent.agent_id 
+            ? { ...a, is_favorited: newFavoriteStatus }
+            : a
+        )
+      );
+      
+      message.success(newFavoriteStatus ? '收藏成功' : '取消收藏成功');
+    } catch (error) {
+      console.error('切换收藏状态失败:', error);
+      message.error('操作失败，请重试');
+    }
   };
 
 
@@ -238,14 +272,21 @@ const AgentMarketplace = () => {
         title={
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <Avatar 
-                size={42} 
-                style={{ 
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: '50%',
                   backgroundColor: getAgentBackgroundColor(agent),
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                }} 
-                icon={getAgentIcon(agent)} 
-              />
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                {getAgentIcon(agent)}
+              </div>
               <div style={{ flex: 1 }}>
                 <div style={{ 
                   fontWeight: 600, 
@@ -261,6 +302,13 @@ const AgentMarketplace = () => {
                   {agent.agent_type || '未分类'}
                 </Tag>
               </div>
+              {/* 收藏按钮 */}
+              <Button
+                type="text"
+                icon={agent.is_favorited ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
+                onClick={(e) => handleToggleFavorite(e, agent)}
+                style={{ fontSize: 20 }}
+              />
             </div>
           </div>
         }
@@ -339,13 +387,35 @@ const AgentMarketplace = () => {
         bodyStyle={{ padding: '16px 20px' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+          {/* 我的收藏按钮 */}
+          <Button
+            type={showFavorites ? "primary" : "default"}
+            icon={showFavorites ? <StarFilled /> : <StarOutlined />}
+            onClick={() => {
+              setShowFavorites(!showFavorites);
+              // 切换收藏时清除归属过滤
+              if (!showFavorites) {
+                setOwnerFilter(undefined);
+              }
+            }}
+          >
+            我的收藏
+          </Button>
+          
           {/* 归属过滤下拉 */}
           <Select
             value={ownerFilter}
-            onChange={setOwnerFilter}
+            onChange={(value) => {
+              setOwnerFilter(value);
+              // 选择归属过滤时取消收藏过滤
+              if (value) {
+                setShowFavorites(false);
+              }
+            }}
             style={{ width: 120 }}
             placeholder="归属筛选"
             allowClear
+            disabled={showFavorites}
             options={OWNER_FILTERS.map(filter => ({
               value: filter.value,
               label: filter.label
@@ -383,6 +453,9 @@ const AgentMarketplace = () => {
           <div style={{ marginTop: 16 }}>
             <Text type="secondary">
               {(() => {
+                if (showFavorites) {
+                  return '暂无收藏的智能体';
+                }
                 const ownerLabel = OWNER_FILTERS.find(f => f.value === ownerFilter)?.label || '';
                 const typeLabel = AGENT_TYPES.find(t => t.value === selectedType)?.label || '';
                 
@@ -400,7 +473,9 @@ const AgentMarketplace = () => {
           </div>
           <div style={{ marginTop: 8 }}>
             <Text type="secondary">
-              {ownerFilter === 'mine'
+              {showFavorites
+                ? '点击智能体卡片上的星星图标收藏智能体'
+                : ownerFilter === 'mine'
                 ? '请前往智能体管理创建您的智能体'
                 : '请调整筛选条件或前往智能体管理创建新的智能体'}
             </Text>

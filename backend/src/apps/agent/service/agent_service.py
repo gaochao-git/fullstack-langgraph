@@ -4,7 +4,7 @@ Agent服务层 - 纯异步实现
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, func, case
+from sqlalchemy import select, update, delete, and_, or_, func, case, text
 import uuid
 
 from src.apps.agent.models import AgentConfig
@@ -62,6 +62,7 @@ class AgentService:
         self, 
         db: AsyncSession, 
         agent_id: str,
+        current_user: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """根据ID获取智能体配置"""
         result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
@@ -75,6 +76,14 @@ class AgentService:
                     'selected_tools': [],
                     'total_tools': 0
                 }
+            
+            # 添加当前用户是否收藏的标记
+            if current_user:
+                favorite_users = db_agent._process_favorite_users(db_agent.favorite_users)
+                agent_dict['is_favorited'] = current_user in favorite_users
+            else:
+                agent_dict['is_favorited'] = False
+                
             return agent_dict
 
         return None
@@ -87,12 +96,14 @@ class AgentService:
         search: Optional[str] = None,
         status: Optional[str] = None,
         enabled_only: bool = False,
-        create_by: Optional[str] = None
+        create_by: Optional[str] = None,
+        current_user: Optional[str] = None,
+        owner_filter: Optional[str] = None
     ) -> Tuple[List[Dict[str, Any]], int]:
         """获取智能体列表"""
         offset = (page - 1) * size
         
-        # 构建过滤条件
+        # 构建基础过滤条件
         filters = {}
         if enabled_only:
             filters['agent_enabled'] = 'yes'
@@ -102,54 +113,80 @@ class AgentService:
         if create_by:
             filters['create_by'] = create_by
         
+        # 构建权限过滤条件
+        permission_conditions = []
+        if current_user and owner_filter:
+            if owner_filter == 'mine':
+                # 只看我的智能体
+                permission_conditions.append(AgentConfig.agent_owner == current_user)
+            elif owner_filter == 'team':
+                # 查看团队智能体：我的 + 团队成员的公开智能体
+                # TODO: 需要从用户表获取团队成员信息
+                permission_conditions.append(
+                    and_(
+                        AgentConfig.visibility_type.in_(['team', 'department', 'public']),
+                        # 这里应该加入团队成员判断
+                    )
+                )
+            elif owner_filter == 'department':
+                # 查看部门智能体：我的 + 部门成员的公开智能体
+                # TODO: 需要从用户表获取部门成员信息
+                permission_conditions.append(
+                    and_(
+                        AgentConfig.visibility_type.in_(['department', 'public']),
+                        # 这里应该加入部门成员判断
+                    )
+                )
+        elif current_user:
+            # 默认权限过滤：可以看到的智能体
+            permission_conditions.append(
+                or_(
+                    # 1. 我是所有者
+                    AgentConfig.agent_owner == current_user,
+                    # 2. 公开的智能体
+                    AgentConfig.visibility_type == 'public',
+                    # 3. 我在额外授权用户列表中
+                    text(f"JSON_CONTAINS(visibility_additional_users, '\"{current_user}\"', '$')")
+                )
+            )
+        
         # 获取数据库中的智能体
+        # 构建查询
+        query = select(AgentConfig)
+        conditions = []
+        
+        # 添加搜索条件
         if search:
-            conditions = [AgentConfig.agent_name.contains(search)]
-            if enabled_only:
-                conditions.extend([
-                    AgentConfig.agent_enabled == 'yes',
-                    AgentConfig.is_active == True
-                ])
-            if create_by:
-                conditions.append(AgentConfig.create_by == create_by)
-            
-            query = select(AgentConfig).where(and_(*conditions))
-            
-            # 计算总数
-            count_result = await db.execute(select(func.count(AgentConfig.id)).where(and_(*conditions)))
-            total = count_result.scalar()
-            
-            query = query.offset(offset).limit(size)
-            result = await db.execute(query)
-            db_agents = list(result.scalars().all())
-        else:
-            query = select(AgentConfig)
-            if filters:
-                conditions = []
-                for field_name, field_value in filters.items():
-                    if hasattr(AgentConfig, field_name):
-                        field = getattr(AgentConfig, field_name)
-                        conditions.append(field == field_value)
-                if conditions:
-                    query = query.where(and_(*conditions))
-            
-            query = query.order_by(AgentConfig.create_time.desc())
-            query = query.offset(offset).limit(size)
-            result = await db.execute(query)
-            db_agents = list(result.scalars().all())
-            
-            # 计算总数
-            count_query = select(func.count(AgentConfig.id))
-            if filters:
-                conditions = []
-                for field_name, field_value in filters.items():
-                    if hasattr(AgentConfig, field_name):
-                        field = getattr(AgentConfig, field_name)
-                        conditions.append(field == field_value)
-                if conditions:
-                    count_query = count_query.where(and_(*conditions))
-            count_result = await db.execute(count_query)
-            total = count_result.scalar()
+            conditions.append(AgentConfig.agent_name.contains(search))
+        
+        # 添加基础过滤条件
+        for field_name, field_value in filters.items():
+            if hasattr(AgentConfig, field_name):
+                field = getattr(AgentConfig, field_name)
+                conditions.append(field == field_value)
+        
+        # 添加权限过滤条件
+        if permission_conditions:
+            conditions.extend(permission_conditions)
+        
+        # 应用所有条件
+        if conditions:
+            query = query.where(and_(*conditions))
+        
+        # 排序
+        query = query.order_by(AgentConfig.create_time.desc())
+        
+        # 计算总数
+        count_query = select(func.count(AgentConfig.id))
+        if conditions:
+            count_query = count_query.where(and_(*conditions))
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        # 分页
+        query = query.offset(offset).limit(size)
+        result = await db.execute(query)
+        db_agents = list(result.scalars().all())
         
         # 转换为字典格式
         all_agents = []
@@ -162,6 +199,14 @@ class AgentService:
                     'selected_tools': [],
                     'total_tools': 0
                 }
+            
+            # 添加当前用户是否收藏的标记
+            if current_user:
+                favorite_users = agent._process_favorite_users(agent.favorite_users)
+                agent_dict['is_favorited'] = current_user in favorite_users
+            else:
+                agent_dict['is_favorited'] = False
+                
             all_agents.append(agent_dict)
         
         return all_agents, total
@@ -326,6 +371,129 @@ class AgentService:
             all_matches.append(agent_dict)
         
         return all_matches, len(all_matches)
+    
+    async def transfer_ownership(
+        self,
+        db: AsyncSession,
+        agent_id: str,
+        new_owner: str,
+        current_user: str,
+        reason: Optional[str] = None
+    ) -> Optional[AgentConfig]:
+        """转移智能体所有权"""
+        async with db.begin():
+            # 检查智能体是否存在
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            agent = result.scalar_one_or_none()
+            if not agent:
+                raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            
+            # 检查当前用户是否为所有者
+            if agent.agent_owner != current_user:
+                raise BusinessException("只有智能体所有者才能转移所有权", ResponseCode.FORBIDDEN)
+            
+            # 更新所有者
+            update_data = {
+                'agent_owner': new_owner,
+                'update_time': now_shanghai(),
+                'update_by': current_user
+            }
+            
+            logger.info(f"Transferring ownership of agent {agent_id} from {current_user} to {new_owner}. Reason: {reason}")
+            
+            await db.execute(
+                update(AgentConfig)
+                .where(AgentConfig.agent_id == agent_id)
+                .values(**update_data)
+            )
+            
+            # 返回更新后的数据
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            return result.scalar_one_or_none()
+    
+    async def toggle_favorite(
+        self,
+        db: AsyncSession,
+        agent_id: str,
+        username: str,
+        is_favorite: bool
+    ) -> bool:
+        """切换智能体收藏状态"""
+        async with db.begin():
+            # 检查智能体是否存在
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            agent = result.scalar_one_or_none()
+            if not agent:
+                raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            
+            # 获取当前收藏用户列表
+            current_favorites = agent._process_favorite_users(agent.favorite_users)
+            
+            if is_favorite:
+                # 添加收藏
+                if username not in current_favorites:
+                    current_favorites.append(username)
+                    logger.info(f"User {username} favorited agent {agent_id}")
+            else:
+                # 取消收藏
+                if username in current_favorites:
+                    current_favorites.remove(username)
+                    logger.info(f"User {username} unfavorited agent {agent_id}")
+            
+            # 更新收藏列表
+            import json
+            await db.execute(
+                update(AgentConfig)
+                .where(AgentConfig.agent_id == agent_id)
+                .values(favorite_users=json.dumps(current_favorites))
+            )
+            
+            return is_favorite
+    
+    async def get_user_favorites(
+        self,
+        db: AsyncSession,
+        username: str,
+        page: int = 1,
+        size: int = 10
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """获取用户收藏的智能体列表"""
+        offset = (page - 1) * size
+        
+        # 使用JSON_CONTAINS查询包含该用户的收藏
+        query = select(AgentConfig).where(
+            text(f"JSON_CONTAINS(favorite_users, '\"{username}\"', '$')")
+        )
+        
+        # 排序
+        query = query.order_by(AgentConfig.update_time.desc())
+        
+        # 计算总数
+        count_query = select(func.count(AgentConfig.id)).where(
+            text(f"JSON_CONTAINS(favorite_users, '\"{username}\"', '$')")
+        )
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
+        
+        # 分页
+        query = query.offset(offset).limit(size)
+        result = await db.execute(query)
+        db_agents = list(result.scalars().all())
+        
+        # 转换为字典格式
+        agents = []
+        for agent in db_agents:
+            agent_dict = agent.to_dict()
+            # 确保有mcp_config字段
+            if 'mcp_config' not in agent_dict:
+                agent_dict['mcp_config'] = {
+                    'enabled_servers': [],
+                    'selected_tools': [],
+                    'total_tools': 0
+                }
+            agents.append(agent_dict)
+        
+        return agents, total
 
 
 # 创建全局实例

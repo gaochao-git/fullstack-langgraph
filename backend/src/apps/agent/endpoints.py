@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
     AgentCreate, AgentUpdate, AgentQueryParams, MCPConfigUpdate,
-    AgentStatusUpdate, AgentStatisticsUpdate, AgentResponse, AgentStatistics
+    AgentStatusUpdate, AgentStatisticsUpdate, AgentResponse, AgentStatistics,
+    AgentOwnerTransfer
 )
 from src.apps.agent.service.agent_service import agent_service
 from src.shared.core.logging import get_logger
@@ -34,11 +35,13 @@ async def create_agent(
 ):
     """创建智能体"""
     agent_dict = agent_data.model_dump(exclude_none=True)
-    # 设置创建者
+    # 设置创建者和所有者
     if current_user:
         agent_dict['create_by'] = current_user.get('username', 'system')
+        agent_dict['agent_owner'] = current_user.get('username', 'system')
     else:
         agent_dict['create_by'] = 'system'
+        agent_dict['agent_owner'] = 'system'
     agent = await agent_service.create_agent(db, agent_dict)
     return success_response(data=agent,msg="智能体创建成功",code=ResponseCode.CREATED)
 
@@ -51,17 +54,30 @@ async def list_agents(
     status: Optional[str] = Query(None, description="状态过滤"),
     enabled_only: bool = Query(False, description="仅显示启用的智能体"),
     create_by: Optional[str] = Query(None, description="创建者过滤"),
-    db: AsyncSession = Depends(get_async_db)
+    owner_filter: Optional[str] = Query(None, description="归属过滤：mine/team/department"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """查询智能体列表"""
-    agents, total = await agent_service.list_agents(db, page, size, search, status, enabled_only, create_by)
+    # 获取当前用户名
+    current_username = current_user.get('username') if current_user else None
+    
+    agents, total = await agent_service.list_agents(
+        db, page, size, search, status, enabled_only, create_by,
+        current_user=current_username, owner_filter=owner_filter
+    )
     return paginated_response(items=agents,total=total,page=page,size=size,msg="查询智能体列表成功")
 
 
 @router.get("/v1/agents/{agent_id}", response_model=UnifiedResponse)
-async def get_agent(agent_id: str, db: AsyncSession = Depends(get_async_db)):
+async def get_agent(
+    agent_id: str, 
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     """获取指定智能体"""
-    agent = await agent_service.get_agent_by_id(db, agent_id)
+    current_username = current_user.get('username') if current_user else None
+    agent = await agent_service.get_agent_by_id(db, agent_id, current_username)
     if not agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data=agent,msg="获取智能体信息成功")
 
@@ -130,6 +146,66 @@ async def search_agents(
     """搜索智能体"""
     agents, total = await agent_service.search_agents(db, keyword, page, size)
     return paginated_response(items=agents,total=total,page=page,size=size,msg="搜索智能体成功")
+
+
+@router.post("/v1/agents/{agent_id}/transfer-ownership", response_model=UnifiedResponse)
+async def transfer_agent_ownership(
+    agent_id: str,
+    transfer_data: AgentOwnerTransfer,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """转移智能体所有权"""
+    if not current_user:
+        raise BusinessException("需要登录才能转移所有权", ResponseCode.UNAUTHORIZED)
+    
+    current_username = current_user.get('username')
+    if not current_username:
+        raise BusinessException("无法获取当前用户信息", ResponseCode.UNAUTHORIZED)
+    
+    updated_agent = await agent_service.transfer_ownership(
+        db, agent_id, transfer_data.new_owner, current_username, transfer_data.reason
+    )
+    return success_response(data=updated_agent, msg="智能体所有权转移成功")
+
+
+@router.post("/v1/agents/{agent_id}/favorite", response_model=UnifiedResponse)
+async def toggle_agent_favorite(
+    agent_id: str,
+    is_favorite: bool = True,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """切换智能体收藏状态"""
+    if not current_user:
+        raise BusinessException("需要登录才能收藏智能体", ResponseCode.UNAUTHORIZED)
+    
+    username = current_user.get('username')
+    if not username:
+        raise BusinessException("无法获取当前用户信息", ResponseCode.UNAUTHORIZED)
+    
+    result = await agent_service.toggle_favorite(db, agent_id, username, is_favorite)
+    msg = "智能体收藏成功" if result else "取消收藏成功"
+    return success_response(data={"is_favorite": result}, msg=msg)
+
+
+@router.get("/v1/agents/favorites", response_model=UnifiedResponse)
+async def get_user_favorite_agents(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取用户收藏的智能体列表"""
+    if not current_user:
+        raise BusinessException("需要登录才能查看收藏", ResponseCode.UNAUTHORIZED)
+    
+    username = current_user.get('username')
+    if not username:
+        raise BusinessException("无法获取当前用户信息", ResponseCode.UNAUTHORIZED)
+    
+    agents, total = await agent_service.get_user_favorites(db, username, page, size)
+    return paginated_response(items=agents, total=total, page=page, size=size, msg="获取收藏列表成功")
 
 
 # ==================== LLM智能体流式处理路由 ====================

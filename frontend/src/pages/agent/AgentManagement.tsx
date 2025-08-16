@@ -54,6 +54,7 @@ const STATUS_FILTERS = [
 // 归属过滤选项
 const OWNER_FILTERS = [
   { value: 'mine', label: '我的' },
+  { value: 'favorites', label: '我的收藏' },
   { value: 'team', label: '我的团队' },
   { value: 'department', label: '我的部门' },
 ];
@@ -181,23 +182,24 @@ const AgentManagement: React.FC = () => {
       // 根据筛选条件构建参数
       const params: any = { size: 100 };
       
-      // 根据归属过滤设置参数
-      if (ownerFilter) {
-        switch (ownerFilter) {
-          case 'mine':
-            if (user?.username) {
-              params.create_by = user.username;
-            }
-            break;
-          case 'team':
-            // TODO: 需要后端支持团队信息
-            // params.team_id = user?.team_id;
-            break;
-          case 'department':
-            // TODO: 需要后端支持部门信息
-            // params.department_id = user?.department_id;
-            break;
+      // 设置归属过滤参数
+      if (ownerFilter === 'favorites') {
+        // 获取收藏列表
+        const favResponse = await agentApi.getFavoriteAgents({ size: 100 });
+        
+        // 处理业务逻辑错误
+        if (favResponse.status === 'error') {
+          message.error(favResponse.msg || '加载收藏列表失败');
+          return;
         }
+        
+        // 处理成功响应
+        const favData = favResponse.data || favResponse;
+        const favAgentsData = favData.items || favData;
+        setAgents(Array.isArray(favAgentsData) ? favAgentsData.map(transformAgentToLocal) : []);
+        return;
+      } else if (ownerFilter) {
+        params.owner_filter = ownerFilter;
       }
       
       const response = await agentApi.getAgents(params);

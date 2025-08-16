@@ -27,12 +27,22 @@ class AgentCreate(AgentBase):
     tools_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="工具配置信息")
     llm_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="LLM配置信息")
     prompt_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="提示词配置信息")
+    # 权限相关字段
+    visibility_type: Optional[str] = Field(default="private", pattern=r'^(private|team|department|public)$', description="可见权限级别")
+    visibility_additional_users: Optional[List[str]] = Field(default_factory=list, description="额外授权用户列表")
     
     @field_validator('agent_capabilities')
     @classmethod
     def validate_capabilities(cls, v):
         if v and len(v) > 20:
             raise ValueError("能力列表不能超过20个")
+        return v
+    
+    @field_validator('visibility_additional_users')
+    @classmethod
+    def validate_additional_users(cls, v):
+        if v and len(v) > 50:
+            raise ValueError("额外授权用户不能超过50个")
         return v
 
 
@@ -48,6 +58,9 @@ class AgentUpdate(BaseModel):
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具配置信息")
     llm_info: Optional[Dict[str, Any]] = Field(None, description="LLM配置信息")
     prompt_info: Optional[Dict[str, Any]] = Field(None, description="提示词配置信息")
+    # 权限相关字段
+    visibility_type: Optional[str] = Field(None, pattern=r'^(private|team|department|public)$', description="可见权限级别")
+    visibility_additional_users: Optional[List[str]] = Field(None, description="额外授权用户列表")
     
     class Config:
         str_strip_whitespace = True
@@ -57,6 +70,13 @@ class AgentUpdate(BaseModel):
     def validate_capabilities(cls, v):
         if v and len(v) > 20:
             raise ValueError("能力列表不能超过20个")
+        return v
+    
+    @field_validator('visibility_additional_users')
+    @classmethod
+    def validate_additional_users(cls, v):
+        if v and len(v) > 50:
+            raise ValueError("额外授权用户不能超过50个")
         return v
 
 
@@ -103,6 +123,12 @@ class AgentStatisticsUpdate(BaseModel):
     total_runs: int = Field(..., ge=0, description="总运行次数")
     success_rate: float = Field(..., ge=0.0, le=100.0, description="成功率")
     avg_response_time: float = Field(..., ge=0.0, description="平均响应时间(秒)")
+
+
+class AgentOwnerTransfer(BaseModel):
+    """Agent所有权转移模型"""
+    new_owner: str = Field(..., min_length=1, max_length=100, description="新所有者用户名")
+    reason: Optional[str] = Field(None, max_length=200, description="转移原因")
 
 
 class MCPTool(BaseModel):
