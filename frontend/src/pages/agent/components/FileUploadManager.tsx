@@ -110,6 +110,15 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
   isDark
 }) => {
   if (files.length === 0) return null;
+  
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   return (
     <div className={cn(
@@ -136,8 +145,13 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
             ) : (
               <X className="h-3 w-3" />
             )}
-            <span className="max-w-[200px] truncate" title={item.file.name}>
-              {item.file.name}
+            <span className="flex items-center gap-1">
+              <span className="max-w-[200px] truncate" title={item.file.name}>
+                {item.file.name}
+              </span>
+              <span className="text-xs opacity-70">
+                ({formatFileSize(item.file.size)})
+              </span>
             </span>
             {item.status !== 'uploading' && (
               <button
