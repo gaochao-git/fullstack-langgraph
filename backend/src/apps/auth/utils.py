@@ -266,12 +266,12 @@ def parse_cas_attributes(attributes: Dict[str, Any]) -> Dict[str, Any]:
         if cas_attr in attributes:
             parsed[local_attr] = attributes[cas_attr]
     
-    # 解析group_name属性（可能包含LDAP格式的DN）
+    # 解析group_name属性（可能包含CAS格式的DN）
     if 'group_name' in attributes:
         group_name = attributes['group_name']
         parsed['group_name'] = group_name
         
-        # 尝试从LDAP DN中提取部门信息
+        # 尝试从CAS DN中提取部门信息
         if 'department' not in parsed and group_name:
             # 例如: CN=张三,OU=开发组,OU=技术部,OU=淘宝,DC=taobao,DC=COM
             parts = [p.strip() for p in group_name.split(',')]
@@ -357,7 +357,7 @@ class CASAttributeParser:
                 
                 # 特殊处理group_name
                 if cas_attr == 'group_name' and value:
-                    # 解析LDAP DN格式
+                    # 解析CAS DN格式
                     parsed['group_name'] = value
                     parsed['department_name'] = self._parse_department_from_dn(value)
                 elif db_field:
@@ -377,10 +377,10 @@ class CASAttributeParser:
     
     def _parse_department_from_dn(self, dn: str) -> str:
         """
-        从LDAP DN中解析部门信息
+        从CAS DN中解析部门信息
         
         Args:
-            dn: LDAP DN字符串
+            dn: CAS DN字符串
             
         Returns:
             部门名称

@@ -12,9 +12,9 @@ cas_attribute_mapping:
   # 示例: CN=张三,OU=开发组,OU=技术部,OU=淘宝,DC=taobao,DC=COM
   group_name_parsing:
     enabled: true
-    parser_type: ldap_dn
+    parser_type: CAS_dn
     rules:
-      # 从 LDAP DN 中提取信息
+      # 从 CAS DN 中提取信息
       - type: "CN"
         index: 0
         target: "display_name_backup"  # 作为 display_name 的备用

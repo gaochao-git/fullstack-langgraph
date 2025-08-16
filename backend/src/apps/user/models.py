@@ -22,7 +22,7 @@ class RbacUser(BaseModel):
     group_name = Column(String(50), nullable=False, comment="组名")
     email = Column(String(100), nullable=False, comment="邮箱")
     mobile = Column(String(20), nullable=False, comment="手机号")
-    user_source = Column(Integer, default=3, nullable=False, comment="用户来源：1=cas,2=jwt,3=手动添加")
+    user_source = Column(Integer, default=2, nullable=False, comment="用户来源：1=cas,2=local")
     
     # 认证相关字段（本地用户使用）
     locked_until = Column(DateTime, nullable=True, comment="账户锁定到期时间")

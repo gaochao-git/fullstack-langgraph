@@ -329,7 +329,7 @@ class SSOService:
                     mobile="",  # SSO用户可能没有手机号
                     department_name="SSO用户",
                     group_name="SSO",
-                    user_source=2,  # 2表示LDAP/SSO
+                    user_source=2,  # 2表示CAS
                     is_active=1,
                     create_by="SSO",
                     update_by="SSO",

@@ -147,7 +147,7 @@ export function UserManagement() {
       render: (source: number) => {
         const sourceMap: Record<number, string> = {
           1: '系统',
-          2: 'LDAP',
+          2: 'CAS',
           3: '手动'
         };
         return <span style={{ whiteSpace: 'nowrap' }}>{sourceMap[source] || '未知'}</span>;
@@ -560,7 +560,7 @@ export function UserManagement() {
               >
                 <Select>
                   <Option value={1}>系统</Option>
-                  <Option value={2}>LDAP</Option>
+                  <Option value={2}>CAS</Option>
                   <Option value={3}>手动</Option>
                 </Select>
               </Form.Item>

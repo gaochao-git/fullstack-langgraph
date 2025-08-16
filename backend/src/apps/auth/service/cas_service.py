@@ -240,8 +240,13 @@ class CASService:
         
         if not user:
             # 创建新用户（使用YAML配置中的字段映射）
+            # 生成与本地用户一致的user_id格式
+            import time
+            timestamp = int(time.time() * 1000)
+            user_id = parsed_attrs.get('user_id', f"user_{timestamp}")
+            
             user = RbacUser(
-                user_id=parsed_attrs.get('user_id', f"cas_{username}"),
+                user_id=user_id,
                 user_name=parsed_attrs.get('user_name', username),
                 display_name=parsed_attrs.get('display_name', username),
                 email=parsed_attrs.get('email', f"{username}@cas.local"),
