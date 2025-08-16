@@ -92,7 +92,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     result = await db.execute(stmt)
                     session = result.scalar_one_or_none()
                     
-                    if session and session.expires_at > datetime.now(timezone.utc):
+                    if session and session.expires_at > datetime.now():
                         user_info = {
                             "sub": session.user_id,
                             "username": session.user_id,  # CAS可能没有username，使用user_id
