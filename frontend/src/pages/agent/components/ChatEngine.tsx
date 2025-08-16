@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";
 import { omind_get, getBaseUrl } from "@/utils/base_api";
 import { type Agent } from "@/services/agentApi";
+import { threadApi } from "@/services/threadApi";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -53,6 +54,7 @@ export default function ChatEngine({
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [threadFileIds, setThreadFileIds] = useState<string[]>([]);
   
   // 模型管理状态
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
@@ -172,6 +174,22 @@ export default function ChatEngine({
       window.history.replaceState({}, '', url.toString());
     }
   }, [thread.threadId]);
+
+  // 当有线程ID时，获取关联的文件ID
+  useEffect(() => {
+    const threadIdFromUrl = getThreadIdFromUrl();
+    if (threadIdFromUrl) {
+      threadApi.getThreadFiles(threadIdFromUrl)
+        .then(result => {
+          setThreadFileIds(result.file_ids || []);
+          console.log('✅ 获取会话文件成功:', result.file_ids);
+        })
+        .catch(err => {
+          console.error('获取会话文件失败:', err);
+          setThreadFileIds([]);
+        });
+    }
+  }, []);
 
   useEffect(() => {
     if (
@@ -326,6 +344,7 @@ export default function ChatEngine({
             onModelChange={handleModelChange}
             WelcomeComponent={WelcomeComponent}
             agent={agent}
+            threadFileIds={threadFileIds}
           />
         )}
       

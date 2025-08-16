@@ -9,6 +9,9 @@ from src.shared.schemas.response import ResponseCode
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from src.shared.db.config import get_async_db_context
 
 from ..utils import (
     prepare_graph_config, 
@@ -151,6 +154,11 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
             }
             graph_input["messages"].insert(0, doc_message)
             logger.info(f"✅ 已添加文档上下文，长度: {len(doc_context)} 字符")
+            
+            # 保存会话和文档的关联
+            agent_id = config.get("configurable", {}).get("agent_id", "diagnostic_agent")
+            user_name = config.get("configurable", {}).get("user_name", "system")
+            await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
     
     logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
     
@@ -286,3 +294,72 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             "Content-Type": "text/event-stream"
         }
     )
+
+
+async def save_thread_file_associations(thread_id: str, file_ids: List[str], agent_id: str, user_name: str) -> None:
+    """
+    保存会话和文档的关联关系
+    
+    Args:
+        thread_id: 会话线程ID
+        file_ids: 文件ID列表
+        agent_id: 智能体ID
+        user_name: 用户名
+    """
+    from ..models import AgentDocumentSession
+    
+    try:
+        async with get_async_db_context() as db:
+            for file_id in file_ids:
+                # 检查是否已存在关联
+                result = await db.execute(
+                    select(AgentDocumentSession).where(
+                        AgentDocumentSession.thread_id == thread_id,
+                        AgentDocumentSession.file_id == file_id
+                    )
+                )
+                existing = result.scalar_one_or_none()
+                
+                if not existing:
+                    # 创建新的关联
+                    session = AgentDocumentSession(
+                        thread_id=thread_id,
+                        file_id=file_id,
+                        agent_id=agent_id,
+                        create_by=user_name
+                    )
+                    db.add(session)
+            
+            await db.commit()
+            logger.info(f"✅ 保存会话文档关联成功: thread_id={thread_id}, files={file_ids}")
+    except Exception as e:
+        logger.error(f"保存会话文档关联失败: {e}", exc_info=True)
+        # 不影响主流程
+
+
+async def get_thread_file_ids(thread_id: str) -> List[str]:
+    """
+    获取会话关联的文件ID列表
+    
+    Args:
+        thread_id: 会话线程ID
+        
+    Returns:
+        文件ID列表
+    """
+    from ..models import AgentDocumentSession
+    
+    try:
+        async with get_async_db_context() as db:
+            result = await db.execute(
+                select(AgentDocumentSession.file_id)
+                .where(AgentDocumentSession.thread_id == thread_id)
+                .order_by(AgentDocumentSession.create_time)
+            )
+            
+            file_ids = [row[0] for row in result.fetchall()]
+            logger.info(f"✅ 获取会话文档关联成功: thread_id={thread_id}, files={file_ids}")
+            return file_ids
+    except Exception as e:
+        logger.error(f"获取会话文档关联失败: {e}", exc_info=True)
+        return []

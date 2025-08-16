@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paperclip, X } from 'lucide-react';
+import { Paperclip, X, Eye } from 'lucide-react';
 import { cn } from '@/utils/lib-utils';
 import { configService, UploadConfig } from '@/services/configApi';
+import { FilePreviewModal } from './FilePreviewModal';
 
 interface FileUploadManagerProps {
   selectedFiles: File[];
@@ -109,6 +110,8 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
   onRemove,
   isDark
 }) => {
+  const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
+  
   if (files.length === 0) return null;
   
   // 格式化文件大小
@@ -119,57 +122,100 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+  
+  // 获取文件扩展名
+  const getFileExtension = (fileName: string): string => {
+    const lastDot = fileName.lastIndexOf('.');
+    return lastDot > -1 ? fileName.substring(lastDot) : '';
+  };
+  
+  // 判断是否可预览
+  const isPreviewable = (fileName: string): boolean => {
+    const ext = getFileExtension(fileName).toLowerCase();
+    return ['.txt', '.md'].includes(ext);
+  };
 
   return (
-    <div className={cn(
-      "px-4 py-2 border-b",
-      isDark ? "border-gray-700" : "border-gray-200"
-    )}>
-      <div className="flex flex-wrap gap-2">
-        {files.map((item, index) => (
-          <div
-            key={index}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
-              item.status === 'uploading' 
-                ? (isDark ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-700")
-                : item.status === 'success'
-                  ? (isDark ? "bg-green-900 text-green-200" : "bg-green-100 text-green-700")
-                  : (isDark ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700")
-            )}
-          >
-            {item.status === 'uploading' ? (
-              <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
-            ) : item.status === 'success' ? (
-              <Paperclip className="h-3 w-3" />
-            ) : (
-              <X className="h-3 w-3" />
-            )}
-            <span className="flex items-center gap-1">
-              <span className="max-w-[200px] truncate" title={item.file.name}>
-                {item.file.name}
-              </span>
-              <span className="text-xs opacity-70">
-                ({formatFileSize(item.file.size)})
-              </span>
-            </span>
-            {item.status !== 'uploading' && (
-              <button
-                type="button"
-                onClick={() => onRemove(index)}
-                className={cn(
-                  "ml-1 hover:text-red-500 transition-colors",
-                  isDark ? "text-gray-400" : "text-gray-500"
-                )}
-                aria-label={`删除文件 ${item.file.name}`}
-              >
+    <>
+      <div className={cn(
+        "px-4 py-2 border-b",
+        isDark ? "border-gray-700" : "border-gray-200"
+      )}>
+        <div className="flex flex-wrap gap-2">
+          {files.map((item, index) => (
+            <div
+              key={index}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
+                item.status === 'uploading' 
+                  ? (isDark ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-700")
+                  : item.status === 'success'
+                    ? (isDark ? "bg-green-900 text-green-200" : "bg-green-100 text-green-700")
+                    : (isDark ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700")
+              )}
+            >
+              {item.status === 'uploading' ? (
+                <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+              ) : item.status === 'success' ? (
+                <Paperclip className="h-3 w-3" />
+              ) : (
                 <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-        ))}
+              )}
+              <span className="flex items-center gap-1">
+                <span className="max-w-[200px] truncate" title={item.file.name}>
+                  {item.file.name}
+                </span>
+                <span className="text-xs opacity-70">
+                  ({formatFileSize(item.file.size)})
+                </span>
+              </span>
+              <div className="flex items-center gap-1">
+                {item.status === 'success' && isPreviewable(item.file.name) && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile({
+                      fileId: item.fileId,
+                      fileName: item.file.name,
+                      fileType: getFileExtension(item.file.name)
+                    })}
+                    className={cn(
+                      "hover:opacity-80 transition-opacity",
+                      isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                    )}
+                    title="预览"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </button>
+                )}
+                {item.status !== 'uploading' && (
+                  <button
+                    type="button"
+                    onClick={() => onRemove(index)}
+                    className={cn(
+                      "hover:text-red-500 transition-colors",
+                      isDark ? "text-gray-400" : "text-gray-500"
+                    )}
+                    title="删除"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+      
+      {previewFile && (
+        <FilePreviewModal
+          visible={!!previewFile}
+          fileId={previewFile.fileId}
+          fileName={previewFile.fileName}
+          fileType={previewFile.fileType}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
+    </>
   );
 };
 

@@ -706,3 +706,30 @@
     }
   }
 }
+
+/* Dark mode styles for Ant Design Modal */
+.dark-modal .ant-modal-content {
+  background-color: #1f2937;
+  color: #f3f4f6;
+}
+
+.dark-modal .ant-modal-header {
+  background-color: #1f2937;
+  border-bottom: 1px solid #374151;
+}
+
+.dark-modal .ant-modal-title {
+  color: #f3f4f6;
+}
+
+.dark-modal .ant-modal-close {
+  color: #9ca3af;
+}
+
+.dark-modal .ant-modal-close:hover {
+  color: #f3f4f6;
+}
+
+.dark-modal .ant-modal-footer {
+  border-top: 1px solid #374151;
+}

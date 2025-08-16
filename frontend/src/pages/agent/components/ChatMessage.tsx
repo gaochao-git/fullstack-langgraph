@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -12,6 +12,7 @@ import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 import { theme } from "antd";
 import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
+import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
 
@@ -26,6 +27,35 @@ const HIDDEN_TOOLS = [
 export interface ProcessedEvent {
   title: string;
   data: any;
+}
+
+// 文档引用信息
+interface DocumentReference {
+  fileName: string;
+  content: string;
+  fileId?: string;
+}
+
+// 解析系统消息中的文档引用
+function parseDocumentReferences(content: string): { 
+  documents: DocumentReference[]; 
+  hasDocuments: boolean;
+} {
+  const docPattern = /【文档：([^】]+)】\n([^【]*)/g;
+  const documents: DocumentReference[] = [];
+  let match;
+  
+  while ((match = docPattern.exec(content)) !== null) {
+    documents.push({
+      fileName: match[1],
+      content: match[2].trim()
+    });
+  }
+  
+  return {
+    documents,
+    hasDocuments: documents.length > 0
+  };
 }
 
 
@@ -767,7 +797,90 @@ interface ChatMessagesProps {
   onModelChange?: (modelType: string) => void; // 新增：模型切换回调
   WelcomeComponent?: React.ComponentType<WelcomeComponentProps>; // 新增：自定义欢迎组件
   agent?: Agent | null; // 新增：智能体信息
+  threadFileIds?: string[]; // 新增：会话关联的文件ID列表
 }
+
+// 系统消息组件 - 用于显示文档引用
+interface SystemMessageProps {
+  message: Message;
+  fileIds?: string[];
+}
+
+const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
+  const { isDark } = useTheme();
+  const { token } = theme.useToken();
+  const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
+  
+  if (message.type !== 'system' || !message.content) return null;
+  
+  const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
+  const { documents, hasDocuments } = parseDocumentReferences(content);
+  
+  // 如果不是文档引用的系统消息，不显示
+  if (!hasDocuments || !content.includes('请参考以下文档内容回答用户问题')) {
+    return null;
+  }
+  
+  // 获取文件扩展名
+  const getFileExtension = (fileName: string): string => {
+    const lastDot = fileName.lastIndexOf('.');
+    return lastDot > -1 ? fileName.substring(lastDot) : '';
+  };
+  
+  // 判断是否可预览
+  const isPreviewable = (fileName: string): boolean => {
+    const ext = getFileExtension(fileName).toLowerCase();
+    return ['.txt', '.md'].includes(ext);
+  };
+  
+  return (
+    <>
+      <div className="mb-4">
+        <div className="flex flex-wrap gap-2">
+          {documents.map((doc, index) => (
+            <div 
+              key={index}
+              className={cn(
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
+                isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"
+              )}
+            >
+              <FileText className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
+              <span>{doc.fileName}</span>
+              {isPreviewable(doc.fileName) && fileIds && fileIds[index] && (
+                <button
+                  type="button"
+                  onClick={() => setPreviewFile({
+                    fileId: fileIds[index],
+                    fileName: doc.fileName,
+                    fileType: getFileExtension(doc.fileName)
+                  })}
+                  className={cn(
+                    "ml-1 p-0.5 rounded hover:opacity-70 transition-opacity",
+                    isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                  )}
+                  title="预览"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {previewFile && (
+        <FilePreviewModal
+          visible={!!previewFile}
+          fileId={previewFile.fileId}
+          fileName={previewFile.fileName}
+          fileType={previewFile.fileType}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
+    </>
+  );
+};
 
 // 诊断聊天视图组件
 function ChatMessages({
@@ -786,6 +899,7 @@ function ChatMessages({
   onModelChange,
   WelcomeComponent,
   agent,
+  threadFileIds = [],
 }: ChatMessagesProps) {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
@@ -799,6 +913,8 @@ function ChatMessages({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed' }>>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [currentFileIds, setCurrentFileIds] = useState<string[]>([]);
+  const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
   
   // 处理故障诊断开始 - 将诊断消息设置到输入框
   const handleStartDiagnosis = (message: string) => {
@@ -823,6 +939,11 @@ function ChatMessages({
       .map(f => f.fileId);
     
     if (inputValue.trim() || successFileIds.length > 0) {
+      // 存储当前文件IDs以便在系统消息中使用
+      if (successFileIds.length > 0) {
+        setCurrentFileIds(successFileIds);
+      }
+      
       // 提交消息和文件ID
       onSubmit(inputValue.trim(), successFileIds.length > 0 ? successFileIds : undefined);
       setInputValue("");
@@ -1060,31 +1181,99 @@ function ChatMessages({
               )}
             </div>
           )}
-          {dialogRounds.map((round, idx) => (
-            <div key={round.user.id || idx}>
-              {/* 用户消息 */}
-              <div className="flex flex-col items-end mb-6 pl-4">
-                <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
-                  <div 
-                    className="rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 py-2.5 border"
-                    style={{ 
-                      backgroundColor: token.colorPrimary,
-                      borderColor: token.colorPrimaryBorder,
-                      color: token.colorTextLightSolid
-                    }}
-                  >
-                    <span className="whitespace-pre-wrap">
-                      {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
-                    </span>
-                  </div>
-                  <div 
-                    className="rounded-full p-2 flex-shrink-0 flex items-center justify-center"
-                    style={{ backgroundColor: token.colorFillSecondary }}
-                  >
-                    <User className="h-5 w-5" style={{ color: token.colorPrimary }} />
+          {dialogRounds.map((round, idx) => {
+            // 查找这一轮之前的系统消息（文档引用）
+            const roundIndex = messages.findIndex(m => m.id === round.user.id);
+            let systemMessage = null;
+            let systemFileIds = null;
+            
+            if (roundIndex > 0) {
+              // 检查前一条消息是否是系统消息
+              const prevMessage = messages[roundIndex - 1];
+              if (prevMessage.type === 'system' && prevMessage.content) {
+                const content = typeof prevMessage.content === 'string' ? prevMessage.content : JSON.stringify(prevMessage.content);
+                if (content.includes('请参考以下文档内容回答用户问题')) {
+                  systemMessage = prevMessage;
+                  // 使用会话关联的文件IDs（优先使用线程文件ID，如果没有则使用当前文件ID）
+                  systemFileIds = threadFileIds.length > 0 ? threadFileIds : currentFileIds;
+                }
+              }
+            }
+            
+            return (
+              <div key={round.user.id || idx}>
+                {/* 用户消息 */}
+                <div className="flex flex-col items-end mb-6 pl-4">
+                  <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
+                    <div className="flex flex-col items-end gap-2">
+                      {/* 文档附件 - 显示在消息上方 */}
+                      {systemMessage && (() => {
+                        const content = typeof systemMessage.content === 'string' ? systemMessage.content : JSON.stringify(systemMessage.content);
+                        const { documents, hasDocuments } = parseDocumentReferences(content);
+                        if (hasDocuments) {
+                          return (
+                            <div className="flex flex-wrap gap-2 justify-end">
+                              {documents.map((doc, index) => (
+                                <div 
+                                  key={index}
+                                  className={cn(
+                                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
+                                    isDark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"
+                                  )}
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span>{doc.fileName}</span>
+                                  {(() => {
+                                    const ext = doc.fileName.substring(doc.fileName.lastIndexOf('.')).toLowerCase();
+                                    const isPreviewable = ['.txt', '.md'].includes(ext);
+                                    return isPreviewable && systemFileIds && systemFileIds[index] && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewFile({
+                                          fileId: systemFileIds[index],
+                                          fileName: doc.fileName,
+                                          fileType: ext
+                                        })}
+                                        className={cn(
+                                          "ml-1 p-0.5 rounded hover:opacity-70 transition-opacity",
+                                          isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                                        )}
+                                        title="预览"
+                                      >
+                                        <Eye className="h-3.5 w-3.5" />
+                                      </button>
+                                    );
+                                  })()}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                      
+                      {/* 用户消息内容 */}
+                      <div 
+                        className="rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 py-2.5 border"
+                        style={{ 
+                          backgroundColor: token.colorPrimary,
+                          borderColor: token.colorPrimaryBorder,
+                          color: token.colorTextLightSolid
+                        }}
+                      >
+                        <span className="whitespace-pre-wrap">
+                          {typeof round.user.content === "string" ? round.user.content : JSON.stringify(round.user.content)}
+                        </span>
+                      </div>
+                    </div>
+                    <div 
+                      className="rounded-full p-2 flex-shrink-0 flex items-center justify-center"
+                      style={{ backgroundColor: token.colorFillSecondary }}
+                    >
+                      <User className="h-5 w-5" style={{ color: token.colorPrimary }} />
+                    </div>
                   </div>
                 </div>
-              </div>
               {/* 助手合并输出区域 - 只有当有实际可显示内容时才显示 */}
               {(() => {
                 // 检查是否有任何实际要渲染的内容
@@ -1221,8 +1410,9 @@ function ChatMessages({
                   </div>
                 </div>
               )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
           
           {/* 调试信息 */}
           {/* {interrupt && (
@@ -1442,6 +1632,17 @@ function ChatMessages({
           </div>
         </form>
       </div>
+      
+      {/* 文件预览模态框 */}
+      {previewFile && (
+        <FilePreviewModal
+          visible={!!previewFile}
+          fileId={previewFile.fileId}
+          fileName={previewFile.fileName}
+          fileType={previewFile.fileType}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
     </div>
   );
 }

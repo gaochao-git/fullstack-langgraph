@@ -362,3 +362,15 @@ async def get_file_status(
         data=FileProcessStatus(**status).model_dump(),
         msg="获取文件状态成功"
     )
+
+
+@router.get("/v1/agents/threads/{thread_id}/files", response_model=UnifiedResponse)
+async def get_thread_files(
+    thread_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取会话关联的文件ID列表"""
+    from .service.streaming import get_thread_file_ids
+    
+    file_ids = await get_thread_file_ids(thread_id)
+    return success_response(data={"file_ids": file_ids}, msg="获取会话文件成功")
