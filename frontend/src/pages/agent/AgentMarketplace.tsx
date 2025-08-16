@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Tabs } from "antd";
+import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Tabs, Radio } from "antd";
 import { 
   DatabaseOutlined, 
   RobotOutlined, 
@@ -15,6 +15,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { agentApi } from "@/services/agentApi";
 import { useTheme } from "@/hooks/ThemeContext";
+import { useAuth } from "@/hooks/useAuth";
 
 const { Title, Text, Paragraph } = Typography;
 import { Agent as ApiAgent } from '@/services/agentApi';
@@ -40,13 +41,20 @@ const AGENT_TYPES = [
 const AgentMarketplace = () => {
   const navigate = useNavigate();
   const { isDark } = useTheme();
+  const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine'>('all');
   
-  // 根据类型过滤智能体
-  const filteredAgents = selectedType === 'all' 
-    ? agents 
-    : agents.filter(agent => agent.agent_type === selectedType);
+  // 根据类型和所有者过滤智能体
+  const filteredAgents = agents
+    .filter(agent => {
+      // 类型过滤
+      const matchType = selectedType === 'all' || agent.agent_type === selectedType;
+      // 所有者过滤
+      const matchOwner = ownerFilter === 'all' || (ownerFilter === 'mine' && agent.create_by === user?.username);
+      return matchType && matchOwner;
+    });
 
   // 获取智能体数据
   const loadAgents = async () => {
@@ -281,6 +289,18 @@ const AgentMarketplace = () => {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
+        {/* 所有/我的过滤按钮 */}
+        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Radio.Group 
+            value={ownerFilter} 
+            onChange={(e) => setOwnerFilter(e.target.value)}
+            buttonStyle="solid"
+          >
+            <Radio.Button value="all">所有</Radio.Button>
+            <Radio.Button value="mine">我的</Radio.Button>
+          </Radio.Group>
+        </div>
+        
         {/* 分类选择器 */}
         <Tabs 
           activeKey={selectedType}
@@ -298,14 +318,20 @@ const AgentMarketplace = () => {
           <RobotOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
           <div style={{ marginTop: 16 }}>
             <Text type="secondary">
-              {selectedType === 'all' 
+              {ownerFilter === 'mine' && selectedType === 'all'
+                ? '您还没有创建任何智能体' 
+                : ownerFilter === 'mine' && selectedType !== 'all'
+                ? `您还没有创建${selectedType}类型的智能体`
+                : selectedType === 'all' 
                 ? '暂无可用的智能体' 
                 : `暂无${selectedType}类型的智能体`}
             </Text>
           </div>
           <div style={{ marginTop: 8 }}>
             <Text type="secondary">
-              {selectedType === 'all'
+              {ownerFilter === 'mine'
+                ? '请前往智能体管理创建您的智能体'
+                : selectedType === 'all'
                 ? '请在智能体管理中创建并启用智能体'
                 : '请尝试查看其他分类或创建新的智能体'}
             </Text>
