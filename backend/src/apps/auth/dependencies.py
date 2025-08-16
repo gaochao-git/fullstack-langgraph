@@ -49,7 +49,7 @@ async def get_current_user_optional(
             # 查询session
             stmt = select(AuthSession).where(
                 AuthSession.session_id == cas_session_id,
-                AuthSession.expires_at > datetime.now(timezone.utc)
+                AuthSession.expires_at > datetime.now()
             )
             result = await db.execute(stmt)
             session = result.scalar_one_or_none()
@@ -61,12 +61,21 @@ async def get_current_user_optional(
                 user = result.scalar_one_or_none()
                 
                 if user and user.is_active:
+                    # 获取用户角色
+                    roles_stmt = select(RbacRole).join(
+                        RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+                    ).where(RbacUsersRoles.user_id == user.user_id)
+                    
+                    roles_result = await db.execute(roles_stmt)
+                    roles = list(roles_result.scalars().all())
+                    
                     return {
                         "sub": user.user_id,
                         "username": user.user_name,
                         "email": user.email,
                         "display_name": user.display_name,
-                        "auth_type": "cas"
+                        "auth_type": "cas",
+                        "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
                     }
         
         # 2. 尝试Bearer Token认证

@@ -373,19 +373,29 @@ async def get_current_user_info(
         result = await db.execute(stmt)
         session = result.scalar_one_or_none()
         
-        if session and session.expires_at > datetime.now(timezone.utc):
+        if session and session.expires_at > datetime.now():
             # 获取用户信息
             user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
             user_result = await db.execute(user_stmt)
             user = user_result.scalar_one_or_none()
             
             if user:
+                # 获取用户角色
+                from src.apps.user.models import RbacUsersRoles, RbacRole
+                roles_stmt = select(RbacRole).join(
+                    RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+                ).where(RbacUsersRoles.user_id == user.user_id)
+                
+                roles_result = await db.execute(roles_stmt)
+                roles = list(roles_result.scalars().all())
+                
                 return success_response({
                     "user": {
                         "user_id": user.user_id,
                         "username": user.user_name,
                         "display_name": user.display_name,
-                        "email": user.email
+                        "email": user.email,
+                        "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
                     },
                     "auth_type": "cas"
                 })

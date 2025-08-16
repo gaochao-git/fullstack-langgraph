@@ -93,13 +93,31 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     session = result.scalar_one_or_none()
                     
                     if session and session.expires_at > datetime.now():
-                        user_info = {
-                            "sub": session.user_id,
-                            "username": session.user_id,  # CAS可能没有username，使用user_id
-                            "auth_type": "cas",
-                            "session_id": session.session_id
-                        }
-                        auth_type = "cas"
+                        # 获取用户详细信息
+                        from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
+                        user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
+                        user_result = await db.execute(user_stmt)
+                        user = user_result.scalar_one_or_none()
+                        
+                        if user and user.is_active:
+                            # 获取用户角色
+                            roles_stmt = select(RbacRole).join(
+                                RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+                            ).where(RbacUsersRoles.user_id == user.user_id)
+                            
+                            roles_result = await db.execute(roles_stmt)
+                            roles = list(roles_result.scalars().all())
+                            
+                            user_info = {
+                                "sub": session.user_id,
+                                "username": user.user_name,
+                                "email": user.email,
+                                "display_name": user.display_name,
+                                "auth_type": "cas",
+                                "session_id": session.session_id,
+                                "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
+                            }
+                            auth_type = "cas"
         
         # 3. 检查API Key认证
         if not user_info:

@@ -73,7 +73,8 @@ class AuthApi {
     
     // 处理统一响应格式
     if (response.status === 'ok' && response.data) {
-      return response.data;
+      // 返回 data.user 而不是 data
+      return response.data.user || response.data;
     } else if (response.status === 'error') {
       throw new Error(response.msg || '获取用户信息失败');
     }
