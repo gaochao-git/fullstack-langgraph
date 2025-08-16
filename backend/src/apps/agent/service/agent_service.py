@@ -4,7 +4,7 @@ Agent服务层 - 纯异步实现
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_, func, case, text
+from sqlalchemy import select, update, delete, and_, or_, func, case, text, bindparam
 import uuid
 import json
 
@@ -158,7 +158,7 @@ class AgentService:
                     # 2. 公开的智能体
                     AgentConfig.visibility_type == 'public',
                     # 3. 我在额外授权用户列表中
-                    text(f"JSON_CONTAINS(visibility_additional_users, '\"{current_user}\"', '$')")
+                    text("JSON_CONTAINS(visibility_additional_users, :user, '$')").bindparams(user=f'"{current_user}"')
                 )
             )
         
@@ -480,7 +480,7 @@ class AgentService:
         
         # 使用JSON_CONTAINS查询包含该用户的收藏
         query = select(AgentConfig).where(
-            text(f"JSON_CONTAINS(favorite_users, '\"{username}\"', '$')")
+            text("JSON_CONTAINS(favorite_users, :user, '$')").bindparams(user=f'"{username}"')
         )
         
         # 排序
@@ -488,7 +488,7 @@ class AgentService:
         
         # 计算总数
         count_query = select(func.count(AgentConfig.id)).where(
-            text(f"JSON_CONTAINS(favorite_users, '\"{username}\"', '$')")
+            text("JSON_CONTAINS(favorite_users, :user, '$')").bindparams(user=f'"{username}"')
         )
         count_result = await db.execute(count_query)
         total = count_result.scalar()

@@ -83,20 +83,67 @@ async def get_agent(
 
 
 @router.put("/v1/agents/{agent_id}", response_model=UnifiedResponse)
-async def update_agent(agent_id: str,agent_data: AgentUpdate,db: AsyncSession = Depends(get_async_db)):
+async def update_agent(
+    agent_id: str,
+    agent_data: AgentUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     """更新智能体"""
+    # 先获取智能体信息，检查权限
+    existing_agent = await agent_service.get_agent_by_id(db, agent_id)
+    if not existing_agent:
+        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    
+    # 检查是否为内置智能体
+    if existing_agent.get('is_builtin') == 'yes':
+        raise BusinessException("不能修改内置智能体", ResponseCode.FORBIDDEN)
+    
+    # 检查权限：只有所有者可以修改
+    if current_user:
+        current_username = current_user.get('username')
+        if existing_agent.get('agent_owner') != current_username and existing_agent.get('create_by') != current_username:
+            raise BusinessException("只有智能体所有者可以修改", ResponseCode.FORBIDDEN)
+    
     update_dict = agent_data.model_dump(exclude_none=True)
-    if not update_dict: raise BusinessException("更新数据不能为空", ResponseCode.INVALID_PARAMETER)
+    if not update_dict: 
+        raise BusinessException("更新数据不能为空", ResponseCode.INVALID_PARAMETER)
+    
+    # 设置更新者
+    if current_user:
+        update_dict['update_by'] = current_user.get('username', 'system')
+    
     updated_agent = await agent_service.update_agent(db, agent_id, update_dict)
-    if not updated_agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    if not updated_agent: 
+        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data=updated_agent,msg="智能体更新成功")
 
 
 @router.delete("/v1/agents/{agent_id}", response_model=UnifiedResponse)
-async def delete_agent(agent_id: str,db: AsyncSession = Depends(get_async_db)):
+async def delete_agent(
+    agent_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     """删除智能体"""
+    # 先获取智能体信息，检查权限
+    existing_agent = await agent_service.get_agent_by_id(db, agent_id)
+    if not existing_agent:
+        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    
+    # 检查是否为内置智能体（在service层也会检查，但这里提前检查更友好）
+    if existing_agent.get('is_builtin') == 'yes':
+        raise BusinessException("不能删除内置智能体", ResponseCode.FORBIDDEN)
+    
+    # 检查权限：只有所有者可以删除
+    if current_user:
+        current_username = current_user.get('username')
+        if existing_agent.get('agent_owner') != current_username and existing_agent.get('create_by') != current_username:
+            raise BusinessException("只有智能体所有者可以删除", ResponseCode.FORBIDDEN)
+    
     success = await agent_service.delete_agent(db, agent_id)
-    if not success: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    if not success: 
+        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data={"deleted_id": agent_id},msg="智能体删除成功")
 
 
