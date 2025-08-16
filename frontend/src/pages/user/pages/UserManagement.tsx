@@ -146,9 +146,8 @@ export function UserManagement() {
       width: 80,
       render: (source: number) => {
         const sourceMap: Record<number, string> = {
-          1: '系统',
-          2: 'CAS',
-          3: '手动'
+          1: 'SSO',
+          2: 'Local'
         };
         return <span style={{ whiteSpace: 'nowrap' }}>{sourceMap[source] || '未知'}</span>;
       },
@@ -314,7 +313,7 @@ export function UserManagement() {
           group_name: values.group_name,
           email: values.email,
           mobile: values.mobile,
-          user_source: values.user_source || 3,
+          user_source: values.user_source || 2,
           is_active: values.is_active ?? 1,
           role_ids: values.role_ids || [],
           password: values.password,
@@ -526,9 +525,8 @@ export function UserManagement() {
               <Form.Item
                 name="mobile"
                 label="手机号"
-                rules={[{ required: true, message: '请输入手机号' }]}
               >
-                <Input placeholder="请输入手机号" />
+                <Input placeholder="请输入手机号（选填）" />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -556,12 +554,11 @@ export function UserManagement() {
               <Form.Item
                 name="user_source"
                 label="用户来源"
-                initialValue={3}
+                initialValue={2}
               >
                 <Select>
-                  <Option value={1}>系统</Option>
-                  <Option value={2}>CAS</Option>
-                  <Option value={3}>手动</Option>
+                  <Option value={1}>SSO</Option>
+                  <Option value={2}>Local</Option>
                 </Select>
               </Form.Item>
             </Col>

@@ -44,8 +44,8 @@ class UserCreateRequest(BaseModel):
     department_name: str = Field(..., min_length=1, max_length=50, description="部门名称")
     group_name: str = Field(..., min_length=1, max_length=50, description="组名")
     email: EmailStr = Field(..., description="邮箱")
-    mobile: str = Field(..., max_length=20, description="手机号")
-    user_source: int = Field(3, description="用户来源")
+    mobile: Optional[str] = Field("", max_length=20, description="手机号")
+    user_source: int = Field(2, description="用户来源：1=SSO,2=Local")
     is_active: int = Field(1, description="是否激活: 1激活 0禁用")
     role_ids: Optional[List[int]] = Field([], description="角色ID列表")
 
@@ -58,7 +58,7 @@ class UserUpdateRequest(BaseModel):
     group_name: Optional[str] = Field(None, min_length=1, max_length=50, description="组名")
     email: Optional[EmailStr] = Field(None, description="邮箱")
     mobile: Optional[str] = Field(None, max_length=20, description="手机号")
-    user_source: Optional[int] = Field(None, description="用户来源")
+    user_source: Optional[int] = Field(None, description="用户来源：1=sso,2=local")
     is_active: Optional[int] = Field(None, description="是否激活: 1激活 0禁用")
     role_ids: Optional[List[int]] = Field(None, description="角色ID列表")
 
@@ -90,7 +90,7 @@ class UserQueryParams(PaginationParams):
     is_active: Optional[int] = Field(None, description="激活状态筛选: 1激活 0禁用")
     department_name: Optional[str] = Field(None, description="部门筛选")
     group_name: Optional[str] = Field(None, description="组筛选")
-    user_source: Optional[int] = Field(None, description="用户来源筛选")
+    user_source: Optional[int] = Field(None, description="用户来源筛选：1=sso,2=local")
 
 
 class UserListResponse(BaseModel):

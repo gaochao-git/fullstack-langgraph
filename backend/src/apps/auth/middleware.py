@@ -128,6 +128,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         # 如果没有任何有效的认证信息
         if not user_info:
+            # 记录请求路径，方便调试
+            logger.debug(f"No authentication provided for path: {request.url.path}")
             raise BusinessException(
                 "未提供有效的认证凭据",
                 ResponseCode.UNAUTHORIZED
