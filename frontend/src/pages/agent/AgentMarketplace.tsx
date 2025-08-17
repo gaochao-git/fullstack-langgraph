@@ -8,7 +8,8 @@ import {
   ToolOutlined,
   SearchOutlined,
   StarOutlined,
-  StarFilled
+  StarFilled,
+  PlayCircleOutlined
 } from "@ant-design/icons";
 import { 
   categoryColors,
@@ -306,17 +307,20 @@ const AgentMarketplace = () => {
         description={
           <div className="space-y-2">
             {/* 描述文本 */}
-            <Paragraph 
-              ellipsis={{ rows: 2, expandable: false }} 
+            <div 
               style={{ 
                 marginBottom: 8,
                 fontSize: 13,
                 lineHeight: 1.5,
-                color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)'
+                color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.65)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
               }}
+              title={agent.agent_description || '智能助手，能够帮助您完成各种任务'}
             >
               {agent.agent_description || '智能助手，能够帮助您完成各种任务'}
-            </Paragraph>
+            </div>
             
             {/* 标签行 */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -326,8 +330,10 @@ const AgentMarketplace = () => {
               >
                 {agent.agent_type || '未分类'}
               </Tag>
-              {agent.is_builtin === 'yes' && (
+              {agent.is_builtin === 'yes' ? (
                 <Tag color="gold" className="text-xs">内置</Tag>
+              ) : (
+                <Tag color="cyan" className="text-xs">模版</Tag>
               )}
             </div>
 
@@ -335,24 +341,29 @@ const AgentMarketplace = () => {
             <div className="flex items-center gap-3 text-gray-500" style={{ fontSize: 11 }}>
               <span>
                 <ToolOutlined style={{ fontSize: 11, marginRight: 2 }} />
-                {agent.mcp_config?.total_tools || 0} 个工具
+                {(() => {
+                  const toolsInfo = agent.tools_info || { mcp_tools: [], system_tools: [] };
+                  const mcpTools = toolsInfo.mcp_tools || [];
+                  const systemTools = toolsInfo.system_tools || [];
+                  const allMcpToolNames = mcpTools.flatMap((tool: any) => tool.tools || []);
+                  const totalTools = [...systemTools, ...allMcpToolNames].length;
+                  return totalTools;
+                })()} 个工具
               </span>
-              <span>
-                {agent.llm_info?.model_name || '默认模型'}
+              <span style={{ color: agent.total_runs > 0 ? '#1890ff' : undefined, fontWeight: agent.total_runs > 0 ? 500 : undefined }}>
+                <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
+                {agent.total_runs || 0}
               </span>
             </div>
 
             {/* 能力标签 */}
             {getAgentTags(agent).length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {getAgentTags(agent).slice(0, 2).map((tag: string) => (
-                  <Tag key={tag} color="blue" className="text-xs">
-                    {tag}
+              <div className="flex gap-1" style={{ overflow: 'hidden' }}>
+                {getAgentTags(agent).slice(0, 3).map((tag: string) => (
+                  <Tag key={tag} color="blue" className="text-xs" style={{ margin: 0 }}>
+                    {tag.length > 4 ? tag.slice(0, 4) : tag}
                   </Tag>
                 ))}
-                {getAgentTags(agent).length > 2 && (
-                  <Tag className="text-xs">+{getAgentTags(agent).length - 2}</Tag>
-                )}
               </div>
             )}
           </div>
