@@ -256,7 +256,7 @@ export function APIKeyManagement() {
             >
               搜索
             </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
+            <Button onClick={() => clearFilters()} style={{ width: 90 }}>
               重置
             </Button>
           </Space>
@@ -287,7 +287,7 @@ export function APIKeyManagement() {
             >
               搜索
             </Button>
-            <Button onClick={() => clearFilters()} size="small" style={{ width: 90 }}>
+            <Button onClick={() => clearFilters()} style={{ width: 90 }}>
               重置
             </Button>
           </Space>
@@ -443,7 +443,6 @@ export function APIKeyManagement() {
             {!isRevoked && !isExpired && (
               <>
                 <Switch
-                  size="small"
                   checked={record.is_active}
                   onChange={() => handleToggleStatus(record.key_id, record.key_name, record.is_active)}
                   checkedChildren="启用"
@@ -452,7 +451,6 @@ export function APIKeyManagement() {
                 <Button
                   type="link"
                   danger
-                  size="small"
                   icon={<DeleteOutlined />}
                   onClick={() => handleRevokeAPIKey(record.key_id, record.key_name)}
                 >

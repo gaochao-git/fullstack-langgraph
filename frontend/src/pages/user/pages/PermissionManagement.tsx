@@ -171,7 +171,6 @@ export function PermissionManagement() {
           <Tooltip title="编辑">
             <Button
               type="link"
-              size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
               disabled={record.is_deleted === 1}
@@ -181,7 +180,6 @@ export function PermissionManagement() {
             <Tooltip title="删除">
               <Button
                 type="link"
-                size="small"
                 danger
                 icon={<DeleteOutlined />}
                 onClick={() => {

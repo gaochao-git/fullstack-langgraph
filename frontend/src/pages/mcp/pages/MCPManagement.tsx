@@ -1006,7 +1006,7 @@ const MCPManagement: React.FC = () => {
             label="传输类型"
             name="transportType"
           >
-            <Select size="middle">
+            <Select>
               <Option value="streamable-http">streamable-http</Option>
               <Option value="sse">sse</Option>
               <Option value="stdio">stdio</Option>
@@ -1018,7 +1018,7 @@ const MCPManagement: React.FC = () => {
             label="认证类型"
             name="authType"
           >
-            <Select size="middle">
+            <Select>
               <Option value="none">无认证</Option>
               <Option value="bearer">Bearer</Option>
               <Option value="basic">Basic</Option>

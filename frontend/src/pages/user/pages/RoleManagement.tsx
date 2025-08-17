@@ -106,7 +106,6 @@ export function RoleManagement() {
           <Tooltip title="配置">
             <Button
               type="link"
-              size="small"
               icon={<SettingOutlined />}
               onClick={() => handleManagePermissions(record)}
             />
@@ -114,7 +113,6 @@ export function RoleManagement() {
           <Tooltip title="删除">
             <Button
               type="link"
-              size="small"
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}

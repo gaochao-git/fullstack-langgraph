@@ -611,7 +611,6 @@ const TasksManagement: React.FC = () => {
           <Tooltip title={record.task_enabled ? '禁用' : '启用'}>
             <Button
               type="text"
-              size="small"
               icon={record.task_enabled ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
               onClick={() => handleToggleTask(record)}
             />
@@ -619,7 +618,6 @@ const TasksManagement: React.FC = () => {
           <Tooltip title="立即执行">
             <Button
               type="text"
-              size="small"
               icon={<PlayCircleOutlined />}
               onClick={() => handleRunTask(record)}
             />
@@ -627,7 +625,6 @@ const TasksManagement: React.FC = () => {
           <Tooltip title="查看详情">
             <Button
               type="text"
-              size="small"
               icon={<EyeOutlined />}
               onClick={() => handleViewTaskDetail(record)}
             />
@@ -635,7 +632,6 @@ const TasksManagement: React.FC = () => {
           <Tooltip title="查看日志">
             <Button
               type="text"
-              size="small"
               icon={<HistoryOutlined />}
               onClick={() => handleViewLogs(record)}
             />
@@ -643,7 +639,6 @@ const TasksManagement: React.FC = () => {
           <Tooltip title="编辑">
             <Button
               type="text"
-              size="small"
               icon={<EditOutlined />}
               onClick={() => handleEditTask(record)}
             />
@@ -651,7 +646,6 @@ const TasksManagement: React.FC = () => {
           <Tooltip title="删除">
             <Button
               type="text"
-              size="small"
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDeleteTask(record)}

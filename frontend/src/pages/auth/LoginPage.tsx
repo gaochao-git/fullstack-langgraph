@@ -56,7 +56,6 @@ export function LoginPage() {
                 name="jwt-login"
                 className="login-form"
                 onFinish={handleJWTLogin}
-                size="large"
               >
                 <Form.Item
                   name="username"
@@ -103,7 +102,6 @@ export function LoginPage() {
                 
                 <Button
                   type="primary"
-                  size="large"
                   icon={<GlobalOutlined />}
                   onClick={handleSSOLogin}
                   block

@@ -573,7 +573,7 @@ const ModelsManagement = () => {
             cancelText="取消"
           >
             <Tooltip title="删除">
-              <Button size="small" danger icon={<DeleteOutlined />} />
+              <Button danger icon={<DeleteOutlined />} />
             </Tooltip>
           </Popconfirm>
         </Space>

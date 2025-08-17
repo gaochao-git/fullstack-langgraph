@@ -378,14 +378,12 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
         <Space size="small">
           <Button 
             type="text" 
-            size="small" 
             icon={<EyeOutlined />}
             onClick={() => handleViewConfig(record)}
             title="查看详情"
           />
           <Button 
             type="text" 
-            size="small" 
             icon={<EditOutlined />}
             onClick={() => handleEditConfig(record)}
             title="编辑"
@@ -400,7 +398,6 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
           >
             <Button 
               type="text" 
-              size="small" 
               icon={<DeleteOutlined />}
               danger
               title="删除"

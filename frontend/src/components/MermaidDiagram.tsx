@@ -257,7 +257,6 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
       <div className="relative">
         <div className="absolute top-2 right-2 z-10">
           <Button
-            size="small"
             icon={showCode ? <ChartLine className="h-4 w-4" /> : <Code2 className="h-4 w-4" />}
             onClick={() => setShowCode(!showCode)}
             className="flex items-center gap-1"
@@ -311,8 +310,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
           {/* 左侧：视图切换按钮 */}
           <div className="flex items-center gap-2">
             <Button
-              size="small"
-              type={showCode ? 'default' : 'primary'}
+                type={showCode ? 'default' : 'primary'}
               icon={<ChartLine className="h-4 w-4" />}
               onClick={() => setShowCode(false)}
               className="flex items-center gap-1"
@@ -320,8 +318,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
               图表
             </Button>
             <Button
-              size="small"
-              type={showCode ? 'primary' : 'default'}
+                type={showCode ? 'primary' : 'default'}
               icon={<Code2 className="h-4 w-4" />}
               onClick={() => setShowCode(true)}
               className="flex items-center gap-1"
@@ -336,8 +333,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
               // 代码视图的操作按钮
               <>
                 <Button
-                  size="small"
-                  type="text"
+                        type="text"
                   icon={copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   onClick={() => {
                     navigator.clipboard.writeText(chart);
@@ -349,8 +345,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
                   {copied ? '已复制' : '复制'}
                 </Button>
                 <Button
-                  size="small"
-                  type="text"
+                        type="text"
                   icon={<Download className="h-4 w-4" />}
                   onClick={exportCode}
                 >
@@ -363,8 +358,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
                 {/* 缩放控制 */}
                 <div className="flex items-center gap-2">
                   <Button
-                    size="small"
-                    type="text"
+                            type="text"
                     icon={<ZoomOut className="h-4 w-4" />}
                     onClick={() => setScale(prev => Math.max(0.1, prev - 0.1))}
                   />
@@ -376,16 +370,14 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
                     style={{ width: 100 }}
                   />
                   <Button
-                    size="small"
-                    type="text"
+                            type="text"
                     icon={<ZoomIn className="h-4 w-4" />}
                     onClick={() => setScale(prev => Math.min(2, prev + 0.1))}
                   />
                   <span className="text-xs text-gray-500">{Math.round(scale * 100)}%</span>
                 </div>
                 <Button
-                  size="small"
-                  type="text"
+                        type="text"
                   icon={<Maximize2 className="h-4 w-4" />}
                   onClick={resetView}
                   title="重置视图"
@@ -398,8 +390,7 @@ export const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ chart, id }) => 
               placement="bottomRight"
             >
               <Button
-                size="small"
-                type="text"
+                    type="text"
                 icon={<MoreVertical className="h-4 w-4" />}
               />
             </Dropdown>

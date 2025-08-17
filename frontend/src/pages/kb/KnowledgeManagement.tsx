@@ -45,7 +45,7 @@ const KnowledgeManagement = () => {
           </Title>
           <Text type="secondary">管理和维护智能体的知识库</Text>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} size="large">
+        <Button type="primary" icon={<PlusOutlined />}>
           创建知识库
         </Button>
       </div>

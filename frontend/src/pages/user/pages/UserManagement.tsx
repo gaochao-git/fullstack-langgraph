@@ -173,7 +173,6 @@ export function UserManagement() {
           <Tooltip title="编辑">
             <Button
               type="link"
-              size="small"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
             />
@@ -181,7 +180,6 @@ export function UserManagement() {
           <Tooltip title="删除">
             <Button
               type="link"
-              size="small"
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDelete(record)}

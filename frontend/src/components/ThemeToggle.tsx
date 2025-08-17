@@ -74,7 +74,6 @@ export const ThemeToggle: React.FC = () => {
     >
       <Button
         type="text"
-        size="small"
         className="flex items-center gap-1"
         style={{
           color: isDark ? '#fff' : '#666',
@@ -129,7 +128,6 @@ export const ThemeToggleSimple: React.FC = () => {
   return (
     <Button
       type="text"
-      size="small"
       icon={getCurrentIcon()}
       onClick={handleToggle}
       className="flex items-center justify-center"

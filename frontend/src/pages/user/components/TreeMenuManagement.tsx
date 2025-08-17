@@ -79,7 +79,6 @@ const TreeMenuManagement: React.FC = () => {
           >
             <Button 
               type="text" 
-              size="small" 
               icon={<MoreOutlined />}
               onClick={(e) => e.stopPropagation()}
             />
@@ -361,7 +360,6 @@ const TreeMenuManagement: React.FC = () => {
             type="primary" 
             icon={<PlusOutlined />} 
             onClick={handleAddRoot}
-            size="small"
           >
             新增根菜单
           </Button>
@@ -404,7 +402,6 @@ const TreeMenuManagement: React.FC = () => {
               type="primary" 
               icon={<EditOutlined />}
               onClick={() => setEditMode(true)}
-              size="small"
             >
               编辑
             </Button>

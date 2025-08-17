@@ -301,7 +301,6 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
               <Button 
                 type="text" 
                 danger 
-                size="small"
                 icon={<DeleteOutlined />}
                 onClick={() => removeStep(index)}
               >

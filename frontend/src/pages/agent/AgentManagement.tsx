@@ -661,7 +661,6 @@ const AgentManagement: React.FC = () => {
                         </div>
                       </div>
                       <Switch
-                        size="small"
                         checked={agent.agent_enabled === 'yes'}
                         onChange={() => toggleAgentEnabled(agent.agent_id)}
                       />

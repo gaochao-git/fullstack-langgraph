@@ -234,7 +234,6 @@ const SOPList: React.FC = () => {
           <Tooltip title="查看详情">
             <Button 
               type="text" 
-              size="small" 
               icon={<EyeOutlined />}
               onClick={() => handleView(record)}
             />
@@ -242,7 +241,6 @@ const SOPList: React.FC = () => {
           <Tooltip title="编辑">
             <Button 
               type="text" 
-              size="small" 
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
             />
@@ -256,7 +254,6 @@ const SOPList: React.FC = () => {
             >
               <Button 
                 type="text" 
-                size="small" 
                 danger
                 icon={<DeleteOutlined />}
               />

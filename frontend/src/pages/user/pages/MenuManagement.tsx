@@ -1151,7 +1151,6 @@ export function MenuManagement() {
                 redirect_path: selectedMenu.redirect_path,
                 sort_order: selectedMenu.sort_order
               })}
-              size="small"
             >
               编辑
             </Button>

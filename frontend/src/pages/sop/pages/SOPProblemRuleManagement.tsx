@@ -378,7 +378,6 @@ const SOPProblemRuleManagement: React.FC = () => {
                 指标名称
                 <Button
                   type="link"
-                  size="small"
                   icon={<ReloadOutlined />}
                   loading={loadingItems}
                   onClick={loadZabbixItems}

@@ -395,7 +395,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           <Tooltip title="暂停/启动">
             <Button
               type="text"
-              size="small"
               icon={record.task_enabled ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
               onClick={() => handleToggleTask(record)}
             />
@@ -403,7 +402,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           <Tooltip title="查看消息">
             <Button
               type="text"
-              size="small"
               icon={<MessageOutlined />}
               onClick={() => handleViewMessages(record)}
             />
@@ -411,7 +409,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           <Tooltip title="编辑">
             <Button
               type="text"
-              size="small"
               icon={<SettingOutlined />}
               onClick={() => handleEditTask(record)}
             />
@@ -419,7 +416,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           <Tooltip title="删除">
             <Button
               type="text"
-              size="small"
               danger
               icon={<DeleteOutlined />}
               onClick={() => handleDeleteTask(record)}
@@ -568,7 +564,6 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         <h4 className="text-sm font-medium">智能体定时任务</h4>
         <Button 
           type="primary" 
-          size="small"
           icon={<PlusOutlined />}
           onClick={() => setCreateModalVisible(true)}
         >

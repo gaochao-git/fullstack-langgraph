@@ -767,7 +767,6 @@ const OpenAPIConfigTable: React.FC<OpenAPIConfigTableProps> = ({ onSuccess }) =>
         <Space size="small">
           <Button
             type="primary"
-            size="small"
             icon={<EyeOutlined />}
             onClick={() => handleViewConfig(record)}
             title="查看详情"
@@ -775,7 +774,6 @@ const OpenAPIConfigTable: React.FC<OpenAPIConfigTableProps> = ({ onSuccess }) =>
           />
           <Button
             type="default"
-            size="small"
             icon={<EditOutlined />}
             onClick={() => handleEditConfig(record)}
             title="编辑"
@@ -783,7 +781,6 @@ const OpenAPIConfigTable: React.FC<OpenAPIConfigTableProps> = ({ onSuccess }) =>
           />
           <Button
             type="default"
-            size="small"
             onClick={() => handleToggleEnable(record)}
             title={record.mcp_tool_enabled === 1 ? '禁用' : '启用'}
             style={{ 
@@ -804,7 +801,6 @@ const OpenAPIConfigTable: React.FC<OpenAPIConfigTableProps> = ({ onSuccess }) =>
           >
             <Button
               type="primary"
-              size="small"
               icon={<DeleteOutlined />}
               danger
               title="删除"
@@ -1106,7 +1102,6 @@ const OpenAPIConfigTable: React.FC<OpenAPIConfigTableProps> = ({ onSuccess }) =>
                     extra={
                       <Button
                         type="link"
-                        size="small"
                         icon={<CopyOutlined />}
                         onClick={(e) => {
                           e.stopPropagation();

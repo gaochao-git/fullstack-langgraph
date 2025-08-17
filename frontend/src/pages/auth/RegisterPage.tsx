@@ -98,7 +98,6 @@ export function RegisterPage() {
             name="register"
             className="login-form"
             onFinish={handleRegister}
-            size="large"
             scrollToFirstError
           >
             <Form.Item
