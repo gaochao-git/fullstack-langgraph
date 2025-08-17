@@ -323,18 +323,22 @@ const AgentMarketplace = () => {
             </div>
             
             {/* 标签行 */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2" style={{ overflow: 'hidden' }}>
               <Tag 
                 color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'} 
                 className="text-xs"
+                style={{ margin: 0 }}
               >
                 {agent.agent_type || '未分类'}
               </Tag>
               {agent.is_builtin === 'yes' ? (
-                <Tag color="gold" className="text-xs">内置</Tag>
+                <Tag color="gold" className="text-xs" style={{ margin: 0 }}>内置</Tag>
               ) : (
-                <Tag color="cyan" className="text-xs">模版</Tag>
+                <Tag color="cyan" className="text-xs" style={{ margin: 0 }}>模版</Tag>
               )}
+              <Tag className="text-xs" style={{ margin: 0 }}>
+                {agent.agent_owner || agent.create_by || 'system'}
+              </Tag>
             </div>
 
             {/* 统计信息 */}
