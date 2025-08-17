@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -15,6 +15,7 @@ import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
+import { exportToWord } from "@/services/documentExportApi";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -906,6 +907,7 @@ function ChatMessages({
   const { message } = App.useApp();
   const [inputValue, setInputValue] = useState<string>("");
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [downloadingMessageId, setDownloadingMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
   const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1389,21 +1391,50 @@ function ChatMessages({
                         
                         return renderItems;
                       })()}
-                      {/* 合并区域只显示最后一条 AI 消息的复制按钮 */}
+                      {/* 合并区域只显示最后一条 AI 消息的操作按钮 */}
                       {(() => {
                         // 找到最后一条有内容的 AI 消息
                         const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
                         if (!lastAiMsg) return null;
                         const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
                         return (
-                          <Button
-                            variant="default"
-                            className="cursor-pointer bg-blue-200 border-blue-300 text-blue-800 hover:bg-blue-300 self-end mt-2"
-                            onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
-                          >
-                            {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
-                            {copiedMessageId === lastAiMsg.id ? <CopyCheck /> : <Copy />}
-                          </Button>
+                          <div className="flex gap-2 self-end mt-2">
+                            <Button
+                              variant="default"
+                              className="cursor-pointer bg-blue-200 border-blue-300 text-blue-800 hover:bg-blue-300"
+                              onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
+                            >
+                              {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
+                              {copiedMessageId === lastAiMsg.id ? <CopyCheck className="h-4 w-4 ml-1" /> : <Copy className="h-4 w-4 ml-1" />}
+                            </Button>
+                            <Button
+                              variant="default"
+                              className="cursor-pointer bg-green-200 border-green-300 text-green-800 hover:bg-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={async () => {
+                                try {
+                                  setDownloadingMessageId(lastAiMsg.id!);
+                                  await exportToWord(aiContent, `对话导出_${new Date().toLocaleDateString()}`);
+                                } catch (error) {
+                                  // 错误已在 exportToWord 中处理
+                                } finally {
+                                  setDownloadingMessageId(null);
+                                }
+                              }}
+                              disabled={downloadingMessageId === lastAiMsg.id}
+                            >
+                              {downloadingMessageId === lastAiMsg.id ? (
+                                <>
+                                  下载中
+                                  <Loader2 className="h-4 w-4 ml-1 animate-spin" />
+                                </>
+                              ) : (
+                                <>
+                                  下载Word
+                                  <Download className="h-4 w-4 ml-1" />
+                                </>
+                              )}
+                            </Button>
+                          </div>
                         );
                       })()}
                     </div>

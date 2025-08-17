@@ -23,6 +23,7 @@ from src.apps.auth.dependencies import get_current_user_optional
 from .service.streaming import stream_run_standard, RunCreate
 from .service.threads import create_thread, get_thread_history_post, ThreadCreate, ThreadResponse
 from .service.document_service import document_service
+from .service.document_export_service import document_export_service
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["Agent Management"])
@@ -367,3 +368,47 @@ async def get_thread_files(
     
     file_ids = await get_thread_file_ids(thread_id)
     return success_response(data={"file_ids": file_ids}, msg="获取会话文件成功")
+
+
+# 添加文档导出的请求模型
+class ExportDocumentRequest(BaseModel):
+    content: str
+    title: Optional[str] = None
+    format: str = 'markdown'
+
+
+@router.post("/v1/agents/export/word", response_model=UnifiedResponse)
+async def export_to_word(
+    request: ExportDocumentRequest,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """导出内容为Word文档"""
+    try:
+        # 导出为Word
+        file_path = await document_export_service.export_to_word(
+            content=request.content,
+            title=request.title,
+            format=request.format
+        )
+        
+        # 创建文件响应
+        from fastapi.responses import FileResponse
+        import os
+        from urllib.parse import quote
+        
+        filename = f"{request.title or 'document'}.docx"
+        # 对文件名进行URL编码，处理中文字符
+        encoded_filename = quote(filename.encode('utf-8'))
+        
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"导出Word文档失败: {e}")
+        raise BusinessException(f"导出失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
