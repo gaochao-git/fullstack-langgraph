@@ -32,22 +32,23 @@ class DocumentExportService:
         for directory in [self.upload_dir, self.template_dir, self.generated_dir]:
             os.makedirs(directory, exist_ok=True)
         
-        # 检查Pandoc安装
-        self._setup_pandoc()
+        # 检查Pandoc安装状态
+        self.pandoc_available = self._check_pandoc()
     
-    def _setup_pandoc(self):
-        """检查并设置Pandoc"""
+    def _check_pandoc(self) -> bool:
+        """检查Pandoc是否已安装"""
         try:
-            pypandoc.get_pandoc_version()
-            logger.info("Pandoc已安装")
-        except:
-            logger.warning("Pandoc未安装，尝试下载...")
-            try:
-                pypandoc.download_pandoc()
-                logger.info("Pandoc下载成功")
-            except Exception as e:
-                logger.error(f"Pandoc下载失败: {e}")
-                raise RuntimeError("Pandoc未安装且下载失败，请手动安装: https://pandoc.org/installing.html")
+            version = pypandoc.get_pandoc_version()
+            logger.info(f"Pandoc已安装，版本: {version}")
+            return True
+        except Exception as e:
+            logger.warning(
+                f"Pandoc未安装: {e}. "
+                "Word导出功能将不可用。请手动安装: "
+                "Ubuntu/Debian: sudo apt-get install pandoc, "
+                "MacOS: brew install pandoc"
+            )
+            return False
     
     def _use_frontend_mermaid_images(self, content: str, mermaid_images: List[Dict]) -> tuple[str, Optional[str]]:
         """
@@ -141,6 +142,14 @@ class DocumentExportService:
         Returns:
             生成的文档路径
         """
+        # 检查Pandoc是否可用
+        if not self.pandoc_available:
+            raise RuntimeError(
+                "Pandoc未安装，无法导出Word文档。请安装Pandoc: "
+                "Ubuntu/Debian: sudo apt-get install pandoc, "
+                "MacOS: brew install pandoc"
+            )
+        
         temp_dir = None
         try:
             # 处理Mermaid图表
