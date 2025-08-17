@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useIsMobile } from '@/hooks';
 import { getBaseUrl } from '@/utils/base_api';
 import { 
   Card, 
@@ -134,7 +135,7 @@ const AgentManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined);
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>(undefined); // 归属过滤：我的/我的团队/我的部门
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const isMobile = useIsMobile();
   
   // 模态框状态
   const [agentDetailModal, setAgentDetailModal] = useState(false);
@@ -269,15 +270,6 @@ const AgentManagement: React.FC = () => {
     loadData();
   }, [ownerFilter]);
   
-  // 监听窗口大小变化
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
 
   // 过滤智能体

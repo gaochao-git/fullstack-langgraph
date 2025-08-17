@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useIsMobile } from '@/hooks';
 import { 
   Card, Table, Button, Form, Input, Modal,
   Space, Alert, Tag, Tooltip, Switch, Radio,
@@ -42,15 +43,7 @@ export function APIKeyManagement() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('active');
   const [form] = Form.useForm();
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   // 加载API密钥列表
   const loadAPIKeys = useCallback(async () => {

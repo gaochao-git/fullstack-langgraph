@@ -253,6 +253,17 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     
     # 移除验证逻辑，直接根据数据库配置处理智能体
     
+    # 更新智能体使用统计
+    from src.shared.db.config import get_async_db_context
+    from .agent_service import agent_service
+    try:
+        async with get_async_db_context() as async_db:
+            await agent_service.increment_run_count(async_db, agent_id)
+            logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
+    except Exception as e:
+        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
+        # 统计更新失败不影响主流程
+    
     # 创建用户线程关联（如果提供了用户名且关联不存在）
     # 用户名可能在 request_body.user_name 或 request_body.input.user_name 中
     user_name = None

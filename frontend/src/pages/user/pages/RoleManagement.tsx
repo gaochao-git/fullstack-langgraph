@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useIsMobile } from '@/hooks';
 import { 
   Card, Table, Button, Space, Input, Modal, Form, message, 
   Tag, Tooltip, Row, Col, InputNumber, Transfer, Tabs, App
@@ -32,7 +33,7 @@ export function RoleManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<RbacRole | null>(null);
   const [form] = Form.useForm();
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const isMobile = useIsMobile();
   
   // 分页和搜索状态
   const [pagination, setPagination] = useState({
@@ -43,14 +44,6 @@ export function RoleManagement() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const columns: ColumnsType<RbacRole> = [
     {

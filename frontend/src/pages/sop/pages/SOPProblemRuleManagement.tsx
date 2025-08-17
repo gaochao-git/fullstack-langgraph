@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useIsMobile } from '@/hooks';
 import {
   Card,
   Table,
@@ -43,15 +44,7 @@ const SOPProblemRuleManagement: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRule, setEditingRule] = useState<SOPProblemRule | null>(null);
   const [form] = Form.useForm();
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   // 加载规则列表
   const loadRules = async () => {

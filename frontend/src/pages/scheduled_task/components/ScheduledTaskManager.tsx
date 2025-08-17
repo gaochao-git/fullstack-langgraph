@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useIsMobile } from '@/hooks';
 import { getBaseUrl } from '@/utils/base_api';
 import {
   Table,
@@ -41,21 +42,13 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [selectedTaskMessages, setSelectedTaskMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const isMobile = useIsMobile();
   
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   
   const { message, modal } = App.useApp();
   const API_BASE_URL = getBaseUrl();
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   // 获取任务列表
   const fetchTasks = async () => {

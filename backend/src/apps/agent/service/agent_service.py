@@ -342,6 +342,21 @@ class AgentService:
             result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.scalar_one_or_none()
     
+    async def increment_run_count(self, db: AsyncSession, agent_id: str) -> None:
+        """增量更新运行次数和最后使用时间"""
+        async with db.begin():
+            # 使用SQL的原子操作，直接在数据库层面增加计数
+            await db.execute(
+                update(AgentConfig)
+                .where(AgentConfig.agent_id == agent_id)
+                .values(
+                    total_runs=AgentConfig.total_runs + 1,
+                    last_used=now_shanghai(),
+                    update_time=now_shanghai()
+                )
+            )
+            logger.info(f"Updated run count for agent: {agent_id}")
+    
     async def get_statistics(self, db: AsyncSession):
         """获取智能体统计信息 - 返回原始查询结果让响应层处理"""
         result = await db.execute(
