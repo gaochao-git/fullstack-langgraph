@@ -227,14 +227,21 @@ class AgentService:
         self, 
         db: AsyncSession,
         agent_id: str,
-        update_data: Dict[str, Any]
+        update_data: Dict[str, Any],
+        current_username: Optional[str] = None
     ) -> Optional[AgentConfig]:
         """更新智能体配置"""
         async with db.begin():
             # 检查是否存在
             result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
             existing = result.scalar_one_or_none()
-            if not existing: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            if not existing: 
+                raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            
+            # 检查权限：只有所有者可以修改
+            if current_username:
+                if existing.agent_owner != current_username and existing.create_by != current_username:
+                    raise BusinessException("只有智能体所有者可以修改", ResponseCode.FORBIDDEN)
             
             # 移除不可更新的字段
             update_data = {k: v for k, v in update_data.items() if k not in ['agent_id', 'create_time', 'create_by']}

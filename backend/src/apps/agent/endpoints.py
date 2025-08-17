@@ -91,26 +91,23 @@ async def update_agent(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """更新智能体"""
-    # 先获取智能体信息，检查权限
-    existing_agent = await agent_service.get_agent_by_id(db, agent_id)
-    if not existing_agent:
-        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-    
-    # 检查权限：只有所有者可以修改
-    if current_user:
-        current_username = current_user.get('username')
-        if existing_agent.get('agent_owner') != current_username and existing_agent.get('create_by') != current_username:
-            raise BusinessException("只有智能体所有者可以修改", ResponseCode.FORBIDDEN)
-    
     update_dict = agent_data.model_dump(exclude_none=True)
     if not update_dict: 
         raise BusinessException("更新数据不能为空", ResponseCode.INVALID_PARAMETER)
     
-    # 设置更新者
+    # 设置更新者信息
+    current_username = None
     if current_user:
-        update_dict['update_by'] = current_user.get('username', 'system')
+        current_username = current_user.get('username')
+        update_dict['update_by'] = current_username or 'system'
     
-    updated_agent = await agent_service.update_agent(db, agent_id, update_dict)
+    # 所有数据库操作都在 service 层处理
+    updated_agent = await agent_service.update_agent(
+        db, 
+        agent_id, 
+        update_dict,
+        current_username=current_username
+    )
     if not updated_agent: 
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data=updated_agent,msg="智能体更新成功")
