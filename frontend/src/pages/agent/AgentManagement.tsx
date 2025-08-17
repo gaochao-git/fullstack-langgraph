@@ -106,7 +106,7 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => {
     ...agent,
     displayName: agent.agent_name,
     lastUsed: agent.last_used_at || '',
-    totalRuns: agent.total_queries || 0,
+    totalRuns: agent.total_runs || 0,
     successRate: agent.success_queries && agent.total_queries ? 
       Number((agent.success_queries / agent.total_queries * 100).toFixed(1)) : 0,
     avgResponseTime: 0, // 这个字段在 Agent 接口中不存在
