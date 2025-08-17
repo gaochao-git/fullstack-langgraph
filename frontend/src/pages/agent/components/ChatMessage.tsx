@@ -1556,7 +1556,7 @@ function ChatMessages({
           )}>
             {/* 模型选择器 - 作为地址栏的协议部分 */}
             <div className={cn(
-              "flex items-center border-r px-3 py-2.5",
+              "flex items-center border-r px-1 sm:px-3 py-2 sm:py-2.5 flex-shrink-0",
               isDark 
                 ? "border-gray-600" 
                 : "border-gray-300"
@@ -1565,11 +1565,10 @@ function ChatMessages({
                 value={currentModel || ''}
                 onChange={(e) => onModelChange?.(e.target.value)}
                 className={cn(
-                  "bg-transparent text-sm font-medium cursor-pointer focus:outline-none",
-                  "max-w-[120px] sm:max-w-[150px] truncate", // 设置最大宽度并添加截断
+                  "bg-transparent text-xs sm:text-sm font-medium cursor-pointer focus:outline-none",
+                  "w-16 sm:w-[120px] truncate", // 手机端更窄的宽度
                   isDark ? "text-gray-200" : "text-gray-700"
                 )}
-                style={{ width: '120px' }} // 固定宽度
                 disabled={isLoading || !!interrupt || availableModels.length === 0}
                 title={availableModels.length > 0 ? `当前模型: ${availableModels.find(m => m.type === currentModel)?.name || '未选择'}` : '正在加载模型...'}
               >
@@ -1598,9 +1597,9 @@ function ChatMessages({
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={interrupt ? "请先确认或取消工具执行..." : (window.innerWidth < 640 ? "请描述问题..." : "请描述您遇到的问题...")}
+              placeholder={interrupt ? "请先确认或取消..." : "请描述问题..."}
               className={cn(
-                "flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-sm sm:text-base",
+                "flex-1 min-w-0 px-2 sm:px-3 py-2 sm:py-2.5 bg-transparent focus:outline-none text-sm sm:text-base",
                 isDark 
                   ? "text-gray-100 placeholder-gray-400" 
                   : "text-gray-900 placeholder-gray-500"
@@ -1610,7 +1609,7 @@ function ChatMessages({
             
             {/* 操作按钮区域 - 包含上传文件和发送按钮 */}
             <div className={cn(
-              "flex items-center border-l",
+              "flex items-center border-l flex-shrink-0",
               isDark 
                 ? "border-gray-600" 
                 : "border-gray-300"
@@ -1626,10 +1625,10 @@ function ChatMessages({
                 />
               )}
               
-              {/* 分隔线 */}
+              {/* 分隔线 - 手机端隐藏 */}
               {!(isLoading || interrupt) && (
                 <div className={cn(
-                  "h-6 w-px mx-1",
+                  "hidden sm:block h-6 w-px mx-1",
                   isDark ? "bg-gray-600" : "bg-gray-300"
                 )} />
               )}
