@@ -239,11 +239,7 @@
       margin-right: 8px !important;
     }
     
-    /* 按钮组移动端优化 */
-    .ant-space-item .ant-btn {
-      min-height: 44px !important;
-      padding: 0 16px !important;
-    }
+    /* 表单元素样式已移至 mobile-form-elements.css */
     
     /* 卡片移动端优化 */
     .ant-card {
@@ -345,95 +341,65 @@
       min-width: 80px !important;
     }
     
-    /* Form输入框优化 */
+    /* 统一移动端表单元素高度为 32px */
+    .ant-btn:not(.ant-btn-icon-only):not(.ant-btn-link):not(.ant-btn-text),
+    .ant-select-single .ant-select-selector,
     .ant-input:not(textarea) {
-      height: 44px !important;
-      font-size: 16px !important; /* 防止iOS自动缩放 */
-      line-height: 44px !important;
-      padding: 0 12px !important;
+      height: 32px !important;
+      min-height: 32px !important;
+      max-height: 32px !important;
     }
-    
-    .ant-input-number {
-      min-height: 44px !important;
-      height: 44px !important;
+
+    /* 按钮样式 */
+    .ant-btn:not(.ant-btn-icon-only):not(.ant-btn-link):not(.ant-btn-text) {
+      line-height: 30px !important;
+      padding: 0 15px !important;
+      font-size: 14px !important;
     }
-    
-    .ant-input-number .ant-input-number-input {
-      height: 44px !important;
-      line-height: 44px !important;
-    }
-    
+
+    /* Select 样式 */
     .ant-select-single .ant-select-selector {
-      height: 44px !important;
-      padding: 0 12px !important;
-      border: 1px solid #d9d9d9 !important;
-      border-radius: 6px !important;
-      background-color: #fff !important;
+      padding: 4px 11px !important;
     }
-    
+
+    .ant-select-single .ant-select-selection-item,
+    .ant-select-single .ant-select-selection-placeholder {
+      line-height: 24px !important;
+    }
+
     .ant-select-arrow {
       color: #00000073 !important;
     }
-    
-    /* 移动端Select优化 */
-    @media (max-width: 768px) {
-      .ant-select-single .ant-select-selector {
-        height: 44px !important;
-        border: 1px solid #d9d9d9 !important;
-        border-radius: 6px !important;
-        background-color: #fff !important;
-        font-size: 16px !important;
-      }
-      
-      .ant-select-selection-item,
-      .ant-select-selection-placeholder {
-        line-height: 44px !important;
-        height: 44px !important;
-        font-size: 16px !important;
-      }
-      
-      .ant-select-arrow {
-        color: #00000073 !important;
-        font-size: 12px !important;
-      }
+
+    /* Input 样式 */
+    .ant-input:not(textarea) {
+      padding: 4px 11px !important;
+      line-height: 24px !important;
+      font-size: 14px !important;
     }
-    
-    /* 搜索框精确结构修复 */
-    .ant-input-group-wrapper.ant-input-search {
-      height: 44px !important;
+
+    /* 带前缀/后缀的 Input（如搜索框） */
+    .ant-input-affix-wrapper {
+      height: 32px !important;
+      padding: 4px 11px !important;
     }
-    
-    .ant-input-search .ant-input-wrapper {
-      height: 44px !important;
-    }
-    
-    .ant-input-search .ant-input-affix-wrapper {
-      height: 44px !important;
+
+    .ant-input-affix-wrapper .ant-input {
       padding: 0 !important;
+      height: 24px !important;
     }
-    
-    .ant-input-search .ant-input {
-      height: 44px !important;
-      line-height: 44px !important;
-      padding: 0 12px !important;
-      border: none !important;
+
+    /* 输入框前缀图标 */
+    .ant-input-prefix {
+      margin-right: 4px !important;
     }
-    
-    .ant-input-search .ant-input-group-addon {
-      height: 44px !important;
-      padding: 0 !important;
-    }
-    
-    .ant-input-search .ant-input-search-button {
-      height: 44px !important;
-    }
-    
-    /* Select下拉框内容对齐优化 */
-    .ant-select-selection-item,
-    .ant-select-selection-placeholder {
-      line-height: 44px !important;
-      height: 44px !important;
-      padding: 0 !important;
+
+    /* 确保表单元素在flex容器中对齐 */
+    .ant-btn,
+    .ant-select,
+    .ant-input-affix-wrapper {
+      display: inline-flex !important;
+      align-items: center !important;
     }
     
     /* TextArea保持正常样式 */
