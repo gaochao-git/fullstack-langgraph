@@ -607,7 +607,8 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
         <Layout style={{ 
           padding: 0,
           overflow: 'hidden',
-          height: 'calc(100vh - 64px)', // 减去头部高度
+          height: isMobile ? '100vh' : 'calc(100vh - 64px)', // 移动端使用全高，桌面端减去头部高度
+          paddingTop: isMobile ? 48 : 0, // 移动端添加顶部内边距避免被固定头部遮挡
           display: 'flex',
           flexDirection: 'column'
         }}>
