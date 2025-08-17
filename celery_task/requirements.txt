@@ -6,7 +6,7 @@ kombu==5.5.4            # Celery消息传输库
 # ==================== Database ====================
 # 使用 PyMySQL 替代 mysqlclient
 pymysql==1.1.1          # MySQL数据库驱动
-SQLAlchemy==2.0.36      # ORM框架
+SQLAlchemy==2.0.23      # ORM框架
 
 # ==================== HTTP Requests ====================
 requests==2.32.4        # HTTP请求库 (智能体API调用)
