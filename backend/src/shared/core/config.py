@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 10  # 最大上传文件大小（MB）
     UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md"]  # 允许的文件扩展名
     UPLOAD_DIR: str = "uploads/documents"  # 上传文件存储目录
+    
+    # 文档目录配置
+    DOCUMENT_DIR: str = "documents"  # 文档目录，包含 templates/ 和 generated/ 子目录
 
     # CAS认证配置
     CAS_SERVER_URL: str = "http://localhost:5555/cas"

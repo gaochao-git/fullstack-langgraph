@@ -16,12 +16,15 @@ class DocumentExportService:
     """文档导出服务"""
     
     def __init__(self):
-        # 确保临时目录存在
-        self.temp_dir = os.path.join(tempfile.gettempdir(), 'document_exports')
-        os.makedirs(self.temp_dir, exist_ok=True)
+        # 文档基础目录
+        self.doc_dir = settings.DOCUMENT_DIR
         
         # 模板目录
-        self.template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        self.template_dir = os.path.join(self.doc_dir, 'templates')
+        
+        # 生成文档目录
+        self.generated_dir = os.path.join(self.doc_dir, 'generated')
+        os.makedirs(self.generated_dir, exist_ok=True)
         
         # 检查pandoc是否安装
         try:
@@ -56,7 +59,7 @@ class DocumentExportService:
         try:
             # 生成唯一的文件名
             file_id = str(uuid.uuid4())
-            output_file = os.path.join(self.temp_dir, f"{file_id}.docx")
+            output_file = os.path.join(self.generated_dir, f"{file_id}.docx")
             
             # 准备pandoc参数
             extra_args = []
@@ -100,27 +103,6 @@ class DocumentExportService:
             logger.error(f"导出Word文档失败: {e}")
             raise
     
-    def cleanup_old_files(self, max_age_hours: int = 24):
-        """
-        清理旧的导出文件
-        
-        Args:
-            max_age_hours: 文件保留的最大小时数
-        """
-        try:
-            import time
-            current_time = time.time()
-            
-            for filename in os.listdir(self.temp_dir):
-                file_path = os.path.join(self.temp_dir, filename)
-                if os.path.isfile(file_path):
-                    file_age_hours = (current_time - os.path.getmtime(file_path)) / 3600
-                    if file_age_hours > max_age_hours:
-                        os.remove(file_path)
-                        logger.info(f"删除过期文件: {filename}")
-                        
-        except Exception as e:
-            logger.error(f"清理旧文件失败: {e}")
 
 # 创建服务实例
 document_export_service = DocumentExportService()
