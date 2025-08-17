@@ -121,22 +121,12 @@ async def delete_agent(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """删除智能体"""
-    # 先获取智能体信息，检查权限
-    existing_agent = await agent_service.get_agent_by_id(db, agent_id)
-    if not existing_agent:
-        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+    # 获取当前用户名
+    current_username = current_user.get('username') if current_user else None
     
-    # 检查是否为内置智能体（在service层也会检查，但这里提前检查更友好）
-    if existing_agent.get('is_builtin') == 'yes':
-        raise BusinessException("不能删除内置智能体", ResponseCode.FORBIDDEN)
-    
-    # 检查权限：只有所有者可以删除
-    if current_user:
-        current_username = current_user.get('username')
-        if existing_agent.get('agent_owner') != current_username and existing_agent.get('create_by') != current_username:
-            raise BusinessException("只有智能体所有者可以删除", ResponseCode.FORBIDDEN)
-    
-    success = await agent_service.delete_agent(db, agent_id)
+    # 直接调用service层的delete_agent方法
+    # service层会在事务中完成所有检查和删除操作
+    success = await agent_service.delete_agent_with_permission_check(db, agent_id, current_username)
     if not success: 
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data={"deleted_id": agent_id},msg="智能体删除成功")

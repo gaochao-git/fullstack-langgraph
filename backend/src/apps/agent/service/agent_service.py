@@ -284,6 +284,33 @@ class AgentService:
             result = await db.execute(delete(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.rowcount > 0
     
+    async def delete_agent_with_permission_check(
+        self, 
+        db: AsyncSession,
+        agent_id: str,
+        current_username: Optional[str] = None
+    ) -> bool:
+        """删除智能体配置（带权限检查）"""
+        async with db.begin():
+            # 检查是否存在
+            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            existing = result.scalar_one_or_none()
+            if not existing: 
+                raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            
+            # 检查是否为内置智能体
+            if existing.is_builtin == 'yes': 
+                raise BusinessException("不能删除内置智能体", ResponseCode.FORBIDDEN)
+            
+            # 检查权限：只有所有者可以删除
+            if current_username:
+                if existing.agent_owner != current_username and existing.create_by != current_username:
+                    raise BusinessException("只有智能体所有者可以删除", ResponseCode.FORBIDDEN)
+            
+            logger.info(f"Deleting agent: {agent_id} by user: {current_username}")
+            result = await db.execute(delete(AgentConfig).where(AgentConfig.agent_id == agent_id))
+            return result.rowcount > 0
+    
     async def update_mcp_config(
         self,
         db: AsyncSession,
