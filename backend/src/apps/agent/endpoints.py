@@ -96,10 +96,6 @@ async def update_agent(
     if not existing_agent:
         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     
-    # 检查是否为内置智能体
-    if existing_agent.get('is_builtin') == 'yes':
-        raise BusinessException("不能修改内置智能体", ResponseCode.FORBIDDEN)
-    
     # 检查权限：只有所有者可以修改
     if current_user:
         current_username = current_user.get('username')
