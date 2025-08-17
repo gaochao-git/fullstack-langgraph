@@ -25,6 +25,7 @@ export function UserManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<RbacUser | null>(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // 分页和搜索状态
   const [pagination, setPagination] = useState({
@@ -39,13 +40,21 @@ export function UserManagement() {
     group_name: undefined as string | undefined,
   });
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const columns: ColumnsType<RbacUser> = [
     {
       title: '用户ID',
       dataIndex: 'user_id',
       key: 'user_id',
       width: 150,
-      fixed: 'left',
+      fixed: isMobile ? undefined : 'left',
       ellipsis: false,
       render: (text: string) => (
         <span style={{ whiteSpace: 'nowrap' }}>{text}</span>
@@ -167,7 +176,7 @@ export function UserManagement() {
       title: '操作',
       key: 'action',
       width: 100,
-      fixed: 'right',
+      fixed: isMobile ? undefined : 'right',
       render: (_: any, record: RbacUser) => (
         <Space size="small" style={{ whiteSpace: 'nowrap' }}>
           <Tooltip title="编辑">

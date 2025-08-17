@@ -41,12 +41,21 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [selectedTaskMessages, setSelectedTaskMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   
   const { message, modal } = App.useApp();
   const API_BASE_URL = getBaseUrl();
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 获取任务列表
   const fetchTasks = async () => {
@@ -305,7 +314,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       dataIndex: 'task_name',
       key: 'task_name',
       width: 150,
-      fixed: 'left' as const,
+      fixed: isMobile ? undefined : 'left' as const,
     },
     {
       title: '类型',
@@ -366,7 +375,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       title: '操作',
       key: 'actions',
       width: 200,
-      fixed: 'right' as const,
+      fixed: isMobile ? undefined : 'right' as const,
       render: (_: any, record: any) => (
         <Space size="small">
           <Tooltip title="暂停/启动">

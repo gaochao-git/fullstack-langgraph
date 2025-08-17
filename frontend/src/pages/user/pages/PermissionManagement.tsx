@@ -23,6 +23,7 @@ export function PermissionManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPermission, setEditingPermission] = useState<RbacPermission | null>(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // 分页和搜索状态
   const [pagination, setPagination] = useState({
@@ -31,6 +32,14 @@ export function PermissionManagement() {
     total: 0,
   });
   const [searchText, setSearchText] = useState('');
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const columns: ColumnsType<RbacPermission> = [
     {
@@ -165,7 +174,7 @@ export function PermissionManagement() {
     {
       title: '操作',
       key: 'action',
-      fixed: 'right',
+      fixed: isMobile ? undefined : 'right',
       render: (_: any, record: RbacPermission) => (
         <Space size="small">
           <Tooltip title="编辑">

@@ -43,6 +43,15 @@ const SOPProblemRuleManagement: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRule, setEditingRule] = useState<SOPProblemRule | null>(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 加载规则列表
   const loadRules = async () => {
@@ -278,7 +287,7 @@ const SOPProblemRuleManagement: React.FC = () => {
       title: '操作',
       key: 'action',
       width: 150,
-      fixed: 'right' as const,
+      fixed: isMobile ? undefined : 'right' as const,
       render: (record: SOPProblemRule) => (
         <Space>
           <Button

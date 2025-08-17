@@ -42,6 +42,15 @@ export function APIKeyManagement() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('active');
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 加载API密钥列表
   const loadAPIKeys = useCallback(async () => {
@@ -431,7 +440,7 @@ export function APIKeyManagement() {
     {
       title: '操作',
       key: 'action',
-      fixed: 'right',
+      fixed: isMobile ? undefined : 'right',
       render: (_: unknown, record: APIKeyInfo) => {
         // 检查是否已过期
         const isExpired = record.expires_at && new Date(record.expires_at) < new Date();

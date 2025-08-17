@@ -32,6 +32,7 @@ export function RoleManagement() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState<RbacRole | null>(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   // 分页和搜索状态
   const [pagination, setPagination] = useState({
@@ -42,6 +43,14 @@ export function RoleManagement() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
   const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const columns: ColumnsType<RbacRole> = [
     {
@@ -100,7 +109,7 @@ export function RoleManagement() {
       title: '操作',
       key: 'action',
       width: 100,
-      fixed: 'right',
+      fixed: isMobile ? undefined : 'right',
       render: (_: any, record: RbacRole) => (
         <Space size="small">
           <Tooltip title="配置">
