@@ -63,3 +63,11 @@ servers:
       username: gaochao
       password: "fffjjj"
       database: omind  # SOP数据库名称
+      
+  document_server:
+    enabled: true
+    port: 3006
+    script: "servers/document_mcp_server.py"
+    display_name: "文档生成服务"
+    config:
+      document_dir: "/tmp/mcp_documents"
