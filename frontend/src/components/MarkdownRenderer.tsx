@@ -1,14 +1,20 @@
 import { Typography, theme } from 'antd';
-import React from 'react';
+import React, { useMemo } from 'react';
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
+import { MermaidDiagram } from './MermaidDiagram';
 
 const md: MarkdownIt = new MarkdownIt({ 
   html: true, 
   breaks: false,
   // 配置代码高亮
   highlight: function (str: string, lang: string): string {
+    // 如果是 mermaid 代码块，返回特殊标记
+    if (lang === 'mermaid') {
+      return `<div class="mermaid-placeholder" data-mermaid="${encodeURIComponent(str)}"></div>`;
+    }
+    
     if (lang && hljs.getLanguage(lang)) {
       try {
         const highlighted = hljs.highlight(str, { language: lang }).value;
@@ -255,14 +261,67 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     return null;
   }
 
+  // 分割内容为 Markdown 和 Mermaid 部分
+  const parts = useMemo(() => {
+    const result: Array<{ type: 'markdown' | 'mermaid'; content: string; id?: string }> = [];
+    let currentContent = processedContent;
+    let mermaidIndex = 0;
+    
+    // 正则匹配 mermaid 代码块
+    const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+    
+    while ((match = mermaidRegex.exec(processedContent)) !== null) {
+      // 添加之前的 Markdown 内容
+      if (match.index > lastIndex) {
+        const mdContent = processedContent.slice(lastIndex, match.index);
+        if (mdContent.trim()) {
+          result.push({ type: 'markdown', content: mdContent });
+        }
+      }
+      
+      // 添加 Mermaid 图表
+      result.push({
+        type: 'mermaid',
+        content: match[1].trim(),
+        id: `mermaid-${mermaidIndex++}`
+      });
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // 添加剩余的 Markdown 内容
+    if (lastIndex < processedContent.length) {
+      const mdContent = processedContent.slice(lastIndex);
+      if (mdContent.trim()) {
+        result.push({ type: 'markdown', content: mdContent });
+      }
+    }
+    
+    return result;
+  }, [processedContent]);
+
   return (
     <Typography>
       <style>{markdownStyles}</style>
-      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: used in demo */}
-      <div 
-        className="markdown-body"
-        dangerouslySetInnerHTML={{ __html: md.render(processedContent) }} 
-      />
+      {parts.map((part, index) => {
+        if (part.type === 'markdown') {
+          return (
+            <div 
+              key={`md-${index}`}
+              className="markdown-body"
+              dangerouslySetInnerHTML={{ __html: md.render(part.content) }} 
+            />
+          );
+        } else {
+          return (
+            <div key={part.id} className="my-4">
+              <MermaidDiagram id={part.id!} chart={part.content} />
+            </div>
+          );
+        }
+      })}
     </Typography>
   );
 };
