@@ -485,7 +485,6 @@ const AgentManagement: React.FC = () => {
                     value={ownerFilter}
                     onChange={setOwnerFilter}
                     style={{ width: 100 }}
-                    size="small"
                     allowClear
                     placeholder="归属"
                     options={OWNER_FILTERS.map(filter => ({
@@ -497,7 +496,6 @@ const AgentManagement: React.FC = () => {
                     type="primary"
                     icon={<RobotOutlined />}
                     onClick={handleCreateAgent}
-                    size="small"
                   >
                     新建
                   </Button>
@@ -509,7 +507,6 @@ const AgentManagement: React.FC = () => {
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
                     style={{ flex: 1, minWidth: '100px' }}
-                    size="small"
                   />
                   <Select
                     placeholder="分类"
@@ -517,7 +514,6 @@ const AgentManagement: React.FC = () => {
                     style={{ width: '70px' }}
                     value={typeFilter}
                     onChange={setTypeFilter}
-                    size="small"
                   >
                     {AGENT_TYPES.map(type => (
                       <Option key={type.value} value={type.value}>{type.label}</Option>
@@ -529,7 +525,6 @@ const AgentManagement: React.FC = () => {
                     style={{ width: '80px' }}
                     value={statusFilter}
                     onChange={setStatusFilter}
-                    size="small"
                   >
                     {STATUS_FILTERS.map(status => (
                       <Option key={status.value} value={status.value}>{status.label}</Option>
@@ -538,7 +533,6 @@ const AgentManagement: React.FC = () => {
                   <Button 
                     icon={<ReloadOutlined />}
                     onClick={loadData}
-                    size="small"
                   />
                 </div>
               </>
