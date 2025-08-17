@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -1392,54 +1392,73 @@ function ChatMessages({
                         return renderItems;
                       })()}
                       {/* 合并区域只显示最后一条 AI 消息的操作按钮 */}
-                      {(() => {
-                        // 找到最后一条有内容的 AI 消息
-                        const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
-                        if (!lastAiMsg) return null;
-                        const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
-                        return (
-                          <div className="flex gap-2 self-end mt-2">
-                            <Button
-                              variant="default"
-                              className="cursor-pointer bg-blue-200 border-blue-300 text-blue-800 hover:bg-blue-300"
-                              onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
-                            >
-                              {copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
-                              {copiedMessageId === lastAiMsg.id ? <CopyCheck className="h-4 w-4 ml-1" /> : <Copy className="h-4 w-4 ml-1" />}
-                            </Button>
-                            <Button
-                              variant="default"
-                              className="cursor-pointer bg-green-200 border-green-300 text-green-800 hover:bg-green-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={async () => {
-                                try {
-                                  setDownloadingMessageId(lastAiMsg.id!);
-                                  // 使用新的导出函数，传入isDark参数以匹配主题
-                                  await exportToWordWithImages(aiContent, `对话导出_${new Date().toLocaleDateString()}`, isDark);
-                                } catch (error) {
-                                  // 错误已在 exportToWordWithImages 中处理
-                                } finally {
-                                  setDownloadingMessageId(null);
-                                }
-                              }}
-                              disabled={downloadingMessageId === lastAiMsg.id}
-                            >
-                              {downloadingMessageId === lastAiMsg.id ? (
-                                <>
-                                  下载中
-                                  <Loader2 className="h-4 w-4 ml-1 animate-spin" />
-                                </>
-                              ) : (
-                                <>
-                                  下载Word
-                                  <Download className="h-4 w-4 ml-1" />
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        );
-                      })()}
                     </div>
                   </div>
+                  {/* 操作按钮 - 放在左下角 */}
+                  {(() => {
+                    // 找到最后一条有内容的 AI 消息
+                    const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
+                    if (!lastAiMsg) return null;
+                    const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
+                    return (
+                      <div className="flex gap-1 mt-2 ml-12">
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                          onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
+                          title={copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
+                        >
+                          {copiedMessageId === lastAiMsg.id ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                          onClick={async () => {
+                            try {
+                              setDownloadingMessageId(lastAiMsg.id!);
+                              // 使用新的导出函数，传入isDark参数以匹配主题
+                              await exportToWordWithImages(aiContent, `对话导出_${new Date().toLocaleDateString()}`, isDark);
+                            } catch (error) {
+                              // 错误已在 exportToWordWithImages 中处理
+                            } finally {
+                              setDownloadingMessageId(null);
+                            }
+                          }}
+                          disabled={downloadingMessageId === lastAiMsg.id}
+                          title="下载Word"
+                        >
+                          {downloadingMessageId === lastAiMsg.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                        {idx === dialogRounds.length - 1 && (
+                          <Button
+                            variant="ghost"
+                            size="small"
+                            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                            onClick={() => {
+                              // 重新生成回复 - 使用当前轮次的用户消息
+                              if (round.user && round.user.content) {
+                                const content = typeof round.user.content === 'string' 
+                                  ? round.user.content 
+                                  : JSON.stringify(round.user.content);
+                                // 直接调用 onSubmit 重新生成
+                                onSubmit(content);
+                              }
+                            }}
+                            disabled={isLoading}
+                            title="重新生成"
+                          >
+                            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
               </div>
