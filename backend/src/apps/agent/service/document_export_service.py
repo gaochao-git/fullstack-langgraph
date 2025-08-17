@@ -20,6 +20,9 @@ class DocumentExportService:
         self.temp_dir = os.path.join(tempfile.gettempdir(), 'document_exports')
         os.makedirs(self.temp_dir, exist_ok=True)
         
+        # 模板目录
+        self.template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        
         # 检查pandoc是否安装
         try:
             pypandoc.get_pandoc_version()
@@ -62,8 +65,23 @@ class DocumentExportService:
             if title:
                 extra_args.extend(['--metadata', f'title={title}'])
             
-            # 添加目录
-            extra_args.append('--toc')
+            # 不生成目录
+            # 如果需要目录功能，可以取消下面的注释
+            # extra_args.append('--toc')
+            
+            # 使用公文写作规范模板
+            template_path = os.path.join(self.template_dir, '公文写作规范模板.docx')
+            if os.path.exists(template_path):
+                extra_args.extend(['--reference-doc', template_path])
+                logger.info(f"使用模板: {template_path}")
+            else:
+                # 尝试使用默认模板
+                default_template_path = os.path.join(self.template_dir, 'template.docx')
+                if os.path.exists(default_template_path):
+                    extra_args.extend(['--reference-doc', default_template_path])
+                    logger.info(f"使用默认模板: {default_template_path}")
+                else:
+                    logger.info("未找到模板文件，使用pandoc默认格式")
             
             # 执行转换
             logger.info(f"开始转换: {format} -> docx")
