@@ -429,11 +429,19 @@ async def get_thread_files(
     return success_response(data={"file_ids": file_ids}, msg="获取会话文件成功")
 
 
-# 添加文档导出的请求模型
+# ==================== 文档导出相关模型 ====================
+
+class MermaidImage(BaseModel):
+    """Mermaid图片数据"""
+    index: int
+    image_data: str  # base64编码的图片数据
+
 class ExportDocumentRequest(BaseModel):
+    """文档导出请求"""
     content: str
     title: Optional[str] = None
     format: str = 'markdown'
+    mermaid_images: Optional[List[MermaidImage]] = None
 
 
 @router.post("/v1/agents/export/word", response_model=UnifiedResponse)
@@ -441,13 +449,21 @@ async def export_to_word(
     request: ExportDocumentRequest,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """导出内容为Word文档"""
+    """
+    导出内容为Word文档
+    
+    支持将Markdown内容导出为Word文档，包括：
+    - Markdown文本转换
+    - Mermaid图表转换为图片
+    - 使用模板样式（如果配置）
+    """
     try:
-        # 导出为Word
+        # 导出为Word，支持前端提供的Mermaid图片
         file_path = await document_export_service.export_to_word(
             content=request.content,
             title=request.title,
-            format=request.format
+            format=request.format,
+            mermaid_images=request.mermaid_images
         )
         
         # 创建文件响应

@@ -15,7 +15,7 @@ import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
-import { exportToWord } from "@/services/documentExportApi";
+import { exportToWordWithImages } from "@/services/documentExportApi";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -1413,9 +1413,10 @@ function ChatMessages({
                               onClick={async () => {
                                 try {
                                   setDownloadingMessageId(lastAiMsg.id!);
-                                  await exportToWord(aiContent, `对话导出_${new Date().toLocaleDateString()}`);
+                                  // 使用新的导出函数，传入isDark参数以匹配主题
+                                  await exportToWordWithImages(aiContent, `对话导出_${new Date().toLocaleDateString()}`, isDark);
                                 } catch (error) {
-                                  // 错误已在 exportToWord 中处理
+                                  // 错误已在 exportToWordWithImages 中处理
                                 } finally {
                                   setDownloadingMessageId(null);
                                 }
