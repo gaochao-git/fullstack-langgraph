@@ -14,12 +14,14 @@ import { DynamicRouter } from "@/components/DynamicRouter";
 import GlobalLoading from "@/components/GlobalLoading";
 import { AuthErrorBoundary } from "@/components/AuthErrorBoundary";
 import { configService } from "@/services/configApi";
+import { useResponsiveSize } from "@/hooks/useResponsiveSize";
 
 
 // 主应用组件（包装在主题提供者内部）
 function AppContent() {
   const { antdTheme } = useTheme();
   const { checkAuth, logout } = useAuth();
+  const { size } = useResponsiveSize();
 
   // 初始化认证检查和拦截器
   useEffect(() => {
@@ -37,7 +39,7 @@ function AppContent() {
   }, []);
 
   return (
-    <ConfigProvider theme={antdTheme}>
+    <ConfigProvider theme={antdTheme} componentSize={size}>
       <AntdApp>
         <GlobalLoading />
         <AuthErrorBoundary>
