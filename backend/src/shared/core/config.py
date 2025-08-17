@@ -81,10 +81,9 @@ class Settings(BaseSettings):
     # 文件上传配置
     MAX_UPLOAD_SIZE_MB: int = 10  # 最大上传文件大小（MB）
     UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md"]  # 允许的文件扩展名
-    UPLOAD_DIR: str = "uploads/documents"  # 上传文件存储目录
     
     # 文档目录配置
-    DOCUMENT_DIR: str = "documents"  # 文档目录，包含 templates/ 和 generated/ 子目录
+    DOCUMENT_DIR: str = "documents"  # 文档根目录，包含 uploads/, templates/, generated/ 子目录
 
     # CAS认证配置
     CAS_SERVER_URL: str = "http://localhost:5555/cas"
@@ -101,6 +100,11 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+    
+    @property
+    def UPLOAD_DIR(self) -> str:
+        """上传文件存储目录"""
+        return os.path.join(self.DOCUMENT_DIR, "uploads")
 
 
 # 创建全局配置实例

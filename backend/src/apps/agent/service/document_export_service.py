@@ -19,11 +19,14 @@ class DocumentExportService:
         # 文档基础目录
         self.doc_dir = settings.DOCUMENT_DIR
         
-        # 模板目录
+        # 确保所有子目录存在
+        self.upload_dir = os.path.join(self.doc_dir, 'uploads')
         self.template_dir = os.path.join(self.doc_dir, 'templates')
-        
-        # 生成文档目录
         self.generated_dir = os.path.join(self.doc_dir, 'generated')
+        
+        # 创建必要的目录
+        os.makedirs(self.upload_dir, exist_ok=True)
+        os.makedirs(self.template_dir, exist_ok=True)
         os.makedirs(self.generated_dir, exist_ok=True)
         
         # 检查pandoc是否安装

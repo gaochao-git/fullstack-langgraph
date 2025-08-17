@@ -401,6 +401,43 @@ class DocumentService:
         except Exception as e:
             logger.error(f"异步处理文档失败: {file_id}, 错误: {str(e)}")
 
+    async def get_file_info(self, db: AsyncSession, file_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """
+        获取文件信息（用于下载）
+        
+        Args:
+            db: 数据库会话
+            file_id: 文件ID
+            user_id: 用户ID（用于权限检查）
+            
+        Returns:
+            文件信息字典，包含 file_path 和 file_name
+        """
+        # 查询文档
+        query = select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
+        
+        # 如果提供了用户ID，检查所有权
+        if user_id:
+            query = query.where(AgentDocumentUpload.create_by == user_id)
+        
+        result = await db.execute(query)
+        doc_upload = result.scalar_one_or_none()
+        
+        if not doc_upload:
+            return None
+        
+        # 构建文件路径，需要加上文件扩展名
+        file_path = os.path.join(UPLOAD_DIR, f"{doc_upload.file_id}{doc_upload.file_type}")
+        
+        return {
+            "file_id": doc_upload.file_id,
+            "file_name": doc_upload.file_name,
+            "file_path": file_path,
+            "file_type": doc_upload.file_type,
+            "file_size": doc_upload.file_size,
+            "upload_time": doc_upload.upload_time.isoformat() if doc_upload.upload_time else None
+        }
+
 
 # 全局文档服务实例
 document_service = DocumentService()

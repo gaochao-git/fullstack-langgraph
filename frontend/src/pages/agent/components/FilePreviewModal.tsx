@@ -49,9 +49,25 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     }
   };
 
-  const handleDownload = () => {
-    // TODO: 实现文件下载功能
-    message.info('下载功能暂未实现');
+  const handleDownload = async () => {
+    try {
+      const blob = await fileApi.downloadDocument(fileId);
+      
+      // 创建下载链接
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      message.success('文件下载成功');
+    } catch (error) {
+      message.error('文件下载失败');
+      console.error('下载失败:', error);
+    }
   };
 
   return (

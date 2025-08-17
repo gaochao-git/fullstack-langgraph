@@ -200,7 +200,10 @@ cython_debug/
 #.idea/
 
 backend/.langgraph_api
-backend/uploads
+backend/documents/generated/
+backend/documents/templates/
+backend/documents/uploads/
+backend/uploads/
 production_build
 *.log
 *.pid

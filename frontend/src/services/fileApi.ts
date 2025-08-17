@@ -95,5 +95,26 @@ export const fileApi = {
       await new Promise(resolve => setTimeout(resolve, interval));
     }
     throw new Error('文件处理超时');
+  },
+
+  // 下载文档
+  async downloadDocument(fileId: string): Promise<Blob> {
+    const token = localStorage.getItem('access_token');
+    const headers: any = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`/api/v1/agents/files/${fileId}/download`, {
+      method: 'GET',
+      headers: headers
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`下载失败: ${errorText || response.statusText}`);
+    }
+
+    return response.blob();
   }
 };

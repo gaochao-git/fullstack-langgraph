@@ -358,6 +358,65 @@ async def get_file_status(
     )
 
 
+@router.get("/v1/agents/files/{file_id}/download")
+async def download_file(
+    file_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """下载上传的文件"""
+    from fastapi.responses import FileResponse
+    from urllib.parse import quote
+    import os
+    
+    try:
+        # 获取当前用户ID用于权限检查
+        user_id = current_user.get('username') if current_user else None
+        
+        # 获取文件信息
+        file_info = await document_service.get_file_info(db, file_id, user_id)
+        if not file_info:
+            raise BusinessException("文件不存在或无权访问", ResponseCode.NOT_FOUND)
+        
+        # 构建文件路径
+        file_path = file_info['file_path']
+        if not os.path.exists(file_path):
+            logger.error(f"文件不存在: {file_path}")
+            raise BusinessException("文件不存在", ResponseCode.NOT_FOUND)
+        
+        # 对文件名进行URL编码，处理中文字符
+        filename = file_info['file_name']
+        encoded_filename = quote(filename.encode('utf-8'))
+        
+        # 根据文件扩展名设置 MIME 类型
+        content_type = "application/octet-stream"
+        ext = filename.lower().split('.')[-1] if '.' in filename else ''
+        mime_types = {
+            'txt': 'text/plain',
+            'md': 'text/markdown',
+            'pdf': 'application/pdf',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'doc': 'application/msword'
+        }
+        content_type = mime_types.get(ext, content_type)
+        
+        logger.info(f"下载文件: {filename}, 路径: {file_path}")
+        
+        return FileResponse(
+            path=file_path,
+            filename=filename,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+            }
+        )
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"文件下载失败: {str(e)}", exc_info=True)
+        raise BusinessException(f"文件下载失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
 @router.get("/v1/agents/threads/{thread_id}/files", response_model=UnifiedResponse)
 async def get_thread_files(
     thread_id: str,
