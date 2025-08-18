@@ -525,6 +525,16 @@ class AgentService:
             if agent.agent_owner != current_user:
                 raise BusinessException("只有智能体所有者才能转移所有权", ResponseCode.FORBIDDEN)
             
+            # 检查新用户是否存在
+            result = await db.execute(select(RbacUser).where(RbacUser.user_name == new_owner))
+            new_user = result.scalar_one_or_none()
+            if not new_user:
+                raise BusinessException(f"用户 {new_owner} 不存在", ResponseCode.NOT_FOUND)
+            
+            # 不能转移给自己
+            if new_owner == current_user:
+                raise BusinessException("不能将所有权转移给自己", ResponseCode.BAD_REQUEST)
+            
             # 更新所有者
             update_data = {
                 'agent_owner': new_owner,

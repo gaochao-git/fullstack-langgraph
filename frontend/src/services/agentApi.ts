@@ -318,15 +318,6 @@ class AgentApiService {
     return await omind_get(url);
   }
 
-  /**
-   * 转移智能体所有权
-   */
-  async transferOwnership(agentId: string, newOwner: string, reason?: string) {
-    return await omind_post(`/api/v1/agents/${agentId}/transfer-ownership`, {
-      new_owner: newOwner,
-      reason: reason
-    });
-  }
 }
 
 // 导出服务实例

@@ -388,6 +388,12 @@ const AgentManagement: React.FC = () => {
       const values = await transferForm.validateFields();
       if (!agentToTransfer) return;
 
+      console.log('Transfer form values:', values);
+      console.log('Transfer data:', {
+        new_owner: values.new_owner,
+        reason: values.reason
+      });
+
       const response = await agentApi.transferOwnership(agentToTransfer.agent_id, {
         new_owner: values.new_owner,
         reason: values.reason
