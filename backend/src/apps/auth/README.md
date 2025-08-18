@@ -153,9 +153,123 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 MAX_LOGIN_ATTEMPTS=5
 LOCKOUT_DURATION_MINUTES=30
 
-# SSO配置
+# SSO配置（通用）
 SSO_REDIRECT_URI=http://localhost:3000/sso/callback
+
+# CAS配置（接入公司CAS必需）
+CAS_SERVER_URL=https://your-cas-server.com/cas     # CAS服务器地址
+CAS_SERVICE_URL=http://your-app.com/sso/callback   # 应用回调地址（需在CAS服务器注册）
+CAS_VERSION=3                                       # CAS协议版本（默认3）
+CAS_VERIFY_SSL=true                                 # 是否验证SSL证书（生产环境必须true）
+CAS_SESSION_TIMEOUT=36000                           # 会话超时时间（秒，默认10小时）
+CAS_SINGLE_LOGOUT_ENABLED=true                      # 是否启用单点登出
 ```
+
+## CAS集成配置说明
+
+### 必需配置参数
+
+1. **CAS_SERVER_URL**
+   - 说明：公司CAS服务器的基础URL
+   - 示例：`https://sso.company.com/cas`
+   - 注意：不要包含具体路径如/login或/logout
+
+2. **CAS_SERVICE_URL**
+   - 说明：应用的回调URL，用户登录后CAS将重定向到此地址
+   - 示例：`https://app.company.com/sso/callback`
+   - 注意：
+     - 必须与CAS服务器中注册的Service URL完全一致
+     - 生产环境必须使用HTTPS
+     - 路径固定为 `/sso/callback`
+
+3. **CAS_VERIFY_SSL**
+   - 说明：是否验证CAS服务器的SSL证书
+   - 生产环境：必须设置为 `true`
+   - 开发环境：如果使用自签名证书可设置为 `false`
+
+### 可选配置参数
+
+4. **CAS_VERSION**
+   - 说明：CAS协议版本
+   - 默认值：`3`
+   - 可选值：`2` 或 `3`
+
+5. **CAS_SESSION_TIMEOUT**
+   - 说明：CAS会话超时时间（秒）
+   - 默认值：`36000`（10小时）
+   - 建议：与公司CAS服务器的会话超时保持一致
+
+6. **CAS_SINGLE_LOGOUT_ENABLED**
+   - 说明：是否启用单点登出
+   - 默认值：`true`
+   - 功能：用户在CAS服务器登出时，所有应用同时登出
+
+### CAS属性映射配置
+
+CAS返回的用户属性需要映射到本地用户表，配置文件位于：
+`src/shared/core/cas_mapping_config.yaml`
+
+```yaml
+# 示例：将CAS属性映射到本地字段
+cas_attribute_mapping:
+  direct_mapping:
+    username: user_name        # CAS的username -> 表的user_name
+    display_name: display_name  # CAS的display_name -> 表的display_name  
+    email: email               # CAS的email -> 表的email
+    
+  # 如果CAS返回的是DN格式的组织信息
+  group_name_parsing:
+    enabled: true
+    parser_type: CAS_dn
+```
+
+### 集成前准备
+
+1. **在CAS服务器注册应用**
+   - 提供Service URL（即CAS_SERVICE_URL的值）
+   - 获取必要的访问权限
+
+2. **确认CAS返回的属性**
+   - 与CAS管理员确认返回的用户属性
+   - 根据实际属性调整映射配置
+
+3. **网络连通性**
+   - 确保应用服务器能访问CAS服务器
+   - 检查防火墙规则
+
+4. **HTTPS配置**
+   - 生产环境必须配置HTTPS
+   - 确保SSL证书有效
+
+### 集成步骤
+
+1. **修改.env配置**
+   系统已内置CAS配置，只需修改以下两个参数：
+   ```env
+   # 修改为公司的CAS服务器地址
+   CAS_SERVER_URL=https://cas.company.com/cas
+   
+   # 修改为应用的实际访问地址
+   CAS_SERVICE_URL=https://app.company.com/sso/callback
+   ```
+   
+   其他配置保持默认即可：
+   - `CAS_VERIFY_SSL=false`：开发环境默认不验证SSL
+   - `CAS_VERSION=3`：使用CAS v3协议
+   - `CAS_SESSION_TIMEOUT=36000`：10小时会话超时
+   - 其他配置无需修改
+
+2. **验证配置**
+   ```bash
+   # 获取CAS登录URL
+   curl http://localhost:8000/api/v1/auth/cas/login
+   ```
+
+3. **测试登录流程**
+   - 访问应用登录页面
+   - 选择SSO登录
+   - 跳转到CAS登录页面
+   - 登录成功后自动回调到应用
 
 ## 安全建议
 
