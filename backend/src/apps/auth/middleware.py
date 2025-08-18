@@ -43,6 +43,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/openapi.json",
             "/health",
             "/api/health",
+            "/api/v1/mcp/gateway/configs/all",
         ]
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
