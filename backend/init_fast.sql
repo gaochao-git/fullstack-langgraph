@@ -30,3 +30,7 @@ insert into rbac_users_roles select * from omind.rbac_users_roles;
 insert into rbac_roles_permissions select * from omind.rbac_roles_permissions;
 insert into agent_configs select * from omind.agent_configs;
 insert into ai_model_configs select * from omind.ai_model_configs;
+
+# 备份语句
+/home/mysql/multi/3306/mysql57/bin/mysqldump -h127.0.0.1 -uroot -pfffjjj --set-gtid-purged=OFF --single-transaction --master-data=2 --skip-tz-utc --default-character-set=utf8mb4 -d omind_prd >omind_prd_frm.sql
+/home/mysql/multi/3306/mysql57/bin/mysqldump -h127.0.0.1 -uroot -pfffjjj --set-gtid-purged=OFF --single-transaction --master-data=2 --skip-tz-utc --default-character-set=utf8mb4 omind_prd rbac_users rbac_roles rbac_menus rbac_permissions rbac_users_roles rbac_roles_permissions agent_configs ai_model_configs >omind_prd_data.sql
