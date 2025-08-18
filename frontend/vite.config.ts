@@ -18,7 +18,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the backend server
       "/api": {
-        target: process.env.VITE_BACKEND_URL || "http://127.0.0.1:8000", // 支持环境变量配置后端地址
+        target: "http://127.0.0.1:8000", // 开发环境后端地址
         changeOrigin: true,
         secure: false, // 开发环境可以禁用SSL验证
       },
