@@ -198,24 +198,28 @@ class AgentService:
                     and_(
                         AgentConfig.visibility_type == 'team',
                         exists(
-                            select(1).select_from(RbacUser).alias('owner_user').where(
+                            select(1).where(
                                 and_(
-                                    text('owner_user.user_name = agent_configs.agent_owner'),
-                                    text('owner_user.group_name = (SELECT group_name FROM rbac_users WHERE user_name = :current_user)')
+                                    RbacUser.user_name == AgentConfig.agent_owner,
+                                    RbacUser.group_name == select(RbacUser.group_name).where(
+                                        RbacUser.user_name == current_user
+                                    ).scalar_subquery()
                                 )
-                            ).params(current_user=current_user)
+                            )
                         )
                     ),
                     # 4. 部门权限：同部门成员的department级别智能体
                     and_(
                         AgentConfig.visibility_type == 'department',
                         exists(
-                            select(1).select_from(RbacUser).alias('owner_user').where(
+                            select(1).where(
                                 and_(
-                                    text('owner_user.user_name = agent_configs.agent_owner'),
-                                    text('owner_user.department_name = (SELECT department_name FROM rbac_users WHERE user_name = :current_user)')
+                                    RbacUser.user_name == AgentConfig.agent_owner,
+                                    RbacUser.department_name == select(RbacUser.department_name).where(
+                                        RbacUser.user_name == current_user
+                                    ).scalar_subquery()
                                 )
-                            ).params(current_user=current_user)
+                            )
                         )
                     ),
                     # 5. 我在额外授权用户列表中
