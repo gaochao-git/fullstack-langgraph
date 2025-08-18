@@ -12,7 +12,8 @@ import {
   Row,
   Col,
   Switch,
-  Modal
+  Modal,
+  Form
 } from 'antd';
 import { 
   RobotOutlined,
@@ -23,7 +24,8 @@ import {
   LockOutlined,
   TeamOutlined,
   GlobalOutlined,
-  UserOutlined
+  UserOutlined,
+  SwapOutlined
 } from '@ant-design/icons';
 import AgentDetailModal from './components/AgentDetailModal';
 import AgentEditModal from './components/AgentEditModal';
@@ -150,6 +152,11 @@ const AgentManagement: React.FC = () => {
   // 1. 新增 state
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<LocalAgent | null>(null);
+  
+  // 转移所有权相关状态
+  const [transferModalVisible, setTransferModalVisible] = useState(false);
+  const [agentToTransfer, setAgentToTransfer] = useState<LocalAgent | null>(null);
+  const [transferForm] = Form.useForm();
   
   
   
@@ -366,6 +373,39 @@ const AgentManagement: React.FC = () => {
     }
     setAgentToDelete(agent);
     setDeleteModalVisible(true);
+  };
+
+  // 转移所有权
+  const handleTransferOwnership = (agent: LocalAgent) => {
+    setAgentToTransfer(agent);
+    setTransferModalVisible(true);
+    transferForm.resetFields();
+  };
+
+  // 确认转移所有权
+  const confirmTransferOwnership = async () => {
+    try {
+      const values = await transferForm.validateFields();
+      if (!agentToTransfer) return;
+
+      const response = await agentApi.transferOwnership(agentToTransfer.agent_id, {
+        new_owner: values.new_owner,
+        reason: values.reason
+      });
+
+      if (response.status === 'error') {
+        message.error(response.msg || '转移所有权失败');
+        return;
+      }
+
+      message.success('所有权转移成功');
+      setTransferModalVisible(false);
+      setAgentToTransfer(null);
+      // 重新加载列表
+      await loadData();
+    } catch (error) {
+      message.error('转移所有权失败，请重试');
+    }
   };
 
 
@@ -612,7 +652,19 @@ const AgentManagement: React.FC = () => {
                   >
                     编辑
                   </Button>,
-                  ...(agent.is_builtin !== 'yes' ? [
+                  ...(agent.is_builtin !== 'yes' && user && agent.agent_owner === user.username ? [
+                    <Button 
+                      key="transfer"
+                      type="text" 
+                      icon={<SwapOutlined />}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleTransferOwnership(agent);
+                      }}
+                    >
+                      转移
+                    </Button>,
                     <Button 
                       key="delete"
                       type="text" 
@@ -777,6 +829,55 @@ const AgentManagement: React.FC = () => {
         )}
       </Modal>
 
+      {/* 转移所有权模态框 */}
+      <Modal
+        title="转移智能体所有权"
+        open={transferModalVisible}
+        onOk={confirmTransferOwnership}
+        onCancel={() => {
+          setTransferModalVisible(false);
+          setAgentToTransfer(null);
+          transferForm.resetFields();
+        }}
+        okText="确认转移"
+        cancelText="取消"
+      >
+        {agentToTransfer && (
+          <div>
+            <p style={{ marginBottom: 16 }}>
+              将智能体 "{agentToTransfer.displayName}" 的所有权转移给其他用户
+            </p>
+            <Form
+              form={transferForm}
+              layout="vertical"
+            >
+              <Form.Item
+                name="new_owner"
+                label="新所有者用户名"
+                rules={[
+                  { required: true, message: '请输入新所有者用户名' },
+                  { min: 3, message: '用户名至少3个字符' }
+                ]}
+              >
+                <Input placeholder="请输入新所有者的用户名" />
+              </Form.Item>
+              <Form.Item
+                name="reason"
+                label="转移原因（可选）"
+              >
+                <Input.TextArea 
+                  rows={3} 
+                  placeholder="请输入转移原因" 
+                  maxLength={200}
+                />
+              </Form.Item>
+            </Form>
+            <p style={{ color: '#ff4d4f', marginTop: 16 }}>
+              注意：转移后您将失去对该智能体的所有权限
+            </p>
+          </div>
+        )}
+      </Modal>
 
     </div>
   );

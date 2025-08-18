@@ -4,11 +4,12 @@ Agent服务层 - 纯异步实现
 
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_, func, case, text, bindparam
+from sqlalchemy import select, update, delete, and_, or_, func, case, text, bindparam, exists
 import uuid
 import json
 
 from src.apps.agent.models import AgentConfig
+from src.apps.user.models import RbacUser
 from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
@@ -132,21 +133,57 @@ class AgentService:
                 # 只看我的智能体
                 permission_conditions.append(AgentConfig.agent_owner == current_user)
             elif owner_filter == 'team':
-                # 查看团队智能体：我的 + 团队成员的公开智能体
-                # TODO: 需要从用户表获取团队成员信息
+                # 查看团队智能体：需要先获取当前用户的团队信息
+                # 子查询获取当前用户的团队名称
+                user_team_subquery = select(RbacUser.group_name).where(
+                    RbacUser.user_name == current_user
+                ).scalar_subquery()
+                
                 permission_conditions.append(
-                    and_(
-                        AgentConfig.visibility_type.in_(['team', 'department', 'public']),
-                        # 这里应该加入团队成员判断
+                    or_(
+                        # 1. 我的智能体
+                        AgentConfig.agent_owner == current_user,
+                        # 2. 团队成员的团队级别或更高权限的智能体
+                        and_(
+                            AgentConfig.visibility_type.in_(['team', 'department', 'public']),
+                            exists(
+                                select(1).where(
+                                    and_(
+                                        RbacUser.user_name == AgentConfig.agent_owner,
+                                        RbacUser.group_name == user_team_subquery
+                                    )
+                                )
+                            )
+                        ),
+                        # 3. 我在额外授权用户列表中
+                        text("JSON_CONTAINS(visibility_additional_users, :user, '$')").bindparams(user=f'"{current_user}"')
                     )
                 )
             elif owner_filter == 'department':
-                # 查看部门智能体：我的 + 部门成员的公开智能体
-                # TODO: 需要从用户表获取部门成员信息
+                # 查看部门智能体：需要先获取当前用户的部门信息
+                # 子查询获取当前用户的部门名称
+                user_dept_subquery = select(RbacUser.department_name).where(
+                    RbacUser.user_name == current_user
+                ).scalar_subquery()
+                
                 permission_conditions.append(
-                    and_(
-                        AgentConfig.visibility_type.in_(['department', 'public']),
-                        # 这里应该加入部门成员判断
+                    or_(
+                        # 1. 我的智能体
+                        AgentConfig.agent_owner == current_user,
+                        # 2. 部门成员的部门级别或更高权限的智能体
+                        and_(
+                            AgentConfig.visibility_type.in_(['department', 'public']),
+                            exists(
+                                select(1).where(
+                                    and_(
+                                        RbacUser.user_name == AgentConfig.agent_owner,
+                                        RbacUser.department_name == user_dept_subquery
+                                    )
+                                )
+                            )
+                        ),
+                        # 3. 我在额外授权用户列表中
+                        text("JSON_CONTAINS(visibility_additional_users, :user, '$')").bindparams(user=f'"{current_user}"')
                     )
                 )
         elif current_user:
@@ -157,7 +194,31 @@ class AgentService:
                     AgentConfig.agent_owner == current_user,
                     # 2. 公开的智能体
                     AgentConfig.visibility_type == 'public',
-                    # 3. 我在额外授权用户列表中
+                    # 3. 团队权限：同团队成员的team级别智能体
+                    and_(
+                        AgentConfig.visibility_type == 'team',
+                        exists(
+                            select(1).select_from(RbacUser).alias('owner_user').where(
+                                and_(
+                                    text('owner_user.user_name = agent_configs.agent_owner'),
+                                    text('owner_user.group_name = (SELECT group_name FROM rbac_users WHERE user_name = :current_user)')
+                                )
+                            ).params(current_user=current_user)
+                        )
+                    ),
+                    # 4. 部门权限：同部门成员的department级别智能体
+                    and_(
+                        AgentConfig.visibility_type == 'department',
+                        exists(
+                            select(1).select_from(RbacUser).alias('owner_user').where(
+                                and_(
+                                    text('owner_user.user_name = agent_configs.agent_owner'),
+                                    text('owner_user.department_name = (SELECT department_name FROM rbac_users WHERE user_name = :current_user)')
+                                )
+                            ).params(current_user=current_user)
+                        )
+                    ),
+                    # 5. 我在额外授权用户列表中
                     text("JSON_CONTAINS(visibility_additional_users, :user, '$')").bindparams(user=f'"{current_user}"')
                 )
             )

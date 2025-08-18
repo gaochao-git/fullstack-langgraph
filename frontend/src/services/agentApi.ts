@@ -294,6 +294,16 @@ class AgentApiService {
   }
 
   /**
+   * 转移智能体所有权
+   */
+  async transferOwnership(agentId: string, data: {
+    new_owner: string;
+    reason?: string;
+  }) {
+    return await omind_post(`/api/v1/agents/${agentId}/transfer-ownership`, data);
+  }
+
+  /**
    * 获取用户收藏的智能体列表
    */
   async getFavoriteAgents(params?: {
