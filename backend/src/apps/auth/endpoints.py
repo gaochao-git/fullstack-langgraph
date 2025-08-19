@@ -3,15 +3,26 @@
 """
 
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Request, Response, Cookie
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from urllib.parse import parse_qs
 from datetime import datetime, timezone
 
+from fastapi import APIRouter, Depends, Request, Response, Cookie
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import select, and_
+from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.shared.db.config import get_async_db
-from src.apps.auth.service import AuthService, SSOService
-from src.apps.auth.models import AuthSession
+from src.shared.core.config import settings
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode, success_response
+from src.shared.core.logging import get_logger
+from src.apps.auth.service import AuthService, SSOService, CASService, menu_service
+from src.apps.auth.models import AuthSession, AuthSSOProvider, AuthApiKey, AuthToken
+from src.apps.auth.utils import JWTUtils
+from src.apps.auth.dependencies import get_current_user, get_current_user_optional, require_auth, require_roles
+from src.apps.auth.service.rbac_service import RBACService
+from src.apps.auth.utils import MFAUtils, PasswordUtils, TokenBlacklist
 from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.apps.auth.schema import (
     LoginRequest, LoginResponse, RefreshTokenRequest, LogoutRequest,
@@ -25,10 +36,8 @@ from src.apps.auth.schema import (
     MenuCreateRequest, MenuUpdateRequest, MenuResponse, 
     MenuTreeResponse, MenuListResponse, UserMenuResponse
 )
-from src.apps.auth.service import menu_service
-from src.apps.auth.dependencies import get_current_user, get_current_user_optional, require_auth, require_roles
-from src.shared.core.exceptions import BusinessException
-from src.shared.schemas.response import ResponseCode, success_response
+
+logger = get_logger(__name__)
 
 
 router = APIRouter(prefix="/v1/auth", tags=["认证"])
@@ -91,7 +100,6 @@ async def get_password_policy():
     
     返回密码要求，供前端动态验证使用
     """
-    from src.shared.core.config import settings
     
     # 构建密码要求描述
     requirements = []
@@ -153,7 +161,6 @@ async def logout(
         
         # 从token中获取jti
         if credentials and credentials.credentials:
-            from src.apps.auth.utils import JWTUtils
             jti = JWTUtils.get_jti(credentials.credentials)
             
             await service.logout(
@@ -183,8 +190,6 @@ async def get_current_user_permissions(
     db: AsyncSession = Depends(get_async_db)
 ):
     """获取当前用户的权限树（角色、权限、菜单）"""
-    from src.apps.auth.rbac_service import RBACService
-    
     service = RBACService(db)
     return await service.get_permission_tree(current_user["sub"])
 
@@ -195,7 +200,6 @@ async def verify_token(
 ):
     """验证访问令牌是否有效"""
     try:
-        from src.apps.auth.utils import JWTUtils
         payload = JWTUtils.decode_token(credentials.credentials)
         
         return TokenValidationResponse(
@@ -214,7 +218,6 @@ async def verify_token(
 @router.get("/sso/providers", summary="获取SSO提供商列表")
 async def get_sso_providers(db: AsyncSession = Depends(get_async_db)):
     """获取可用的SSO提供商列表"""
-    from src.apps.auth.models import AuthSSOProvider
     
     providers = db.query(AuthSSOProvider).filter(
         AuthSSOProvider.is_active == True
@@ -278,7 +281,6 @@ async def get_cas_login_url(
     db: AsyncSession = Depends(get_async_db)
 ):
     """获取CAS登录URL"""
-    from .service import CASService
     service = CASService(db)
     login_url = service.get_login_url()
     
@@ -295,7 +297,6 @@ async def cas_callback(
     db: AsyncSession = Depends(get_async_db)
 ):
     """处理CAS登录回调"""
-    from .service import CASService
     service = CASService(db)
     
     ip_address = req.client.host
@@ -331,43 +332,69 @@ async def cas_logout(
     
     - **redirect_url**: 登出后的重定向URL（可选）
     """
-    if cas_session_id:
-        from sqlalchemy import select
-        from .models import AuthSession
-        
-        stmt = select(AuthSession).where(
-            AuthSession.session_id == cas_session_id,
-            AuthSession.is_active == True
-        )
-        result = await db.execute(stmt)
-        session = result.scalar_one_or_none()
-        
-        if session:
-            session.is_active = False
-            session.terminated_at = datetime.now(timezone.utc)
-            session.termination_reason = "用户主动登出"
-            await db.commit()
-    
     # 删除CAS会话cookie
     response.delete_cookie("cas_session_id")
     
-    # 生成CAS登出URL
-    from .service import CASService
-    service = CASService(db)
-    
-    # 如果没有指定重定向URL，默认重定向到前端登录页
+    # 设置默认重定向URL
     if not redirect_url:
-        # 获取前端地址
         frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else "http://localhost:3000"
         redirect_url = f"{frontend_url}/login"
     
-    logout_url = service.get_logout_url(redirect_url)
+    # 调用服务层处理
+    service = CASService(db)
     
-    return success_response({
-        "message": "登出成功",
-        "logout_url": logout_url,
-        "redirect_required": True
-    })
+    if cas_session_id:
+        # 执行完整登出流程
+        logout_result = await service.perform_logout(cas_session_id, redirect_url)
+        await db.commit()
+        
+        return success_response({
+            "message": "登出成功",
+            "logout_url": logout_result["logout_url"],
+            "redirect_required": True,
+            "cas_notified": logout_result.get("session_cleared", False)
+        })
+    else:
+        # 只返回登出URL
+        logout_url = service.get_logout_url(redirect_url)
+        
+        return success_response({
+            "message": "登出成功",
+            "logout_url": logout_url,
+            "redirect_required": True,
+            "cas_notified": False
+        })
+
+
+@router.post("/cas/slo", summary="CAS Single Logout回调")
+async def cas_single_logout_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    处理CAS服务器发送的Single Logout通知
+    
+    当其他应用触发CAS登出时，CAS服务器会向所有已登录的应用发送登出通知
+    """
+    # 获取请求体
+    body = await request.body()
+    
+    if body:
+        try:
+            # 解析表单数据
+            params = parse_qs(body.decode('utf-8'))
+            logout_request = params.get('logoutRequest', [None])[0]
+            
+            if logout_request:
+                # 调用服务层处理
+                service = CASService(db)
+                await service.handle_single_logout(logout_request)
+                
+        except Exception as e:
+            logger.error(f"Error processing CAS SLO callback: {e}")
+    
+    # 即使处理失败，也返回200避免CAS服务器重试
+    return Response(status_code=200)
 
 
 # ============= 统一认证接口 =============
@@ -512,8 +539,6 @@ async def get_current_user_debug(
     user_id = current_user.get("sub")
     
     # 获取用户完整信息
-    from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
-    from src.apps.auth.service.rbac_service import RBACService
     
     # 获取用户数据
     user_result = await db.execute(
@@ -529,7 +554,6 @@ async def get_current_user_debug(
     # 获取CAS session信息（如果有）
     cas_info = None
     if current_user.get("auth_type") == "cas":
-        from .models import AuthSession
         session_result = await db.execute(
             select(AuthSession).where(
                 AuthSession.user_id == user_id,
@@ -618,7 +642,6 @@ async def enable_mfa(
 ):
     """启用多因素认证"""
     # TODO: 实现MFA启用
-    from src.apps.auth.utils import MFAUtils
     
     secret = MFAUtils.generate_secret()
     qr_uri = MFAUtils.generate_qr_uri(secret, current_user.get("email", ""))
@@ -673,10 +696,6 @@ async def list_api_keys(
 ):
     """获取API密钥列表（管理员查看所有，普通用户只看自己的）"""
     # 先导入必要的模块
-    from sqlalchemy import select, and_
-    from sqlalchemy.orm import joinedload
-    from src.apps.auth.models import AuthApiKey
-    from src.apps.user.models import RbacUser
     
     # TODO: 检查是否是管理员，如果是管理员显示所有，否则只显示自己的
     # 暂时显示所有的（包括已禁用和已撤销的）
@@ -730,9 +749,6 @@ async def revoke_api_key(
     撤销后的密钥将无法再次启用，这是一个永久性操作。
     如果只是想临时禁用，请使用禁用/启用功能。
     """
-    from sqlalchemy import select, and_
-    from src.apps.auth.models import AuthApiKey
-    from datetime import datetime, timezone
     
     # 查询密钥
     stmt = select(AuthApiKey).where(
@@ -775,8 +791,6 @@ async def toggle_api_key_status(
     这是一个临时性操作，可以随时切换。
     已撤销的密钥无法再次启用。
     """
-    from sqlalchemy import select
-    from src.apps.auth.models import AuthApiKey
     
     stmt = select(AuthApiKey).where(
         AuthApiKey.id == int(key_id)
@@ -815,8 +829,6 @@ async def list_sessions(
     db: AsyncSession = Depends(get_async_db)
 ):
     """获取当前用户的所有活跃会话"""
-    from src.apps.auth.models import AuthToken, AuthSession
-    from src.apps.auth.utils import JWTUtils
     
     current_jti = JWTUtils.get_jti(credentials.credentials)
     
@@ -849,15 +861,15 @@ async def terminate_session(
     db: AsyncSession = Depends(get_async_db)
 ):
     """终止指定的会话"""
-    from src.apps.auth.models import AuthToken
-    from src.apps.auth.utils import TokenBlacklist
-    from datetime import datetime, timezone
     
     # 查找并撤销该会话的所有令牌
-    tokens = db.query(AuthToken).filter(
-        AuthToken.user_id == current_user["sub"],
-        AuthToken.token_jti == request.session_id
-    ).all()
+    result = await db.execute(
+        select(AuthToken).where(
+            AuthToken.user_id == current_user["sub"],
+            AuthToken.token_jti == request.session_id
+        )
+    )
+    tokens = result.scalars().all()
     
     if not tokens:
         raise BusinessException(
@@ -1034,9 +1046,6 @@ async def init_admin(
     """
     初始化管理员账户（仅在没有管理员时可用）
     """
-    from src.apps.user.models import RbacUser
-    from src.apps.auth.utils import PasswordUtils
-    from sqlalchemy import select
     
     # 检查是否已有管理员
     stmt = select(RbacUser).where(RbacUser.user_name == "admin")
@@ -1081,9 +1090,6 @@ async def get_active_sessions(
     """获取当前用户的所有活跃CAS会话"""
     if not cas_session_id:
         raise BusinessException("需要CAS认证", ResponseCode.UNAUTHORIZED)
-    
-    from sqlalchemy import select
-    from .models import AuthSession
     
     # 获取当前会话
     current_session = await db.execute(

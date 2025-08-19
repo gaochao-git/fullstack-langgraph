@@ -7,9 +7,11 @@ import asyncio
 import secrets
 import time
 import json
+import xml.etree.ElementTree as ET
 from typing import Dict, Any, Optional
 from urllib.parse import urlencode
 from datetime import timedelta
+import httpx
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
@@ -63,6 +65,113 @@ class CASService:
         # 使用 CAS 客户端生成登出URL
         logout_url = self.cas_client.get_logout_url(redirect_url)
         return logout_url
+    
+    async def perform_logout(self, session_id: str, redirect_url: Optional[str] = None) -> Dict[str, Any]:
+        """
+        执行完整的CAS登出流程
+        
+        Args:
+            session_id: 本地会话ID
+            redirect_url: 登出后重定向URL
+            
+        Returns:
+            包含登出结果的字典
+        """
+        # 1. 清理本地session
+        
+        stmt = select(AuthSession).where(
+            AuthSession.session_id == session_id,
+            AuthSession.is_active == True
+        )
+        result = await self.db.execute(stmt)
+        session = result.scalar_one_or_none()
+        
+        if session:
+            session.is_active = False
+            session.terminated_at = now_shanghai()
+            session.termination_reason = "用户主动登出"
+            await self.db.flush()
+            
+            # 获取CAS ticket (如果有保存)
+            cas_ticket = session.sso_session_id
+            
+            # 2. 主动通知CAS服务器登出（如果启用了single logout）
+            if self.single_logout_enabled and cas_ticket:
+                try:
+                    # 构建登出请求URL
+                    logout_endpoint = f"{self.cas_server_url}/logout"
+                    
+                    # 发送异步HTTP请求到CAS服务器
+                    async with httpx.AsyncClient(verify=self.verify_ssl) as client:
+                        response = await client.get(
+                            logout_endpoint,
+                            params={"service": redirect_url} if redirect_url else None,
+                            timeout=5.0
+                        )
+                        
+                        if response.status_code == 200:
+                            logger.info(f"Successfully notified CAS server for logout, session: {session_id}")
+                        else:
+                            logger.warning(f"CAS logout notification failed with status: {response.status_code}")
+                            
+                except Exception as e:
+                    logger.error(f"Failed to notify CAS server for logout: {e}")
+                    # 继续执行，不因为CAS通知失败而中断登出流程
+        
+        # 3. 获取登出URL供前端使用（作为备份方案）
+        logout_url = self.get_logout_url(redirect_url)
+        
+        return {
+            "success": True,
+            "logout_url": logout_url,
+            "session_cleared": session is not None
+        }
+    
+    async def handle_single_logout(self, logout_request_xml: str) -> bool:
+        """
+        处理CAS Single Logout回调
+        
+        Args:
+            logout_request_xml: CAS发送的logout请求XML
+            
+        Returns:
+            是否处理成功
+        """
+        try:
+            # 解析XML获取SessionIndex (ticket)
+            root = ET.fromstring(logout_request_xml)
+            
+            # 查找SessionIndex元素
+            ns = {'samlp': 'urn:oasis:names:tc:SAML:2.0:protocol'}
+            session_index = root.find('.//samlp:SessionIndex', ns)
+            
+            if session_index is not None and session_index.text:
+                ticket = session_index.text
+                
+                # 查找并清理相关的本地session
+                
+                stmt = select(AuthSession).where(
+                    AuthSession.sso_session_id == ticket,
+                    AuthSession.is_active == True
+                )
+                result = await self.db.execute(stmt)
+                session = result.scalar_one_or_none()
+                
+                if session:
+                    session.is_active = False
+                    session.terminated_at = now_shanghai()
+                    session.termination_reason = "CAS Single Logout"
+                    await self.db.commit()
+                    
+                    logger.info(f"Processed CAS SLO for ticket: {ticket}, session: {session.session_id}")
+                    return True
+                else:
+                    logger.info(f"No active session found for CAS SLO ticket: {ticket}")
+                    
+        except Exception as e:
+            logger.error(f"Error processing CAS SLO: {e}", exc_info=True)
+            
+        return False
     
     async def validate_ticket(self, ticket: str) -> Dict[str, Any]:
         """
