@@ -89,7 +89,6 @@ class Settings(BaseSettings):
     CAS_SERVER_URL: str = "http://localhost:5555/cas"
     CAS_VERSION: str = "3"
     CAS_VERIFY_SSL: bool = False
-    CAS_APPLY_ATTRIBUTES: bool = True
     CAS_SESSION_TIMEOUT: int = 36000
     CAS_CHECK_NEXT: bool = True
     CAS_SERVICE_URL: str = "http://localhost:3000/sso/callback"

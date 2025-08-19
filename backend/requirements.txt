@@ -117,6 +117,7 @@ pure_eval==0.2.3
 pycodestyle==2.14.0
 pycparser==2.22
 pydantic==2.11.7
+python-cas==1.6.0
 pydantic-settings==2.10.1
 pydantic_core==2.33.2
 pyflakes==3.4.0
@@ -136,6 +137,7 @@ python-iso639==2025.2.18
 python-magic==0.4.27
 python-multipart==0.0.20
 python-oxmsg==0.0.2
+python-cas==1.6.0
 pytz==2025.2
 PyYAML==6.0.2
 RapidFuzz==3.13.0

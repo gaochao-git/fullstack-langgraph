@@ -3,27 +3,23 @@ CAS (Central Authentication Service) 集成服务
 使用python-cas库简化集成
 """
 
+import asyncio
 import secrets
+import time
 from typing import Dict, Any, Optional
 from urllib.parse import urlencode
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
 from datetime import timedelta
 
-try:
-    from cas import CASClient
-except ImportError:
-    # 如果没有安装python-cas，使用自定义实现
-    CASClient = None
-    import httpx
-    import xml.etree.ElementTree as ET
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, or_
+from cas import CASClient
 
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.logging import get_logger
 from src.shared.core.config import settings
-from src.apps.auth.models import AuthSession
-from src.apps.user.models import RbacUser
+from src.apps.auth.models import AuthSession, AuthLoginHistory
+from src.apps.user.models import RbacUser, RbacRole, RbacUsersRoles
 from src.apps.auth.utils import CASAttributeParser
 from src.shared.db.models import now_shanghai
 
@@ -40,7 +36,6 @@ class CASService:
         self.service_url = settings.CAS_SERVICE_URL
         self.cas_version = settings.CAS_VERSION
         self.verify_ssl = settings.CAS_VERIFY_SSL
-        self.apply_attributes = settings.CAS_APPLY_ATTRIBUTES
         self.session_timeout = settings.CAS_SESSION_TIMEOUT
         self.check_next = settings.CAS_CHECK_NEXT
         self.single_logout_enabled = settings.CAS_SINGLE_LOGOUT_ENABLED
@@ -48,22 +43,33 @@ class CASService:
         # 初始化CAS属性解析器（使用YAML配置）
         self.attribute_parser = CASAttributeParser()
         
-        # 初始化CAS客户端（如果安装了python-cas）
-        if CASClient:
-            self.cas_client = CASClient(
-                version=int(self.cas_version) if self.cas_version else 3,
-                service_url=self.service_url,
-                server_url=self.cas_server_url
-            )
-        else:
-            self.cas_client = None
+        # 初始化CAS客户端
+        logger.info("Initializing CAS Client with parameters:")
+        logger.info(f"  - CAS Server URL: {self.cas_server_url}")
+        logger.info(f"  - Service URL: {self.service_url}")
+        logger.info(f"  - CAS Version: {self.cas_version}")
+        logger.info(f"  - Verify SSL: {self.verify_ssl}")
+        logger.info(f"  - Session Timeout: {self.session_timeout}")
+        
+        self.cas_client = CASClient(
+            version=int(self.cas_version),
+            service_url=self.service_url,
+            server_url=self.cas_server_url,
+            verify_ssl_certificate=self.verify_ssl,
+            renew=False,  # 不强制重新认证
+            extra_login_params={},  # 可以添加额外的登录参数
+            username_attribute=None  # 使用默认的用户名属性
+        )
         
     def get_login_url(self) -> str:
         """获取CAS登录URL"""
         params = {
             'service': self.service_url
         }
-        return f"{self.cas_server_url}/login?{urlencode(params)}"
+        login_url = f"{self.cas_server_url}/login?{urlencode(params)}"
+        logger.info(f"CAS Login URL: {login_url}")
+        logger.info(f"CAS Login Parameters: service={self.service_url}")
+        return login_url
     
     def get_logout_url(self, redirect_url: Optional[str] = None) -> str:
         """获取CAS登出URL"""
@@ -84,129 +90,47 @@ class CASService:
         Returns:
             包含用户信息的字典
         """
-        if self.cas_client:
-            # 使用python-cas库
-            try:
-                # python-cas是同步的，需要在异步环境中调用
-                import asyncio
-                loop = asyncio.get_event_loop()
-                
-                # 在线程池中执行同步操作
-                user, attributes, pgtiou = await loop.run_in_executor(
-                    None,
-                    self.cas_client.verify_ticket,
-                    ticket
-                )
-                
-                if not user:
-                    raise BusinessException(
-                        "CAS票据验证失败",
-                        ResponseCode.UNAUTHORIZED
-                    )
-                
-                logger.info(f"CAS validation successful for user: {user}")
-                
-                return {
-                    'username': user,
-                    'attributes': attributes or {}
-                }
-                
-            except Exception as e:
-                logger.error(f"CAS validation error: {e}")
-                raise BusinessException(
-                    "CAS验证失败",
-                    ResponseCode.UNAUTHORIZED
-                )
-        else:
-            # 使用自定义实现（原有代码）
-            return await self._validate_ticket_custom(ticket)
-    
-    async def _validate_ticket_custom(self, ticket: str) -> Dict[str, Any]:
-        """自定义的票据验证实现（备用）"""
-        # 构建验证URL
-        if self.cas_version == '3':
-            validate_url = f"{self.cas_server_url}/p3/serviceValidate"
-        else:
-            validate_url = f"{self.cas_server_url}/serviceValidate"
-            
-        params = {
-            'service': self.service_url,
-            'ticket': ticket
-        }
-        
+        # 使用python-cas库
         try:
-            # 请求CAS服务器验证票据
-            async with httpx.AsyncClient(verify=self.verify_ssl) as client:
-                response = await client.get(
-                    validate_url,
-                    params=params,
-                    timeout=10.0
-                )
-                
-            if response.status_code != 200:
-                logger.error(f"CAS ticket validation failed: {response.status_code}")
+            # python-cas是同步的，需要在异步环境中调用
+            loop = asyncio.get_event_loop()
+            
+            # 打印验证票据时的参数
+            logger.info(f"CAS Ticket Validation Parameters:")
+            logger.info(f"  - Ticket: {ticket}")
+            logger.info(f"  - Service URL: {self.service_url}")
+            logger.info(f"  - CAS Server URL: {self.cas_server_url}")
+            logger.info(f"  - CAS Version: {self.cas_version}")
+            
+            # 在线程池中执行同步操作
+            user, attributes, pgtiou = await loop.run_in_executor(
+                None,
+                self.cas_client.verify_ticket,
+                ticket
+            )
+            
+            if not user:
                 raise BusinessException(
                     "CAS票据验证失败",
                     ResponseCode.UNAUTHORIZED
                 )
-                
-            # 解析XML响应
-            root = ET.fromstring(response.text)
             
-            # CAS命名空间
-            ns = {'cas': 'http://www.yale.edu/tp/cas'}
-            
-            # 检查认证是否成功
-            auth_success = root.find('.//cas:authenticationSuccess', ns)
-            if auth_success is None:
-                auth_failure = root.find('.//cas:authenticationFailure', ns)
-                if auth_failure is not None:
-                    error_code = auth_failure.get('code', 'UNKNOWN')
-                    error_msg = auth_failure.text.strip() if auth_failure.text else 'Unknown error'
-                    logger.error(f"CAS authentication failed: {error_code} - {error_msg}")
-                raise BusinessException(
-                    "CAS认证失败",
-                    ResponseCode.UNAUTHORIZED
-                )
-                
-            # 提取用户名
-            user_element = auth_success.find('cas:user', ns)
-            if user_element is None:
-                raise BusinessException(
-                    "CAS响应中缺少用户信息",
-                    ResponseCode.INTERNAL_ERROR
-                )
-                
-            username = user_element.text.strip()
-            
-            # 提取属性
-            attributes = {}
-            attrs_element = auth_success.find('cas:attributes', ns)
-            if attrs_element is not None:
-                for attr in attrs_element:
-                    attr_name = attr.tag.replace('{http://www.yale.edu/tp/cas}', '')
-                    attributes[attr_name] = attr.text
-                    
-            logger.info(f"CAS validation successful for user: {username}")
+            logger.info(f"CAS validation successful for user: {user}")
+            logger.info(f"CAS returned attributes: {attributes}")
+            logger.info(f"CAS pgtiou: {pgtiou}")
             
             return {
-                'username': username,
-                'attributes': attributes
+                'username': user,
+                'attributes': attributes or {}
             }
             
-        except httpx.RequestError as e:
-            logger.error(f"CAS request error: {e}")
+        except Exception as e:
+            logger.error(f"CAS validation error: {e}")
             raise BusinessException(
-                "无法连接到CAS服务器",
-                ResponseCode.INTERNAL_ERROR
+                "CAS验证失败",
+                ResponseCode.UNAUTHORIZED
             )
-        except ET.ParseError as e:
-            logger.error(f"CAS response parse error: {e}")
-            raise BusinessException(
-                "CAS响应格式错误",
-                ResponseCode.INTERNAL_ERROR
-            )
-            
+    
     async def process_cas_login(self, ticket: str, ip_address: str = None, user_agent: str = None) -> Dict[str, Any]:
         """
         处理CAS登录 - 纯Session模式
@@ -225,7 +149,19 @@ class CASService:
         attributes = cas_data.get('attributes', {})
         
         # 解析CAS属性（使用YAML配置）
-        parsed_attrs = self.attribute_parser.parse_attributes(attributes)
+        if attributes:
+            logger.info(f"Parsing CAS attributes with YAML config")
+            logger.info(f"  - Raw attributes: {attributes}")
+            parsed_attrs = self.attribute_parser.parse_attributes(attributes)
+            logger.info(f"  - Parsed attributes: {parsed_attrs}")
+        else:
+            logger.info(f"No attributes returned from CAS, using defaults")
+            parsed_attrs = {
+                'display_name': username,
+                'email': f"{username}@example.com",  # 默认邮箱
+                'department_name': '默认部门',
+                'group_name': '默认组'
+            }
         
         # 查找或创建用户
         result = await self.db.execute(
@@ -241,7 +177,6 @@ class CASService:
         if not user:
             # 创建新用户（使用YAML配置中的字段映射）
             # 生成与本地用户一致的user_id格式
-            import time
             timestamp = int(time.time() * 1000)
             user_id = parsed_attrs.get('user_id', f"user_{timestamp}")
             
@@ -266,7 +201,6 @@ class CASService:
             # 因为CAS用户不需要密码，认证完全依赖CAS Server
             
             # 为新CAS用户分配默认角色
-            from src.apps.user.models import RbacRole, RbacUsersRoles
             # 查找默认角色（假设有一个名为"普通用户"的角色）
             result = await self.db.execute(
                 select(RbacRole).where(
@@ -305,7 +239,6 @@ class CASService:
             await self.db.flush()
             
         # 创建CAS Session（纯Session管理，不涉及JWT）
-        from src.apps.auth.models import AuthSession
         cas_session = AuthSession(
             session_id=secrets.token_urlsafe(32),
             user_id=user.user_id,
@@ -320,7 +253,6 @@ class CASService:
         await self.db.flush()
         
         # 记录登录历史
-        from src.apps.auth.models import AuthLoginHistory
         login_history = AuthLoginHistory(
             user_id=user.user_id,
             username=user.user_name,
