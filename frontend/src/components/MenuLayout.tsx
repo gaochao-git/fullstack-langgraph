@@ -254,6 +254,8 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                             <span style={{ fontWeight: 500 }}>{user?.display_name || user?.username || '未获取'}</span>
                           </div>
                           <div style={{ paddingLeft: 24, fontSize: 12, color: '#666' }}>
+                            <div>用户名：{user?.username || '未获取'}</div>
+                            <div>邮箱：{user?.email || '未设置'}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                               <span>角色：</span>
                               {user?.roles && Array.isArray(user.roles) && user.roles.length > 1 ? (
@@ -281,12 +283,12 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                                     Array.isArray(user.roles) ? 
                                       user.roles.map(r => typeof r === 'string' ? r : r.role_name).join(', ') : 
                                       user.roles
-                                  ) : '未获取'}
+                                  ) : '未分配'}
                                 </span>
                               )}
                             </div>
-                            <div>部门：{user?.department || '未获取'}</div>
-                            <div>团队：{user?.team || '未获取'}</div>
+                            <div>部门：{user?.department_name || user?.department || '未分配'}</div>
+                            <div>团队：{user?.group_name || user?.team || '未分配'}</div>
                           </div>
                         </Space>
                       </div>

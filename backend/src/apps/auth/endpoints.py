@@ -355,10 +355,50 @@ async def get_current_user_info(
     """
     # 1. 优先使用依赖注入的用户信息（兼容各种认证方式）
     if current_user:
-        return success_response({
-            "user": current_user,
-            "auth_type": current_user.get("auth_type", "jwt")
-        })
+        # 获取用户ID
+        user_id = current_user.get("sub") or current_user.get("user_id")
+        
+        # 从数据库获取完整的用户信息
+        from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
+        
+        # 获取用户详细信息
+        user_stmt = select(RbacUser).where(RbacUser.user_id == user_id)
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalar_one_or_none()
+        
+        if user:
+            # 获取用户角色
+            roles_stmt = select(RbacRole).join(
+                RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+            ).where(RbacUsersRoles.user_id == user.user_id)
+            
+            roles_result = await db.execute(roles_stmt)
+            roles = list(roles_result.scalars().all())
+            
+            return success_response({
+                "user": {
+                    "id": user.user_id,  # 前端需要id字段
+                    "user_id": user.user_id,
+                    "username": user.user_name,
+                    "display_name": user.display_name,
+                    "email": user.email,
+                    "department_name": user.department_name,
+                    "group_name": user.group_name,
+                    "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles],
+                    # 保留JWT中的一些字段
+                    "exp": current_user.get("exp"),
+                    "iat": current_user.get("iat"),
+                    "jti": current_user.get("jti"),
+                    "type": current_user.get("type")
+                },
+                "auth_type": current_user.get("auth_type", "jwt")
+            })
+        else:
+            # 如果数据库中找不到用户，返回JWT中的基本信息
+            return success_response({
+                "user": current_user,
+                "auth_type": current_user.get("auth_type", "jwt")
+            })
     
     # 2. 检查CAS认证
     if cas_session_id:
@@ -391,10 +431,13 @@ async def get_current_user_info(
                 
                 return success_response({
                     "user": {
+                        "id": user.user_id,  # 前端需要id字段
                         "user_id": user.user_id,
                         "username": user.user_name,
                         "display_name": user.display_name,
                         "email": user.email,
+                        "department_name": user.department_name,
+                        "group_name": user.group_name,
                         "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
                     },
                     "auth_type": "cas"

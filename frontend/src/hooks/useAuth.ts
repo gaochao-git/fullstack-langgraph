@@ -17,7 +17,9 @@ interface User {
   roles?: Role[] | string[];
   current_role?: Role | string;
   department?: string;
+  department_name?: string;
   team?: string;
+  group_name?: string;
 }
 
 interface AuthState {
