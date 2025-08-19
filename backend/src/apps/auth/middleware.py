@@ -19,6 +19,39 @@ from src.shared.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+# 定义认证排除路径常量
+AUTH_EXCLUDE_PATHS = [
+    "/api/v1/auth/login",
+    "/api/v1/auth/register",
+    "/api/v1/auth/sso",
+    "/api/v1/auth/cas",
+    "/api/v1/auth/forgot-password",
+    "/api/v1/auth/password-policy",
+    "/api/v1/auth/check",
+    "/api/v1/auth/admin/menus",  # 菜单列表（公开）
+    "/api/v1/auth/init",
+    "/api/v1/config/system",  # 系统配置（公开）
+    "/api/v1/mcp/gateway/configs/all",  # MCP Gateway配置（公开）
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/health",
+    "/api/health",
+]
+
+# 定义RBAC权限检查排除路径常量
+RBAC_EXCLUDE_PATHS = [
+    "/api/v1/auth",
+    "/api/v1/agent/ws",  # WebSocket不需要权限检查
+    "/api/v1/agent/sse",  # SSE流式接口
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/health",
+    "/api/health",
+]
+
+
 class AuthMiddleware(BaseHTTPMiddleware):
     """
     认证中间件
@@ -27,24 +60,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     
     def __init__(self, app, exclude_paths: Optional[List[str]] = None):
         super().__init__(app)
-        self.exclude_paths = exclude_paths or [
-            "/api/v1/auth/login",
-            "/api/v1/auth/register",
-            "/api/v1/auth/sso",
-            "/api/v1/auth/cas",
-            "/api/v1/auth/forgot-password",
-            "/api/v1/auth/password-policy",
-            "/api/v1/auth/check",
-            "/api/v1/auth/admin/menus",  # 菜单列表（公开）
-            "/api/v1/auth/init",
-            "/api/v1/config/system",  # 系统配置（公开）
-            "/docs",
-            "/redoc",
-            "/openapi.json",
-            "/health",
-            "/api/health",
-            "/api/v1/mcp/gateway/configs/all",
-        ]
+        self.exclude_paths = exclude_paths or AUTH_EXCLUDE_PATHS
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 检查是否是排除的路径
@@ -160,13 +176,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
     ):
         super().__init__(app)
         self.check_permissions = check_permissions
-        self.exclude_paths = exclude_paths or [
-            "/api/v1/auth",
-            "/docs",
-            "/redoc",
-            "/openapi.json",
-            "/health",
-        ]
+        self.exclude_paths = exclude_paths or RBAC_EXCLUDE_PATHS
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 检查是否需要权限检查
@@ -258,41 +268,15 @@ def setup_auth_middleware(app):
     ```
     """
     # 添加RBAC权限中间件（需要认证信息）
+    # 使用默认的排除路径，不再重复定义
     app.add_middleware(
         RBACMiddleware, 
-        check_permissions=True,
-        exclude_paths=[
-            "/api/v1/auth",
-            "/api/v1/agent/ws",  # WebSocket不需要权限检查
-            "/api/v1/agent/sse",  # SSE流式接口
-            "/docs",
-            "/redoc",
-            "/openapi.json",
-            "/health",
-            "/api/health",
-        ]
+        check_permissions=True
     )
     
     # 添加认证中间件（必须在权限中间件之前）
-    app.add_middleware(
-        AuthMiddleware,
-        exclude_paths=[
-            "/api/v1/auth/login",
-            "/api/v1/auth/register",
-            "/api/v1/auth/sso",
-            "/api/v1/auth/cas",
-            "/api/v1/auth/forgot-password",
-            "/api/v1/auth/password-policy",
-            "/api/v1/auth/check",
-            "/api/v1/auth/admin/menus",  # 菜单列表（公开）
-            "/api/v1/auth/init",
-            "/docs",
-            "/redoc",
-            "/openapi.json",
-            "/health",
-            "/api/health",
-        ]
-    )
+    # 使用默认的排除路径，不再重复定义
+    app.add_middleware(AuthMiddleware)
     
     # 添加审计中间件（最内层，可选）
     # app.add_middleware(AuditMiddleware, log_requests=True)

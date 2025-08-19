@@ -241,6 +241,28 @@ class AuthService:
             )
             self.db.add(login_history)
             
+            # 为新用户分配默认角色（普通用户）
+            from src.apps.user.models import RbacRole, RbacUsersRoles
+            # 查找默认角色
+            result = await self.db.execute(
+                select(RbacRole).where(
+                    RbacRole.role_name == "普通用户"  # 默认角色名是"普通用户"
+                )
+            )
+            default_role = result.scalar_one_or_none()
+            
+            if default_role:
+                user_role = RbacUsersRoles(
+                    user_id=user_id,
+                    role_id=default_role.role_id,
+                    create_by="system",
+                    update_by="system"
+                )
+                self.db.add(user_role)
+                logger.info(f"Assigned default role '{default_role.role_name}' to new user: {request.username}")
+            else:
+                logger.warning(f"No default role '普通用户' found for new user: {request.username}")
+            
             await self.db.flush()
             
             return RegisterResponse(

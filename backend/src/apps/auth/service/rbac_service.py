@@ -111,13 +111,7 @@ class RBACService:
         Returns:
             bool: 是否有权限
         """
-        # 检查是否是超级管理员
-        roles = await self.get_user_roles(user_id)
-        for role in roles:
-            if role.role_name == '超级管理员':
-                return True  # 管理员有所有权限
-        
-        # 获取用户权限
+        # 获取用户权限（包括超级管理员）
         permissions = await self.get_user_permissions(user_id)
         
         for perm in permissions:
