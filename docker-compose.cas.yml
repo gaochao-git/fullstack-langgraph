@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  cas:
+    image: apereo/cas:6.6.15
+    container_name: cas-server
+    ports:
+      - "8080:8080"
+    environment:
+      # 基础配置
+      - SERVER_PORT=8080
+      - SERVER_SSL_ENABLED=false
+      
+      # 时区配置
+      - TZ=Asia/Shanghai
+      - JAVA_OPTS=-Duser.timezone=Asia/Shanghai
+      
+      # CAS服务器配置
+      - CAS_SERVER_NAME=http://localhost:8080
+      - CAS_SERVER_PREFIX=http://localhost:8080/cas
+      
+      # 测试用户
+      - CAS_AUTHN_ACCEPT_USERS=test::123456
+      
+      # 服务注册配置 - 使用JSON格式配置
+      - SPRING_APPLICATION_JSON={"cas":{"serviceRegistry":{"core":{"initFromJson":true},"json":{"location":"file:/etc/cas/services"}},"tgc":{"secure":false},"warningCookie":{"secure":false}}}
+      
+    volumes:
+      # 挂载服务配置目录
+      - ./cas-services:/etc/cas/services:ro
+      
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/cas/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s

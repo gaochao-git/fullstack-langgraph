@@ -81,7 +81,8 @@ export function SSOCallback() {
         } catch (err: any) {
           setError(err.message || 'CAS登录处理失败');
           message.error('CAS登录失败');
-          setTimeout(() => navigate('/login'), 3000);
+          // 延长等待时间到10秒，方便调试时复制ticket
+          setTimeout(() => navigate('/login'), 10000);
         }
         return;
       }
@@ -121,7 +122,7 @@ export function SSOCallback() {
       } catch (err: any) {
         setError(err.message || 'SSO登录处理失败');
         message.error('SSO登录失败');
-        setTimeout(() => navigate('/login'), 3000);
+        setTimeout(() => navigate('/login'), 10000);
       }
     };
 

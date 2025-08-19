@@ -63,22 +63,18 @@ class CASService:
         
     def get_login_url(self) -> str:
         """获取CAS登录URL"""
-        params = {
-            'service': self.service_url
-        }
-        login_url = f"{self.cas_server_url}/login?{urlencode(params)}"
+        # 使用 CAS 客户端生成登录URL，避免手动拼接导致的问题
+        login_url = self.cas_client.get_login_url()
         logger.info(f"CAS Login URL: {login_url}")
         logger.info(f"CAS Login Parameters: service={self.service_url}")
         return login_url
     
     def get_logout_url(self, redirect_url: Optional[str] = None) -> str:
         """获取CAS登出URL"""
-        if redirect_url:
-            params = {
-                'service': redirect_url
-            }
-            return f"{self.cas_server_url}/logout?{urlencode(params)}"
-        return f"{self.cas_server_url}/logout"
+        # 使用 CAS 客户端生成登出URL
+        logout_url = self.cas_client.get_logout_url(redirect_url)
+        logger.info(f"CAS Logout URL: {logout_url}")
+        return logout_url
     
     async def validate_ticket(self, ticket: str) -> Dict[str, Any]:
         """
@@ -95,13 +91,6 @@ class CASService:
             # python-cas是同步的，需要在异步环境中调用
             loop = asyncio.get_event_loop()
             
-            # 打印验证票据时的参数
-            logger.info(f"CAS Ticket Validation Parameters:")
-            logger.info(f"  - Ticket: {ticket}")
-            logger.info(f"  - Service URL: {self.service_url}")
-            logger.info(f"  - CAS Server URL: {self.cas_server_url}")
-            logger.info(f"  - CAS Version: {self.cas_version}")
-            
             # 在线程池中执行同步操作
             user, attributes, pgtiou = await loop.run_in_executor(
                 None,
@@ -110,6 +99,7 @@ class CASService:
             )
             
             if not user:
+                logger.error(f"CAS票据验证失败: user={user}, attributes={attributes}, pgtiou={pgtiou}")
                 raise BusinessException(
                     "CAS票据验证失败",
                     ResponseCode.UNAUTHORIZED
@@ -125,7 +115,13 @@ class CASService:
             }
             
         except Exception as e:
-            logger.error(f"CAS validation error: {e}")
+            logger.error(f"CAS validation error: {e}", exc_info=True)
+            logger.error(f"Error type: {type(e).__name__}")
+            # 如果是XML解析错误，可能是返回了HTML错误页面
+            if "syntax error" in str(e).lower():
+                logger.error("CAS returned invalid response format (possibly HTML instead of XML)")
+                logger.error(f"This usually means CAS server returned an error page")
+                logger.error(f"Check CAS server logs for details")
             raise BusinessException(
                 "CAS验证失败",
                 ResponseCode.UNAUTHORIZED
@@ -163,13 +159,10 @@ class CASService:
                 'group_name': '默认组'
             }
         
-        # 查找或创建用户
+        # 查找用户（只根据用户名查找，避免邮箱冲突）
         result = await self.db.execute(
             select(RbacUser).where(
-                or_(
-                    RbacUser.user_name == username,
-                    RbacUser.email == parsed_attrs.get('email')
-                )
+                RbacUser.user_name == username
             )
         )
         user = result.scalar_one_or_none()
