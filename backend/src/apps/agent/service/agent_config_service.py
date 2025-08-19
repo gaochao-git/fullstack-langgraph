@@ -73,15 +73,13 @@ class AgentConfigService:
         """
         agent_config = AgentConfigService.get_agent_config(agent_name, db)
         
-        if not agent_config or not agent_config.get('llm_config'):
-            # Return default configuration if agent not found or no LLM config
-            return {
-                'model_name': selected_model or 'deepseek-chat',
-                'temperature': 0.1,
-                'max_tokens': 2000,
-                'base_url': 'https://api.deepseek.com',
-                'available_models': ['deepseek-chat']
-            }
+        if not agent_config:
+            logger.warning(f"Agent configuration not found for agent: {agent_name}")
+            return {}
+            
+        if not agent_config.get('llm_config'):
+            logger.warning(f"LLM configuration not found for agent: {agent_name}")
+            return {}
         
         llm_config = agent_config['llm_config']
         
@@ -90,73 +88,63 @@ class AgentConfigService:
             try:
                 llm_config = json.loads(llm_config)
             except (json.JSONDecodeError, ValueError):
-                llm_config = {}
-        elif not isinstance(llm_config, dict):
-            llm_config = {}
+                llm_config = []
         
-        # Extract configuration with fallbacks and type conversion
-        temperature = llm_config.get('temperature', 0.1)
-        if isinstance(temperature, str):
-            try:
-                temperature = float(temperature)
-            except (ValueError, TypeError):
-                temperature = 0.1
+        # 只支持新的数据结构：llm_config必须是列表
+        if not isinstance(llm_config, list):
+            logger.error(f"Invalid LLM configuration format for agent: {agent_name}. Expected list, got {type(llm_config)}. Please update configuration to new format.")
+            return {}
+            
+        if not llm_config:
+            logger.error(f"Empty LLM configuration for agent: {agent_name}")
+            return {}
+            
+        # 如果指定了模型，查找对应的配置
+        if selected_model:
+            for config in llm_config:
+                if config.get('model_name') == selected_model:
+                    model_args = config.get('model_args', {})
+                    # Get model info from database
+                    model_info = AgentConfigService._get_model_info_from_db(selected_model, db)
+                    if not model_info.get('endpoint_url'):
+                        logger.error(f"No endpoint_url found for model: {selected_model}")
+                        return {}
+                        
+                    result = {
+                        'model_name': selected_model,
+                        'temperature': model_args.get('temperature', 0.7),
+                        'max_tokens': model_args.get('max_tokens', 2000),
+                        'top_p': model_args.get('top_p', 1.0),
+                        'base_url': model_info['endpoint_url'],
+                        'available_models': [cfg.get('model_name') for cfg in llm_config if cfg.get('model_name')]
+                    }
+                    if model_info.get('api_key'):
+                        result['api_key'] = model_info['api_key']
+                    return result
         
-        max_tokens = llm_config.get('max_tokens', 2000)
-        if isinstance(max_tokens, str):
-            try:
-                max_tokens = int(max_tokens)
-            except (ValueError, TypeError):
-                max_tokens = 2000
-        
-        top_p = llm_config.get('top_p', 1.0)
-        if isinstance(top_p, str):
-            try:
-                top_p = float(top_p)
-            except (ValueError, TypeError):
-                top_p = 1.0
-        
-        frequency_penalty = llm_config.get('frequency_penalty', 0.0)
-        if isinstance(frequency_penalty, str):
-            try:
-                frequency_penalty = float(frequency_penalty)
-            except (ValueError, TypeError):
-                frequency_penalty = 0.0
-        
-        presence_penalty = llm_config.get('presence_penalty', 0.0)
-        if isinstance(presence_penalty, str):
-            try:
-                presence_penalty = float(presence_penalty)
-            except (ValueError, TypeError):
-                presence_penalty = 0.0
-        
-        # Use selected_model if provided, otherwise use configured model
-        model_name = selected_model or llm_config.get('model_name', 'deepseek-chat')
-        
-        logger.info(f"模型选择逻辑: selected_model={selected_model}, configured_model={llm_config.get('model_name')}, final_model={model_name}")
-        
-        # Get model info from database (includes endpoint_url and api_key)
+        # 如果没有指定模型或没找到，使用第一个配置
+        first_config = llm_config[0]
+        model_name = first_config.get('model_name')
+        if not model_name:
+            logger.error(f"No model_name in first config for agent: {agent_name}")
+            return {}
+            
+        model_args = first_config.get('model_args', {})
         model_info = AgentConfigService._get_model_info_from_db(model_name, db)
-        
-        # 直接使用用户输入的endpoint_url
-        # 前端已经确保OpenAI兼容模式不会包含/chat/completions
-        base_url = model_info.get('endpoint_url', 'https://api.deepseek.com')
-        
+        if not model_info.get('endpoint_url'):
+            logger.error(f"No endpoint_url found for model: {model_name}")
+            return {}
+            
         result = {
             'model_name': model_name,
-            'temperature': temperature,
-            'max_tokens': max_tokens,
-            'top_p': top_p,
-            'frequency_penalty': frequency_penalty,
-            'presence_penalty': presence_penalty,
-            'available_models': llm_config.get('available_models', ['deepseek-chat']),
-            'base_url': base_url
+            'temperature': model_args.get('temperature', 0.7),
+            'max_tokens': model_args.get('max_tokens', 2000),
+            'top_p': model_args.get('top_p', 1.0),
+            'base_url': model_info['endpoint_url'],
+            'available_models': [cfg.get('model_name') for cfg in llm_config if cfg.get('model_name')]
         }
-        
-        # Add API key if found in database
         if model_info.get('api_key'):
-            result['api_key'] = model_info.get('api_key')
-            
+            result['api_key'] = model_info['api_key']
         return result
     
     @staticmethod
