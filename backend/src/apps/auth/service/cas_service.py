@@ -44,13 +44,6 @@ class CASService:
         self.attribute_parser = CASAttributeParser()
         
         # 初始化CAS客户端
-        logger.info("Initializing CAS Client with parameters:")
-        logger.info(f"  - CAS Server URL: {self.cas_server_url}")
-        logger.info(f"  - Service URL: {self.service_url}")
-        logger.info(f"  - CAS Version: {self.cas_version}")
-        logger.info(f"  - Verify SSL: {self.verify_ssl}")
-        logger.info(f"  - Session Timeout: {self.session_timeout}")
-        
         self.cas_client = CASClient(
             version=int(self.cas_version),
             service_url=self.service_url,
@@ -65,15 +58,12 @@ class CASService:
         """获取CAS登录URL"""
         # 使用 CAS 客户端生成登录URL，避免手动拼接导致的问题
         login_url = self.cas_client.get_login_url()
-        logger.info(f"CAS Login URL: {login_url}")
-        logger.info(f"CAS Login Parameters: service={self.service_url}")
         return login_url
     
     def get_logout_url(self, redirect_url: Optional[str] = None) -> str:
         """获取CAS登出URL"""
         # 使用 CAS 客户端生成登出URL
         logout_url = self.cas_client.get_logout_url(redirect_url)
-        logger.info(f"CAS Logout URL: {logout_url}")
         return logout_url
     
     async def validate_ticket(self, ticket: str) -> Dict[str, Any]:
@@ -99,15 +89,12 @@ class CASService:
             )
             
             if not user:
-                logger.error(f"CAS票据验证失败: user={user}, attributes={attributes}, pgtiou={pgtiou}")
                 raise BusinessException(
                     "CAS票据验证失败",
                     ResponseCode.UNAUTHORIZED
                 )
             
             logger.info(f"CAS validation successful for user: {user}")
-            logger.info(f"CAS returned attributes: {attributes}")
-            logger.info(f"CAS pgtiou: {pgtiou}")
             
             return {
                 'username': user,
@@ -116,12 +103,6 @@ class CASService:
             
         except Exception as e:
             logger.error(f"CAS validation error: {e}", exc_info=True)
-            logger.error(f"Error type: {type(e).__name__}")
-            # 如果是XML解析错误，可能是返回了HTML错误页面
-            if "syntax error" in str(e).lower():
-                logger.error("CAS returned invalid response format (possibly HTML instead of XML)")
-                logger.error(f"This usually means CAS server returned an error page")
-                logger.error(f"Check CAS server logs for details")
             raise BusinessException(
                 "CAS验证失败",
                 ResponseCode.UNAUTHORIZED
@@ -146,12 +127,8 @@ class CASService:
         
         # 解析CAS属性（使用YAML配置）
         if attributes:
-            logger.info(f"Parsing CAS attributes with YAML config")
-            logger.info(f"  - Raw attributes: {attributes}")
             parsed_attrs = self.attribute_parser.parse_attributes(attributes)
-            logger.info(f"  - Parsed attributes: {parsed_attrs}")
         else:
-            logger.info(f"No attributes returned from CAS, using defaults")
             parsed_attrs = {
                 'display_name': username,
                 'email': f"{username}@example.com",  # 默认邮箱
@@ -214,8 +191,6 @@ class CASService:
                 logger.info(f"Assigned default role '{default_role.role_name}' to CAS user: {username}")
             else:
                 logger.warning(f"No default role found for CAS user: {username}")
-            
-            logger.info(f"Created new user from CAS: {username}")
         else:
             # 更新用户信息（使用YAML配置中的字段）
             if parsed_attrs.get('display_name'):
