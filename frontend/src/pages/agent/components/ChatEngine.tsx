@@ -137,8 +137,18 @@ export default function ChatEngine({
     if (!agent) return;
     
     try {
-      // 直接从传入的agent对象中获取配置信息
-      const availableModelNames = agent.llm_info?.available_models || [];
+      let availableModelNames: string[] = [];
+      
+      // 只处理新的数据结构
+      if (Array.isArray(agent.llm_info)) {
+        // 新格式：从数组中提取所有model_name
+        availableModelNames = agent.llm_info.map((config: any) => config.model_name).filter(Boolean);
+      } else {
+        // 旧格式，显示错误
+        console.error('智能体使用旧版LLM配置格式，需要更新配置');
+        setAvailableModels([]);
+        return;
+      }
       
       // 转换为ModelInfo格式
       const models: ModelInfo[] = availableModelNames.map((modelName: string) => ({
@@ -149,20 +159,17 @@ export default function ChatEngine({
       }));
       
       setAvailableModels(models);
-      // 智能体可用模型列表
       
-      // 设置默认选中当前使用的模型
-      // 只在 currentModel 未设置时才设置默认值
-      if (!currentModel) {
-        const currentModelName = agent.llm_info?.model_name;
-        if (currentModelName) {
-          setCurrentModel(currentModelName);
-        } else if (models.length > 0) {
-          setCurrentModel(models[0].type);
+      // 设置默认选中的模型
+      if (!currentModel && Array.isArray(agent.llm_info) && agent.llm_info.length > 0) {
+        // 新格式：使用第一个配置的模型
+        const defaultModelName = agent.llm_info[0].model_name;
+        if (defaultModelName) {
+          setCurrentModel(defaultModelName);
         }
       }
     } catch (error) {
-      // 处理agent配置信息失败
+      console.error('处理agent配置信息失败:', error);
     }
   }, [agent]); // 移除 currentModel 依赖，避免循环更新
 

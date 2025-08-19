@@ -90,8 +90,8 @@ def get_api_key(base_url: str, api_key_from_db: Optional[str] = None) -> str:
     elif "dashscope.aliyuncs.com" in base_url:
         api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("ALIBABA_CLOUD_API_KEY")
     else:
-        # 默认回退选项
-        api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        # 未知的API端点，不做默认假设
+        logger.warning(f"Unknown API endpoint: {base_url}, cannot determine which API key to use")
     
     if not api_key:
         raise ValueError(
@@ -120,17 +120,30 @@ def get_llm_config_for_agent(
     try:
         model_config = get_model_config(agent_id, db, selected_model)
         
+        # 检查必要的配置
+        if not model_config:
+            logger.error(f"No model configuration found for agent: {agent_id}")
+            raise ValueError(f"No model configuration found for agent: {agent_id}")
+            
+        if not model_config.get("model_name"):
+            logger.error(f"No model_name in configuration for agent: {agent_id}")
+            raise ValueError(f"No model_name in configuration for agent: {agent_id}")
+            
+        if not model_config.get("base_url"):
+            logger.error(f"No base_url in configuration for agent: {agent_id}")
+            raise ValueError(f"No base_url in configuration for agent: {agent_id}")
+        
         # 返回可以直接传给ChatOpenAI的配置
         return {
-            "model": model_config.get("model_name", "deepseek-chat"),
-            "temperature": model_config.get("temperature", 0.1),
-            "max_tokens": model_config.get("max_tokens"),
+            "model": model_config["model_name"],
+            "temperature": model_config.get("temperature", 0.7),
+            "max_tokens": model_config.get("max_tokens", 2000),
             "max_retries": 2,
             "api_key": get_api_key(
-                model_config.get("base_url", "https://api.deepseek.com"),
+                model_config["base_url"],
                 model_config.get("api_key")
             ),
-            "base_url": model_config.get("base_url", "https://api.deepseek.com"),
+            "base_url": model_config["base_url"],
             "http_client": httpx.Client(verify=False)
         }
     finally:

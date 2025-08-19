@@ -13,7 +13,8 @@ import {
   Tooltip,
   App,
   Radio,
-  Tag
+  Tag,
+  InputNumber
 } from 'antd';
 import { 
   ToolOutlined, 
@@ -22,7 +23,9 @@ import {
   LockOutlined,
   TeamOutlined,
   GlobalOutlined,
-  UserOutlined
+  UserOutlined,
+  PlusOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import { 
   iconConfig,
@@ -138,6 +141,8 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
   const [editSystemExpandedKeys, setEditSystemExpandedKeys] = useState<string[]>(['system-root']);
   const [editCheckedKeys, setEditCheckedKeys] = useState<string[]>([]);
   const [editExpandedKeys, setEditExpandedKeys] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [modelConfigs, setModelConfigs] = useState<Record<string, any>>({});
 
   // 将图标配置转换为选择器需要的格式
   const availableIcons = iconConfig.map(icon => ({
@@ -364,12 +369,14 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           agent_type: '故障诊断',
           agent_capabilities: [],
           agent_icon: 'Bot',
-          available_models: [availableModels.length > 0 ? availableModels[0].model : 'gpt-4'],
-          temperature: 0.7,
-          max_tokens: 2000,
-          top_p: 1.0,
-          frequency_penalty: 0.0,
-          presence_penalty: 0.0,
+          llm_configs: [{
+            model_name: availableModels.length > 0 ? availableModels[0].model : 'deepseek-chat',
+            model_args: {
+              temperature: 0.7,
+              max_tokens: 2000,
+              top_p: 1.0
+            }
+          }],
           system_prompt: '',
           user_prompt_template: '',
           assistant_prompt_template: '',
@@ -426,26 +433,18 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           visibility_additional_users: fullAgent.visibility_additional_users || [],
         };
 
-        // LLM 配置 - 只设置实际存在的值
+        // LLM 配置 - 只支持新的数据结构
         if (fullAgent.llm_info) {
-          if (fullAgent.llm_info.available_models) {
-            formValues.available_models = fullAgent.llm_info.available_models;
+          if (Array.isArray(fullAgent.llm_info)) {
+            // 新的数据结构
+            formValues.llm_configs = fullAgent.llm_info;
+          } else {
+            // 旧格式，提示用户更新
+            message.error('该智能体使用旧版LLM配置格式，请重新配置');
+            formValues.llm_configs = [];
           }
-          if (fullAgent.llm_info.temperature !== undefined) {
-            formValues.temperature = fullAgent.llm_info.temperature;
-          }
-          if (fullAgent.llm_info.max_tokens !== undefined) {
-            formValues.max_tokens = fullAgent.llm_info.max_tokens;
-          }
-          if (fullAgent.llm_info.top_p !== undefined) {
-            formValues.top_p = fullAgent.llm_info.top_p;
-          }
-          if (fullAgent.llm_info.frequency_penalty !== undefined) {
-            formValues.frequency_penalty = fullAgent.llm_info.frequency_penalty;
-          }
-          if (fullAgent.llm_info.presence_penalty !== undefined) {
-            formValues.presence_penalty = fullAgent.llm_info.presence_penalty;
-          }
+        } else {
+          formValues.llm_configs = [];
         }
 
         // 提示词配置 - 只设置实际存在的值
@@ -506,34 +505,8 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         .filter(server => server.tools.length > 0)
     };
 
-    // 构建LLM配置
-    const llmConfig: any = {};
-    
-    // 如果是编辑模式，先复制原有的配置
-    if (!isCreating && agent?.llm_info) {
-      // 保留原有的所有配置，特别是 model_name
-      Object.assign(llmConfig, agent.llm_info);
-    }
-    
-    // 然后只更新表单中实际修改的字段
-    if (values.available_models) {
-      llmConfig.available_models = values.available_models;
-    }
-    if (values.temperature !== undefined) {
-      llmConfig.temperature = values.temperature;
-    }
-    if (values.max_tokens !== undefined) {
-      llmConfig.max_tokens = values.max_tokens;
-    }
-    if (values.top_p !== undefined) {
-      llmConfig.top_p = values.top_p;
-    }
-    if (values.frequency_penalty !== undefined) {
-      llmConfig.frequency_penalty = values.frequency_penalty;
-    }
-    if (values.presence_penalty !== undefined) {
-      llmConfig.presence_penalty = values.presence_penalty;
-    }
+    // 构建LLM配置 - 新的数据结构
+    const llmConfig = values.llm_configs || [];
 
     // 构建提示词配置
     const promptConfig: any = {};
@@ -925,106 +898,133 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
 
           {/* LLM配置 */}
           <TabPane tab="大模型配置" key="llm">
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item
-                  label="可用模型"
-                  name="available_models"
-                  rules={[{ required: true, message: '请至少选择一个模型' }]}
-                >
-                  <Select 
-                    mode="multiple" 
-                    placeholder="选择智能体可以使用的模型" 
-                    showSearch
-                    optionFilterProp="children"
-                  >
-                    {availableModels.length > 0 ? (
-                      availableModels.map(model => (
-                        <Option key={model.id} value={model.model}>
-                          <span style={{ fontWeight: 500 }}>{model.name}</span>
-                          <span style={{ marginLeft: 8, color: '#666', fontSize: '12px' }}>
-                            ({model.provider})
-                          </span>
-                        </Option>
-                      ))
-                    ) : (
-                      <>
-                        <Option value="gpt-4">GPT-4 (备用)</Option>
-                        <Option value="gpt-3.5-turbo">GPT-3.5 Turbo (备用)</Option>
-                      </>
-                    )}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  label={
-                    <Tooltip title="模型单次生成的最大字符数量，影响回答长度">
-                      最大Token数
-                    </Tooltip>
-                  }
-                  name="max_tokens"
-                  rules={[{ required: true, message: '请输入最大Token数' }]}
-                >
-                  <Input type="number" placeholder="2000" />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={
-                    <Tooltip title="控制输出的随机性和创造性，0-2之间，值越高越随机">
-                      温度
-                    </Tooltip>
-                  }
-                  name="temperature"
-                  rules={[{ required: true, message: '请输入温度值' }]}
-                >
-                  <Input type="number" min={0} max={2} step={0.1} placeholder="0.7" />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  label={
-                    <Tooltip title="核采样参数，控制候选词汇范围，0-1之间，值越小越保守">
-                      Top P
-                    </Tooltip>
-                  }
-                  name="top_p"
-                >
-                  <Input type="number" min={0} max={1} step={0.1} placeholder="1.0" />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  label={
-                    <Tooltip title="降低重复词汇出现频率，-2到2之间，正值减少重复">
-                      频率惩罚
-                    </Tooltip>
-                  }
-                  name="frequency_penalty"
-                >
-                  <Input type="number" min={-2} max={2} step={0.1} placeholder="0.0" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={
-                    <Tooltip title="鼓励讨论新话题，-2到2之间，正值增加新内容倾向">
-                      存在惩罚
-                    </Tooltip>
-                  }
-                  name="presence_penalty"
-                >
-                  <Input type="number" min={-2} max={2} step={0.1} placeholder="0.0" />
-                </Form.Item>
-              </Col>
-            </Row>
+            <Form.List name="llm_configs">
+              {(fields, { add, remove }) => (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                      添加模型配置
+                    </Button>
+                  </div>
+                  {fields.map(({ key, name, ...restField }) => (
+                    <div key={key} style={{ 
+                      marginBottom: 16, 
+                      padding: 16, 
+                      border: '1px solid #f0f0f0',
+                      borderRadius: 8,
+                      position: 'relative'
+                    }}>
+                      <CloseOutlined
+                        style={{ 
+                          position: 'absolute', 
+                          right: 8, 
+                          top: 8,
+                          cursor: 'pointer',
+                          color: '#ff4d4f'
+                        }}
+                        onClick={() => remove(name)}
+                      />
+                      <Row gutter={16}>
+                        <Col span={24}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'model_name']}
+                            label="选择模型"
+                            rules={[{ required: true, message: '请选择模型' }]}
+                          >
+                            <Select 
+                              placeholder="选择模型" 
+                              showSearch
+                              optionFilterProp="children"
+                            >
+                              {availableModels.length > 0 ? (
+                                availableModels.map(model => (
+                                  <Option key={model.id} value={model.model}>
+                                    <span style={{ fontWeight: 500 }}>{model.name}</span>
+                                    <span style={{ marginLeft: 8, color: '#666', fontSize: '12px' }}>
+                                      ({model.provider})
+                                    </span>
+                                  </Option>
+                                ))
+                              ) : (
+                                <>
+                                  <Option value="deepseek-chat">DeepSeek Chat</Option>
+                                  <Option value="gpt-4">GPT-4</Option>
+                                  <Option value="gpt-3.5-turbo">GPT-3.5 Turbo</Option>
+                                </>
+                              )}
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Row gutter={16}>
+                        <Col span={8}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'model_args', 'temperature']}
+                            label={
+                              <Tooltip title="控制输出的随机性和创造性，0-2之间，值越高越随机">
+                                温度
+                              </Tooltip>
+                            }
+                            rules={[{ required: true, message: '请输入温度值' }]}
+                            initialValue={0.7}
+                          >
+                            <InputNumber 
+                              min={0} 
+                              max={2} 
+                              step={0.1} 
+                              placeholder="0.7"
+                              style={{ width: '100%' }}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'model_args', 'max_tokens']}
+                            label={
+                              <Tooltip title="模型单次生成的最大字符数量，影响回答长度">
+                                最大Token数
+                              </Tooltip>
+                            }
+                            rules={[{ required: true, message: '请输入最大Token数' }]}
+                            initialValue={2000}
+                          >
+                            <InputNumber 
+                              min={1}
+                              max={100000}
+                              placeholder="2000"
+                              style={{ width: '100%' }}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'model_args', 'top_p']}
+                            label={
+                              <Tooltip title="核采样参数，控制候选词汇范围，0-1之间，值越小越保守">
+                                Top P
+                              </Tooltip>
+                            }
+                            initialValue={1.0}
+                          >
+                            <InputNumber 
+                              min={0} 
+                              max={1} 
+                              step={0.1} 
+                              placeholder="1.0"
+                              style={{ width: '100%' }}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                    </div>
+                  ))}
+                </>
+              )}
+            </Form.List>
           </TabPane>
 
           {/* 提示词配置 */}

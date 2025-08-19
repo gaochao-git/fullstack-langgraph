@@ -7,6 +7,36 @@ from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
 
+class LLMModelConfig(BaseModel):
+    """单个LLM模型配置"""
+    model_name: str = Field(..., description="模型名称")
+    model_args: Dict[str, Any] = Field(default_factory=dict, description="模型参数配置")
+    
+    @field_validator('model_args')
+    @classmethod
+    def validate_model_args(cls, v):
+        """验证模型参数"""
+        allowed_keys = {'temperature', 'max_tokens', 'top_p'}
+        for key in v.keys():
+            if key not in allowed_keys:
+                raise ValueError(f"不支持的参数: {key}")
+        
+        # 验证参数值范围
+        if 'temperature' in v:
+            if not (0 <= v['temperature'] <= 2):
+                raise ValueError("temperature必须在0到2之间")
+        
+        if 'max_tokens' in v:
+            if not (1 <= v['max_tokens'] <= 100000):
+                raise ValueError("max_tokens必须在1到100000之间")
+                
+        if 'top_p' in v:
+            if not (0 <= v['top_p'] <= 1):
+                raise ValueError("top_p必须在0到1之间")
+                
+        return v
+
+
 class AgentBase(BaseModel):
     """Agent基础模型"""
     agent_name: str = Field(..., min_length=1, max_length=100, description="智能体名称")
@@ -25,7 +55,7 @@ class AgentCreate(AgentBase):
     """创建Agent请求模型"""
     agent_id: Optional[str] = Field(None, pattern=r'^[a-zA-Z0-9_-]+$', max_length=50, description="智能体ID")
     tools_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="工具配置信息")
-    llm_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="LLM配置信息")
+    llm_info: Optional[List[LLMModelConfig]] = Field(default_factory=list, description="LLM配置信息列表")
     prompt_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="提示词配置信息")
     # 权限相关字段
     visibility_type: Optional[str] = Field(default="private", pattern=r'^(private|team|department|public)$', description="可见权限级别")
@@ -56,7 +86,7 @@ class AgentUpdate(BaseModel):
     agent_enabled: Optional[str] = Field(None, pattern=r'^(yes|no)$', description="是否启用")
     agent_icon: Optional[str] = Field(None, max_length=50, description="智能体图标")
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具配置信息")
-    llm_info: Optional[Dict[str, Any]] = Field(None, description="LLM配置信息")
+    llm_info: Optional[List[LLMModelConfig]] = Field(None, description="LLM配置信息列表")
     prompt_info: Optional[Dict[str, Any]] = Field(None, description="提示词配置信息")
     # 权限相关字段
     visibility_type: Optional[str] = Field(None, pattern=r'^(private|team|department|public)$', description="可见权限级别")
@@ -175,7 +205,7 @@ class AgentResponse(BaseModel):
     mcp_config: AgentMCPConfig = Field(default_factory=AgentMCPConfig, description="MCP配置")
     is_builtin: str = Field("no", description="是否为内置智能体")
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具信息")
-    llm_info: Optional[Dict[str, Any]] = Field(None, description="LLM信息")
+    llm_info: Optional[List[LLMModelConfig]] = Field(None, description="LLM信息列表")
     prompt_info: Optional[Dict[str, Any]] = Field(None, description="提示词信息")
     create_time: Optional[datetime] = Field(None, description="创建时间")
     update_time: Optional[datetime] = Field(None, description="更新时间")
