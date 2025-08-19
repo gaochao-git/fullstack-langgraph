@@ -163,27 +163,27 @@ export const useAuth = create<AuthState>((set, get) => ({
   logout: async () => {
     const { authType } = get();
     
-    if (authType === 'cas') {
-      // CAS登出：清理本地存储
-      get().updateAuthState(null, null);
+    try {
+      // 调用统一的登出接口
+      const response = await authApi.logout({ everywhere: false });
       
-      try {
-        // 调用CAS登出接口获取登出URL
-        const response = await authApi.casLogout();
-        if (response?.data?.logout_url) {
-          // 重定向到CAS登出页面
-          window.location.href = response.data.logout_url;
-          return;
-        }
-      } catch (error) {
-        console.error('CAS logout failed:', error);
+      // 清理本地存储
+      tokenManager.clearTokens();
+      get().updateAuthState(null, null);
+      set({ token: null });
+      
+      // 如果是CAS登出且返回了登出URL，重定向到CAS服务器
+      if (authType === 'cas' && response?.data?.logout_url) {
+        window.location.href = response.data.logout_url;
+        return;
       }
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // 即使登出失败，也清理本地状态
+      tokenManager.clearTokens();
+      get().updateAuthState(null, null);
+      set({ token: null });
     }
-    
-    // JWT Token登出或CAS登出失败的fallback
-    tokenManager.clearTokens();
-    get().updateAuthState(null, null);
-    set({ token: null });
     
     // 跳转到登录页
     window.location.href = '/login';

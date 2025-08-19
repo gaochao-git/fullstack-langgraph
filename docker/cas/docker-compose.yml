@@ -27,7 +27,7 @@ services:
       
     volumes:
       # 挂载服务配置目录
-      - ./cas-services:/etc/cas/services:ro
+      - ./services:/etc/cas/services:ro
       
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/cas/login"]

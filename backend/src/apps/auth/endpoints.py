@@ -127,28 +127,41 @@ async def refresh_token(
 @router.post("/logout", summary="用户登出")
 async def logout(
     request: LogoutRequest,
+    response: Response,
     current_user: dict = Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    cas_session_id: Optional[str] = Cookie(None),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    用户登出
+    统一登出接口
     
-    - **everywhere**: 是否登出所有设备
+    支持JWT和CAS两种认证方式的登出
+    - **everywhere**: 是否登出所有设备（仅JWT认证适用）
     """
-    service = AuthService(db)
+    auth_type = current_user.get("auth_type", "jwt")
     
-    # 从token中获取jti
-    from src.apps.auth.utils import JWTUtils
-    jti = JWTUtils.get_jti(credentials.credentials)
-    
-    await service.logout(
-        user_id=current_user["sub"],
-        current_jti=jti,
-        everywhere=request.everywhere
-    )
-    
-    return {"message": "登出成功"}
+    if auth_type == "cas" and cas_session_id:
+        # CAS登出：调用CAS登出接口
+        return await cas_logout(response, None, cas_session_id, db)
+    else:
+        # JWT登出
+        service = AuthService(db)
+        
+        # 从token中获取jti
+        if credentials and credentials.credentials:
+            from src.apps.auth.utils import JWTUtils
+            jti = JWTUtils.get_jti(credentials.credentials)
+            
+            await service.logout(
+                user_id=current_user["sub"],
+                current_jti=jti,
+                everywhere=request.everywhere
+            )
+        
+        return success_response({
+            "message": "登出成功"
+        })
 
 
 @router.get("/me/profile", response_model=UserProfile, summary="获取当前用户详细信息")
@@ -306,10 +319,15 @@ async def cas_callback(
 @router.post("/cas/logout", summary="CAS登出")
 async def cas_logout(
     response: Response,
+    redirect_url: Optional[str] = None,
     cas_session_id: Optional[str] = Cookie(None),
     db: AsyncSession = Depends(get_async_db)
 ):
-    """处理CAS登出"""
+    """
+    处理CAS登出
+    
+    - **redirect_url**: 登出后的重定向URL（可选）
+    """
     if cas_session_id:
         from sqlalchemy import select
         from .models import AuthSession
@@ -327,11 +345,20 @@ async def cas_logout(
             session.termination_reason = "用户主动登出"
             await db.commit()
     
+    # 删除CAS会话cookie
     response.delete_cookie("cas_session_id")
     
+    # 生成CAS登出URL
     from .service import CASService
     service = CASService(db)
-    logout_url = service.get_logout_url()
+    
+    # 如果没有指定重定向URL，默认重定向到前端登录页
+    if not redirect_url:
+        # 获取前端地址
+        frontend_url = settings.FRONTEND_URL if hasattr(settings, 'FRONTEND_URL') else "http://localhost:3000"
+        redirect_url = f"{frontend_url}/login"
+    
+    logout_url = service.get_logout_url(redirect_url)
     
     return success_response({
         "message": "登出成功",
