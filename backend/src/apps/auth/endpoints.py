@@ -5,11 +5,14 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Request, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
 from src.shared.db.config import get_async_db
 from src.apps.auth.service import AuthService, SSOService
+from src.apps.auth.models import AuthSession
+from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.apps.auth.schema import (
     LoginRequest, LoginResponse, RefreshTokenRequest, LogoutRequest,
     RegisterRequest, RegisterResponse,
@@ -386,8 +389,6 @@ async def get_current_user_info(
         user_id = current_user.get("sub") or current_user.get("user_id")
         
         # 从数据库获取完整的用户信息
-        from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
-        
         # 获取用户详细信息
         user_stmt = select(RbacUser).where(RbacUser.user_id == user_id)
         user_result = await db.execute(user_stmt)
@@ -429,9 +430,6 @@ async def get_current_user_info(
     
     # 2. 检查CAS认证
     if cas_session_id:
-        from sqlalchemy import select
-        from .models import AuthSession
-        from src.apps.user.models import RbacUser
         
         stmt = select(AuthSession).where(
             AuthSession.session_id == cas_session_id,
@@ -448,7 +446,6 @@ async def get_current_user_info(
             
             if user:
                 # 获取用户角色
-                from src.apps.user.models import RbacUsersRoles, RbacRole
                 roles_stmt = select(RbacRole).join(
                     RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
                 ).where(RbacUsersRoles.user_id == user.user_id)
