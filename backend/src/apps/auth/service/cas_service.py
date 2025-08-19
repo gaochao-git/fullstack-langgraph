@@ -6,6 +6,7 @@ CAS (Central Authentication Service) 集成服务
 import asyncio
 import secrets
 import time
+import json
 from typing import Dict, Any, Optional
 from urllib.parse import urlencode
 from datetime import timedelta
@@ -20,7 +21,6 @@ from src.shared.core.logging import get_logger
 from src.shared.core.config import settings
 from src.apps.auth.models import AuthSession, AuthLoginHistory
 from src.apps.user.models import RbacUser, RbacRole, RbacUsersRoles
-from src.apps.auth.utils import CASAttributeParser
 from src.shared.db.models import now_shanghai
 
 logger = get_logger(__name__)
@@ -40,8 +40,6 @@ class CASService:
         self.check_next = settings.CAS_CHECK_NEXT
         self.single_logout_enabled = settings.CAS_SINGLE_LOGOUT_ENABLED
         
-        # 初始化CAS属性解析器（使用YAML配置）
-        self.attribute_parser = CASAttributeParser()
         
         # 初始化CAS客户端
         self.cas_client = CASClient(
@@ -108,6 +106,76 @@ class CASService:
                 ResponseCode.UNAUTHORIZED
             )
     
+    def parse_cas_attributes(self, username: str, attributes: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        解析CAS返回的用户属性
+        
+        这是CAS属性映射的核心方法，不同公司可以通过修改此方法来适配自己的CAS属性格式
+        
+        Args:
+            username: CAS返回的用户名
+            attributes: CAS返回的属性字典
+            
+        Returns:
+            解析后的用户属性字典，包含数据库所需的所有字段
+            
+        示例CAS属性:
+        {
+            "display_name": "张三",
+            "username": "zhangsan", 
+            "email": "zhangsan@company.com",
+            "group_name": "CN=zhangsan,OU=团队名称,OU=部门名称"
+        }
+        """
+        parsed = {}
+        
+        # 1. 直接映射的字段
+        parsed['user_name'] = attributes.get('username', username)
+        parsed['display_name'] = attributes.get('display_name', username)
+        parsed['email'] = attributes.get('email', '')  # 获取不到时为空字符串
+        parsed['mobile'] = attributes.get('mobile', '')
+        
+        # 2. 解析group_name获取部门和团队信息
+        group_name = attributes.get('group_name', '')
+        if group_name:
+            # 解析DN格式: CN=zhangsan,OU=团队名称,OU=部门名称
+            parts = [p.strip() for p in group_name.split(',')]
+            ou_values = []
+            
+            for part in parts:
+                if part.startswith('OU='):
+                    ou_values.append(part[3:])
+            
+            # 第一个OU作为团队，第二个OU作为部门
+            if len(ou_values) >= 1:
+                parsed['group_name'] = ou_values[0]
+            else:
+                parsed['group_name'] = '未分配团队'
+                
+            if len(ou_values) >= 2:
+                parsed['department_name'] = ou_values[1]
+            else:
+                parsed['department_name'] = '未分配部门'
+        else:
+            parsed['group_name'] = '未分配团队'
+            parsed['department_name'] = '未分配部门'
+        
+        # 3. 生成user_id (使用cas_前缀)
+        parsed['user_id'] = f"cas_{parsed['user_name']}"
+        
+        # 4. 设置固定字段
+        parsed['user_source'] = 1  # 1=CAS来源
+        parsed['is_active'] = 1
+        parsed['is_deleted'] = 0
+        parsed['create_by'] = 'CAS'
+        parsed['update_by'] = 'CAS'
+        
+        # 5. 其他可选字段
+        parsed['position'] = attributes.get('position', '')
+        parsed['org_code'] = attributes.get('org_code', '')
+        
+        return parsed
+    
     async def process_cas_login(self, ticket: str, ip_address: str = None, user_agent: str = None) -> Dict[str, Any]:
         """
         处理CAS登录 - 纯Session模式
@@ -125,50 +193,39 @@ class CASService:
         username = cas_data['username']
         attributes = cas_data.get('attributes', {})
         
-        # 解析CAS属性（使用YAML配置）
-        if attributes:
-            parsed_attrs = self.attribute_parser.parse_attributes(attributes)
-        else:
-            parsed_attrs = {
-                'display_name': username,
-                'email': f"{username}@example.com",  # 默认邮箱
-                'department_name': '默认部门',
-                'group_name': '默认组'
-            }
+        # 记录CAS返回的原始数据
+        logger.info(f"CAS验证成功，返回的用户信息:")
+        logger.info(f"  - 用户名: {username}")
+        logger.info(f"  - 原始属性: {json.dumps(attributes, ensure_ascii=False, indent=2)}")
+        
+        # 使用独立方法解析CAS属性
+        parsed_attrs = self.parse_cas_attributes(username, attributes)
+        logger.info(f"  - 解析后属性: {json.dumps(parsed_attrs, ensure_ascii=False, indent=2)}")
         
         # 查找用户（只根据用户名查找，避免邮箱冲突）
+        user_name = parsed_attrs.get('user_name', username)
         result = await self.db.execute(
             select(RbacUser).where(
-                RbacUser.user_name == username
+                RbacUser.user_name == user_name
             )
         )
         user = result.scalar_one_or_none()
         
         if not user:
-            # 创建新用户（使用YAML配置中的字段映射）
-            # 生成与本地用户一致的user_id格式
-            timestamp = int(time.time() * 1000)
-            user_id = parsed_attrs.get('user_id', f"user_{timestamp}")
+            # 创建新用户（使用解析后的属性）
+            # 如果配置中没有生成user_id，使用时间戳
+            if 'user_id' not in parsed_attrs:
+                timestamp = int(time.time() * 1000)
+                parsed_attrs['user_id'] = f"user_{timestamp}"
             
-            user = RbacUser(
-                user_id=user_id,
-                user_name=parsed_attrs.get('user_name', username),
-                display_name=parsed_attrs.get('display_name', username),
-                email=parsed_attrs.get('email', f"{username}@cas.local"),
-                mobile=parsed_attrs.get('mobile', ''),
-                department_name=parsed_attrs.get('department_name', '未分配部门'),
-                group_name=parsed_attrs.get('group_name', '未分配团队'),
-                user_source=parsed_attrs.get('user_source', 1),  # 1=CAS来源
-                is_active=parsed_attrs.get('is_active', 1),
-                is_deleted=parsed_attrs.get('is_deleted', 0),
-                create_by=parsed_attrs.get('create_by', 'CAS'),
-                update_by=parsed_attrs.get('update_by', 'CAS')
-            )
+            # 创建用户对象，使用解析后的所有属性
+            user = RbacUser(**{
+                key: value for key, value in parsed_attrs.items()
+                if hasattr(RbacUser, key) and key not in ['create_time', 'update_time']
+            })
+            
             self.db.add(user)
             await self.db.flush()
-            
-            # CAS用户不创建auth_user记录（可选）
-            # 因为CAS用户不需要密码，认证完全依赖CAS Server
             
             # 为新CAS用户分配默认角色
             # 查找默认角色（假设有一个名为"普通用户"的角色）
@@ -183,28 +240,35 @@ class CASService:
                 user_role = RbacUsersRoles(
                     user_id=user.user_id,
                     role_id=default_role.role_id,
-                    create_by='CAS',
-                    update_by='CAS'
+                    create_by=parsed_attrs.get('create_by', 'CAS'),
+                    update_by=parsed_attrs.get('update_by', 'CAS')
                 )
                 self.db.add(user_role)
                 await self.db.flush()
-                logger.info(f"Assigned default role '{default_role.role_name}' to CAS user: {username}")
+                logger.info(f"Assigned default role '{default_role.role_name}' to CAS user: {user_name}")
             else:
-                logger.warning(f"No default role found for CAS user: {username}")
+                logger.warning(f"No default role found for CAS user: {user_name}")
+            
+            logger.info(f"Created new CAS user: {user_name} (ID: {user.user_id})")
         else:
-            # 更新用户信息（使用YAML配置中的字段）
-            if parsed_attrs.get('display_name'):
-                user.display_name = parsed_attrs['display_name']
-            if parsed_attrs.get('email'):
-                user.email = parsed_attrs['email']
-            if parsed_attrs.get('department_name'):
-                user.department_name = parsed_attrs['department_name']
-            if parsed_attrs.get('group_name'):
-                user.group_name = parsed_attrs['group_name']
+            # 每次登录都更新用户信息（基于配置文件的映射）
+            # 更新所有从CAS获取到的属性，但不更新系统字段
+            update_fields = [
+                'display_name', 'email', 'department_name', 'group_name', 
+                'mobile', 'position', 'org_code'
+            ]
+            
+            for field in update_fields:
+                if field in parsed_attrs and hasattr(user, field):
+                    setattr(user, field, parsed_attrs[field])
+            
+            # 更新登录时间和更新信息
             user.last_login = now_shanghai()
             user.updated_at = now_shanghai()
-            user.update_by = 'CAS'
+            user.update_by = parsed_attrs.get('update_by', 'CAS')
+            
             await self.db.flush()
+            logger.info(f"Updated CAS user information: {user_name}")
             
         # 创建CAS Session（纯Session管理，不涉及JWT）
         cas_session = AuthSession(

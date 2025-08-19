@@ -432,6 +432,67 @@ async def check_auth_status(
         })
 
 
+@router.get("/me/debug", summary="获取当前用户详细调试信息")
+async def get_current_user_debug(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    获取当前用户的详细调试信息
+    包括SSO返回的原始信息、角色、权限等
+    """
+    user_id = current_user.get("sub")
+    
+    # 获取用户完整信息
+    from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
+    from src.apps.auth.service.rbac_service import RBACService
+    
+    # 获取用户数据
+    user_result = await db.execute(
+        select(RbacUser).where(RbacUser.user_id == user_id)
+    )
+    user = user_result.scalar_one_or_none()
+    
+    # 获取角色信息
+    rbac_service = RBACService(db)
+    roles = await rbac_service.get_user_roles(user_id)
+    permissions = await rbac_service.get_user_permissions(user_id)
+    
+    # 获取CAS session信息（如果有）
+    cas_info = None
+    if current_user.get("auth_type") == "cas":
+        from .models import AuthSession
+        session_result = await db.execute(
+            select(AuthSession).where(
+                AuthSession.user_id == user_id,
+                AuthSession.sso_provider == "cas"
+            ).order_by(AuthSession.created_at.desc()).limit(1)
+        )
+        cas_session = session_result.scalar_one_or_none()
+        if cas_session:
+            cas_info = {
+                "session_id": cas_session.session_id,
+                "sso_session_id": cas_session.sso_session_id,
+                "created_at": cas_session.created_at.isoformat(),
+                "expires_at": cas_session.expires_at.isoformat()
+            }
+    
+    return success_response({
+        "current_auth": current_user,
+        "user_info": user.to_dict() if user else None,
+        "roles": [{"role_id": r.role_id, "role_name": r.role_name, "description": r.description} for r in roles],
+        "permissions_count": len(permissions),
+        "permissions_sample": [p.permission_name for p in permissions[:10]],  # 前10个权限示例
+        "cas_session": cas_info,
+        "auth_headers": {
+            "Authorization": request.headers.get("Authorization", "None"),
+            "X-API-Key": request.headers.get("X-API-Key", "None"),
+            "Cookie": "Present" if request.headers.get("Cookie") else "None"
+        }
+    })
+
+
 # ============= 密码管理 =============
 
 @router.post("/change-password", summary="修改密码")
