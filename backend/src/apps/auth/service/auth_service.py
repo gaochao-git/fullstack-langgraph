@@ -27,6 +27,9 @@ from src.apps.auth.schema import (
 )
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
+from src.shared.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class AuthService:
