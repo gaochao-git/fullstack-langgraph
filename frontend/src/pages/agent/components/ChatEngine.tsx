@@ -56,6 +56,10 @@ export default function ChatEngine({
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [threadFileIds, setThreadFileIds] = useState<string[]>([]);
+  // 分页相关状态
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // 模型管理状态
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
@@ -276,32 +280,62 @@ export default function ChatEngine({
   }, [thread]);
 
   // 加载历史线程数据
-  const loadHistoryThreads = useCallback(async () => {
-    setLoadingHistory(true);
+  const loadHistoryThreads = useCallback(async (append = false) => {
+    // 如果是追加加载，使用loadingMore状态
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoadingHistory(true);
+    }
+    
     try {
       // 添加agent_id参数，只获取当前智能体的会话
       const username = getCurrentUsername();
-      const url = `/api/chat/users/${username}/threads?limit=20&offset=0&agent_id=${agentId}`;
+      const offset = append ? currentOffset : 0;
+      const url = `/api/chat/users/${encodeURIComponent(username)}/threads?limit=20&offset=${offset}&agent_id=${encodeURIComponent(agentId)}`;
       const data = await omind_get(url);
       
       // omind_get 直接返回解析后的数据
       const threads = data.threads || [];
-      setHistoryThreads(threads);
+      
+      if (append) {
+        // 追加到现有列表
+        setHistoryThreads(prev => [...prev, ...threads]);
+      } else {
+        // 替换列表（初始加载或刷新）
+        setHistoryThreads(threads);
+        setCurrentOffset(0);
+      }
+      
+      // 更新分页状态
+      setCurrentOffset(offset + threads.length);
+      setHasMore(threads.length === 20); // 如果返回少于20条，说明没有更多了
       setError(null); // 清除错误状态
     } catch (error) {
       // 获取历史线程出错
       setError('获取历史线程出错');
     } finally {
       setLoadingHistory(false);
+      setLoadingMore(false);
     }
-  }, [agentId]);
+  }, [agentId, currentOffset]);
+
+  // 加载更多历史线程
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      loadHistoryThreads(true);
+    }
+  }, [loadingMore, hasMore, loadHistoryThreads]);
 
   // 切换历史会话抽屉显示/隐藏
   const handleToggleHistoryDrawer = useCallback(() => {
     setShowHistoryDrawer(prev => !prev);
     // 如果抽屉要打开，加载历史数据
     if (!showHistoryDrawer) {
-      loadHistoryThreads();
+      // 重置分页状态并加载第一页
+      setCurrentOffset(0);
+      setHasMore(true);
+      loadHistoryThreads(false);
     }
   }, [showHistoryDrawer, loadHistoryThreads]);
 
@@ -447,6 +481,44 @@ export default function ChatEngine({
               isDark ? "text-gray-400" : "text-gray-500"
             )}>
               暂无历史会话
+            </div>
+          )}
+          
+          {/* 加载更多按钮 */}
+          {historyThreads.length > 0 && hasMore && (
+            <div className="mt-4 text-center">
+              <Button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className={cn(
+                  "w-full",
+                  isDark 
+                    ? "bg-gray-700 hover:bg-gray-600 text-gray-200" 
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                )}
+              >
+                {loadingMore ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    加载中...
+                  </span>
+                ) : (
+                  '加载更多'
+                )}
+              </Button>
+            </div>
+          )}
+          
+          {/* 没有更多数据提示 */}
+          {historyThreads.length > 0 && !hasMore && (
+            <div className={cn(
+              "text-center py-2 text-sm",
+              isDark ? "text-gray-500" : "text-gray-400"
+            )}>
+              没有更多会话了
             </div>
           )}
         </div>

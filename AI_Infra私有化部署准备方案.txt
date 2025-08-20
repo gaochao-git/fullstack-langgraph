@@ -67,17 +67,34 @@ AI Infrastructure私有化部署准备方案
 
 2. 配置参考
 ```
-训练节点配置：
+NVIDIA训练节点配置：
 - CPU: 2×AMD EPYC 64核
 - 内存: 1-2TB DDR4
 - GPU: 8×A100 80GB / H100 80GB
 - 存储: 8×3.84TB NVMe
 - 网络: 8×200G InfiniBand + 2×100G Ethernet
+- 功耗: 6-10KW
+
+华为昇腾训练节点配置：
+- CPU: 2×鲲鹏920 64核
+- 内存: 1-2TB DDR4
+- GPU: 8×Atlas 910B
+- 存储: 8×3.84TB NVMe
+- 网络: 8×200G RoCE + 2×100G Ethernet
+- 功耗: 8-12KW
+- 特色: 支持CANN软件栈，原生支持MindSpore
+
+Atlas 900 PoD集群配置：
+- 规模: 64卡（8节点）
+- 算力: 2 ExaFLOPS (FP16)
+- 互联: 100G RoCE全互联
+- 功耗: 约100KW
+- 制冷: 必须液冷
 
 推理节点配置：
-- CPU: 2×Intel Xeon 32核
+- NVIDIA方案: 4×A30 24GB / 8×T4 16GB
+- 华为方案: 4×Atlas 800 / 8×Atlas 300I
 - 内存: 512GB DDR4
-- GPU: 4×A30 24GB / 8×T4 16GB
 - 存储: 4×1.92TB NVMe
 - 网络: 2×100G Ethernet
 ```
@@ -96,10 +113,17 @@ AI Infrastructure私有化部署准备方案
 • 监控stack：Prometheus、Grafana、ELK
 
 2. AI框架
-• 深度学习：PyTorch 2.x、TensorFlow 2.x
-• 大模型：Transformers、DeepSpeed
+• 深度学习：
+  - 通用：PyTorch 2.x、TensorFlow 2.x
+  - 华为：MindSpore（昇腾原生支持）
+• 大模型：
+  - 通用：Transformers、DeepSpeed
+  - 华为：ModelArts、MindFormers
+• 推理优化：
+  - NVIDIA：TensorRT、Triton
+  - 华为：MindIE、MindX SDK
 • 传统ML：Scikit-learn、XGBoost
-• 分布式：Ray、Horovod
+• 分布式：Ray、Horovod、MindSpore分布式
 
 3. 许可证需求
 • NVIDIA许可：vGPU、NGC Enterprise

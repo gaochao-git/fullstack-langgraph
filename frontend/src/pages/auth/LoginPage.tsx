@@ -9,7 +9,7 @@ import './LoginPage.css';
 const { TabPane } = Tabs;
 
 export function LoginPage() {
-  const [activeTab, setActiveTab] = useState<'jwt' | 'sso'>('jwt');
+  const [activeTab, setActiveTab] = useState<'jwt' | 'sso'>('sso');
   const navigate = useNavigate();
   const location = useLocation();
   const { login, ssoLogin } = useAuth();
@@ -51,6 +51,26 @@ export function LoginPage() {
             onChange={(key) => setActiveTab(key as 'jwt' | 'sso')}
             centered
           >
+            <TabPane tab="SSO单点登录" key="sso">
+              <div className="sso-login-container">
+                <div className="sso-description">
+                  <GlobalOutlined className="sso-icon" />
+                  <p>使用企业统一身份认证</p>
+                  <p className="sso-hint">您将被重定向到SSO认证页面</p>
+                </div>
+                
+                <Button
+                  type="primary"
+                  icon={<GlobalOutlined />}
+                  onClick={handleSSOLogin}
+                  block
+                  className="sso-button"
+                >
+                  SSO 登录
+                </Button>
+              </div>
+            </TabPane>
+
             <TabPane tab="本地登录" key="jwt">
               <Form
                 name="jwt-login"
@@ -91,26 +111,6 @@ export function LoginPage() {
                 </Form.Item>
               </Form>
             </TabPane>
-
-            <TabPane tab="SSO单点登录" key="sso">
-              <div className="sso-login-container">
-                <div className="sso-description">
-                  <GlobalOutlined className="sso-icon" />
-                  <p>使用企业SSO账号登录</p>
-                  <p className="sso-hint">您将被重定向到SSO认证页面</p>
-                </div>
-                
-                <Button
-                  type="primary"
-                  icon={<GlobalOutlined />}
-                  onClick={handleSSOLogin}
-                  block
-                  className="sso-button"
-                >
-                  SSO 登录
-                </Button>
-              </div>
-            </TabPane>
           </Tabs>
 
           <Divider className="login-divider">或</Divider>
@@ -119,8 +119,8 @@ export function LoginPage() {
             <div className="login-tips">
               <p>提示：</p>
               <ul>
-                <li>本地登录：使用本地用户名密码认证</li>
                 <li>SSO登录：使用企业统一身份认证</li>
+                <li>本地登录：使用本地用户名密码认证</li>
               </ul>
             </div>
             
