@@ -68,98 +68,110 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(excluded) for excluded in self.exclude_paths):
             return await call_next(request)
         
-        # 尝试获取认证信息
-        user_info = None
-        auth_type = None
-        
-        # 1. 检查JWT认证（Authorization头）
-        authorization = request.headers.get("Authorization")
-        if authorization:
-            scheme, token = get_authorization_scheme_param(authorization)
-            if scheme.lower() == "bearer":
-                try:
-                    # 验证JWT
-                    payload = JWTUtils.decode_token(token)
-                    
-                    # 检查黑名单
-                    jti = payload.get("jti")
-                    if jti and TokenBlacklist.is_blacklisted(jti):
-                        raise BusinessException(
-                            "令牌已失效",
-                            ResponseCode.UNAUTHORIZED
-                        )
-                    
-                    user_info = payload
-                    auth_type = "jwt"
-                    
-                except Exception:
-                    # JWT验证失败，继续尝试其他认证方式
-                    pass
-        
-        # 2. 检查CAS认证（Cookie）
-        if not user_info:
-            cas_session_id = request.cookies.get("cas_session_id")
-            if cas_session_id:
-                # 创建数据库会话检查CAS session
-                async with AsyncSessionLocal() as db:
-                    from sqlalchemy import select
-                    from src.apps.auth.models import AuthSession
-                    from datetime import datetime, timezone
-                    
-                    stmt = select(AuthSession).where(
-                        AuthSession.session_id == cas_session_id,
-                        AuthSession.is_active == True
-                    )
-                    result = await db.execute(stmt)
-                    session = result.scalar_one_or_none()
-                    
-                    if session and session.expires_at > datetime.now():
-                        # 获取用户详细信息
-                        from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
-                        user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
-                        user_result = await db.execute(user_stmt)
-                        user = user_result.scalar_one_or_none()
+        try:
+            # 尝试获取认证信息
+            user_info = None
+            auth_type = None
+            
+            # 1. 检查JWT认证（Authorization头）
+            authorization = request.headers.get("Authorization")
+            if authorization:
+                scheme, token = get_authorization_scheme_param(authorization)
+                if scheme.lower() == "bearer":
+                    try:
+                        # 验证JWT
+                        payload = JWTUtils.decode_token(token)
                         
-                        if user and user.is_active:
-                            # 获取用户角色
-                            roles_stmt = select(RbacRole).join(
-                                RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
-                            ).where(RbacUsersRoles.user_id == user.user_id)
+                        # 检查黑名单
+                        jti = payload.get("jti")
+                        if jti and TokenBlacklist.is_blacklisted(jti):
+                            raise BusinessException(
+                                "令牌已失效",
+                                ResponseCode.UNAUTHORIZED
+                            )
+                        
+                        user_info = payload
+                        auth_type = "jwt"
+                        
+                    except Exception:
+                        # JWT验证失败，继续尝试其他认证方式
+                        pass
+            
+            # 2. 检查CAS认证（Cookie）
+            if not user_info:
+                cas_session_id = request.cookies.get("cas_session_id")
+                if cas_session_id:
+                    # 创建数据库会话检查CAS session
+                    async with AsyncSessionLocal() as db:
+                        from sqlalchemy import select
+                        from src.apps.auth.models import AuthSession
+                        from datetime import datetime, timezone
+                        
+                        stmt = select(AuthSession).where(
+                            AuthSession.session_id == cas_session_id,
+                            AuthSession.is_active == True
+                        )
+                        result = await db.execute(stmt)
+                        session = result.scalar_one_or_none()
+                        
+                        if session and session.expires_at > datetime.now():
+                            # 获取用户详细信息
+                            from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
+                            user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
+                            user_result = await db.execute(user_stmt)
+                            user = user_result.scalar_one_or_none()
                             
-                            roles_result = await db.execute(roles_stmt)
-                            roles = list(roles_result.scalars().all())
-                            
-                            user_info = {
-                                "sub": session.user_id,
-                                "username": user.user_name,
-                                "email": user.email,
-                                "display_name": user.display_name,
-                                "auth_type": "cas",
-                                "session_id": session.session_id,
-                                "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
-                            }
-                            auth_type = "cas"
-        
-        # 3. 检查API Key认证
-        if not user_info:
-            api_key = request.headers.get("X-API-Key")
-            if api_key:
-                # TODO: 实现API Key验证
-                pass
-        
-        # 如果没有任何有效的认证信息
-        if not user_info:
-            # 记录请求路径，方便调试
-            logger.info(f"No authentication provided for path: {request.url.path}")
-            raise BusinessException("未提供有效的认证凭据",ResponseCode.UNAUTHORIZED)
-        
-        # 将用户信息和认证类型添加到请求状态
-        request.state.current_user = user_info
-        request.state.auth_type = auth_type
-        
-        # 继续处理请求
-        response = await call_next(request)
-        return response
+                            if user and user.is_active:
+                                # 获取用户角色
+                                roles_stmt = select(RbacRole).join(
+                                    RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+                                ).where(RbacUsersRoles.user_id == user.user_id)
+                                
+                                roles_result = await db.execute(roles_stmt)
+                                roles = list(roles_result.scalars().all())
+                                
+                                user_info = {
+                                    "sub": session.user_id,
+                                    "username": user.user_name,
+                                    "email": user.email,
+                                    "display_name": user.display_name,
+                                    "auth_type": "cas",
+                                    "session_id": session.session_id,
+                                    "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
+                                }
+                                auth_type = "cas"
+            
+            # 3. 检查API Key认证
+            if not user_info:
+                api_key = request.headers.get("X-API-Key")
+                if api_key:
+                    # TODO: 实现API Key验证
+                    pass
+            
+            # 如果没有任何有效的认证信息
+            if not user_info:
+                # 记录请求路径，方便调试
+                logger.info(f"No authentication provided for path: {request.url.path}")
+                raise BusinessException("未提供有效的认证凭据",ResponseCode.UNAUTHORIZED)
+            
+            # 将用户信息和认证类型添加到请求状态
+            request.state.current_user = user_info
+            request.state.auth_type = auth_type
+            
+            # 继续处理请求
+            response = await call_next(request)
+            return response
+            
+        except BusinessException as e:
+            # 捕获业务异常并返回统一格式响应
+            from fastapi.responses import JSONResponse
+            from src.shared.schemas.response import error_response
+            
+            response = error_response(msg=e.message, code=e.code)
+            return JSONResponse(
+                status_code=200,
+                content=response.model_dump()
+            )
 
 
 class RBACMiddleware(BaseHTTPMiddleware):
@@ -188,36 +200,48 @@ class RBACMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(excluded) for excluded in self.exclude_paths):
             return await call_next(request)
         
-        # 获取用户信息（由AuthMiddleware设置）
-        user = getattr(request.state, "current_user", None)
-        if not user:
-            # 如果没有用户信息，说明是公开接口或认证中间件没有正确设置
-            return await call_next(request)
-        
-        # 检查权限
-        user_id = user.get("sub")
-        method = request.method
-        
-        # 创建数据库会话
-        async with AsyncSessionLocal() as db:
-            service = RBACService(db)
+        try:
+            # 获取用户信息（由AuthMiddleware设置）
+            user = getattr(request.state, "current_user", None)
+            if not user:
+                # 如果没有用户信息，说明是公开接口或认证中间件没有正确设置
+                return await call_next(request)
             
-            # 检查是否有访问权限
-            has_permission = await service.check_permission(user_id, path, method)
-            if not has_permission:
-                # 记录权限拒绝日志
-                from src.shared.core.logging import get_logger
-                logger = get_logger(__name__)
-                logger.warning(f"Permission denied for user {user_id}: {method} {path}")
+            # 检查权限
+            user_id = user.get("sub")
+            method = request.method
+            
+            # 创建数据库会话
+            async with AsyncSessionLocal() as db:
+                service = RBACService(db)
                 
-                raise BusinessException(
-                    f"没有访问权限: {method} {path}",
-                    ResponseCode.FORBIDDEN
-                )
-        
-        # 继续处理请求
-        response = await call_next(request)
-        return response
+                # 检查是否有访问权限
+                has_permission = await service.check_permission(user_id, path, method)
+                if not has_permission:
+                    # 记录权限拒绝日志
+                    from src.shared.core.logging import get_logger
+                    logger = get_logger(__name__)
+                    logger.warning(f"Permission denied for user {user_id}: {method} {path}")
+                    
+                    raise BusinessException(
+                        f"没有访问权限: {method} {path}",
+                        ResponseCode.FORBIDDEN
+                    )
+            
+            # 继续处理请求
+            response = await call_next(request)
+            return response
+            
+        except BusinessException as e:
+            # 捕获业务异常并返回统一格式响应
+            from fastapi.responses import JSONResponse
+            from src.shared.schemas.response import error_response
+            
+            response = error_response(msg=e.message, code=e.code)
+            return JSONResponse(
+                status_code=200,
+                content=response.dict()
+            )
 
 
 class AuditMiddleware(BaseHTTPMiddleware):

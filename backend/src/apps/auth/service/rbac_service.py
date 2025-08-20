@@ -284,12 +284,23 @@ class RBACService:
     def _match_resource(self, pattern: str, resource: str) -> bool:
         """
         匹配资源路径
-        支持通配符：
+        支持：
         - * 匹配任意字符（不包括/）
         - ** 匹配任意字符（包括/）
+        - {param} 路径参数（如 {role_id}）
         """
-        # 将通配符转换为正则表达式
-        regex_pattern = pattern.replace("**", ".*").replace("*", "[^/]*")
+        # 处理路径参数 {xxx} -> 匹配数字或字符串
+        # 例如: /api/v1/rbac/roles/{role_id}/permissions 
+        # 匹配: /api/v1/rbac/roles/3/permissions
+        regex_pattern = pattern
+        
+        # 替换路径参数为正则表达式
+        # {xxx} -> ([^/]+) 匹配任意非斜杠字符
+        import re as regex_module
+        regex_pattern = regex_module.sub(r'\{[^}]+\}', r'([^/]+)', regex_pattern)
+        
+        # 处理通配符
+        regex_pattern = regex_pattern.replace("**", ".*").replace("*", "[^/]*")
         regex_pattern = f"^{regex_pattern}$"
         
         return bool(re.match(regex_pattern, resource))
