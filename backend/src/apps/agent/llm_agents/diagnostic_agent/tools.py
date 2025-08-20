@@ -78,5 +78,5 @@ async def get_diagnostic_tools(agent_id: str = "diagnostic_agent"):
         return all_tools
         
     except Exception as e:
-        logger.error(f"获取工具失败: {e}")
+        logger.error(f"❌ 获取工具失败: {e}", exc_info=True)
         return []

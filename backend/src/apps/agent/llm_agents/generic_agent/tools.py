@@ -78,5 +78,5 @@ async def get_generic_agent_tools(agent_id: str = "generic_agent") -> List[Any]:
         return all_tools
         
     except Exception as e:
-        logger.error(f"❌ 获取工具失败: {e}")
+        logger.error(f"❌ 获取工具失败: {e}", exc_info=True)
         return []
