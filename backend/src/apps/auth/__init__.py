@@ -1,6 +1,6 @@
 """
 认证模块
-提供JWT和SSO两种认证方式
+提供JWT和CAS两种认证方式
 """
 
 from src.apps.auth.endpoints import router
@@ -22,10 +22,9 @@ from src.apps.auth.models import (
     AuthToken,
     AuthSession,
     AuthLoginHistory,
-    AuthApiKey,
-    AuthSSOProvider
+    AuthApiKey
 )
-from src.apps.auth.service import AuthService, SSOService
+from src.apps.auth.service import AuthService
 from src.apps.auth.utils import (
     PasswordUtils,
     JWTUtils,
@@ -57,11 +56,9 @@ __all__ = [
     "AuthSession",
     "AuthLoginHistory",
     "AuthApiKey",
-    "AuthSSOProvider",
     
     # Services
     "AuthService",
-    "SSOService",
     
     # Utils
     "PasswordUtils",

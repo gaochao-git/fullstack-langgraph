@@ -14,7 +14,7 @@ from sqlalchemy.future import select
 
 from src.apps.auth.models import (
     AuthToken, AuthSession, AuthLoginHistory, 
-    AuthApiKey, AuthSSOProvider
+    AuthApiKey
 )
 from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.apps.auth.utils import (

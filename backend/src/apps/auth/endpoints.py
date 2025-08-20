@@ -17,8 +17,8 @@ from src.shared.core.config import settings
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode, success_response
 from src.shared.core.logging import get_logger
-from src.apps.auth.service import AuthService, SSOService, CASService, menu_service
-from src.apps.auth.models import AuthSession, AuthSSOProvider, AuthApiKey, AuthToken
+from src.apps.auth.service import AuthService, CASService, menu_service
+from src.apps.auth.models import AuthSession, AuthApiKey, AuthToken
 from src.apps.auth.utils import JWTUtils
 from src.apps.auth.dependencies import get_current_user, get_current_user_optional, require_auth, require_roles
 from src.apps.auth.service.rbac_service import RBACService
@@ -27,7 +27,6 @@ from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.apps.auth.schema import (
     LoginRequest, LoginResponse, RefreshTokenRequest, LogoutRequest,
     RegisterRequest, RegisterResponse,
-    SSOLoginUrlResponse, SSOCallbackRequest,
     UserProfile, ChangePasswordRequest, ResetPasswordRequest, ForgotPasswordRequest,
     EnableMFARequest, EnableMFAResponse, VerifyMFARequest, DisableMFARequest,
     CreateAPIKeyRequest, CreateAPIKeyResponse, APIKeyInfo,
@@ -211,66 +210,6 @@ async def verify_token(
         )
     except:
         return TokenValidationResponse(valid=False)
-
-
-# ============= SSO接口 =============
-
-@router.get("/sso/providers", summary="获取SSO提供商列表")
-async def get_sso_providers(db: AsyncSession = Depends(get_async_db)):
-    """获取可用的SSO提供商列表"""
-    
-    providers = db.query(AuthSSOProvider).filter(
-        AuthSSOProvider.is_active == True
-    ).order_by(AuthSSOProvider.priority.desc()).all()
-    
-    return [
-        {
-            "provider_id": p.provider_id,
-            "provider_name": p.provider_name,
-            "provider_type": p.provider_type
-        }
-        for p in providers
-    ]
-
-
-@router.get("/sso/url", response_model=SSOLoginUrlResponse, summary="获取SSO登录URL")
-async def get_sso_login_url(
-    provider: str,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    获取SSO登录URL
-    
-    - **provider**: SSO提供商标识
-    """
-    service = SSOService(db)
-    return await service.get_login_url(provider)
-
-
-@router.post("/sso/callback", response_model=LoginResponse, summary="SSO回调处理")
-async def sso_callback(
-    request: SSOCallbackRequest,
-    req: Request,
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    处理SSO回调
-    
-    - **code**: 授权码
-    - **state**: State参数
-    - **provider**: 提供商标识
-    """
-    service = SSOService(db)
-    
-    # 添加请求信息
-    request.ip_address = req.client.host
-    request.user_agent = req.headers.get("user-agent")
-    
-    return await service.handle_callback(
-        provider_id=request.provider,
-        code=request.code,
-        state=request.state
-    )
 
 
 # ============= CAS认证 =============

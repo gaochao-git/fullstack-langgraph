@@ -269,8 +269,8 @@ class CASService:
             parsed['group_name'] = '未分配团队'
             parsed['department_name'] = '未分配部门'
         
-        # 3. 生成user_id (使用cas_前缀)
-        parsed['user_id'] = f"cas_{parsed['user_name']}"
+        # 3. 不在这里生成user_id，让后续逻辑使用时间戳格式
+        # parsed['user_id'] 将在 process_cas_login 中生成
         
         # 4. 设置固定字段
         parsed['user_source'] = 1  # 1=CAS来源
@@ -322,10 +322,9 @@ class CASService:
         
         if not user:
             # 创建新用户（使用解析后的属性）
-            # 如果配置中没有生成user_id，使用时间戳
-            if 'user_id' not in parsed_attrs:
-                timestamp = int(time.time() * 1000)
-                parsed_attrs['user_id'] = f"user_{timestamp}"
+            # 生成与JWT用户一致的user_id格式（使用秒级时间戳）
+            timestamp = int(time.time())
+            parsed_attrs['user_id'] = f"user_{timestamp}"
             
             # 创建用户对象，使用解析后的所有属性
             user = RbacUser(**{

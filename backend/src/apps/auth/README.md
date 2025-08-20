@@ -19,11 +19,11 @@
 - 令牌撤销管理
 - 设备和会话追踪
 
-### 3. auth_sessions - SSO会话管理表
-管理SSO登录会话：
-- SSO提供商会话信息
-- OAuth2令牌存储
+### 3. auth_sessions - 会话管理表
+管理用户登录会话：
+- CAS会话信息
 - 会话状态管理
+- 单点登出支持
 
 ### 4. auth_login_history - 登录历史表
 记录所有登录尝试，用于安全审计：
@@ -37,12 +37,6 @@
 - 权限范围控制
 - IP白名单
 
-### 6. auth_sso_providers - SSO提供商配置表
-支持多个SSO提供商：
-- OAuth2/SAML配置
-- 用户属性映射
-- 动态配置管理
-
 ## 认证流程
 
 ### JWT认证流程
@@ -53,14 +47,14 @@
 5. 客户端使用Bearer Token访问API
 6. 服务端验证令牌有效性
 
-### SSO认证流程
-1. 用户选择SSO登录
-2. 重定向到SSO提供商
-3. 用户在SSO提供商处认证
-4. SSO回调到应用
-5. 验证回调并获取用户信息
+### CAS认证流程
+1. 用户选择CAS登录
+2. 重定向到CAS服务器
+3. 用户在CAS服务器认证
+4. CAS回调到应用
+5. 验证票据并获取用户信息
 6. 创建或关联本地用户
-7. 生成JWT令牌
+7. 创建会话（Session模式）
 
 ## API接口
 
@@ -122,23 +116,9 @@ curl -X POST http://localhost:8000/api/v1/auth/init/admin \
   -d '{"password": "your-secure-password"}'
 ```
 
-### 3. 配置SSO提供商
+### 3. 配置CAS认证
 
-```python
-# 在数据库中添加SSO提供商配置
-provider = AuthSSOProvider(
-    provider_id="google",
-    provider_name="Google",
-    provider_type="oauth2",
-    client_id="your-client-id",
-    client_secret="your-client-secret",
-    authorization_url="https://accounts.google.com/o/oauth2/v2/auth",
-    token_url="https://oauth2.googleapis.com/token",
-    userinfo_url="https://www.googleapis.com/oauth2/v2/userinfo",
-    scopes="openid profile email",
-    is_active=True
-)
-```
+CAS认证通过环境变量配置，参见下方的环境变量配置部分。
 
 ## 环境变量配置
 
@@ -284,7 +264,7 @@ cas_attribute_mapping:
 
 1. 邮件发送（密码重置）
 2. MFA完整实现
-3. SAML SSO支持
+3. 增强CAS功能支持
 4. 权限细粒度控制
 5. Redis令牌黑名单
 6. 设备指纹识别

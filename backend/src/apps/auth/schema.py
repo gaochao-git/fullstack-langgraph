@@ -38,28 +38,6 @@ class LogoutRequest(BaseModel):
     everywhere: bool = Field(default=False, description="是否登出所有设备")
 
 
-# ============= SSO相关 =============
-
-class SSOProviderInfo(BaseModel):
-    """SSO提供商信息"""
-    provider_id: str
-    provider_name: str
-    provider_type: str
-    login_url: Optional[str] = None
-
-
-class SSOLoginUrlResponse(BaseModel):
-    """SSO登录URL响应"""
-    auth_url: str = Field(..., description="SSO认证URL")
-    state: str = Field(..., description="状态码")
-
-
-class SSOCallbackRequest(BaseModel):
-    """SSO回调请求"""
-    code: str = Field(..., description="授权码")
-    state: str = Field(..., description="状态码")
-
-
 # ============= 用户相关 =============
 
 class RegisterRequest(BaseModel):
