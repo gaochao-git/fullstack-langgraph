@@ -88,12 +88,17 @@ async def get_user_threads(
     user_name: str, 
     limit: int = 10, 
     offset: int = 0,
-    archived: Optional[bool] = None
+    archived: Optional[bool] = None,
+    agent_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """获取用户的所有线程"""
     try:
         async with get_async_db_context() as db:
             query = select(UserThread).where(UserThread.user_name == user_name)
+            
+            # 如果指定了agent_id，添加过滤条件
+            if agent_id is not None:
+                query = query.where(UserThread.agent_id == agent_id)
             
             # 如果指定了archived状态，添加过滤条件
             if archived is not None:

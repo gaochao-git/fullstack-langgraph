@@ -114,3 +114,42 @@ window.fetch = async function(...args) {
 export function restoreOriginalFetch() {
   window.fetch = originalFetch;
 }
+
+// 从JWT token或SSO用户信息中获取用户名
+export function getCurrentUsername(): string {
+  try {
+    // 首先检查认证类型
+    const authType = localStorage.getItem('auth_type');
+    
+    // SSO/CAS认证：从localStorage的user字段获取
+    if (authType === 'cas') {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        return user.username || 'anonymous';
+      }
+    }
+    
+    // JWT认证：从token中解析
+    const token = localStorage.getItem('token');
+    if (token) {
+      // 解析JWT token
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      const payload = JSON.parse(jsonPayload);
+      return payload.username || 'anonymous';
+    }
+    
+    // 如果都没有，返回anonymous
+    return 'anonymous';
+  } catch (error) {
+    console.error('Failed to get username:', error);
+    return 'anonymous';
+  }
+}

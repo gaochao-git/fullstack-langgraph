@@ -9,6 +9,7 @@ import { cn } from "@/utils/lib-utils";
 import { omind_get, getBaseUrl } from "@/utils/base_api";
 import { type Agent } from "@/services/agentApi";
 import { threadApi } from "@/services/threadApi";
+import { getCurrentUsername } from "@/utils/authInterceptor";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -233,7 +234,7 @@ export default function ChatEngine({
       // 构建完整的提交数据，包含模型选择信息
       const submitData = {
         messages: newMessages,
-        user_name: "zhangsan123", // 临时固定用户名，后续可从用户系统获取
+        user_name: getCurrentUsername(),
       };
       
       const submitConfig = {
@@ -248,7 +249,7 @@ export default function ChatEngine({
       
       const submitOptions = {
         config: submitConfig,
-        user_name: "zhangsan123"
+        user_name: getCurrentUsername()
       };
       
       // 最终提交选项
@@ -270,7 +271,7 @@ export default function ChatEngine({
   const handleInterruptResume = useCallback((approved: boolean) => {
     thread.submit(undefined, { 
       command: { resume: approved },
-      user_name: "zhangsan123"
+      user_name: getCurrentUsername()
     });
   }, [thread]);
 
@@ -278,7 +279,10 @@ export default function ChatEngine({
   const loadHistoryThreads = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const data = await omind_get('/api/chat/users/zhangsan123/threads?limit=20&offset=0');
+      // 添加agent_id参数，只获取当前智能体的会话
+      const username = getCurrentUsername();
+      const url = `/api/chat/users/${username}/threads?limit=20&offset=0&agent_id=${agentId}`;
+      const data = await omind_get(url);
       
       // omind_get 直接返回解析后的数据
       const threads = data.threads || [];
@@ -290,7 +294,7 @@ export default function ChatEngine({
     } finally {
       setLoadingHistory(false);
     }
-  }, []);
+  }, [agentId]);
 
   // 切换历史会话抽屉显示/隐藏
   const handleToggleHistoryDrawer = useCallback(() => {

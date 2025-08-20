@@ -53,8 +53,12 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
                 if isinstance(last_msg, dict) and "content" in last_msg:
                     content = str(last_msg["content"])
                     thread_title = content[:20] + "..." if len(content) > 20 else content
-        logger.info(f"[ensure_user_thread_mapping] creating mapping: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}")
-        await create_user_thread_mapping(user_name, thread_id, thread_title)
+        
+        # 从request_body中获取agent_id (assistant_id)
+        agent_id = getattr(request_body, 'assistant_id', None)
+        
+        logger.info(f"[ensure_user_thread_mapping] creating mapping: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
+        await create_user_thread_mapping(user_name, thread_id, thread_title, agent_id)
 
 class RunCreate(BaseModel):
     assistant_id: str
