@@ -33,7 +33,19 @@ export const useMenus = (): UseMenusReturn => {
       setError(null);
       const menuData = await MenuApiService.getUserMenus();
       setUserMenus(menuData);
-    } catch (err) {
+    } catch (err: any) {
+      // 如果是401错误，说明token过期，需要重新登录
+      if (err?.response?.status === 401 || err?.status === 401) {
+        console.warn('Token expired, redirecting to login');
+        // 清除本地存储的认证信息
+        localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('auth_type');
+        // 直接跳转到登录页
+        window.location.href = '/login';
+        return;
+      }
       setError(err instanceof Error ? err.message : '获取菜单失败');
       console.error('Failed to fetch menus:', err);
     } finally {

@@ -78,7 +78,7 @@ const generateRoutes = (menus: MenuTreeNode[]): React.ReactElement[] => {
 };
 
 export const DynamicRouter: React.FC = () => {
-  const { menus, loading } = useMenus();
+  const { menus, loading, error } = useMenus();
   
   // 使用 useMemo 缓存路由，避免每次渲染都重新生成
   const dynamicRoutes = useMemo(() => {
@@ -88,6 +88,22 @@ export const DynamicRouter: React.FC = () => {
   
   if (loading) {
     return <LoadingComponent />;
+  }
+  
+  // 如果加载菜单出错，显示错误信息
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <h1 className="text-2xl font-bold text-red-500">加载失败</h1>
+        <p className="text-gray-600">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-200"
+        >
+          刷新页面
+        </button>
+      </div>
+    );
   }
   
   return (
