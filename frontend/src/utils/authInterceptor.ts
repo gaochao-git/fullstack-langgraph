@@ -42,6 +42,8 @@ window.fetch = async function(...args) {
 
     // 处理401未授权错误
     const isRetry = init && init.headers && (init.headers as any)['X-No-Retry'];
+    
+    // 处理HTTP 401状态码
     if (response.status === 401 && !isRetry) {
       const authState = useAuth.getState();
       
@@ -94,6 +96,38 @@ window.fetch = async function(...args) {
         // 无认证信息
         message.error('请先登录');
         window.location.href = '/login';
+      }
+    }
+    
+    // 处理返回200但响应体包含401错误的情况
+    if (response.status === 200 && !isRetry) {
+      // 克隆响应以便读取body
+      const clonedResponse = response.clone();
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await clonedResponse.json();
+          // 检查是否是认证错误
+          if (data.status === 'error' && (data.code === 401 || data.msg?.includes('认证凭据'))) {
+            const authState = useAuth.getState();
+            
+            // 清理认证状态
+            tokenManager.clearTokens();
+            authState.updateAuthState(null, null);
+            
+            // 显示错误消息
+            message.error(data.msg || '请先登录');
+            
+            // 跳转到登录页
+            if (config.onUnauthorized) {
+              config.onUnauthorized();
+            } else {
+              window.location.href = '/login';
+            }
+          }
+        }
+      } catch (e) {
+        // 忽略JSON解析错误
       }
     }
 
