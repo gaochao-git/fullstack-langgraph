@@ -8,6 +8,7 @@ interface FileUploadManagerProps {
   selectedFiles: File[];
   onFilesSelect: (files: File[]) => void;
   onFileRemove: (index: number) => void;
+  onError?: (message: string) => void;
   isDark: boolean;
   disabled?: boolean;
 }
@@ -16,6 +17,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
   selectedFiles,
   onFilesSelect,
   onFileRemove,
+  onError,
   isDark,
   disabled = false
 }) => {
@@ -41,10 +43,10 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
     if (files.length > 0 && uploadConfig) {
       // 前端预检查文件大小
       const MAX_SIZE = uploadConfig.max_upload_size_mb * 1024 * 1024;
+      const oversizedFiles: string[] = [];
       const validFiles = files.filter(file => {
         if (file.size > MAX_SIZE) {
-          console.warn(`文件 ${file.name} 超过 ${uploadConfig.max_upload_size_mb}MB 限制，大小为 ${(file.size / 1024 / 1024).toFixed(2)}MB`);
-          // TODO: 可以通过props传递错误处理回调
+          oversizedFiles.push(`${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
           return false;
         }
         return true;
@@ -54,10 +56,9 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
         onFilesSelect(validFiles);
       }
       
-      if (validFiles.length < files.length) {
-        // 有文件被过滤，可以显示提示
-        const filtered = files.length - validFiles.length;
-        console.error(`${filtered} 个文件因超过大小限制被过滤`);
+      if (oversizedFiles.length > 0) {
+        const errorMsg = `以下文件超过 ${uploadConfig.max_upload_size_mb}MB 限制：${oversizedFiles.join(', ')}`;
+        onError?.(errorMsg);
       }
       
       // 清空 input 的值，以便可以再次选择相同的文件
@@ -114,21 +115,6 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
   
   if (files.length === 0) return null;
   
-  // 格式化文件大小
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-  
-  // 获取文件扩展名
-  const getFileExtension = (fileName: string): string => {
-    const lastDot = fileName.lastIndexOf('.');
-    return lastDot > -1 ? fileName.substring(lastDot) : '';
-  };
-  
 
   return (
     <>
@@ -177,7 +163,7 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
                     onClick={() => setPreviewFile({
                       fileId: item.fileId,
                       fileName: item.file.name,
-                      fileType: getFileExtension(item.file.name)
+                      fileType: '.' + getFileExtension(item.file.name)
                     })}
                     className={cn(
                       "hover:opacity-80 transition-opacity",
@@ -220,22 +206,61 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
   );
 };
 
-// 文件上传相关的工具函数
+// 文件类型常量定义
+const FILE_EXTENSIONS = {
+  TEXT: ['txt', 'md'],
+  IMAGE: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'],
+  DOCUMENT: ['pdf', 'docx', 'doc'],
+  SPREADSHEET: ['xlsx', 'xls'],
+} as const;
+
+// 可预览的文件扩展名
+const PREVIEWABLE_EXTENSIONS = [
+  ...FILE_EXTENSIONS.TEXT,
+  ...FILE_EXTENSIONS.IMAGE,
+];
+
+// 获取文件扩展名的辅助函数（统一使用这一个）
+function getFileExtension(filename: string): string {
+  const lastDot = filename.lastIndexOf('.');
+  return lastDot > -1 ? filename.substring(lastDot + 1).toLowerCase() : '';
+}
+
+// 格式化文件大小（统一使用这一个）
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 判断是否是图片文件
+function isImageFile(filename: string): boolean {
+  const ext = getFileExtension(filename);
+  return FILE_EXTENSIONS.IMAGE.includes(ext as any);
+}
+
+// 判断是否是Excel文件
+function isExcelFile(filename: string): boolean {
+  const ext = getFileExtension(filename);
+  return FILE_EXTENSIONS.SPREADSHEET.includes(ext as any);
+}
+
+// 判断文件是否可预览
+function isFilePreviewable(filename: string): boolean {
+  const ext = getFileExtension(filename);
+  return PREVIEWABLE_EXTENSIONS.includes(ext as any);
+}
+
+// 文件上传相关的工具函数（导出供其他组件使用）
 export const fileUploadUtils = {
-  // 格式化文件大小
-  formatFileSize: (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  },
-
-  // 获取文件扩展名
-  getFileExtension: (filename: string): string => {
-    return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2);
-  },
-
+  formatFileSize,
+  getFileExtension,
+  isImageFile,
+  isExcelFile,
+  isFilePreviewable,
+  
   // 验证文件类型
   isValidFileType: (file: File): boolean => {
     const validTypes = [
@@ -252,9 +277,10 @@ export const fileUploadUtils = {
       'image/webp',
       'image/svg+xml'
     ];
-    return validTypes.includes(file.type) || 
-           ['pdf', 'docx', 'xlsx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
-             .includes(getFileExtension(file.name).toLowerCase());
+    const ext = getFileExtension(file.name);
+    const allExtensions = Object.values(FILE_EXTENSIONS).flat();
+    
+    return validTypes.includes(file.type) || allExtensions.includes(ext);
   },
 
   // 验证文件大小（默认最大 10MB）
@@ -262,26 +288,3 @@ export const fileUploadUtils = {
     return file.size <= maxSizeInMB * 1024 * 1024;
   }
 };
-
-// 获取文件扩展名的辅助函数
-function getFileExtension(filename: string): string {
-  return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2);
-}
-
-// 判断是否是图片文件
-function isImageFile(filename: string): boolean {
-  const ext = getFileExtension(filename).toLowerCase();
-  return ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
-}
-
-// 判断是否是Excel文件
-function isExcelFile(filename: string): boolean {
-  const ext = getFileExtension(filename).toLowerCase();
-  return ['xlsx', 'xls'].includes(ext);
-}
-
-// 判断文件是否可预览
-function isFilePreviewable(filename: string): boolean {
-  const ext = getFileExtension(filename).toLowerCase();
-  return ['txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
-}
