@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -39,6 +39,11 @@ const isFilePreviewable = (fileName: string): boolean => {
 const isImageFile = (fileName: string): boolean => {
   const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
   return PREVIEWABLE_IMAGE_EXTENSIONS.includes(ext);
+};
+
+const isExcelFile = (fileName: string): boolean => {
+  const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+  return ['.xlsx', '.xls'].includes(ext);
 };
 
 // 诊断消息中的事件类型
@@ -860,6 +865,8 @@ const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
             >
               {isImageFile(doc.fileName) ? (
                 <Image className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
+              ) : isExcelFile(doc.fileName) ? (
+                <FileSpreadsheet className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
               ) : (
                 <FileText className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
               )}
@@ -1267,6 +1274,8 @@ function ChatMessages({
                                 >
                                   {isImageFile(doc.fileName) ? (
                                     <Image className="h-4 w-4" />
+                                  ) : isExcelFile(doc.fileName) ? (
+                                    <FileSpreadsheet className="h-4 w-4" />
                                   ) : (
                                     <FileText className="h-4 w-4" />
                                   )}

@@ -65,7 +65,7 @@ class ConfigService {
       return {
         upload: {
           max_upload_size_mb: 10,
-          allowed_extensions: ['.pdf', '.docx', '.txt', '.md']
+          allowed_extensions: ['.pdf', '.docx', '.txt', '.md', '.xlsx']
         }
       };
     }

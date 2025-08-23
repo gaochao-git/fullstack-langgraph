@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     
     # 文件上传配置
     MAX_UPLOAD_SIZE_MB: int = 10  # 最大上传文件大小（MB）
-    UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"]  # 允许的文件扩展名
+    UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".xlsx"]  # 允许的文件扩展名
     
     # 文档目录配置
     DOCUMENT_DIR: str = "documents"  # 文档根目录，包含 uploads/, templates/, generated/ 子目录

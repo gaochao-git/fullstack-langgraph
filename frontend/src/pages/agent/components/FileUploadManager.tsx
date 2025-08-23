@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paperclip, X, Eye, Image, FileText } from 'lucide-react';
+import { Paperclip, X, Eye, Image, FileText, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/utils/lib-utils';
 import { configService, UploadConfig } from '@/services/configApi';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -31,7 +31,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
       // 使用默认配置
       setUploadConfig({
         max_upload_size_mb: 10,
-        allowed_extensions: ['.pdf', '.docx', '.txt', '.md']
+        allowed_extensions: ['.pdf', '.docx', '.txt', '.md', '.xlsx']
       });
     });
   }, []);
@@ -74,7 +74,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
         multiple
         onChange={handleFileSelect}
         className="hidden"
-        accept={uploadConfig?.allowed_extensions.join(',') || '.pdf,.docx,.txt,.md'}
+        accept={uploadConfig?.allowed_extensions.join(',') || '.pdf,.docx,.txt,.md,.xlsx'}
         disabled={disabled}
       />
       
@@ -154,6 +154,8 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
               ) : item.status === 'success' ? (
                 isImageFile(item.file.name) ? (
                   <Image className="h-3 w-3" />
+                ) : isExcelFile(item.file.name) ? (
+                  <FileSpreadsheet className="h-3 w-3" />
                 ) : (
                   <FileText className="h-3 w-3" />
                 )
@@ -239,6 +241,7 @@ export const fileUploadUtils = {
     const validTypes = [
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'text/plain',
       'text/markdown',
       'image/png',
@@ -250,7 +253,7 @@ export const fileUploadUtils = {
       'image/svg+xml'
     ];
     return validTypes.includes(file.type) || 
-           ['pdf', 'docx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
+           ['pdf', 'docx', 'xlsx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
              .includes(getFileExtension(file.name).toLowerCase());
   },
 
@@ -269,6 +272,12 @@ function getFileExtension(filename: string): string {
 function isImageFile(filename: string): boolean {
   const ext = getFileExtension(filename).toLowerCase();
   return ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
+}
+
+// 判断是否是Excel文件
+function isExcelFile(filename: string): boolean {
+  const ext = getFileExtension(filename).toLowerCase();
+  return ['xlsx', 'xls'].includes(ext);
 }
 
 // 判断文件是否可预览

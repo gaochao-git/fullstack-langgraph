@@ -24,13 +24,29 @@ except ImportError:
     HAS_DOCX = False
 
 from src.shared.core.logging import get_logger
+
+try:
+    import openpyxl
+    HAS_OPENPYXL = True
+except ImportError:
+    HAS_OPENPYXL = False
+
+logger = get_logger(__name__)
+
+# 在模块加载时检查依赖并给出警告
+if not HAS_PDF:
+    logger.warning("⚠️  未安装 pypdf 库，PDF 文件解析功能将不可用。请运行: pip install pypdf")
+    
+if not HAS_DOCX:
+    logger.warning("⚠️  未安装 python-docx 库，Word 文档解析功能将不可用。请运行: pip install python-docx")
+    
+if not HAS_OPENPYXL:
+    logger.warning("⚠️  未安装 openpyxl 库，Excel 文件解析功能将不可用。请运行: pip install openpyxl")
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.db.models import now_shanghai
 from src.shared.core.config import settings
 from ..models import AgentDocumentUpload
-
-logger = get_logger(__name__)
 
 # 从配置中获取文件存储路径
 UPLOAD_DIR = Path(settings.UPLOAD_DIR)
@@ -238,6 +254,38 @@ class DocumentService:
                 except Exception as e:
                     logger.error(f"Word文档解析错误: {e}")
                     full_text = f"Word文档解析失败: {str(e)}"
+            elif file_ext == '.xlsx' and HAS_OPENPYXL:
+                # Excel文件解析
+                try:
+                    workbook = openpyxl.load_workbook(str(file_path), data_only=True)
+                    content_parts = []
+                    
+                    for sheet_name in workbook.sheetnames:
+                        sheet = workbook[sheet_name]
+                        content_parts.append(f"[工作表: {sheet_name}]")
+                        
+                        # 获取表格内容
+                        table_data = []
+                        for row in sheet.iter_rows(values_only=True):
+                            # 过滤空行
+                            if any(cell is not None for cell in row):
+                                row_text = " | ".join([str(cell) if cell is not None else "" for cell in row])
+                                table_data.append(row_text)
+                        
+                        if table_data:
+                            content_parts.append("\n".join(table_data))
+                        else:
+                            content_parts.append("(空表)")
+                        
+                        content_parts.append("")  # 添加空行分隔
+                    
+                    full_text = "\n".join(content_parts)
+                    logger.info(f"Excel文件解析成功: {file_name}, 工作表数: {len(workbook.sheetnames)}")
+                    
+                except Exception as e:
+                    logger.error(f"Excel文件解析错误: {e}")
+                    full_text = f"Excel文件解析失败: {str(e)}"
+                    
             elif file_ext.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']:
                 # 处理图片文件
                 logger.info(f"开始处理图片文件: {file_name}")
@@ -271,8 +319,23 @@ class DocumentService:
                 else:
                     full_text = f"[图片文件: {file_name}]\n\n未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY。"
             else:
-                # 不支持的格式
-                full_text = f"[{file_ext} 文件: {file_name}]\n\n暂不支持此格式的文档解析。"
+                # 不支持的格式或缺少依赖
+                unsupported_msg = f"[{file_ext} 文件: {file_name}]\n\n"
+                
+                # 检查是否是因为缺少依赖
+                if file_ext == '.xlsx' and not HAS_OPENPYXL:
+                    unsupported_msg += "Excel 文件解析功能未启用。请联系管理员安装 openpyxl 库。"
+                    logger.warning(f"用户尝试上传 Excel 文件，但未安装 openpyxl 库: {file_name}")
+                elif file_ext == '.pdf' and not HAS_PDF:
+                    unsupported_msg += "PDF 文件解析功能未启用。请联系管理员安装 pypdf 库。"
+                    logger.warning(f"用户尝试上传 PDF 文件，但未安装 pypdf 库: {file_name}")
+                elif file_ext == '.docx' and not HAS_DOCX:
+                    unsupported_msg += "Word 文档解析功能未启用。请联系管理员安装 python-docx 库。"
+                    logger.warning(f"用户尝试上传 Word 文档，但未安装 python-docx 库: {file_name}")
+                else:
+                    unsupported_msg += "暂不支持此格式的文档解析。"
+                
+                full_text = unsupported_msg
             
             # 如果没有提取到内容
             if not full_text.strip():
