@@ -74,7 +74,7 @@ export const fileApi = {
 
   // 获取文件处理状态
   async getFileStatus(fileId: string): Promise<FileProcessStatus> {
-    const response = await omind_get(`/api/v1/agents/files/${fileId}/status`);
+    const response = await omind_get(`/api/v1/agents/files/${fileId}/status`, { showLoading: false });
     if (response.status === 'ok' && response.data) {
       return response.data;
     } else {
