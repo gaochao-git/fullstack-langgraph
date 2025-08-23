@@ -11,7 +11,7 @@ import DiagnosticAgentWelcome from "./DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
 import { theme } from "antd";
-import { FileUploadManager, FileListDisplay } from "./FileUploadManager";
+import { FileUploadManager, FileListDisplay, fileUploadUtils } from "./FileUploadManager";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
@@ -977,27 +977,109 @@ function ChatMessages({
     }
   };
 
-  // 处理粘贴事件，支持图片粘贴
+  // 处理粘贴事件，支持文件粘贴
   const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
+    const files: File[] = [];
+    
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
-      if (item.type.indexOf('image') !== -1) {
+      
+      // 检查是否是文件类型
+      if (item.kind === 'file') {
         e.preventDefault(); // 阻止默认粘贴行为
         
         const blob = item.getAsFile();
         if (!blob) continue;
 
+        // 根据类型生成合适的文件名
+        let fileName = `paste-${Date.now()}`;
+        if (item.type.startsWith('image/')) {
+          fileName += '.png';
+        } else if (item.type === 'text/plain') {
+          fileName += '.txt';
+        } else if (item.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          fileName += '.docx';
+        } else if (item.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+          fileName += '.xlsx';
+        } else if (item.type === 'application/pdf') {
+          fileName += '.pdf';
+        } else {
+          // 尝试从blob中获取扩展名或使用默认
+          const ext = blob.name?.split('.').pop();
+          fileName += ext ? `.${ext}` : '.dat';
+        }
+
         // 创建File对象
-        const file = new File([blob], `paste-image-${Date.now()}.png`, { type: blob.type });
-        
-        // 使用现有的文件处理逻辑
-        await handleFilesSelect([file]);
-        
-        message.success('已粘贴图片');
-        break; // 只处理第一个图片
+        const file = new File([blob], fileName, { type: blob.type });
+        files.push(file);
+      }
+    }
+    
+    if (files.length > 0) {
+      // 使用现有的文件处理逻辑
+      await handleFilesSelect(files);
+      message.success(`已粘贴 ${files.length} 个文件`);
+    }
+  };
+
+  // 拖放状态
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+
+  // 处理拖入事件
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  // 处理拖动悬停事件
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // 处理拖离事件
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  // 处理拖放事件
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      // 验证文件类型
+      const validFiles = files.filter(file => {
+        // 使用 fileUploadUtils 中的验证函数
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        return fileUploadUtils.isValidFileType(file);
+      });
+
+      if (validFiles.length > 0) {
+        await handleFilesSelect(validFiles);
+        message.success(`已拖入 ${validFiles.length} 个文件`);
+      }
+
+      if (validFiles.length < files.length) {
+        message.warning(`${files.length - validFiles.length} 个文件类型不支持`);
       }
     }
   };
@@ -1142,7 +1224,49 @@ function ChatMessages({
   if (currentRound) dialogRounds.push(currentRound);
 
   return (
-    <div className="flex flex-col relative w-full overflow-hidden h-full" style={{ backgroundColor: token.colorBgContainer }}>
+    <div 
+      className="flex flex-col relative w-full overflow-hidden h-full" 
+      style={{ backgroundColor: token.colorBgContainer }}
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* 全屏拖放提示 */}
+      {isDragging && (
+        <div className={cn(
+          "absolute inset-0 flex items-center justify-center z-50 pointer-events-none",
+          isDark ? "bg-gray-900/90" : "bg-white/90"
+        )}>
+          <div className={cn(
+            "flex flex-col items-center gap-4 p-8 rounded-lg",
+            isDark ? "bg-gray-800 shadow-2xl" : "bg-white shadow-2xl"
+          )}>
+            <div className={cn(
+              "w-16 h-16 rounded-full flex items-center justify-center",
+              isDark ? "bg-cyan-900" : "bg-cyan-100"
+            )}>
+              <Image className={cn(
+                "w-8 h-8",
+                isDark ? "text-cyan-400" : "text-cyan-600"
+              )} />
+            </div>
+            <div className={cn(
+              "text-xl font-medium",
+              isDark ? "text-cyan-400" : "text-cyan-600"
+            )}>
+              释放以上传文件
+            </div>
+            <div className={cn(
+              "text-sm",
+              isDark ? "text-gray-400" : "text-gray-600"
+            )}>
+              支持图片、文档、表格等多种格式
+            </div>
+          </div>
+        </div>
+      )}
+      
       <style>
         {`
           @keyframes buttonSpin {
@@ -1587,12 +1711,13 @@ function ChatMessages({
       {/* 输入区 - 固定高度 */}
       <div
         className={cn(
-          "flex-shrink-0 border-t-2 transition-colors duration-200",
+          "relative flex-shrink-0 border-t-2 transition-colors duration-200",
           isDark 
             ? "bg-gradient-to-r from-gray-800 to-gray-700 border-gray-600" 
             : "bg-gradient-to-r from-white to-gray-50 border-gray-300"
         )}
       >
+        
         {/* 已上传文件显示区域 */}
         <FileListDisplay 
           files={uploadedFiles}
