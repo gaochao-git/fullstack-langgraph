@@ -24,22 +24,48 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [content, setContent] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [imageUrl, setImageUrl] = useState<string>('');
 
-  // 支持预览的文件类型
-  const isPreviewable = ['.txt', '.md'].includes(fileType.toLowerCase());
+  // 支持预览的文本文件类型
+  const isTextPreviewable = ['.txt', '.md'].includes(fileType.toLowerCase());
+  
+  // 支持预览的图片文件类型
+  const isImagePreviewable = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'].includes(fileType.toLowerCase());
+  
+  // 是否支持预览
+  const isPreviewable = isTextPreviewable || isImagePreviewable;
 
   useEffect(() => {
     if (visible && fileId && isPreviewable) {
       fetchFileContent();
     }
+    
+    // 清理函数
+    return () => {
+      if (imageUrl) {
+        URL.revokeObjectURL(imageUrl);
+        setImageUrl('');
+      }
+    };
   }, [visible, fileId]);
 
   const fetchFileContent = async () => {
     setLoading(true);
     setError('');
+    setContent('');
+    setImageUrl('');
+    
     try {
-      const docContent = await fileApi.getDocumentContent(fileId);
-      setContent(docContent.content || '文件内容为空');
+      if (isImagePreviewable) {
+        // 获取图片文件
+        const blob = await fileApi.downloadDocument(fileId);
+        const url = URL.createObjectURL(blob);
+        setImageUrl(url);
+      } else if (isTextPreviewable) {
+        // 获取文本内容
+        const docContent = await fileApi.getDocumentContent(fileId);
+        setContent(docContent.content || '文件内容为空');
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '获取文件内容失败';
       setError(errorMsg);
@@ -108,16 +134,31 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
             <FileText className="h-12 w-12 mb-2" />
             <p>该文件类型暂不支持预览</p>
-            <p className="text-sm mt-2">支持预览的格式：.txt, .md</p>
+            <p className="text-sm mt-2">支持预览的格式：文本(.txt, .md) 图片(.png, .jpg, .jpeg, .gif, .bmp, .webp)</p>
           </div>
-        ) : (
+        ) : isImagePreviewable && imageUrl ? (
+          <div className="flex items-center justify-center">
+            <img 
+              src={imageUrl} 
+              alt={fileName}
+              className={cn(
+                "max-w-full max-h-[600px] object-contain rounded-lg",
+                isDark ? "bg-gray-900" : "bg-white"
+              )}
+              onError={() => {
+                setError('图片加载失败');
+                setImageUrl('');
+              }}
+            />
+          </div>
+        ) : isTextPreviewable ? (
           <pre className={cn(
             "whitespace-pre-wrap break-words font-mono text-sm",
             isDark ? "text-gray-100" : "text-gray-800"
           )}>
             {content}
           </pre>
-        )}
+        ) : null}
       </div>
     </Modal>
   );

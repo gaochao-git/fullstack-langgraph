@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download, RefreshCw } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -23,6 +23,23 @@ const HIDDEN_TOOLS = [
   'DiagnosisReflectionOutput',   // 诊断反思输出
   'IntentAnalysisOutput'         // 意图分析输出
 ];
+
+// 支持预览的文件类型
+const PREVIEWABLE_TEXT_EXTENSIONS = ['.txt', '.md'];
+const PREVIEWABLE_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
+const PREVIEWABLE_EXTENSIONS = [...PREVIEWABLE_TEXT_EXTENSIONS, ...PREVIEWABLE_IMAGE_EXTENSIONS];
+
+// 统一的文件预览判断函数
+const isFilePreviewable = (fileName: string): boolean => {
+  const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+  return PREVIEWABLE_EXTENSIONS.includes(ext);
+};
+
+// 判断文件是否是图片
+const isImageFile = (fileName: string): boolean => {
+  const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+  return PREVIEWABLE_IMAGE_EXTENSIONS.includes(ext);
+};
 
 // 诊断消息中的事件类型
 export interface ProcessedEvent {
@@ -828,11 +845,6 @@ const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
     return lastDot > -1 ? fileName.substring(lastDot) : '';
   };
   
-  // 判断是否可预览
-  const isPreviewable = (fileName: string): boolean => {
-    const ext = getFileExtension(fileName).toLowerCase();
-    return ['.txt', '.md'].includes(ext);
-  };
   
   return (
     <>
@@ -846,9 +858,13 @@ const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
                 isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"
               )}
             >
-              <FileText className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
+              {isImageFile(doc.fileName) ? (
+                <Image className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
+              ) : (
+                <FileText className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
+              )}
               <span>{doc.fileName}</span>
-              {isPreviewable(doc.fileName) && fileIds && fileIds[index] && (
+              {isFilePreviewable(doc.fileName) && fileIds && fileIds[index] && (
                 <button
                   type="button"
                   onClick={() => setPreviewFile({
@@ -1249,12 +1265,15 @@ function ChatMessages({
                                     isDark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"
                                   )}
                                 >
-                                  <FileText className="h-4 w-4" />
+                                  {isImageFile(doc.fileName) ? (
+                                    <Image className="h-4 w-4" />
+                                  ) : (
+                                    <FileText className="h-4 w-4" />
+                                  )}
                                   <span>{doc.fileName}</span>
                                   {(() => {
                                     const ext = doc.fileName.substring(doc.fileName.lastIndexOf('.')).toLowerCase();
-                                    const isPreviewable = ['.txt', '.md'].includes(ext);
-                                    return isPreviewable && systemFileIds && systemFileIds[index] && (
+                                    return isFilePreviewable(doc.fileName) && systemFileIds && systemFileIds[index] && (
                                       <button
                                         type="button"
                                         onClick={() => setPreviewFile({

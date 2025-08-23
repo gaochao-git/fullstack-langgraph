@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Paperclip, X, Eye } from 'lucide-react';
+import { Paperclip, X, Eye, Image, FileText } from 'lucide-react';
 import { cn } from '@/utils/lib-utils';
 import { configService, UploadConfig } from '@/services/configApi';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -129,11 +129,6 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
     return lastDot > -1 ? fileName.substring(lastDot) : '';
   };
   
-  // 判断是否可预览
-  const isPreviewable = (fileName: string): boolean => {
-    const ext = getFileExtension(fileName).toLowerCase();
-    return ['.txt', '.md'].includes(ext);
-  };
 
   return (
     <>
@@ -157,7 +152,11 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
               {item.status === 'uploading' ? (
                 <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
               ) : item.status === 'success' ? (
-                <Paperclip className="h-3 w-3" />
+                isImageFile(item.file.name) ? (
+                  <Image className="h-3 w-3" />
+                ) : (
+                  <FileText className="h-3 w-3" />
+                )
               ) : (
                 <X className="h-3 w-3" />
               )}
@@ -170,7 +169,7 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
                 </span>
               </span>
               <div className="flex items-center gap-1">
-                {item.status === 'success' && isPreviewable(item.file.name) && (
+                {item.status === 'success' && isFilePreviewable(item.file.name) && (
                   <button
                     type="button"
                     onClick={() => setPreviewFile({
@@ -241,10 +240,17 @@ export const fileUploadUtils = {
       'application/pdf',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
-      'text/markdown'
+      'text/markdown',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/gif',
+      'image/bmp',
+      'image/webp',
+      'image/svg+xml'
     ];
     return validTypes.includes(file.type) || 
-           ['pdf', 'docx', 'txt', 'md']
+           ['pdf', 'docx', 'txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
              .includes(getFileExtension(file.name).toLowerCase());
   },
 
@@ -257,4 +263,16 @@ export const fileUploadUtils = {
 // 获取文件扩展名的辅助函数
 function getFileExtension(filename: string): string {
   return filename.slice((filename.lastIndexOf(".") - 1 >>> 0) + 2);
+}
+
+// 判断是否是图片文件
+function isImageFile(filename: string): boolean {
+  const ext = getFileExtension(filename).toLowerCase();
+  return ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
+}
+
+// 判断文件是否可预览
+function isFilePreviewable(filename: string): boolean {
+  const ext = getFileExtension(filename).toLowerCase();
+  return ['txt', 'md', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext);
 }
