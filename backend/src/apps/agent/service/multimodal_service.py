@@ -17,7 +17,13 @@ class MultimodalService:
     """多模态内容处理服务"""
     
     def __init__(self):
-        self.timeout = httpx.Timeout(30.0, connect=5.0)
+        # 增加超时时间，大模型处理图片需要更长时间
+        self.timeout = httpx.Timeout(
+            timeout=120.0,  # 总超时时间 120 秒
+            connect=10.0,   # 连接超时 10 秒
+            read=120.0,     # 读取超时 120 秒
+            write=30.0      # 写入超时 30 秒
+        )
     
     async def extract_image_content(
         self,
@@ -68,7 +74,7 @@ class MultimodalService:
             return await self._call_vision_api(image_base64, prompt)
             
         except Exception as e:
-            logger.error(f"AI 视觉处理失败: {str(e)}")
+            logger.error(f"AI 视觉处理失败: {str(e)}", exc_info=True)
             return {
                 "success": False,
                 "content": "",
@@ -78,6 +84,11 @@ class MultimodalService:
     async def _call_vision_api(self, image_base64: str, prompt: str) -> Dict[str, Any]:
         """调用视觉 API（OpenAI 兼容格式）"""
         try:
+            # 记录API调用信息
+            logger.info(f"调用视觉 API: {settings.VISION_API_BASE_URL}/chat/completions")
+            logger.info(f"使用模型: {settings.VISION_MODEL_NAME}")
+            logger.info(f"图片大小: {len(image_base64)} 字符 (base64编码)")
+            
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{settings.VISION_API_BASE_URL}/chat/completions",
@@ -115,18 +126,41 @@ class MultimodalService:
                         "model": settings.VISION_MODEL_NAME
                     }
                 else:
+                    error_detail = f"HTTP {response.status_code}"
+                    try:
+                        error_body = response.json()
+                        error_detail = f"HTTP {response.status_code}: {error_body.get('error', {}).get('message', response.text)}"
+                    except:
+                        error_detail = f"HTTP {response.status_code}: {response.text}"
+                    
+                    logger.error(f"视觉 API 返回错误: {error_detail}")
                     return {
                         "success": False,
                         "content": "",
-                        "error": f"API 调用失败: {response.status_code}"
+                        "error": f"API 调用失败: {error_detail}"
                     }
                     
-        except Exception as e:
-            logger.error(f"视觉 API 调用失败: {str(e)}")
+        except httpx.TimeoutException as e:
+            logger.error(f"视觉 API 请求超时: {str(e)}", exc_info=True)
             return {
                 "success": False,
                 "content": "",
-                "error": f"API 调用失败: {str(e)}"
+                "error": "API 请求超时，图片处理时间过长。请稍后重试或使用较小的图片。"
+            }
+        except httpx.ConnectError as e:
+            logger.error(f"视觉 API 连接失败: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "content": "",
+                "error": "无法连接到视觉 API 服务器，请检查网络连接。"
+            }
+        except Exception as e:
+            error_msg = str(e) if str(e) else f"{type(e).__name__}"
+            logger.error(f"视觉 API 调用失败: {error_msg}", exc_info=True)
+            return {
+                "success": False,
+                "content": "",
+                "error": f"API 调用失败: {error_msg}"
             }
 
 

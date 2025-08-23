@@ -266,7 +266,7 @@ class DocumentService:
                             full_text = f"[图片文件: {file_name}]\n\n图片分析失败: {result.get('error', '未知错误')}"
                             logger.warning(f"图片分析失败: {file_name}, 错误: {result.get('error')}")
                     except Exception as e:
-                        logger.error(f"图片处理异常: {e}")
+                        logger.error(f"图片处理异常: {e}", exc_info=True)
                         full_text = f"[图片文件: {file_name}]\n\n图片处理出错: {str(e)}"
                 else:
                     full_text = f"[图片文件: {file_name}]\n\n未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY。"
