@@ -183,24 +183,93 @@ class DocumentService:
                 # Word文档解析
                 try:
                     doc = docx.Document(str(file_path))
-                    paragraphs = []
+                    content_parts = []
+                    
+                    # 处理段落
                     for para in doc.paragraphs:
                         if para.text.strip():
-                            paragraphs.append(para.text)
-                    full_text = "\n\n".join(paragraphs)
+                            content_parts.append(para.text)
                     
-                    # 也提取表格内容
+                    # 处理图片（如果配置了视觉模型）
+                    from .multimodal_service import multimodal_service
+                    # 检查是否配置了视觉模型
+                    if settings.VISION_API_KEY:
+                        image_count = 0
+                        for rel in doc.part.rels.values():
+                            if "image" in rel.reltype:
+                                image_count += 1
+                                try:
+                                    # 提取图片数据
+                                    image_data = rel.target_part.blob
+                                    
+                                    # 调用多模态服务
+                                    result = await multimodal_service.extract_image_content(
+                                        image_data,
+                                        options={
+                                            'prompt': '请详细描述这张图片的内容，如果是图表请提取其中的数据和信息。'
+                                        }
+                                    )
+                                    
+                                    if result['success']:
+                                        content_parts.append(f"\n[图片 {image_count}]\n{result['content']}\n")
+                                        logger.info(f"成功提取图片 {image_count} 内容")
+                                    else:
+                                        content_parts.append(f"\n[图片 {image_count}：无法识别]\n")
+                                        logger.warning(f"图片 {image_count} 提取失败: {result.get('error', '未知错误')}")
+                                        
+                                except Exception as e:
+                                    logger.error(f"处理图片 {image_count} 时出错: {e}")
+                                    content_parts.append(f"\n[图片 {image_count}：处理失败]\n")
+                        
+                        if image_count > 0:
+                            logger.info(f"Word文档包含 {image_count} 张图片")
+                    
+                    # 处理表格
                     for table in doc.tables:
                         table_text = "\n[表格]\n"
                         for row in table.rows:
                             row_text = " | ".join([cell.text.strip() for cell in row.cells])
                             table_text += row_text + "\n"
-                        full_text += "\n" + table_text
-                        
+                        content_parts.append(table_text)
+                    
+                    full_text = "\n\n".join(content_parts)
                     logger.info(f"Word文档解析成功: {file_name}")
+                    
                 except Exception as e:
                     logger.error(f"Word文档解析错误: {e}")
                     full_text = f"Word文档解析失败: {str(e)}"
+            elif file_ext.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']:
+                # 处理图片文件
+                logger.info(f"开始处理图片文件: {file_name}")
+                
+                # 检查是否配置了视觉模型
+                if settings.VISION_API_KEY:
+                    try:
+                        from .multimodal_service import multimodal_service
+                        
+                        # 读取图片文件内容
+                        with open(file_path, 'rb') as f:
+                            file_content = f.read()
+                        
+                        # 调用视觉模型分析图片
+                        result = await multimodal_service.extract_image_content(
+                            image_data=file_content,
+                            options={
+                                'prompt': '请详细描述这张图片的内容，包括其中的文字、图表、数据等所有信息。'
+                            }
+                        )
+                        
+                        if result['success']:
+                            full_text = f"[图片文件: {file_name}]\n\n{result['content']}"
+                            logger.info(f"图片分析成功: {file_name}")
+                        else:
+                            full_text = f"[图片文件: {file_name}]\n\n图片分析失败: {result.get('error', '未知错误')}"
+                            logger.warning(f"图片分析失败: {file_name}, 错误: {result.get('error')}")
+                    except Exception as e:
+                        logger.error(f"图片处理异常: {e}")
+                        full_text = f"[图片文件: {file_name}]\n\n图片处理出错: {str(e)}"
+                else:
+                    full_text = f"[图片文件: {file_name}]\n\n未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY。"
             else:
                 # 不支持的格式
                 full_text = f"[{file_ext} 文件: {file_name}]\n\n暂不支持此格式的文档解析。"

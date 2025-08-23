@@ -482,3 +482,62 @@ async def export_to_word(
     except Exception as e:
         logger.error(f"导出Word文档失败: {e}")
         raise BusinessException(f"导出失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
+@router.post("/v1/multimodal/extract-image", response_model=UnifiedResponse)
+async def extract_image_content(
+    file: UploadFile = File(...),
+    prompt: Optional[str] = Query(default=None, description="AI视觉模式的提示词"),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    提取图片内容
+    
+    使用 AI 视觉模型理解图片内容
+    """
+    try:
+        # 验证文件类型
+        if not file.content_type.startswith("image/"):
+            raise BusinessException("只支持图片文件", ResponseCode.PARAM_ERROR)
+        
+        # 读取图片数据
+        image_data = await file.read()
+        
+        # 检查图片大小
+        max_size = 10 * 1024 * 1024  # 10MB
+        if len(image_data) > max_size:
+            raise BusinessException("图片大小不能超过10MB", ResponseCode.PARAM_ERROR)
+        
+        # 构建选项
+        options = {}
+        if prompt:
+            options["prompt"] = prompt
+        else:
+            options["prompt"] = "请详细描述这张图片的内容，如果是图表请提取其中的数据和信息。"
+        
+        # 调用多模态服务
+        from .service.multimodal_service import multimodal_service
+        result = await multimodal_service.extract_image_content(
+            image_data=image_data,
+            options=options
+        )
+        
+        if result["success"]:
+            return success_response(
+                data={
+                    "content": result["content"],
+                    "model": result.get("model")
+                },
+                msg="图片内容提取成功"
+            )
+        else:
+            raise BusinessException(
+                result.get("error", "图片处理失败"),
+                ResponseCode.INTERNAL_ERROR
+            )
+            
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"提取图片内容失败: {e}")
+        raise BusinessException(f"处理失败: {str(e)}", ResponseCode.INTERNAL_ERROR)

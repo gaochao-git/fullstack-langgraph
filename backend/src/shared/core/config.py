@@ -80,7 +80,7 @@ class Settings(BaseSettings):
     
     # 文件上传配置
     MAX_UPLOAD_SIZE_MB: int = 10  # 最大上传文件大小（MB）
-    UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md"]  # 允许的文件扩展名
+    UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"]  # 允许的文件扩展名
     
     # 文档目录配置
     DOCUMENT_DIR: str = "documents"  # 文档根目录，包含 uploads/, templates/, generated/ 子目录
@@ -96,6 +96,17 @@ class Settings(BaseSettings):
 
     AUTH_MOCK: str = False
     NO_PROXY: str = ""  # 结局claude 本地开proxy影响httpx调用其他接口
+    
+    # AI 视觉模型配置
+    VISION_MODEL_NAME: str = "gpt-4-vision-preview"  # 视觉模型名称
+    VISION_API_BASE_URL: str = "https://api.openai.com/v1"  # API地址
+    VISION_API_KEY: Optional[str] = None  # API密钥
+    
+    # 多模态服务配置 (用于独立的多模态服务，现已集成到agent内部)
+    MULTIMODAL_SERVICE_URL: Optional[str] = None
+    MULTIMODAL_SERVICE_TIMEOUT: int = 30
+    MULTIMODAL_SERVICE_API_KEY: Optional[str] = None
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
