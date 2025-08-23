@@ -4,16 +4,11 @@ export type SOPSeverity = "low" | "medium" | "high" | "critical";
 // SOP步骤接口 - 支持树形结构
 export interface SOPStep {
   id?: string; // 节点唯一标识
-  step: number;
+  step: string; // 步骤名称
   description: string;
-  ai_generated: boolean;
-  tool: string;
-  args: string;
-  requires_approval: boolean;
-  timeout?: number;
-  retry_count?: number;
-  on_failure?: "continue" | "stop" | "branch";
   status?: string; // 节点状态
+  executionStatus?: string; // 执行状态
+  healthStatus?: string; // 健康状态
   children?: SOPStep[]; // 子步骤
 }
 

@@ -75,14 +75,12 @@ const convertSOPToFaultTree = (sop: Partial<SOPTemplate>): FaultTreeData => {
           type: 'faultNode',
           position: { x, y: levelY },
           data: {
-            label: `步骤 ${step.step}`,
+            label: step.step, // 直接使用step作为label
             type: 'step',
             status: step.status || 'pending',
+            executionStatus: step.executionStatus,
+            healthStatus: step.healthStatus,
             description: step.description,
-            tool: step.tool,
-            args: step.args,
-            aiGenerated: step.ai_generated,
-            requiresApproval: step.requires_approval,
             onAdd: undefined,
             onDelete: undefined,
             onEdit: undefined,
@@ -126,8 +124,6 @@ const convertFaultTreeToSOPSteps = (treeData: FaultTreeData): SOPStep[] => {
   });
   
   // 递归构建树形结构
-  let stepCounter = 1;
-  
   const buildStepTree = (nodeId: string): SOPStep[] => {
     const childIds = childrenMap.get(nodeId) || [];
     const steps: SOPStep[] = [];
@@ -137,13 +133,11 @@ const convertFaultTreeToSOPSteps = (treeData: FaultTreeData): SOPStep[] => {
       if (node && node.data.type !== 'fault') {
         const step: SOPStep = {
           id: node.id,
-          step: stepCounter++,
+          step: node.data.label || '新步骤', // 使用节点名称作为step
           description: node.data.description || '步骤描述', // 确保有默认值
-          ai_generated: node.data.aiGenerated || false,
-          tool: node.data.tool || 'llm',
-          args: node.data.args || '',
-          requires_approval: node.data.requiresApproval || false,
-          status: node.data.status || 'pending',
+          status: node.data.status,
+          executionStatus: node.data.executionStatus,
+          healthStatus: node.data.healthStatus,
         };
         
         // 递归获取子步骤
@@ -165,12 +159,8 @@ const convertFaultTreeToSOPSteps = (treeData: FaultTreeData): SOPStep[] => {
   // 如果没有步骤，返回一个默认步骤
   if (rootSteps.length === 0) {
     return [{
-      step: 1,
-      description: '初始化步骤', // 确保描述不为空
-      ai_generated: false,
-      tool: 'llm',
-      args: '',
-      requires_approval: false,
+      step: '初始化步骤',
+      description: '请编辑步骤描述', // 确保描述不为空
       status: 'pending',
     }];
   }
@@ -257,6 +247,7 @@ const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
   // 保存故障树
   const handleSaveTree = (data: FaultTreeData) => {
     setTreeData(data);
+    message.success('暂存成功');
   };
 
   // 表单提交

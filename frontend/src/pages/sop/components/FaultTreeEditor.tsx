@@ -14,7 +14,7 @@ import ReactFlow, {
   NodeProps,
   ReactFlowProvider,
 } from 'reactflow';
-import { Button, Space, message, Modal, Form, Input, Select, Dropdown, Menu } from 'antd';
+import { Button, Space, Modal, Form, Input, Select, Dropdown, Menu } from 'antd';
 import { Save, Undo, Redo, Plus, Edit, Trash2 } from 'lucide-react';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import 'reactflow/dist/style.css';
@@ -147,10 +147,10 @@ const CustomNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
         <div
           style={{
             position: 'absolute',
-            top: '100%',
+            bottom: '100%',
             left: '50%',
             transform: 'translateX(-50%)',
-            marginTop: '10px',
+            marginBottom: '10px',
             padding: '12px 16px',
             background: 'rgba(0, 0, 0, 0.85)',
             color: 'white',
@@ -159,7 +159,7 @@ const CustomNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
             whiteSpace: 'pre-wrap',
             minWidth: '200px',
             maxWidth: '400px',
-            zIndex: 1000,
+            zIndex: 10000,
             pointerEvents: 'none',
             boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           }}
@@ -183,14 +183,14 @@ const CustomNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
           <div
             style={{
               position: 'absolute',
-              top: '-6px',
+              bottom: '-6px',
               left: '50%',
               transform: 'translateX(-50%)',
               width: 0,
               height: 0,
               borderLeft: '6px solid transparent',
               borderRight: '6px solid transparent',
-              borderBottom: '6px solid rgba(0, 0, 0, 0.85)',
+              borderTop: '6px solid rgba(0, 0, 0, 0.85)',
             }}
           />
         </div>
@@ -298,7 +298,6 @@ const FaultTreeEditorContent: React.FC<FaultTreeEditorProps> = ({
 
     setNodes(nds => [...nds, newNode]);
     setEdges(eds => [...eds, newEdge]);
-    message.success('已添加子节点');
   }, [edges, setNodes, setEdges]);
 
   // 编辑节点
@@ -317,7 +316,6 @@ const FaultTreeEditorContent: React.FC<FaultTreeEditorProps> = ({
   const handleDeleteNode = useCallback((nodeId: string) => {
     setNodes(nds => nds.filter(node => node.id !== nodeId));
     setEdges(eds => eds.filter(edge => edge.source !== nodeId && edge.target !== nodeId));
-    message.success('已删除节点');
   }, [setNodes, setEdges]);
 
   // 复制节点
@@ -337,7 +335,6 @@ const FaultTreeEditorContent: React.FC<FaultTreeEditorProps> = ({
     };
     
     setNodes(nds => [...nds, newNode]);
-    message.success('已复制节点');
   }, [setNodes]);
 
   // 创建右键菜单
@@ -426,7 +423,7 @@ const FaultTreeEditorContent: React.FC<FaultTreeEditorProps> = ({
     }
   };
 
-  // 保存
+  // 暂存
   const handleSave = () => {
     if (onSave) {
       onSave({ nodes, edges });
@@ -497,7 +494,7 @@ const FaultTreeEditorContent: React.FC<FaultTreeEditorProps> = ({
           {!readOnly && (
             <>
               <Button type="primary" icon={<Save size={16} />} onClick={handleSave}>
-                保存
+                暂存
               </Button>
               <Button onClick={autoLayout}>
                 自动布局

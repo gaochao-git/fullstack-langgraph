@@ -8,16 +8,11 @@ from datetime import datetime
 class SOPStep(BaseModel):
     """SOP execution step schema - supports tree structure."""
     id: Optional[str] = Field(None, description="Step unique identifier", max_length=100)
-    step: int = Field(..., description="Step number", ge=1)
+    step: str = Field(..., description="Step name", min_length=1, max_length=200)
     description: str = Field(..., description="Step description", min_length=1, max_length=1000)
-    ai_generated: bool = Field(False, description="Whether this step is AI generated")
-    tool: str = Field(..., description="Tool to execute", min_length=1, max_length=100)
-    args: str = Field(..., description="Tool arguments", max_length=2000)
-    requires_approval: bool = Field(False, description="Whether this step requires approval")
-    timeout: Optional[int] = Field(None, description="Step timeout in seconds", ge=1, le=3600)
-    retry_count: Optional[int] = Field(None, description="Number of retries", ge=0, le=10)
-    on_failure: Optional[Literal["continue", "stop", "branch"]] = Field(None, description="Action on failure")
-    status: Optional[str] = Field("pending", description="Step execution status", max_length=20)
+    status: Optional[str] = Field("pending", description="Step status", max_length=20)
+    execution_status: Optional[str] = Field(None, description="Step execution status", max_length=20)
+    health_status: Optional[str] = Field(None, description="Step health status", max_length=20)
     children: Optional[List[SOPStep]] = Field(None, description="Child steps for tree structure")
     
     class Config:
