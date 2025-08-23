@@ -1,11 +1,13 @@
 """Pydantic schemas for SOP API."""
+from __future__ import annotations
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime
 
 
 class SOPStep(BaseModel):
-    """SOP execution step schema."""
+    """SOP execution step schema - supports tree structure."""
+    id: Optional[str] = Field(None, description="Step unique identifier", max_length=100)
     step: int = Field(..., description="Step number", ge=1)
     description: str = Field(..., description="Step description", min_length=1, max_length=1000)
     ai_generated: bool = Field(False, description="Whether this step is AI generated")
@@ -15,6 +17,12 @@ class SOPStep(BaseModel):
     timeout: Optional[int] = Field(None, description="Step timeout in seconds", ge=1, le=3600)
     retry_count: Optional[int] = Field(None, description="Number of retries", ge=0, le=10)
     on_failure: Optional[Literal["continue", "stop", "branch"]] = Field(None, description="Action on failure")
+    status: Optional[str] = Field("pending", description="Step execution status", max_length=20)
+    children: Optional[List[SOPStep]] = Field(None, description="Child steps for tree structure")
+    
+    class Config:
+        # 允许递归模型
+        arbitrary_types_allowed = True
 
 
 class SOPTemplateCreate(BaseModel):
@@ -23,11 +31,11 @@ class SOPTemplateCreate(BaseModel):
     sop_title: str = Field(..., description="SOP title", min_length=1, max_length=500)
     sop_category: str = Field(..., description="SOP category", min_length=1, max_length=100)
     sop_description: Optional[str] = Field(None, description="SOP description", max_length=2000)
-    sop_severity: Literal["low", "medium", "high", "critical"] = Field(..., description="SOP severity level")
+    sop_severity: Literal["low", "medium", "high", "critical"] = Field("high", description="SOP severity level")
     steps: List[SOPStep] = Field(..., description="List of execution steps", min_items=1, max_items=50)
-    tools_required: Optional[List[str]] = Field(None, description="List of required tools", max_items=20)
-    sop_recommendations: Optional[str] = Field(None, description="SOP recommendations", max_length=2000)
-    team_name: str = Field(..., description="Responsible team name", min_length=1, max_length=100)
+    tools_required: Optional[List[str]] = Field(default_factory=list, description="List of required tools", max_items=20)
+    sop_recommendations: str = Field("", description="SOP recommendations", max_length=2000)
+    team_name: str = Field("", description="Responsible team name", max_length=100)
 
 
 class SOPTemplateUpdate(BaseModel):
@@ -86,6 +94,9 @@ class ApiResponse(BaseModel):
     message: Optional[str] = None
     error: Optional[str] = None
 
+
+# 更新前向引用以支持递归
+SOPStep.model_rebuild()
 
 # ============ SOP Problem Rule 相关模型 ============
 

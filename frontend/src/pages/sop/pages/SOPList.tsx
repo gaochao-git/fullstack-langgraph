@@ -15,14 +15,12 @@ import {
   PlusOutlined, 
   EditOutlined, 
   DeleteOutlined, 
-  ReloadOutlined,
-  EyeOutlined
+  ReloadOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
 import { SOPApi, SOPUtils } from '@/services/sopApi';
-import SOPFormModal from '../components/SOPFormModal';
-import SOPDetailModal from '../components/SOPDetailModal';
+import SOPFormWithTreeModal from '../components/SOPFormWithTreeModal';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -37,9 +35,7 @@ const SOPList: React.FC = () => {
   
   // 模态框状态
   const [formModalVisible, setFormModalVisible] = useState(false);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [editingSOP, setEditingSOP] = useState<SOPTemplate | null>(null);
-  const [viewingSOP, setViewingSOP] = useState<SOPTemplate | null>(null);
   
   const { message } = App.useApp();
 
@@ -115,11 +111,6 @@ const SOPList: React.FC = () => {
     setFormModalVisible(true);
   };
 
-  // 查看SOP详情
-  const handleView = (sop: SOPTemplate) => {
-    setViewingSOP(sop);
-    setDetailModalVisible(true);
-  };
 
   // 删除SOP
   const handleDelete = async (sopId: string) => {
@@ -228,16 +219,9 @@ const SOPList: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 130,
+      width: 100,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="查看详情">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />}
-              onClick={() => handleView(record)}
-            />
-          </Tooltip>
           <Tooltip title="编辑">
             <Button 
               type="text" 
@@ -341,18 +325,11 @@ const SOPList: React.FC = () => {
       </Card>
 
       {/* SOP表单模态框 */}
-      <SOPFormModal
+      <SOPFormWithTreeModal
         visible={formModalVisible}
         onCancel={() => setFormModalVisible(false)}
         onSuccess={handleFormSuccess}
         editData={editingSOP}
-      />
-
-      {/* SOP详情模态框 */}
-      <SOPDetailModal
-        visible={detailModalVisible}
-        onCancel={() => setDetailModalVisible(false)}
-        sopData={viewingSOP}
       />
     </div>
   );

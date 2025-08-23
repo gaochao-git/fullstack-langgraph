@@ -22,7 +22,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
 import { SOPApi, SOPUtils } from '@/services/sopApi';
-import SOPFormModal from '../components/SOPFormModal';
+import SOPFormWithTreeModal from '../components/SOPFormWithTreeModal';
 import SOPDetailModal from '../components/SOPDetailModal';
 
 const { Search } = Input;
@@ -347,8 +347,8 @@ const SOPManagement: React.FC = () => {
         />
       </Card>
 
-      {/* SOP表单模态框 */}
-      <SOPFormModal
+      {/* SOP表单与故障树模态框 */}
+      <SOPFormWithTreeModal
         visible={formModalVisible}
         onCancel={() => setFormModalVisible(false)}
         onSuccess={handleFormSuccess}

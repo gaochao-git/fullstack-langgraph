@@ -18,7 +18,7 @@ from src.apps.sop.service.alarm_service import alarm_service
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException
-# from src.shared.core.dependencies import get_current_user
+from src.apps.auth.dependencies import get_current_user
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["SOP Management"])
@@ -27,10 +27,21 @@ router = APIRouter(tags=["SOP Management"])
 @router.post("/v1/sops", response_model=UnifiedResponse)
 async def create_sop_template(
     sop_data: SOPTemplateCreate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """创建SOP模板"""
-    sop_template = await sop_service.create_sop(db, sop_data)
+    # 从当前用户信息中获取团队名称，如果没有则使用用户名
+    team_name = current_user.get("team_name", current_user.get("username", "default-team"))
+    
+    # 将 team_name 设置到 sop_data 中
+    sop_data_dict = sop_data.dict()
+    sop_data_dict["team_name"] = team_name
+    
+    # 创建新的 SOPTemplateCreate 实例
+    sop_data_with_team = SOPTemplateCreate(**sop_data_dict)
+    
+    sop_template = await sop_service.create_sop(db, sop_data_with_team)
     return success_response(
         data=sop_template,
         msg="SOP模板创建成功",

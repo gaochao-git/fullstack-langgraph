@@ -1,8 +1,9 @@
 // SOP严重性级别
 export type SOPSeverity = "low" | "medium" | "high" | "critical";
 
-// SOP步骤接口
+// SOP步骤接口 - 支持树形结构
 export interface SOPStep {
+  id?: string; // 节点唯一标识
   step: number;
   description: string;
   ai_generated: boolean;
@@ -12,6 +13,8 @@ export interface SOPStep {
   timeout?: number;
   retry_count?: number;
   on_failure?: "continue" | "stop" | "branch";
+  status?: string; // 节点状态
+  children?: SOPStep[]; // 子步骤
 }
 
 // SOP模板接口 - 匹配 sop_prompt_templates 表结构
@@ -24,7 +27,7 @@ export interface SOPTemplate {
   sop_severity: SOPSeverity;
   sop_steps: SOPStep[] | string; // 可能是对象数组或JSON字符串
   tools_required?: string[] | string; // 可能是字符串数组或JSON字符串
-  sop_recommendations?: string;
+  sop_recommendations: string;
   team_name: string;
   create_by: string;
   update_by?: string;
@@ -38,11 +41,11 @@ export interface SOPTemplateRequest {
   sop_title: string;
   sop_category: string;
   sop_description?: string;
-  sop_severity: SOPSeverity;
+  sop_severity?: SOPSeverity; // 后端默认 "high"
   steps: SOPStep[]; // 前端传递的步骤数组
   tools_required?: string[];
-  sop_recommendations?: string;
-  team_name: string;
+  sop_recommendations?: string; // 后端默认 ""
+  team_name?: string; // 后端自动从用户信息获取
 }
 
 // SOP查询参数接口
