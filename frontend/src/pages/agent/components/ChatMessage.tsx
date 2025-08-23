@@ -1784,7 +1784,7 @@ function ChatMessages({
                   ? "text-gray-100 placeholder-gray-400" 
                   : "text-gray-900 placeholder-gray-500"
               )}
-              disabled={isLoading || !!interrupt || isUploading || uploadingClipboard}
+              disabled={false}
             />
             
             {/* 操作按钮区域 - 包含上传文件和发送按钮 */}
@@ -1846,14 +1846,20 @@ function ChatMessages({
               ) : (
                 <button
                   type="submit"
-                  disabled={(!inputValue.trim() && selectedFiles.length === 0) || isUploading}
+                  disabled={(!inputValue.trim() && selectedFiles.length === 0) || isLoading || isUploading || !!interrupt}
                   className={cn(
                     "p-2 rounded transition-colors duration-200 mr-1",
-                    !inputValue.trim() && selectedFiles.length === 0
+                    ((!inputValue.trim() && selectedFiles.length === 0) || isLoading || isUploading || !!interrupt)
                       ? "text-gray-400 cursor-not-allowed"
                       : "text-cyan-500 hover:bg-cyan-50 hover:text-cyan-600"
                   )}
-                  title="发送消息"
+                  title={
+                    isLoading ? "等待AI响应中..." : 
+                    isUploading ? "文件上传中..." : 
+                    interrupt ? "请先处理人工确认..." :
+                    (!inputValue.trim() && selectedFiles.length === 0) ? "请输入消息或选择文件" :
+                    "发送消息"
+                  }
                 >
                   <Send className="h-4 w-4" />
                 </button>
