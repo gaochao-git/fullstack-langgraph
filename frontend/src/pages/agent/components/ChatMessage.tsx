@@ -906,6 +906,7 @@ function ChatMessages({
   const { token } = theme.useToken();
   const { message } = App.useApp();
   const [inputValue, setInputValue] = useState<string>("");
+  const [uploadingClipboard, setUploadingClipboard] = useState<boolean>(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [downloadingMessageId, setDownloadingMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
@@ -950,6 +951,31 @@ function ChatMessages({
       onSubmit(inputValue.trim(), successFileIds.length > 0 ? successFileIds : undefined);
       setInputValue("");
       setUploadedFiles([]); // 清空已上传文件
+    }
+  };
+
+  // 处理粘贴事件，支持图片粘贴
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault(); // 阻止默认粘贴行为
+        
+        const blob = item.getAsFile();
+        if (!blob) continue;
+
+        // 创建File对象
+        const file = new File([blob], `paste-image-${Date.now()}.png`, { type: blob.type });
+        
+        // 使用现有的文件处理逻辑
+        await handleFilesSelect([file]);
+        
+        message.success('已粘贴图片');
+        break; // 只处理第一个图片
+      }
     }
   };
 
@@ -1597,6 +1623,7 @@ function ChatMessages({
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              onPaste={handlePaste}
               placeholder={interrupt ? "请先确认或取消..." : "请描述问题..."}
               className={cn(
                 "flex-1 min-w-0 px-2 sm:px-3 py-2 sm:py-2.5 bg-transparent focus:outline-none text-sm sm:text-base",
@@ -1604,7 +1631,7 @@ function ChatMessages({
                   ? "text-gray-100 placeholder-gray-400" 
                   : "text-gray-900 placeholder-gray-500"
               )}
-              disabled={isLoading || !!interrupt || isUploading}
+              disabled={isLoading || !!interrupt || isUploading || uploadingClipboard}
             />
             
             {/* 操作按钮区域 - 包含上传文件和发送按钮 */}

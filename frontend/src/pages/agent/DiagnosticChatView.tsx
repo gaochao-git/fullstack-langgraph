@@ -9,7 +9,7 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import DiagnosticAgentWelcome from "./components/DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./components/ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
-import { theme } from 'antd';
+import { theme, message } from 'antd';
 import type { GlobalToken } from 'antd/es/theme/interface';
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
@@ -738,6 +738,7 @@ interface DiagnosticChatViewProps {
   onModelChange?: (modelType: string) => void; // 新增：模型切换回调
   WelcomeComponent?: React.ComponentType<WelcomeComponentProps>; // 新增：自定义欢迎组件
   agent?: Agent | null; // 新增：智能体信息
+  onFileUploaded?: (fileInfo: any) => void; // 新增：文件上传回调
 }
 
 // 诊断聊天视图组件
@@ -757,6 +758,7 @@ export function DiagnosticChatView({
   onModelChange,
   WelcomeComponent,
   agent,
+  onFileUploaded,
 }: DiagnosticChatViewProps) {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
@@ -766,6 +768,7 @@ export function DiagnosticChatView({
   // const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   
   // 处理故障诊断开始 - 将诊断消息设置到输入框
   const handleStartDiagnosis = (message: string) => {
@@ -786,6 +789,63 @@ export function DiagnosticChatView({
     if (inputValue.trim()) {
       onSubmit(inputValue.trim());
       setInputValue("");
+    }
+  };
+
+  // 处理粘贴事件，支持图片粘贴
+  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault(); // 阻止默认粘贴行为
+        
+        const blob = item.getAsFile();
+        if (!blob) continue;
+
+        setUploadingImage(true);
+        
+        try {
+          // 创建 FormData
+          const formData = new FormData();
+          formData.append('file', blob, `paste-image-${Date.now()}.png`);
+
+          // 调用文件上传 API
+          const response = await fetch('/api/v1/agents/files/upload', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
+            },
+            body: formData,
+          });
+
+          const result = await response.json();
+          
+          if (result.status === 'ok' && result.data) {
+            // 上传成功，将文件信息添加到消息中
+            const fileInfo = `[文件已上传: ${result.data.file_name}]`;
+            setInputValue(prev => prev + (prev ? ' ' : '') + fileInfo);
+            
+            // 如果有文件管理器，更新文件列表
+            if (onFileUploaded) {
+              onFileUploaded(result.data);
+            }
+            
+            message.success('图片上传成功');
+          } else {
+            message.error(result.msg || '图片上传失败');
+          }
+        } catch (error) {
+          console.error('图片上传失败:', error);
+          message.error('图片上传失败，请重试');
+        } finally {
+          setUploadingImage(false);
+        }
+        
+        break; // 只处理第一个图片
+      }
     }
   };
 
@@ -1213,6 +1273,7 @@ export function DiagnosticChatView({
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              onPaste={handlePaste}
               placeholder={interrupt ? "请先确认或取消工具执行..." : (window.innerWidth < 640 ? "请描述问题..." : "请描述您遇到的问题...")}
               className={cn(
                 "flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-sm sm:text-base",
@@ -1220,8 +1281,16 @@ export function DiagnosticChatView({
                   ? "text-gray-100 placeholder-gray-400" 
                   : "text-gray-900 placeholder-gray-500"
               )}
-              disabled={isLoading || !!interrupt}
+              disabled={isLoading || !!interrupt || uploadingImage}
             />
+            
+            {/* 上传状态指示器 */}
+            {uploadingImage && (
+              <div className="flex items-center px-2 text-sm text-blue-500">
+                <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                <span>上传中...</span>
+              </div>
+            )}
             
             {/* 发送/取消按钮 - 作为地址栏的操作部分 */}
             <div className={cn(
