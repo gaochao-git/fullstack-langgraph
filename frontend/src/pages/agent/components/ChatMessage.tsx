@@ -25,9 +25,10 @@ const HIDDEN_TOOLS = [
 ];
 
 // 支持预览的文件类型
-const PREVIEWABLE_TEXT_EXTENSIONS = ['.txt', '.md'];
-const PREVIEWABLE_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
-const PREVIEWABLE_EXTENSIONS = [...PREVIEWABLE_TEXT_EXTENSIONS, ...PREVIEWABLE_IMAGE_EXTENSIONS];
+const PREVIEWABLE_EXTENSIONS = ['.txt', '.md', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.pdf'];
+
+// 图片文件扩展名
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
 
 // 统一的文件预览判断函数
 const isFilePreviewable = (fileName: string): boolean => {
@@ -38,7 +39,7 @@ const isFilePreviewable = (fileName: string): boolean => {
 // 判断文件是否是图片
 const isImageFile = (fileName: string): boolean => {
   const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-  return PREVIEWABLE_IMAGE_EXTENSIONS.includes(ext);
+  return IMAGE_EXTENSIONS.includes(ext);
 };
 
 const isExcelFile = (fileName: string): boolean => {

@@ -218,6 +218,7 @@ const FILE_EXTENSIONS = {
 const PREVIEWABLE_EXTENSIONS = [
   ...FILE_EXTENSIONS.TEXT,
   ...FILE_EXTENSIONS.IMAGE,
+  'pdf', // 添加PDF支持
 ];
 
 // 获取文件扩展名的辅助函数（统一使用这一个）

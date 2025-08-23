@@ -25,6 +25,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const [content, setContent] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [pdfUrl, setPdfUrl] = useState<string>('');
 
   // 支持预览的文本文件类型
   const isTextPreviewable = ['.txt', '.md'].includes(fileType.toLowerCase());
@@ -32,8 +33,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   // 支持预览的图片文件类型
   const isImagePreviewable = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'].includes(fileType.toLowerCase());
   
+  // 支持预览的PDF文件类型
+  const isPdfPreviewable = ['.pdf'].includes(fileType.toLowerCase());
+  
   // 是否支持预览
-  const isPreviewable = isTextPreviewable || isImagePreviewable;
+  const isPreviewable = isTextPreviewable || isImagePreviewable || isPdfPreviewable;
 
   useEffect(() => {
     if (visible && fileId && isPreviewable) {
@@ -46,6 +50,10 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         URL.revokeObjectURL(imageUrl);
         setImageUrl('');
       }
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+        setPdfUrl('');
+      }
     };
   }, [visible, fileId]);
 
@@ -54,6 +62,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     setError('');
     setContent('');
     setImageUrl('');
+    setPdfUrl('');
     
     try {
       if (isImagePreviewable) {
@@ -61,6 +70,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         const blob = await fileApi.downloadDocument(fileId);
         const url = URL.createObjectURL(blob);
         setImageUrl(url);
+      } else if (isPdfPreviewable) {
+        // 获取PDF文件
+        const blob = await fileApi.downloadDocument(fileId);
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
       } else if (isTextPreviewable) {
         // 获取文本内容
         const docContent = await fileApi.getDocumentContent(fileId);
@@ -134,7 +148,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
             <FileText className="h-12 w-12 mb-2" />
             <p>该文件类型暂不支持预览</p>
-            <p className="text-sm mt-2">支持预览的格式：文本(.txt, .md) 图片(.png, .jpg, .jpeg, .gif, .bmp, .webp)</p>
+            <p className="text-sm mt-2">支持预览的格式：文本(.txt, .md) 图片(.png, .jpg, .jpeg, .gif, .bmp, .webp) PDF(.pdf)</p>
           </div>
         ) : isImagePreviewable && imageUrl ? (
           <div className="flex items-center justify-center">
@@ -149,6 +163,14 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 setError('图片加载失败');
                 setImageUrl('');
               }}
+            />
+          </div>
+        ) : isPdfPreviewable && pdfUrl ? (
+          <div className="w-full h-[600px]">
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0 rounded-lg"
+              title={`PDF Preview: ${fileName}`}
             />
           </div>
         ) : isTextPreviewable ? (
