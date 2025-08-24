@@ -184,29 +184,6 @@ export function RoleManagement() {
     setModalVisible(true);
   };
 
-  const handleEdit = async (role: RbacRole) => {
-    setEditingRole(role);
-    form.setFieldsValue({
-      role_id: role.role_id,
-      role_name: role.role_name,
-      description: role.description,
-    });
-    
-    try {
-      // 获取角色的现有权限
-      const rolePermissions = await roleApi.getRolePermissions(role.role_id);
-      setSelectedPermissions(rolePermissions.api_permission_ids.map(id => id.toString()));
-      setSelectedMenus(rolePermissions.menu_ids.map(id => id.toString()));
-    } catch (error) {
-      console.error('获取角色权限失败:', error);
-      // 如果获取失败，设置为空数组
-      setSelectedPermissions([]);
-      setSelectedMenus([]);
-    }
-    
-    setModalVisible(true);
-  };
-
   const handleManagePermissions = async (role: RbacRole) => {
     setEditingRole(role);
     form.setFieldsValue({
