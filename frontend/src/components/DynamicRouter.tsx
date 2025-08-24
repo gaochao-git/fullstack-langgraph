@@ -1,5 +1,5 @@
 import React, { Suspense, useMemo } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import { Spin } from 'antd';
 import { MenuTreeNode } from '@/types/menu';
 import { useMenus } from '@/hooks/useMenus';
@@ -79,6 +79,7 @@ const generateRoutes = (menus: MenuTreeNode[]): React.ReactElement[] => {
 
 export const DynamicRouter: React.FC = () => {
   const { menus, loading, error } = useMenus();
+  const navigate = useNavigate();
   
   // 使用 useMemo 缓存路由，避免每次渲染都重新生成
   const dynamicRoutes = useMemo(() => {
@@ -97,7 +98,7 @@ export const DynamicRouter: React.FC = () => {
         <h1 className="text-2xl font-bold text-red-500">加载失败</h1>
         <p className="text-gray-600">{error}</p>
         <button 
-          onClick={() => window.location.reload()} 
+          onClick={() => navigate(0)} 
           className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-200"
         >
           刷新页面
@@ -119,11 +120,11 @@ export const DynamicRouter: React.FC = () => {
         <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
           <h1 className="text-4xl font-bold text-red-400">404 - 页面不存在</h1>
           <p className="text-gray-600">您访问的页面不存在。</p>
-          <a href="/">
+          <Link to="/">
             <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-200">
               返回首页
             </button>
-          </a>
+          </Link>
         </div>
       } />
     </Routes>

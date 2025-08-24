@@ -36,7 +36,7 @@ function AppContent() {
     configService.getSystemConfig().catch(err => {
       console.warn('预加载系统配置失败:', err);
     });
-  }, []);
+  }, [checkAuth, logout]);
 
   return (
     <ConfigProvider theme={antdTheme} componentSize={size}>
