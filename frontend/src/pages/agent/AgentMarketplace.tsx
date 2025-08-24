@@ -95,8 +95,8 @@ const AgentMarketplace = () => {
     // 按调用次数排序（从多到少）
     .sort((a, b) => {
       // 获取调用次数
-      const usageA = a.total_queries || 0;
-      const usageB = b.total_queries || 0;
+      const usageA = a.total_runs || 0;
+      const usageB = b.total_runs || 0;
       
       // 按调用次数降序排列
       if (usageA !== usageB) return usageB - usageA;
@@ -319,7 +319,7 @@ const AgentMarketplace = () => {
                   return totalTools;
                 })()} 个工具
               </span>
-              <span>
+              <span style={{ color: agent.total_runs > 0 ? '#1890ff' : undefined, fontWeight: agent.total_runs > 0 ? 500 : undefined }}>
                 <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
                 {agent.total_runs || 0}
               </span>

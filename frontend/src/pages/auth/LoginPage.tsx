@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/ThemeContext';
 import './LoginPage.css';
 
-const { TabPane } = Tabs;
+// const { TabPane } = Tabs; // No longer needed with items API
 
 export function LoginPage() {
   const [activeTab, setActiveTab] = useState<'jwt' | 'sso'>('sso');
@@ -40,7 +40,7 @@ export function LoginPage() {
   return (
     <div className={`login-container ${isDark ? 'dark' : ''}`}>
       <div className="login-content">
-        <Card className="login-card" bordered={false}>
+        <Card className="login-card" variant="borderless">
           <div className="login-header">
             <h1 className="login-title">智能运维平台</h1>
             <p className="login-subtitle">请登录以继续访问系统</p>
@@ -50,68 +50,76 @@ export function LoginPage() {
             activeKey={activeTab} 
             onChange={(key) => setActiveTab(key as 'jwt' | 'sso')}
             centered
-          >
-            <TabPane tab="SSO单点登录" key="sso">
-              <div className="sso-login-container">
-                <div className="sso-description">
-                  <GlobalOutlined className="sso-icon" />
-                  <p>使用企业统一身份认证</p>
-                  <p className="sso-hint">您将被重定向到SSO认证页面</p>
-                </div>
-                
-                <Button
-                  type="primary"
-                  icon={<GlobalOutlined />}
-                  onClick={handleSSOLogin}
-                  block
-                  className="sso-button"
-                >
-                  SSO 登录
-                </Button>
-              </div>
-            </TabPane>
-
-            <TabPane tab="本地登录" key="jwt">
-              <Form
-                name="jwt-login"
-                className="login-form"
-                onFinish={handleJWTLogin}
-              >
-                <Form.Item
-                  name="username"
-                  rules={[{ required: true, message: '请输入用户名' }]}
-                >
-                  <Input 
-                    prefix={<UserOutlined />} 
-                    placeholder="用户名"
-                    autoComplete="username"
-                  />
-                </Form.Item>
-                
-                <Form.Item
-                  name="password"
-                  rules={[{ required: true, message: '请输入密码' }]}
-                >
-                  <Input.Password
-                    prefix={<LockOutlined />}
-                    placeholder="密码"
-                    autoComplete="current-password"
-                  />
-                </Form.Item>
-
-                <Form.Item>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
-                    className="login-button"
-                    block
+            items={[
+              {
+                key: 'sso',
+                label: 'SSO单点登录',
+                children: (
+                  <div className="sso-login-container">
+                    <div className="sso-description">
+                      <GlobalOutlined className="sso-icon" />
+                      <p>使用企业统一身份认证</p>
+                      <p className="sso-hint">您将被重定向到SSO认证页面</p>
+                    </div>
+                    
+                    <Button
+                      type="primary"
+                      icon={<GlobalOutlined />}
+                      onClick={handleSSOLogin}
+                      block
+                      className="sso-button"
+                    >
+                      SSO 登录
+                    </Button>
+                  </div>
+                )
+              },
+              {
+                key: 'jwt',
+                label: '本地登录',
+                children: (
+                  <Form
+                    name="jwt-login"
+                    className="login-form"
+                    onFinish={handleJWTLogin}
                   >
-                    登录
-                  </Button>
-                </Form.Item>
-              </Form>
-            </TabPane>
-          </Tabs>
+                    <Form.Item
+                      name="username"
+                      rules={[{ required: true, message: '请输入用户名' }]}
+                    >
+                      <Input 
+                        prefix={<UserOutlined />} 
+                        placeholder="用户名"
+                        autoComplete="username"
+                      />
+                    </Form.Item>
+                    
+                    <Form.Item
+                      name="password"
+                      rules={[{ required: true, message: '请输入密码' }]}
+                    >
+                      <Input.Password
+                        prefix={<LockOutlined />}
+                        placeholder="密码"
+                        autoComplete="current-password"
+                      />
+                    </Form.Item>
+
+                    <Form.Item>
+                      <Button 
+                        type="primary" 
+                        htmlType="submit" 
+                        className="login-button"
+                        block
+                      >
+                        登录
+                      </Button>
+                    </Form.Item>
+                  </Form>
+                )
+              }
+            ]}
+          />
 
           <Divider className="login-divider">或</Divider>
 
