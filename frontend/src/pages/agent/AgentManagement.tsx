@@ -109,8 +109,7 @@ const transformAgentToLocal = (agent: Agent): LocalAgent => {
     displayName: agent.agent_name,
     lastUsed: agent.last_used_at || '',
     totalRuns: agent.total_runs || 0,
-    successRate: agent.success_queries && agent.total_queries ? 
-      Number((agent.success_queries / agent.total_queries * 100).toFixed(1)) : 0,
+    successRate: agent.success_rate || 0,
     avgResponseTime: 0, // 这个字段在 Agent 接口中不存在
     mcpConfig: {
       enabledServers,
@@ -297,8 +296,8 @@ const AgentManagement: React.FC = () => {
     // 按调用次数排序（从多到少）
     .sort((a, b) => {
       // 获取调用次数
-      const usageA = a.total_queries || 0;
-      const usageB = b.total_queries || 0;
+      const usageA = a.total_runs || 0;
+      const usageB = b.total_runs || 0;
       
       // 按调用次数降序排列
       if (usageA !== usageB) return usageB - usageA;

@@ -95,8 +95,8 @@ const AgentMarketplace = () => {
     // 按调用次数排序（从多到少）
     .sort((a, b) => {
       // 获取调用次数
-      const usageA = a.total_queries || 0;
-      const usageB = b.total_queries || 0;
+      const usageA = a.total_runs || 0;
+      const usageB = b.total_runs || 0;
       
       // 按调用次数降序排列
       if (usageA !== usageB) return usageB - usageA;
@@ -190,7 +190,6 @@ const AgentMarketplace = () => {
 
   // 获取智能体标签（基于agent_name和capabilities）
   const getAgentTags = (agent: Agent) => {
-    console.log('agent', agent);
     const tags = [];
     const name = agent.agent_name?.toLowerCase() || '';
     
@@ -321,7 +320,7 @@ const AgentMarketplace = () => {
               </span>
               <span>
                 <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
-                {agent.total_queries || 0}
+                {agent.total_runs || 0}
               </span>
             </div>
 

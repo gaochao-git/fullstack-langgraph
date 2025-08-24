@@ -68,9 +68,9 @@ export interface Agent {
   create_time: string;
   update_time?: string;
   last_used_at?: string;
-  total_queries?: number;
-  success_queries?: number;
-  failed_queries?: number;
+  total_runs?: number;
+  success_rate?: number;
+  avg_response_time?: number;
   // 权限相关字段
   agent_owner?: string;
   visibility_type?: string;
