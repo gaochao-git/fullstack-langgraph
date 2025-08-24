@@ -118,8 +118,6 @@ const AgentMarketplace = () => {
       
       // 处理成功响应
       const data = response.data || response;
-      console.log('API Response:', response);
-      console.log('Items:', data.items);
       // 显示所有智能体，不再过滤启用状态
       const activeAgents = data.items || [];
       setAgents(activeAgents);
