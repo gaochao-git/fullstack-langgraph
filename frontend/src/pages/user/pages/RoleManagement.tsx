@@ -398,7 +398,7 @@ export function RoleManagement() {
         okText="确定"
         cancelText="取消"
         width={800}
-        destroyOnClose
+        destroyOnHidden
         confirmLoading={submitting}
         okButtonProps={{
           disabled: submitting

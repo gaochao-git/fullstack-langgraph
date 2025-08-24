@@ -207,9 +207,7 @@ export function PermissionManagement() {
       };
       
       const response = await permissionApi.listPermissions(params);
-      console.log('权限API响应:', response);
       const items = response.items || [];
-      console.log('设置权限数据:', items.length, '条');
       setPermissions(items);
       setPagination(prev => ({
         ...prev,
