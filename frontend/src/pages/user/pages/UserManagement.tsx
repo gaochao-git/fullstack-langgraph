@@ -206,9 +206,7 @@ export function UserManagement() {
       };
       
       const response = await userApi.listUsers(params);
-      console.log('用户API响应:', response);
       const items = response.items || [];
-      console.log('设置用户数据:', items.length, '条');
       setUsers(items);
       setPagination(prev => ({
         ...prev,
