@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag, Avatar, Space, message, Select, Input, Button } from "antd";
+import { Card, Row, Col, Typography, Tag,  message, Select, Input, Button } from "antd";
 import { 
-  DatabaseOutlined, 
   RobotOutlined, 
-  SettingOutlined, 
-  UserOutlined,
   ToolOutlined,
   SearchOutlined,
   StarOutlined,
@@ -21,7 +18,7 @@ import { agentApi } from "@/services/agentApi";
 import { useTheme } from "@/hooks/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
 
-const { Title, Text, Paragraph } = Typography;
+const { Text } = Typography;
 import { Agent as ApiAgent } from '@/services/agentApi';
 
 type Agent = ApiAgent;
