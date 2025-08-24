@@ -42,9 +42,21 @@ export interface Agent {
     model_name: string;
     temperature: number;
     max_tokens: number;
-  };
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+  } | Array<{
+    model_name: string;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+  }>;
   prompt_info?: {
     system_prompt: string;
+    user_prompt_template?: string;
+    assistant_prompt_template?: string;
   };
   mcp_config?: {
     total_tools: number;
@@ -85,9 +97,21 @@ export interface CreateAgentRequest {
     model_name: string;
     temperature: number;
     max_tokens: number;
-  };
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+  } | Array<{
+    model_name: string;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+  }>;
   prompt_info?: {
     system_prompt: string;
+    user_prompt_template?: string;
+    assistant_prompt_template?: string;
   };
   mcp_config?: {
     total_tools: number;

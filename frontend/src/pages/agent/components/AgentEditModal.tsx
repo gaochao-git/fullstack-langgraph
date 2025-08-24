@@ -83,7 +83,14 @@ interface LocalAgent {
     top_p?: number;
     frequency_penalty?: number;
     presence_penalty?: number;
-  };
+  } | Array<{
+    model_name: string;
+    temperature?: number;
+    max_tokens?: number;
+    top_p?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+  }>;
   prompt_info?: {
     system_prompt?: string;
     user_prompt_template?: string;
@@ -421,6 +428,10 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       if (response.status === 'ok' && response.data) {
         const fullAgent = response.data;
         
+        // 添加调试日志
+        console.log('Agent details loaded:', fullAgent);
+        console.log('LLM info:', fullAgent.llm_info);
+        
         // 直接设置表单值，只设置实际存在的值，避免默认值覆盖
         const formValues: any = {
           agent_id: fullAgent.agent_id,
@@ -433,17 +444,31 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           visibility_additional_users: fullAgent.visibility_additional_users || [],
         };
 
-        // LLM 配置 - 只支持新的数据结构
+        // LLM 配置 - 支持新旧两种数据结构
         if (fullAgent.llm_info) {
           if (Array.isArray(fullAgent.llm_info)) {
-            // 新的数据结构
+            // 新的数据结构：数组格式
             formValues.llm_configs = fullAgent.llm_info;
+          } else if (typeof fullAgent.llm_info === 'object') {
+            // 旧的数据结构：单个对象，转换为数组
+            const legacyConfig = {
+              model_name: fullAgent.llm_info.model_name || '',
+              temperature: fullAgent.llm_info.temperature ?? 0.7,
+              max_tokens: fullAgent.llm_info.max_tokens ?? 2000,
+              top_p: fullAgent.llm_info.top_p ?? 0.9,
+              frequency_penalty: fullAgent.llm_info.frequency_penalty ?? 0,
+              presence_penalty: fullAgent.llm_info.presence_penalty ?? 0
+            };
+            formValues.llm_configs = [legacyConfig];
+            console.log('Converted legacy LLM config to new format:', formValues.llm_configs);
           } else {
-            // 旧格式，提示用户更新
-            message.error('该智能体使用旧版LLM配置格式，请重新配置');
+            // 未知格式
+            console.warn('Unknown LLM config format:', fullAgent.llm_info);
             formValues.llm_configs = [];
           }
         } else {
+          // 没有LLM配置
+          console.warn('No LLM config found for agent');
           formValues.llm_configs = [];
         }
 
@@ -506,7 +531,28 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     };
 
     // 构建LLM配置 - 新的数据结构
-    const llmConfig = values.llm_configs || [];
+    let llmConfig = values.llm_configs || [];
+    
+    // 如果是编辑模式且没有提供新的LLM配置，保留原有配置
+    if (!isCreating && agent && (!llmConfig || llmConfig.length === 0)) {
+      // 尝试从agent对象中获取原有的llm_info
+      if (agent.llm_info) {
+        if (Array.isArray(agent.llm_info)) {
+          llmConfig = agent.llm_info;
+        } else if (typeof agent.llm_info === 'object') {
+          // 兼容旧格式
+          llmConfig = [{
+            model_name: agent.llm_info.model_name || '',
+            temperature: agent.llm_info.temperature ?? 0.7,
+            max_tokens: agent.llm_info.max_tokens ?? 2000,
+            top_p: agent.llm_info.top_p ?? 0.9,
+            frequency_penalty: agent.llm_info.frequency_penalty ?? 0,
+            presence_penalty: agent.llm_info.presence_penalty ?? 0
+          }];
+        }
+      }
+      console.log('Preserving original LLM config:', llmConfig);
+    }
 
     // 构建提示词配置
     const promptConfig: any = {};
@@ -547,6 +593,8 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     setEditMCPTools([]);
     setEditSystemCheckedKeys([]);
     setEditCheckedKeys([]);
+    setEditExpandedKeys([]);
+    setEditSystemExpandedKeys(['system-root']);
     onCancel();
   };
 
