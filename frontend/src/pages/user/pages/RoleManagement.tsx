@@ -136,9 +136,7 @@ export function RoleManagement() {
       };
       
       const response = await roleApi.listRoles(params);
-      console.log('角色API响应:', response);
       const items = response.items || [];
-      console.log('设置角色数据:', items.length, '条');
       setRoles(items);
       setPagination(prev => ({
         ...prev,

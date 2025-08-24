@@ -366,7 +366,7 @@ const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
       onCancel={onCancel}
       width="95%"
       style={{ top: 20 }}
-      bodyStyle={{ height: 'calc(100vh - 200px)' }}
+      styles={{ body: { height: 'calc(100vh - 200px)' } }}
       footer={[
         <Button key="cancel" onClick={onCancel}>
           取消
@@ -375,7 +375,7 @@ const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
           {editData ? '更新' : '创建'}
         </Button>
       ]}
-      destroyOnClose
+      destroyOnHidden
     >
       <Tabs 
         activeKey={activeTab} 
