@@ -82,31 +82,6 @@ function parseDocumentReferences(content: string): {
   };
 }
 
-
-// 动态按钮文字组件
-const DiagnosisButtonText: React.FC<{ text?: string }> = ({ text = "诊断中" }) => {
-  const [dots, setDots] = useState("");
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => {
-        if (prev.length >= 3) return "";
-        return prev + ".";
-      });
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <span className="flex items-center gap-2">
-      <Loader2 className="h-4 w-4 animate-spin text-cyan-100" />
-      {text}
-      <span className="inline-block w-6 text-left">{dots}</span>
-    </span>
-  );
-};
-
 // 工具调用组件 props
 interface ToolCallProps {
   toolCall: any;
@@ -248,100 +223,6 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           )}
         </div>
       )}
-    </div>
-  );
-};
-
-// SOP执行确认组件 props
-interface SOPExecutionApprovalProps {
-  interrupt: any;
-  onInterruptResume: (approved: boolean) => void;
-}
-
-// SOP执行确认组件
-const SOPExecutionApproval: React.FC<SOPExecutionApprovalProps> = ({ interrupt, onInterruptResume }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const sopInfo = interrupt.value;
-  
-  const handleApprove = async () => {
-    setIsSubmitting(true);
-    try {
-      onInterruptResume(true);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  const handleReject = async () => {
-    setIsSubmitting(true);
-    try {
-      onInterruptResume(false);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  return (
-    <div className="border border-orange-300 rounded-lg p-4 bg-gradient-to-r from-orange-50 to-yellow-50">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-orange-800 mb-2">
-          SOP执行确认
-        </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          {sopInfo.message}
-        </p>
-      </div>
-      
-      {/* SOP信息 */}
-      <div className="mb-4 p-3 bg-white border border-orange-200 rounded-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="font-medium text-orange-800">SOP ID: {sopInfo.sop_id || '未知'}</span>
-          <Badge 
-            variant="outline" 
-            className="text-xs border-orange-500 text-orange-700"
-          >
-            SOP执行
-          </Badge>
-        </div>
-        <div className="text-xs text-gray-600 mb-2">
-          <strong>当前步骤:</strong> {sopInfo.current_sop_step || '未知'}
-        </div>
-        {sopInfo.tool_calls && sopInfo.tool_calls.length > 0 && (
-          <div>
-            <div className="text-xs text-gray-600 mb-2">
-              <strong>计划执行的操作:</strong>
-            </div>
-            <pre className="text-xs bg-gray-100 p-2 rounded border overflow-x-auto">
-              {sopInfo.tool_calls.map((call: any, index: number) => 
-                `${index + 1}. ${call.name}: ${JSON.stringify(call.args, null, 2)}`
-              ).join('\n')}
-            </pre>
-          </div>
-        )}
-      </div>
-      
-      {/* 操作按钮 */}
-      <div className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleReject}
-          className="border-gray-400 text-gray-600 hover:bg-gray-100 rounded-md"
-          disabled={isSubmitting}
-        >
-          取消
-        </Button>
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handleApprove}
-          className="bg-green-500 hover:bg-green-600 text-white"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "处理中..." : "确认执行"}
-        </Button>
-      </div>
     </div>
   );
 };
@@ -1696,7 +1577,7 @@ function ChatMessages({
                 </div>
                 <div className="flex items-center gap-2" style={{ color: token.colorTextDescription }}>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  诊断中...
+                  思考中...
                 </div>
               </div>
             </div>
