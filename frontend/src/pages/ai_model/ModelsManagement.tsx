@@ -676,28 +676,35 @@ const ModelsManagement = () => {
             <Row gutter={8} align="middle" wrap={false}>
               <Col flex="auto">
                 <Form.Item
-                  name="endpoint"
                   noStyle
-                  rules={[
-                    { required: true, message: '请输入端点地址' },
-                    {
-                      validator: (_, value) => {
-                        if (form.getFieldValue('provider') === 'openai-compatible' && 
-                            value && value.includes('/chat/completions')) {
-                          return Promise.reject(new Error('OpenAI兼容模式的URL不应包含 /chat/completions'));
-                        }
-                        return Promise.resolve();
-                      }
-                    }
-                  ]}
+                  shouldUpdate={(prevValues, currentValues) => prevValues.provider !== currentValues.provider}
                 >
-                  <Input 
-                    placeholder={
-                      form.getFieldValue('provider') === 'openai-compatible' 
-                        ? "https://api.siliconflow.cn/v1" 
-                        : "https://api.example.com"
-                    } 
-                  />
+                  {({ getFieldValue }) => (
+                    <Form.Item
+                      name="endpoint"
+                      noStyle
+                      rules={[
+                        { required: true, message: '请输入端点地址' },
+                        {
+                          validator: (_, value) => {
+                            if (getFieldValue('provider') === 'openai-compatible' && 
+                                value && value.includes('/chat/completions')) {
+                              return Promise.reject(new Error('OpenAI兼容模式的URL不应包含 /chat/completions'));
+                            }
+                            return Promise.resolve();
+                          }
+                        }
+                      ]}
+                    >
+                      <Input 
+                        placeholder={
+                          getFieldValue('provider') === 'openai-compatible' 
+                            ? "https://api.siliconflow.cn/v1" 
+                            : "https://api.example.com"
+                        } 
+                      />
+                    </Form.Item>
+                  )}
                 </Form.Item>
               </Col>
               <Col>
