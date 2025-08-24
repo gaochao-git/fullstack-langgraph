@@ -108,7 +108,7 @@ const AgentMarketplace = () => {
   // 获取智能体数据
   const loadAgents = async () => {
     try {
-      const response = await agentApi.getAgents({ include_builtin: true });
+      const response = await agentApi.getAgents();
       
       // 处理业务逻辑错误
       if (response.status === 'error') {
@@ -188,42 +188,9 @@ const AgentMarketplace = () => {
     return categoryColors['基础'] + '20'; // 默认蓝色背景
   };
 
-  // 获取智能体图标（优先使用配置的图标，回退到基于名称匹配）
-  const getAgentIcon = (agent: Agent) => {
-    // 如果有配置的图标，直接使用（基于agent_id获取的配置）
-    if (agent.agent_icon) {
-      return renderIcon(agent.agent_icon, 20); // 稍微大一点的图标
-    }
-    
-    // 回退到基于名称的匹配（向后兼容）
-    const name = agent.agent_name?.toLowerCase() || '';
-    
-    // 故障诊断相关
-    if (name.includes('诊断') || name.includes('故障') || name.includes('监控')) {
-      return <SettingOutlined />;
-    }
-    
-    // 安全防护相关
-    if (name.includes('安全') || name.includes('防护') || name.includes('检测')) {
-      return <UserOutlined />;
-    }
-    
-    // 故事、娱乐相关
-    if (name.includes('故事') || name.includes('笑话') || name.includes('娱乐')) {
-      return <RobotOutlined style={{ color: '#52c41a' }} />;
-    }
-    
-    // 研究分析相关
-    if (name.includes('研究') || name.includes('分析') || name.includes('数据')) {
-      return <DatabaseOutlined />;
-    }
-    
-    // 默认通用智能体图标
-    return <RobotOutlined />;
-  };
-
   // 获取智能体标签（基于agent_name和capabilities）
   const getAgentTags = (agent: Agent) => {
+    console.log('agent', agent);
     const tags = [];
     const name = agent.agent_name?.toLowerCase() || '';
     
@@ -323,7 +290,7 @@ const AgentMarketplace = () => {
             {/* 标签行 */}
             <div className="flex items-center gap-2" style={{ overflow: 'hidden' }}>
               <Tag 
-                color={AGENT_TYPES.find(t => t.value === agent.agent_type)?.color || 'default'} 
+                color="blue" 
                 className="text-xs"
                 style={{ margin: 0 }}
               >
@@ -352,7 +319,7 @@ const AgentMarketplace = () => {
                   return totalTools;
                 })()} 个工具
               </span>
-              <span style={{ color: agent.total_runs > 0 ? '#1890ff' : undefined, fontWeight: agent.total_runs > 0 ? 500 : undefined }}>
+              <span>
                 <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
                 {agent.total_runs || 0}
               </span>
