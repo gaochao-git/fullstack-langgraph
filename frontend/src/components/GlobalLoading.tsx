@@ -51,7 +51,7 @@ const GlobalLoading: React.FC = () => {
         zIndex: 9999,
       }}
     >
-      <Spin size="large" tip="加载中..." />
+      <Spin size="large" />
     </div>
   );
 };

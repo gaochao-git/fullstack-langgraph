@@ -265,7 +265,7 @@ const AgentMarketplace = () => {
         overflow: 'hidden'
       }}
       onClick={() => handleAgentClick(agent.agent_id)}
-      bodyStyle={{ padding: 16 }}
+      styles={{ body: { padding: 16 } }}
     >
       <Card.Meta
         title={
@@ -384,7 +384,7 @@ const AgentMarketplace = () => {
           borderRadius: 8,
           boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)'
         }}
-        bodyStyle={{ padding: '16px 20px' }}
+        styles={{ body: { padding: '16px 20px' } }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           {/* 我的收藏按钮 */}

@@ -508,8 +508,10 @@ const AgentManagement: React.FC = () => {
       <Card 
         title="智能体管理"
         className="agent-management-card"
-        bodyStyle={{ padding: isMobile ? '12px' : '24px' }}
-        headStyle={isMobile ? { padding: '12px 16px' } : undefined}
+        styles={{ 
+          body: { padding: isMobile ? '12px' : '24px' },
+          header: isMobile ? { padding: '12px 16px' } : undefined
+        }}
         extra={
           <div style={{ 
             width: isMobile ? '100%' : 'auto',
