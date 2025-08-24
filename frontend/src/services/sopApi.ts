@@ -16,21 +16,34 @@ export class SOPUtils {
     try {
       // 如果已经是对象，直接返回
       if (typeof stepsJson === 'object' && stepsJson !== null) {
-        return Array.isArray(stepsJson) ? stepsJson : [];
+        return stepsJson;
       }
       // 如果是字符串，尝试解析
       if (typeof stepsJson === 'string') {
         return JSON.parse(stepsJson);
       }
-      return [];
+      // 返回默认根节点
+      return {
+        step: '开始',
+        description: '',
+        execution_status: 'pending',
+        health_status: 'unknown',
+        children: []
+      };
     } catch (error) {
-      // Failed to parse SOP steps
-      return [];
+      // Failed to parse SOP steps - 返回默认根节点
+      return {
+        step: '开始',
+        description: '',
+        execution_status: 'pending',
+        health_status: 'unknown',
+        children: []
+      };
     }
   }
 
-  // 将步骤数组转换为JSON字符串
-  static stringifySteps(steps: any[]): string {
+  // 将步骤对象转换为JSON字符串
+  static stringifySteps(steps: any): string {
     return JSON.stringify(steps, null, 2);
   }
 

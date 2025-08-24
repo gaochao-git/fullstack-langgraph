@@ -199,8 +199,18 @@ const SOPList: React.FC = () => {
       key: 'steps_count',
       width: 80,
       render: (stepsJson: string) => {
-        const steps = SOPUtils.parseSteps(stepsJson);
-        return steps.length;
+        const rootStep = SOPUtils.parseSteps(stepsJson);
+        // Count total steps recursively
+        const countSteps = (step: any): number => {
+          let count = 1; // Count current step
+          if (step.children && Array.isArray(step.children)) {
+            for (const child of step.children) {
+              count += countSteps(child);
+            }
+          }
+          return count;
+        };
+        return countSteps(rootStep);
       }
     },
     {

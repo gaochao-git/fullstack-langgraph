@@ -128,7 +128,7 @@ const CustomNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
       <div style={{ fontWeight: 'bold' }}>{data.label}</div>
       
       {/* 执行状态指示器 */}
-      {(data.executionStatus || data.status) && (data.executionStatus || data.status) !== 'pending' && (
+      {data.executionStatus && data.executionStatus !== 'pending' && (
         <div style={{ 
           position: 'absolute', 
           top: '-8px', 
@@ -136,7 +136,7 @@ const CustomNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
           width: '16px',
           height: '16px',
           borderRadius: '50%',
-          background: getStatusColor(data.executionStatus || data.status),
+          background: getStatusColor(data.executionStatus),
           border: '2px solid white',
           boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
         }} />
@@ -164,9 +164,9 @@ const CustomNode: React.FC<NodeProps> = ({ data, isConnectable }) => {
             boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
           }}
         >
-          {(data.executionStatus || data.status) && (
+          {data.executionStatus && (
             <div style={{ marginBottom: '8px' }}>
-              <strong>执行状态:</strong> {getStatusText(data.executionStatus || data.status)}
+              <strong>执行状态:</strong> {getStatusText(data.executionStatus)}
             </div>
           )}
           {data.healthStatus && data.healthStatus !== 'unknown' && (
@@ -306,7 +306,7 @@ const FaultTreeEditorContent: React.FC<FaultTreeEditorProps> = ({
     form.setFieldsValue({
       label: node.data.label,
       description: node.data.description,
-      executionStatus: node.data.executionStatus || node.data.status || 'pending',
+      executionStatus: node.data.executionStatus || 'pending',
       healthStatus: node.data.healthStatus || 'unknown',
     });
     setNodeModalVisible(true);

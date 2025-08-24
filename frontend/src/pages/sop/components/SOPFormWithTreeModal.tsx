@@ -39,9 +39,10 @@ const convertSOPToFaultTree = (sop: Partial<SOPTemplate>): FaultTreeData => {
     type: 'faultNode',
     position: { x: 400, y: 50 },
     data: {
-      label: sop.sop_title || '新SOP流程',
+      label: '开始',
       type: 'fault',
-      status: 'pending',
+      executionStatus: 'pending',
+      healthStatus: 'unknown',
       description: sop.sop_description || '',
       onAdd: undefined,
       onDelete: undefined,
@@ -49,11 +50,18 @@ const convertSOPToFaultTree = (sop: Partial<SOPTemplate>): FaultTreeData => {
     },
   });
   
-  // 如果有步骤，递归创建步骤节点
+  // 如果有步骤，使用根节点信息更新，并创建子节点
   if (sop.sop_steps) {
-    const steps = typeof sop.sop_steps === 'string' 
+    const rootStep = typeof sop.sop_steps === 'string' 
       ? JSON.parse(sop.sop_steps) 
       : sop.sop_steps;
+    
+    // 更新根节点信息（保持label为"开始"）
+    if (rootStep && nodes.length > 0) {
+      nodes[0].data.description = rootStep.description || sop.sop_description || '';
+      nodes[0].data.executionStatus = rootStep.execution_status || 'pending';
+      nodes[0].data.healthStatus = rootStep.health_status || 'unknown';
+    }
     
     // 递归创建节点和边
     const createNodesFromSteps = (
@@ -62,6 +70,8 @@ const convertSOPToFaultTree = (sop: Partial<SOPTemplate>): FaultTreeData => {
       level: number = 0,
       xOffset: number = 0
     ) => {
+      if (!steps || steps.length === 0) return;
+      
       const levelY = 150 + level * 150;
       const stepCount = steps.length;
       const totalWidth = (stepCount - 1) * 200;
@@ -75,11 +85,10 @@ const convertSOPToFaultTree = (sop: Partial<SOPTemplate>): FaultTreeData => {
           type: 'faultNode',
           position: { x, y: levelY },
           data: {
-            label: step.step, // 直接使用step作为label
+            label: step.step,
             type: 'step',
-            status: step.status || 'pending',
-            executionStatus: step.executionStatus,
-            healthStatus: step.healthStatus,
+            executionStatus: step.execution_status || 'pending',
+            healthStatus: step.health_status || 'unknown',
             description: step.description,
             onAdd: undefined,
             onDelete: undefined,
@@ -102,16 +111,31 @@ const convertSOPToFaultTree = (sop: Partial<SOPTemplate>): FaultTreeData => {
       });
     };
     
-    // 从根节点开始创建
-    createNodesFromSteps(steps, 'root');
+    // 从根节点的子节点开始创建
+    if (rootStep.children && rootStep.children.length > 0) {
+      createNodesFromSteps(rootStep.children, 'root');
+    }
   }
   
   return { nodes, edges };
 };
 
 // 将故障树转换回SOP步骤（树形结构）
-const convertFaultTreeToSOPSteps = (treeData: FaultTreeData): SOPStep[] => {
+const convertFaultTreeToSOPSteps = (treeData: FaultTreeData): SOPStep => {
   const { nodes, edges } = treeData;
+  
+  // 找到根节点
+  const rootNode = nodes.find(n => n.id === 'root' || n.data.type === 'fault');
+  if (!rootNode) {
+    // 如果没有根节点，返回默认结构
+    return {
+      step: '开始',
+      description: '请编辑故障描述',
+      execution_status: 'pending',
+      health_status: 'unknown',
+      children: []
+    };
+  }
   
   // 构建节点关系图
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
@@ -124,48 +148,46 @@ const convertFaultTreeToSOPSteps = (treeData: FaultTreeData): SOPStep[] => {
   });
   
   // 递归构建树形结构
-  const buildStepTree = (nodeId: string): SOPStep[] => {
+  const buildStepTree = (nodeId: string): SOPStep | null => {
+    const node = nodeMap.get(nodeId);
+    if (!node) return null;
+    
+    const step: SOPStep = {
+      id: node.id,
+      step: node.data.type === 'fault' ? '开始' : (node.data.label || '新步骤'),
+      description: node.data.description || '',
+      execution_status: node.data.executionStatus || 'pending',
+      health_status: node.data.healthStatus || 'unknown',
+    };
+    
+    // 递归获取子步骤
     const childIds = childrenMap.get(nodeId) || [];
-    const steps: SOPStep[] = [];
+    const childSteps: SOPStep[] = [];
     
     childIds.forEach(childId => {
-      const node = nodeMap.get(childId);
-      if (node && node.data.type !== 'fault') {
-        const step: SOPStep = {
-          id: node.id,
-          step: node.data.label || '新步骤', // 使用节点名称作为step
-          description: node.data.description || '步骤描述', // 确保有默认值
-          status: node.data.status,
-          executionStatus: node.data.executionStatus,
-          healthStatus: node.data.healthStatus,
-        };
-        
-        // 递归获取子步骤
-        const childSteps = buildStepTree(childId);
-        if (childSteps.length > 0) {
-          step.children = childSteps;
-        }
-        
-        steps.push(step);
+      const childStep = buildStepTree(childId);
+      if (childStep) {
+        childSteps.push(childStep);
       }
     });
     
-    return steps;
+    if (childSteps.length > 0) {
+      step.children = childSteps;
+    }
+    
+    return step;
   };
   
-  // 从根节点开始构建
-  const rootSteps = buildStepTree('root');
+  // 从根节点构建整个树
+  const rootStep = buildStepTree(rootNode.id);
   
-  // 如果没有步骤，返回一个默认步骤
-  if (rootSteps.length === 0) {
-    return [{
-      step: '初始化步骤',
-      description: '请编辑步骤描述', // 确保描述不为空
-      status: 'pending',
-    }];
-  }
-  
-  return rootSteps;
+  return rootStep || {
+    step: '开始',
+    description: '请编辑故障描述',
+    execution_status: 'pending',
+    health_status: 'unknown',
+    children: []
+  };
 };
 
 const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
@@ -205,9 +227,10 @@ const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
             type: 'faultNode',
             position: { x: 400, y: 50 },
             data: {
-              label: '新SOP流程',
+              label: '开始',
               type: 'fault',
-              status: 'pending',
+              executionStatus: 'pending',
+              healthStatus: 'unknown',
               description: '点击编辑SOP描述',
               onAdd: undefined,
               onDelete: undefined,
@@ -263,21 +286,21 @@ const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
       // 从故障树转换为步骤
       const steps = convertFaultTreeToSOPSteps(treeData);
       
-      // 验证步骤
-      if (steps.length === 0) {
-        message.error('至少需要一个执行步骤');
+      // 验证根节点
+      if (!steps || !steps.step) {
+        message.error('需要定义故障/问题');
         return;
       }
       
       // 验证所有步骤的描述不为空
-      const validateSteps = (stepList: SOPStep[]): boolean => {
-        for (const step of stepList) {
-          if (!step.description || step.description.trim() === '') {
-            message.error(`步骤 ${step.step} 的描述不能为空`);
-            return false;
-          }
-          if (step.children && step.children.length > 0) {
-            if (!validateSteps(step.children)) {
+      const validateStep = (step: SOPStep): boolean => {
+        if (!step.description || step.description.trim() === '') {
+          message.error(`"${step.step}" 的描述不能为空`);
+          return false;
+        }
+        if (step.children && step.children.length > 0) {
+          for (const child of step.children) {
+            if (!validateStep(child)) {
               return false;
             }
           }
@@ -285,7 +308,7 @@ const SOPFormWithTreeModal: React.FC<SOPFormWithTreeModalProps> = ({
         return true;
       };
       
-      if (!validateSteps(steps)) {
+      if (!validateStep(steps)) {
         return;
       }
 

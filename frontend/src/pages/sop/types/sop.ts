@@ -6,9 +6,8 @@ export interface SOPStep {
   id?: string; // 节点唯一标识
   step: string; // 步骤名称
   description: string;
-  status?: string; // 节点状态
-  executionStatus?: string; // 执行状态
-  healthStatus?: string; // 健康状态
+  execution_status?: string; // 执行状态
+  health_status?: string; // 健康状态
   children?: SOPStep[]; // 子步骤
 }
 
@@ -20,7 +19,7 @@ export interface SOPTemplate {
   sop_category: string;
   sop_description?: string;
   sop_severity: SOPSeverity;
-  sop_steps: SOPStep[] | string; // 可能是对象数组或JSON字符串
+  sop_steps: SOPStep | string; // 可能是对象或JSON字符串
   tools_required?: string[] | string; // 可能是字符串数组或JSON字符串
   sop_recommendations: string;
   team_name: string;
@@ -37,7 +36,7 @@ export interface SOPTemplateRequest {
   sop_category: string;
   sop_description?: string;
   sop_severity?: SOPSeverity; // 后端默认 "high"
-  steps: SOPStep[]; // 前端传递的步骤数组
+  steps: SOPStep; // 前端传递的步骤树（根节点）
   tools_required?: string[];
   sop_recommendations?: string; // 后端默认 ""
   team_name?: string; // 后端自动从用户信息获取
