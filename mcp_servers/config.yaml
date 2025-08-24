@@ -48,7 +48,7 @@ servers:
     script: "servers/zabbix_mcp_server.py"
     display_name: "Zabbix监控服务"
     config:
-      url: "http://82.156.146.51:60080"
+      url: "http://82.156.146.51:8080/zabbix/api_jsonrpc.php"
       username: "Admin"
       password: "zabbix"
       

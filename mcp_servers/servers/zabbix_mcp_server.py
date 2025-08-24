@@ -29,6 +29,8 @@ def _create_zabbix_session():
         session = requests.Session()
         url = config.get("url").rstrip('/')
         
+        logger.info(f"尝试连接Zabbix - URL: {url}, Username: {config.get('username')}")
+        
         # 认证获取token
         payload = {
             "jsonrpc": "2.0",
@@ -43,20 +45,27 @@ def _create_zabbix_session():
         response = session.post(
             url,
             json=payload,
-            headers={"Content-Type": "application/json"}
+            headers={"Content-Type": "application/json"},
+            timeout=10
         )
+        
+        logger.info(f"Zabbix响应状态码: {response.status_code}")
         
         if response.status_code == 200:
             result = response.json()
+            logger.info(f"Zabbix响应内容: {result}")
             if "result" in result:
                 auth_token = result["result"]
                 logger.info(f"Zabbix连接成功，URL: {url}")
                 return {"session": session, "url": url, "auth_token": auth_token}
+            else:
+                logger.error(f"Zabbix认证失败: {result.get('error', '未知错误')}")
             
     except Exception as e:
         logger.error(f"Zabbix连接失败: {e}")
+        logger.error(f"URL: {config.get('url')}, Username: {config.get('username')}")
     
-    raise Exception("无法建立Zabbix连接，请检查Zabbix服务状态和配置")
+    raise Exception(f"无法建立Zabbix连接，请检查Zabbix服务状态和配置。URL: {config.get('url')}")
 
 def _zabbix_api_call(method: str, params: Dict[str, Any]) -> Dict[str, Any]:
     """执行Zabbix API调用，每次都创建新连接"""
@@ -122,9 +131,9 @@ async def get_zabbix_metric_data(
         
         # 通过IP地址查找主机
         # 如果配置了 default_host_ip，强制使用它（忽略用户传入的IP）
-        config = get_zabbix_config()
-        if 'default_host_ip' in config and config['default_host_ip']:
-            actual_ip = config['default_host_ip']
+        default_host_ip = config.get('default_host_ip')
+        if default_host_ip:
+            actual_ip = default_host_ip
         else:
             actual_ip = ip
         host_interface_result = _zabbix_api_call('hostinterface.get', {
@@ -241,9 +250,9 @@ async def get_zabbix_metrics(hostname: str = None) -> str:
     try:
         # 通过IP地址查找主机
         # 如果配置了 default_host_ip，强制使用它（忽略用户传入的hostname）
-        config = get_zabbix_config()
-        if 'default_host_ip' in config and config['default_host_ip']:
-            actual_hostname = config['default_host_ip']
+        default_host_ip = config.get('default_host_ip')
+        if default_host_ip:
+            actual_hostname = default_host_ip
         else:
             actual_hostname = hostname
         host_interface_result = _zabbix_api_call('hostinterface.get', {
