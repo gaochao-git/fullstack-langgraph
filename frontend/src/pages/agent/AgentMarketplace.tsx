@@ -1,26 +1,13 @@
 import { useState, useEffect } from "react";
 import { Card, Row, Col, Typography, Tag,  message, Select, Input, Button } from "antd";
-import { 
-  RobotOutlined, 
-  ToolOutlined,
-  SearchOutlined,
-  StarOutlined,
-  StarFilled,
-  PlayCircleOutlined
-} from "@ant-design/icons";
-import { 
-  categoryColors,
-  renderIcon,
-  getIconBackgroundColor
-} from './components/AgentIconSystem';
+import { RobotOutlined, ToolOutlined,SearchOutlined,StarOutlined,StarFilled,PlayCircleOutlined} from "@ant-design/icons";
+import { categoryColors,renderIcon,getIconBackgroundColor} from './components/AgentIconSystem';
 import { useNavigate } from "react-router-dom";
 import { agentApi } from "@/services/agentApi";
 import { useTheme } from "@/hooks/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
-
-const { Text } = Typography;
 import { Agent as ApiAgent } from '@/services/agentApi';
-
+const { Text } = Typography;
 type Agent = ApiAgent;
 
 // 智能体分类选项
