@@ -412,40 +412,7 @@ def some_sync_function(db: Session = Depends(get_sync_db)):
 5. **独立函数使用 `get_async_db_context()` 和 `async with db.begin()`**
 6. **只在必要时使用同步（如 LangGraph 工具）**
 7. **避免混用同步和异步会话**
-
-#### 5. 常见场景示例
-
-##### 5.1 多表操作（推荐方式）
-```python
-# Service层 - 使用 async with db.begin()
-async def create_user_with_role(self, db: AsyncSession, user_data: dict, role_id: str):
-    async with db.begin():
-        # 创建用户
-        user = RbacUser(**user_data)
-        db.add(user)
-        await db.flush()
-        
-        # 创建用户角色关联
-        user_role = RbacUsersRoles(user_id=user.user_id, role_id=role_id)
-        db.add(user_role)
-        await db.flush()
-        
-        # 创建认证记录
-        auth_user = AuthUser(user_id=user.user_id, password_hash=hash_password(password))
-        db.add(auth_user)
-        await db.flush()
-        
-        return user  # 事务自动提交
-
-# 路由层 - 简单调用
-@router.post("/users/with-role")
-async def create_user_with_role(data: UserCreateWithRole, db: AsyncSession = Depends(get_async_db)):
-    user = await user_service.create_user_with_role(db, data.dict(), data.role_id)
-    return success_response(user)
-```
-
 ### 注意事项
-
 1. **不要在 endpoints.py 写业务逻辑**
 2. **Service 层不处理 HTTP 相关内容**
 3. **使用 BusinessException 而不是 HTTPException**
