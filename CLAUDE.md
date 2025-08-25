@@ -72,7 +72,7 @@ make clean               # 清理构建产物
 ### 技术栈
 
 - **前端**: React + TypeScript + Vite + Ant Design
-- **后端**: FastAPI + Python 3.12
+- **后端**: FastAPI + Python 3.12 + sqlalchemy
 - **AI框架**: LangGraph + LangChain
 - **数据库**: PostgreSQL/MySQL (通过LangGraph Checkpoint)
 - **MCP工具**: 基于FastMCP的专业工具服务器集群
