@@ -62,17 +62,17 @@ make clean               # 清理构建产物
 - 前端开发页面: http://localhost:5173
 - 后端API文档: http://localhost:8000/docs
 - MCP服务器:
-  - 数据库工具: http://localhost:3001/sse/
-  - SSH工具: http://localhost:3002/sse/
-  - Elasticsearch工具: http://localhost:3003/sse/
-  - Zabbix工具: http://localhost:3004/sse/
+  - 数据库工具: http://localhost:3001/mc
+  - SSH工具: http://localhost:3002/mcp
+  - Elasticsearch工具: http://localhost:3003/mcp
+  - Zabbix工具: http://localhost:3004/mcp
 
 ## 高层架构
 
 ### 技术栈
 
 - **前端**: React + TypeScript + Vite + Ant Design
-- **后端**: FastAPI + Python 3.12 + LangGraph
+- **后端**: FastAPI + Python 3.12
 - **AI框架**: LangGraph + LangChain
 - **数据库**: PostgreSQL/MySQL (通过LangGraph Checkpoint)
 - **MCP工具**: 基于FastMCP的专业工具服务器集群
