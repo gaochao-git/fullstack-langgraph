@@ -17,7 +17,8 @@ import {
   Table,
   Badge,
   Popconfirm,
-  Tooltip
+  Tooltip,
+  InputNumber
 } from "antd";
 import { 
   PlusOutlined, 
@@ -78,6 +79,10 @@ interface ModelConfig {
   apiKey?: string;
   description?: string;
   status: 'active' | 'inactive' | 'testing';
+  config?: {
+    model_type?: 'llm' | 'vlm' | 'embedding';
+    context_length?: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +104,7 @@ const fetchModels = async (): Promise<ModelConfig[]> => {
       apiKey: item.apiKey,
       description: item.description,
       status: item.status,
+      config: item.config,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt
     }));
@@ -116,7 +122,8 @@ const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig
       model_type: modelData.model,
       endpoint_url: modelData.endpoint,
       api_key_value: modelData.apiKey,
-      model_description: modelData.description
+      model_description: modelData.description,
+      config_data: modelData.config
     })
   });
   const data = await response.json();
@@ -131,6 +138,7 @@ const createModel = async (modelData: Partial<ModelConfig>): Promise<ModelConfig
       apiKey: item.apiKey,
       description: item.description,
       status: item.status,
+      config: item.config,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt
     };
@@ -149,7 +157,8 @@ const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Pr
       endpoint_url: modelData.endpoint,
       api_key_value: modelData.apiKey,
       model_description: modelData.description,
-      model_status: modelData.status
+      model_status: modelData.status,
+      config_data: modelData.config
     })
   });
   const data = await response.json();
@@ -164,6 +173,7 @@ const updateModel = async (modelId: string, modelData: Partial<ModelConfig>): Pr
       apiKey: item.apiKey,
       description: item.description,
       status: item.status,
+      config: item.config,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt
     };
@@ -319,7 +329,11 @@ const ModelsManagement = () => {
     setEditingModel(model);
     setFormTestStatus('idle');
     setDiscoveredModels([]);
-    form.setFieldsValue(model);
+    form.setFieldsValue({
+      ...model,
+      model_type: model.config?.model_type,
+      context_length: model.config?.context_length
+    });
     setModalVisible(true);
   };
 
@@ -432,14 +446,27 @@ const ModelsManagement = () => {
   // 保存模型
   const handleSaveModel = async (values: any) => {
     try {
+      // 构建配置数据
+      const modelData = {
+        ...values,
+        config: {
+          model_type: values.model_type,
+          context_length: values.context_length
+        }
+      };
+      
+      // 删除表单级别的配置字段
+      delete modelData.model_type;
+      delete modelData.context_length;
+      
       if (editingModel) {
         // 更新
-        const updatedModel = await updateModel(editingModel.id, values);
+        const updatedModel = await updateModel(editingModel.id, modelData);
         setModels(models.map(m => m.id === editingModel.id ? updatedModel : m));
         message.success('模型更新成功');
       } else {
         // 新增
-        const newModel = await createModel(values);
+        const newModel = await createModel(modelData);
         setModels([...models, newModel]);
         message.success('模型添加成功');
       }
@@ -488,8 +515,28 @@ const ModelsManagement = () => {
       dataIndex: 'model',
       key: 'model',
       width: 150,
-      render: (text: string) => (
-        <Text style={{ fontSize: '13px', fontFamily: 'monospace' }}>{text}</Text>
+      render: (text: string, record: ModelConfig) => (
+        <Space direction="vertical" size={2}>
+          <Text style={{ fontSize: '13px', fontFamily: 'monospace' }}>{text}</Text>
+          {record.config && (
+            <Space size={4}>
+              {record.config.model_type && (
+                <Tag color={
+                  record.config.model_type === 'llm' ? 'blue' : 
+                  record.config.model_type === 'vlm' ? 'purple' : 
+                  'green'
+                } style={{ fontSize: '11px' }}>
+                  {record.config.model_type.toUpperCase()}
+                </Tag>
+              )}
+              {record.config.context_length && (
+                <Text type="secondary" style={{ fontSize: '11px' }}>
+                  {Math.floor(record.config.context_length / 1000)}K
+                </Text>
+              )}
+            </Space>
+          )}
+        </Space>
       ),
     },
     {
@@ -822,7 +869,36 @@ const ModelsManagement = () => {
             label="描述"
             name="description"
           >
-            <Input.TextArea rows={3} placeholder="模型的描述信息" />
+            <Input.TextArea rows={1} placeholder="模型的描述信息" />
+          </Form.Item>
+
+          <Form.Item
+            label="模型类型"
+            name="model_type"
+            initialValue="llm"
+          >
+            <Select>
+              <Option value="llm">LLM（大语言模型）</Option>
+              <Option value="vlm">VLM（视觉语言模型）</Option>
+              <Option value="embedding">Embedding（嵌入模型）</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            label="上下文长度"
+            name="context_length"
+            initialValue={128000}
+            tooltip="模型支持的最大上下文token数，用于对话消息压缩判断"
+          >
+            <InputNumber
+              min={1024}
+              max={2097152}
+              step={1024}
+              style={{ width: '100%' }}
+              placeholder="默认：128000"
+              formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={value => parseInt(value!.replace(/\$\s?|(,*)/g, ''), 10)}
+            />
           </Form.Item>
 
           <Form.Item>
