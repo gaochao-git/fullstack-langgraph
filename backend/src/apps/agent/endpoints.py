@@ -504,9 +504,10 @@ async def extract_image_content(
         image_data = await file.read()
         
         # 检查图片大小
-        max_size = 10 * 1024 * 1024  # 10MB
+        from src.shared.core.config import settings
+        max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024  # 使用配置的大小限制
         if len(image_data) > max_size:
-            raise BusinessException("图片大小不能超过10MB", ResponseCode.PARAM_ERROR)
+            raise BusinessException(f"图片大小不能超过{settings.MAX_UPLOAD_SIZE_MB}MB", ResponseCode.PARAM_ERROR)
         
         # 构建选项
         options = {}

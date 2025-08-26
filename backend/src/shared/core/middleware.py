@@ -190,12 +190,15 @@ class SecurityMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 检查请求大小
+        from .config import settings
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > 10 * 1024 * 1024:  # 10MB
+        max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if content_length and int(content_length) > max_size:
             self.logger.warning("Large request detected", extra={
                 'method': request.method,
                 'url': str(request.url),
                 'content_length': content_length,
+                'max_allowed': max_size,
                 'client_ip': request.client.host if request.client else None
             })
         

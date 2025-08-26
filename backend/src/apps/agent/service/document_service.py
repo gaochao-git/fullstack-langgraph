@@ -341,9 +341,19 @@ class DocumentService:
             if not full_text.strip():
                 full_text = f"[{file_name}]\n\n文档内容为空或无法提取文本内容。"
             
-            # 分块处理
-            chunk_size = 1000
-            chunk_overlap = 200
+            # 分块处理 - 优化分块策略
+            # 对于大文档，使用更大的分块尺寸以减少分块数量
+            base_chunk_size = 1000
+            if len(full_text) > 100000:  # 超过10万字符的大文档
+                chunk_size = 2000  # 使用更大的分块
+                chunk_overlap = 400
+            elif len(full_text) > 50000:  # 5万-10万字符的中等文档
+                chunk_size = 1500
+                chunk_overlap = 300
+            else:  # 小文档
+                chunk_size = base_chunk_size
+                chunk_overlap = 200
+            
             chunks = []
             
             if len(full_text) <= chunk_size:
@@ -369,8 +379,15 @@ class DocumentService:
                 doc_upload = result.scalar_one_or_none()
                 if doc_upload:
                     doc_upload.process_status = ProcessStatus.READY
-                    doc_upload.doc_content = full_text[:50000]  # 限制存储的内容长度
-                    doc_upload.doc_chunks = json.dumps([{"id": i, "content": chunk} for i, chunk in enumerate(chunks[:50])])  # 限制块数
+                    # MEDIUMTEXT 支持 16MB，约 1600万字符，这里限制为 500万字符以保留余量
+                    doc_upload.doc_content = full_text[:5000000] if len(full_text) > 5000000 else full_text
+                    
+                    # 限制分块数量，避免 JSON 过大
+                    # 每个分块 1000 字符，存储前 1000 个分块（约 100万字符的内容）
+                    max_chunks = 1000
+                    chunks_to_store = chunks[:max_chunks]
+                    doc_upload.doc_chunks = json.dumps([{"id": i, "content": chunk} for i, chunk in enumerate(chunks_to_store)])
+                    
                     doc_upload.doc_metadata = json.dumps(metadata)
                     doc_upload.process_end_time = now_shanghai()
                     await db.flush()
