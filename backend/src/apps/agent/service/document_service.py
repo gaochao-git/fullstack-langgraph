@@ -6,6 +6,8 @@ import uuid
 import json
 import csv
 import io
+import subprocess
+import tempfile
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -197,7 +199,31 @@ class DocumentService:
                     logger.error(f"PDF解析错误: {e}")
                     full_text = f"PDF文件解析失败: {str(e)}"
                     
-            elif file_ext == '.docx' and HAS_DOCX:
+            elif file_ext == '.doc':
+                # .doc 文件需要先转换为 .docx
+                logger.info(f"开始转换 .doc 文件: {file_name}")
+                try:
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        # 使用 LibreOffice 转换
+                        cmd = ['soffice', '--headless', '--convert-to', 'docx', '--outdir', temp_dir, str(file_path)]
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                        
+                        if result.returncode == 0:
+                            # 转换成功，更新文件路径为临时的 docx 文件
+                            temp_docx = Path(temp_dir) / (file_path.stem + '.docx')
+                            if temp_docx.exists():
+                                file_path = temp_docx
+                                file_ext = '.docx'
+                                logger.info(f".doc 转换成功，继续处理为 .docx")
+                            else:
+                                raise Exception("转换后的文件未找到")
+                        else:
+                            raise Exception(f"LibreOffice 转换失败: {result.stderr}")
+                except Exception as e:
+                    logger.error(f".doc 转换失败: {e}")
+                    full_text = f".doc 文件转换失败：请确保安装了 LibreOffice。错误: {str(e)}"
+                    
+            if file_ext == '.docx' and HAS_DOCX:
                 # Word文档解析
                 try:
                     doc = docx.Document(str(file_path))
