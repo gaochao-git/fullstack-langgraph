@@ -164,6 +164,10 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
             user_name = config.get("configurable", {}).get("user_name", "system")
             await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
     
+    # 应用消息优化器（如果启用）
+    from .message_optimizer import optimize_messages_if_needed
+    await optimize_messages_if_needed(graph_input)
+    
     logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
     
     event_id = 0
