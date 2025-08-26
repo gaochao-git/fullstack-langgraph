@@ -79,27 +79,33 @@ export const fileApi = {
   // 等待文件处理完成（支持进度回调）
   async waitForFileReady(
     fileId: string, 
-    maxRetries: number = 30, 
-    interval: number = 1000,
     onStatusUpdate?: (status: FileProcessStatus) => void
   ): Promise<void> {
-    for (let i = 0; i < maxRetries; i++) {
-      const status = await this.getFileStatus(fileId);
-      
-      // 回调状态更新
-      if (onStatusUpdate) {
-        onStatusUpdate(status);
+    const interval = 2000; // 固定2秒轮询间隔
+    
+    while (true) {
+      try {
+        const status = await this.getFileStatus(fileId);
+        
+        // 回调状态更新
+        if (onStatusUpdate) {
+          onStatusUpdate(status);
+        }
+        
+        if (status.status === 'ready') {
+          return;
+        } else if (status.status === 'failed') {
+          throw new Error(status.message || '文件处理失败');
+        }
+        
+        // 固定等待2秒后重试
+        await new Promise(resolve => setTimeout(resolve, interval));
+      } catch (error) {
+        // 如果获取状态失败，继续重试
+        console.error('获取文件状态失败:', error);
+        await new Promise(resolve => setTimeout(resolve, interval));
       }
-      
-      if (status.status === 'ready') {
-        return;
-      } else if (status.status === 'failed') {
-        throw new Error(status.message || '文件处理失败');
-      }
-      // 等待一段时间后重试
-      await new Promise(resolve => setTimeout(resolve, interval));
     }
-    throw new Error('文件处理超时');
   },
 
   // 下载文档

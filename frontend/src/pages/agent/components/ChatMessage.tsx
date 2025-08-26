@@ -998,8 +998,20 @@ function ChatMessages({
           return updated;
         });
         
-        // 等待文件处理完成
-        await fileApi.waitForFileReady(result.file_id);
+        // 等待文件处理完成，并更新处理状态
+        await fileApi.waitForFileReady(result.file_id, (status) => {
+          // 更新处理中的消息，让用户知道系统仍在工作
+          setUploadedFiles(prev => {
+            const updated = [...prev];
+            if (updated[currentIndex]) {
+              updated[currentIndex] = {
+                ...updated[currentIndex],
+                processingMessage: status.message || '正在处理...'
+              };
+            }
+            return updated;
+          });
+        });
         
         // 更新状态为成功
         setUploadedFiles(prev => {
