@@ -1098,11 +1098,11 @@ function ChatMessages({
   }, [isAtBottom]);
 
   // 点击滚动按钮
-  const handleScrollButtonClick = useCallback(() => {
-    setIsAutoScrollEnabled(true);
-    setShowScrollButton(false);
-    scrollToBottom();
-  }, [scrollToBottom]);
+  // const handleScrollButtonClick = useCallback(() => {
+  //   setIsAutoScrollEnabled(true);
+  //   setShowScrollButton(false);
+  //   scrollToBottom();
+  // }, [scrollToBottom]);
 
   // 监听消息变化，自动滚动
   useEffect(() => {
