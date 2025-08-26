@@ -30,7 +30,7 @@ interface ModelInfo {
 // 欢迎页面组件接口
 interface WelcomeComponentProps {
   agent: Agent | null;
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string, fileIds?: string[]) => void;
 }
 
 // 聊天引擎组件属性
@@ -66,14 +66,14 @@ export default function ChatEngine({
   const [currentModel, setCurrentModel] = useState<string>('');
 
   // 获取agentId，用于LangGraph SDK的assistantId字段
-  const getAgentId = () => {
+  const getAgentId = (): string => {
     // 如果agent不存在，使用传入的agentId参数
     if (!agent) {
       return agentId;
     }
     
     // 优先使用agent_id（来自API的agent对象），如果没有则使用id（硬编码的agent对象）
-    const id = agent.agent_id || agent.id;
+    const id = agent.agent_id || (agent.id ? agent.id.toString() : '');
     if (!id) {
       // 如果agent对象中没有id，使用传入的agentId参数
       return agentId;
@@ -180,12 +180,13 @@ export default function ChatEngine({
 
   // 当新线程创建时，将线程ID同步到URL
   useEffect(() => {
-    if (thread.threadId && !getThreadIdFromUrl()) {
+    const threadId = (thread as any).threadId;
+    if (threadId && !getThreadIdFromUrl()) {
       const url = new URL(window.location.href);
-      url.searchParams.set('thread_id', thread.threadId);
+      url.searchParams.set('thread_id', threadId);
       window.history.replaceState({}, '', url.toString());
     }
-  }, [thread.threadId]);
+  }, [(thread as any).threadId]);
 
   // 当有线程ID时，获取关联的文件ID
   useEffect(() => {
@@ -257,7 +258,7 @@ export default function ChatEngine({
       };
       
       // 最终提交选项
-      thread.submit(submitData, submitOptions);
+      thread.submit(submitData as any, submitOptions as any);
     },
     [thread, currentModel, agentId]
   );
@@ -272,11 +273,10 @@ export default function ChatEngine({
     // 切换到模型: modelType
   }, []);
 
-  const handleInterruptResume = useCallback((approved: boolean) => {
+  const handleInterruptResume = useCallback((approved: boolean | string[]) => {
     thread.submit(undefined, { 
-      command: { resume: approved },
-      user_name: getCurrentUsername()
-    });
+      command: { resume: approved }
+    } as any);
   }, [thread]);
 
   // 加载历史线程数据
@@ -425,7 +425,7 @@ export default function ChatEngine({
                 key={historyThread.thread_id}
                 className={cn(
                   "p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md",
-                  thread.threadId === historyThread.thread_id 
+                  (thread as any).threadId === historyThread.thread_id 
                     ? (isDark 
                         ? 'bg-blue-800/50 border-blue-400 shadow-sm' 
                         : 'bg-blue-50 border-blue-300 shadow-sm')
@@ -464,7 +464,7 @@ export default function ChatEngine({
                       ID: {historyThread.thread_id.substring(0, 8)}...
                     </div>
                   </div>
-                  {thread.threadId === historyThread.thread_id && (
+                  {(thread as any).threadId === historyThread.thread_id && (
                     <div className={cn(
                       "text-xs font-medium ml-2",
                       isDark ? "text-cyan-400" : "text-blue-600"

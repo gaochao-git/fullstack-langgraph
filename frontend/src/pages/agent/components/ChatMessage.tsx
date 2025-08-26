@@ -16,6 +16,7 @@ import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
 import { exportToWordWithImages } from "@/services/documentExportApi";
+import type { Agent } from "@/services/agentApi";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -650,16 +651,6 @@ const SingleToolApproval: React.FC<SingleToolApprovalProps> = ({ interrupt, onIn
 };
 
 // 诊断聊天视图 props
-interface ChatMessagesProps {
-  messages: Message[];
-  isLoading: boolean;
-  onSubmit: (inputValue: string) => void;
-  onCancel: () => void;
-  liveActivityEvents: ProcessedEvent[];
-  historicalActivities: Record<string, ProcessedEvent[]>;
-  interrupt?: any; // 添加interrupt属性
-  onInterruptResume?: (approved: boolean | string[]) => void; // 添加interrupt处理函数
-}
 
 // 新增：对话轮分组（每轮：用户消息+本轮所有助手消息）
 interface DialogRound {
@@ -667,22 +658,11 @@ interface DialogRound {
   assistant: Message[];
 }
 
-// 智能体信息类型
-interface Agent {
-  id: string;
-  agent_id: string;
-  agent_name: string;
-  agent_description: string;
-  agent_capabilities: string[];
-  agent_status: string;
-  agent_enabled: string;
-  is_builtin: string;
-}
 
 // 自定义欢迎组件接口
 interface WelcomeComponentProps {
   agent: Agent | null;
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string, fileIds?: string[]) => void;
 }
 
 // 诊断聊天视图组件 Props 扩展
@@ -694,7 +674,7 @@ interface ChatMessagesProps {
   liveActivityEvents: ProcessedEvent[];
   historicalActivities: Record<string, ProcessedEvent[]>;
   interrupt?: any;
-  onInterruptResume?: (approved: boolean) => void;
+  onInterruptResume?: (approved: boolean | string[]) => void;
   onNewSession?: () => void; // 新增：新建会话回调
   onHistoryToggle?: () => void; // 新增：历史会话抽屉切换回调
   availableModels?: Array<{id: string, name: string, provider: string, type: string}>; // 新增：可用模型列表
@@ -819,7 +799,13 @@ function ChatMessages({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed'; progress?: number }>>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ 
+    file: File; 
+    fileId: string; 
+    status: 'uploading' | 'processing' | 'success' | 'failed'; 
+    progress?: number;
+    processingMessage?: string;
+  }>>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [currentFileIds, setCurrentFileIds] = useState<string[]>([]);
   const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
@@ -995,6 +981,21 @@ function ChatMessages({
             }
             return updated;
           });
+        });
+        
+        // 上传完成，更新为处理状态
+        setUploadedFiles(prev => {
+          const updated = [...prev];
+          if (updated[currentIndex]) {
+            updated[currentIndex] = {
+              ...updated[currentIndex],
+              fileId: result.file_id,
+              status: 'processing',
+              progress: 100,
+              processingMessage: '正在解析文件内容...'
+            };
+          }
+          return updated;
         });
         
         // 等待文件处理完成
@@ -1186,7 +1187,7 @@ function ChatMessages({
         <div className="flex items-center gap-2">
           <Bot className={cn("h-5 w-5", isDark ? "text-cyan-400" : "text-blue-600")} />
           <span className={cn("font-semibold", isDark ? "text-white" : "text-gray-900")}>
-            {agent?.agent_name || agent?.display_name || null}
+            {agent?.agent_name || null}
           </span>
         </div>
         
@@ -1244,9 +1245,7 @@ function ChatMessages({
                 />
               ) : (
                 <DiagnosticAgentWelcome 
-                  onDiagnose={() => {}} 
-                  onContinueChat={() => {}}
-                  onStartDiagnosis={handleStartDiagnosis}
+                  onSwitchToChat={() => {}}
                 />
               )}
             </div>
@@ -1477,7 +1476,7 @@ function ChatMessages({
                       <div className="flex gap-1 mt-2 ml-12">
                         <Button
                           variant="ghost"
-                          size="small"
+                          size="sm"
                           className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
                           onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
                           title={copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
@@ -1486,7 +1485,7 @@ function ChatMessages({
                         </Button>
                         <Button
                           variant="ghost"
-                          size="small"
+                          size="sm"
                           className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
                           onClick={async () => {
                             try {
@@ -1511,7 +1510,7 @@ function ChatMessages({
                         {idx === dialogRounds.length - 1 && (
                           <Button
                             variant="ghost"
-                            size="small"
+                            size="sm"
                             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
                             onClick={() => {
                               // 重新生成回复 - 使用当前轮次的用户消息

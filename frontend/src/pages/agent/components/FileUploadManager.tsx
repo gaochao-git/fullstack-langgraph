@@ -101,7 +101,13 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
 };
 
 interface FileListDisplayProps {
-  files: Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed'; progress?: number }>;
+  files: Array<{ 
+    file: File; 
+    fileId: string; 
+    status: 'uploading' | 'processing' | 'success' | 'failed'; 
+    progress?: number;
+    processingMessage?: string;
+  }>;
   onRemove: (index: number) => void;
   isDark: boolean;
 }
@@ -130,6 +136,8 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
                 "flex items-center gap-2 px-3 py-1 rounded-full text-sm",
                 item.status === 'uploading' 
                   ? (isDark ? "bg-blue-900 text-blue-200" : "bg-blue-100 text-blue-700")
+                  : item.status === 'processing'
+                    ? (isDark ? "bg-yellow-900 text-yellow-200" : "bg-yellow-100 text-yellow-700")
                   : item.status === 'success'
                     ? (isDark ? "bg-green-900 text-green-200" : "bg-green-100 text-green-700")
                     : (isDark ? "bg-red-900 text-red-200" : "bg-red-100 text-red-700")
@@ -145,6 +153,11 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
                   </div>
                   <span className="text-xs opacity-70">{item.progress || 0}%</span>
                 </div>
+              ) : item.status === 'processing' ? (
+                <div className="flex items-center gap-1">
+                  <div className="animate-spin h-3 w-3 border-2 border-yellow-500 border-t-transparent rounded-full" />
+                  <span className="text-xs">解析中...</span>
+                </div>
               ) : item.status === 'success' ? (
                 isImageFile(item.file.name) ? (
                   <Image className="h-3 w-3" />
@@ -157,7 +170,10 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
                 <X className="h-3 w-3" />
               )}
               <span className="flex items-center gap-1">
-                <span className="max-w-[200px] truncate" title={item.file.name}>
+                <span 
+                  className="max-w-[200px] truncate" 
+                  title={item.status === 'processing' ? `正在解析: ${item.file.name}` : item.file.name}
+                >
                   {item.file.name}
                 </span>
                 <span className="text-xs opacity-70">

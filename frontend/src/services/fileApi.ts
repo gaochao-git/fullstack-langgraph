@@ -76,10 +76,21 @@ export const fileApi = {
     }
   },
 
-  // 等待文件处理完成
-  async waitForFileReady(fileId: string, maxRetries: number = 30, interval: number = 1000): Promise<void> {
+  // 等待文件处理完成（支持进度回调）
+  async waitForFileReady(
+    fileId: string, 
+    maxRetries: number = 30, 
+    interval: number = 1000,
+    onStatusUpdate?: (status: FileProcessStatus) => void
+  ): Promise<void> {
     for (let i = 0; i < maxRetries; i++) {
       const status = await this.getFileStatus(fileId);
+      
+      // 回调状态更新
+      if (onStatusUpdate) {
+        onStatusUpdate(status);
+      }
+      
       if (status.status === 'ready') {
         return;
       } else if (status.status === 'failed') {
