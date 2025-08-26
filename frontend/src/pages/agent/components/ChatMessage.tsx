@@ -1549,20 +1549,6 @@ function ChatMessages({
             );
           })}
           
-          {/* 调试信息 */}
-          {/* {interrupt && (
-            <div className="mb-6 p-4 bg-red-100 border border-red-300 rounded">
-              <h3 className="text-red-800 font-bold">调试信息:</h3>
-              <pre className="text-xs text-red-700 overflow-auto">
-                {JSON.stringify(interrupt, null, 2)}
-              </pre>
-              <div className="mt-2">
-                <strong>batch_mode:</strong> {String(interrupt.value?.batch_mode)}
-              </div>
-            </div>
-          )} */}
-          
-          
           {/* 加载状态 - 当正在加载且最后一轮没有助手气泡时显示 */}
           {isLoading && (() => {
             const lastRound = dialogRounds[dialogRounds.length - 1];
