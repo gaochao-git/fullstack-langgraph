@@ -29,6 +29,7 @@ class OptimizerConfig:
     single_message_threshold: int = 50000  # 单条消息超过此token数触发MapReduce
     chunk_size: int = 20000  # 每个chunk的大小
     chunk_overlap: int = 1000  # chunk之间的重叠
+    map_reduce_all_roles: bool = False  # 是否对所有角色的消息进行MapReduce（默认只处理user消息）
     
     # 消息压缩配置
     enable_compression: bool = True
@@ -94,18 +95,14 @@ class MessageOptimizer:
         total_tokens = self.count_messages_tokens(messages)
         optimization_info["original_tokens"] = total_tokens
         
-        # 检查是否需要优化
-        if total_tokens < max_context_length * 0.5:
-            # 小于50%不需要优化
-            optimization_info["reason"] = "within_safe_range"
-            return messages, optimization_info
-        
-        # 1. 检查是否有超长的单条消息需要MapReduce
+        # 1. 先检查是否有超长的单条消息需要MapReduce（不管总量多少）
         optimized_messages = messages.copy()
         if self.config.enable_map_reduce and llm_instance:
             optimized_messages = await self._apply_map_reduce_if_needed(
                 optimized_messages, llm_instance, optimization_info
             )
+        elif self.config.enable_map_reduce and not llm_instance:
+            logger.warning("MapReduce 已启用但 LLM 实例不可用，跳过 MapReduce 处理")
         
         # 2. 检查总长度是否需要压缩
         current_tokens = self.count_messages_tokens(optimized_messages)
@@ -117,11 +114,30 @@ class MessageOptimizer:
                 optimized_messages, target_tokens, llm_instance, optimization_info
             )
         
+        # 记录最终结果
         optimization_info["optimized"] = len(optimization_info["strategies_used"]) > 0
         optimization_info["final_tokens"] = self.count_messages_tokens(optimized_messages)
         
+        # 如果没有进行任何优化，记录原因
+        if not optimization_info["optimized"]:
+            if total_tokens < max_context_length * 0.5:
+                optimization_info["reason"] = "within_safe_range"
+            else:
+                optimization_info["reason"] = "no_optimization_needed"
+        
         if optimization_info["optimized"]:
-            logger.info(f"消息优化完成: {optimization_info}")
+            # 计算优化效果
+            reduction = optimization_info["original_tokens"] - optimization_info["final_tokens"]
+            reduction_rate = (reduction / optimization_info["original_tokens"]) * 100
+            
+            logger.info(
+                f"📊 消息优化完成:\n"
+                f"  - 原始 tokens: {optimization_info['original_tokens']:,}\n"
+                f"  - 优化后 tokens: {optimization_info['final_tokens']:,}\n"
+                f"  - 减少 tokens: {reduction:,} ({reduction_rate:.1f}%)\n"
+                f"  - 使用策略: {', '.join(optimization_info['strategies_used'])}\n"
+                f"  - 上下文使用率: {(optimization_info['final_tokens'] / max_context_length * 100):.1f}%"
+            )
         
         return optimized_messages, optimization_info
     
@@ -137,9 +153,34 @@ class MessageOptimizer:
         for msg in messages:
             msg_tokens = self.count_tokens(msg.get("content", ""))
             
-            if msg_tokens > self.config.single_message_threshold and msg["role"] == "user":
+            # 获取消息角色（兼容 role 或 type 字段）
+            msg_role = msg.get("role", msg.get("type", "")).lower()
+            
+            # 判断是否为用户消息
+            # role 字段: user → 用户消息
+            # type 字段: human → 用户消息
+            is_user_message = False
+            if "role" in msg:
+                is_user_message = msg.get("role", "").lower() == "user"
+            elif "type" in msg:
+                is_user_message = msg.get("type", "").lower() == "human"
+            
+            # 调试日志：显示消息结构
+            if msg_tokens > 100:  # 只对较长消息输出调试信息
+                logger.debug(
+                    f"消息分析 - tokens: {msg_tokens}, role/type: '{msg_role}', "
+                    f"是用户消息: {is_user_message}, 阈值: {self.config.single_message_threshold}"
+                )
+            
+            # 只处理用户消息，系统消息通常是重要的提示词不应被压缩
+            if msg_tokens > self.config.single_message_threshold and is_user_message:
                 # 需要MapReduce处理
-                logger.info(f"检测到超长消息 ({msg_tokens} tokens)，启动MapReduce处理")
+                logger.info(
+                    f"🔍 检测到超长消息:\n"
+                    f"  - 消息长度: {msg_tokens:,} tokens\n"
+                    f"  - 触发阈值: {self.config.single_message_threshold:,} tokens\n"
+                    f"  - 启动 MapReduce 处理..."
+                )
                 
                 try:
                     reduced_content = await self._map_reduce_content(
@@ -148,16 +189,41 @@ class MessageOptimizer:
                         llm_instance
                     )
                     
-                    result_messages.append({
-                        "role": msg["role"],
-                        "content": f"[已优化的长文本]\n{reduced_content}"
-                    })
+                    # 计算优化后的token数
+                    reduced_tokens = self.count_tokens(reduced_content)
+                    reduction_rate = ((msg_tokens - reduced_tokens) / msg_tokens) * 100
+                    
+                    logger.info(
+                        f"✅ MapReduce 完成:\n"
+                        f"  - 原始长度: {msg_tokens:,} tokens\n"
+                        f"  - 优化后长度: {reduced_tokens:,} tokens\n"
+                        f"  - 压缩率: {reduction_rate:.1f}%"
+                    )
+                    
+                    # 保持原消息的字段结构（role 或 type）
+                    optimized_msg = {}
+                    if "role" in msg:
+                        optimized_msg["role"] = msg["role"]
+                    elif "type" in msg:
+                        optimized_msg["type"] = msg["type"]
+                    optimized_msg["content"] = f"[已优化的长文本]\n{reduced_content}"
+                    
+                    result_messages.append(optimized_msg)
                     
                     optimization_info["strategies_used"].append("map_reduce")
                     
                 except Exception as e:
                     logger.error(f"MapReduce处理失败: {e}")
                     result_messages.append(msg)  # 失败时保留原消息
+            elif msg_tokens > self.config.single_message_threshold and not is_user_message:
+                # 超长但不是用户消息
+                logger.info(
+                    f"⚠️ 检测到超长非用户消息:\n"
+                    f"  - 消息长度: {msg_tokens:,} tokens\n"
+                    f"  - 消息类型: {msg_role}\n"
+                    f"  - 跳过 MapReduce 处理（仅处理用户消息）"
+                )
+                result_messages.append(msg)
             else:
                 result_messages.append(msg)
         
@@ -177,7 +243,16 @@ class MessageOptimizer:
         """
         # 分块
         chunks = self._split_text(content)
-        logger.info(f"内容分为 {len(chunks)} 个块进行处理")
+        total_chars = len(content)
+        avg_chunk_size = total_chars // len(chunks) if chunks else 0
+        
+        logger.info(
+            f"📄 MapReduce 分块信息:\n"
+            f"  - 总字符数: {total_chars:,}\n"
+            f"  - 分块数量: {len(chunks)}\n"
+            f"  - 平均块大小: {avg_chunk_size:,} 字符\n"
+            f"  - 块大小配置: {self.config.chunk_size:,} tokens"
+        )
         
         # Map阶段：并行处理每个块
         map_tasks = []
@@ -232,12 +307,24 @@ class MessageOptimizer:
         optimization_info: Dict[str, Any]
     ) -> List[Dict[str, str]]:
         """压缩消息历史"""
+        original_count = len(messages)
+        original_tokens = self.count_messages_tokens(messages)
+        
+        logger.info(
+            f"📦 开始压缩历史消息:\n"
+            f"  - 原始消息数: {original_count}\n"
+            f"  - 原始 tokens: {original_tokens:,}\n"
+            f"  - 目标 tokens: {target_tokens:,}\n"
+            f"  - 压缩策略: 保留系统消息 + 最近 {self.config.keep_recent_messages} 条消息"
+        )
         # 分离不同类型的消息
         system_messages = []
         other_messages = []
         
         for msg in messages:
-            if msg["role"] == "system" and self.config.keep_system_messages:
+            msg_role = msg.get("role", msg.get("type", "")).lower()
+            # system role 或 system type 都视为系统消息
+            if msg_role == "system" and self.config.keep_system_messages:
                 system_messages.append(msg)
             else:
                 other_messages.append(msg)
@@ -254,13 +341,32 @@ class MessageOptimizer:
             try:
                 summary = await self._summarize_messages(historical_messages, llm_instance)
                 
+                # 创建摘要消息，保持字段格式一致
+                summary_msg = {"content": f"[历史对话摘要]\n{summary}"}
+                # 使用第一个消息的格式来决定用 role 还是 type
+                if messages and "role" in messages[0]:
+                    summary_msg["role"] = "system"
+                elif messages and "type" in messages[0]:
+                    summary_msg["type"] = "system"
+                else:
+                    summary_msg["role"] = "system"  # 默认使用 role
+                
                 compressed_messages = (
                     system_messages + 
-                    [{
-                        "role": "system",
-                        "content": f"[历史对话摘要]\n{summary}"
-                    }] +
+                    [summary_msg] +
                     recent_messages
+                )
+                
+                # 计算压缩效果
+                compressed_count = len(compressed_messages)
+                compressed_tokens = self.count_messages_tokens(compressed_messages)
+                
+                logger.info(
+                    f"✅ 历史压缩完成:\n"
+                    f"  - 消息数: {original_count} → {compressed_count}\n"
+                    f"  - Tokens: {original_tokens:,} → {compressed_tokens:,}\n"
+                    f"  - 压缩率: {((original_tokens - compressed_tokens) / original_tokens * 100):.1f}%\n"
+                    f"  - 历史消息生成摘要: {len(historical_messages)} 条 → 1 条摘要"
                 )
                 
                 optimization_info["strategies_used"].append("compression")
@@ -279,8 +385,15 @@ class MessageOptimizer:
         optimization_info: Dict[str, Any]
     ) -> List[Dict[str, str]]:
         """滑动窗口压缩"""
-        system_messages = [m for m in messages if m["role"] == "system"]
-        other_messages = [m for m in messages if m["role"] != "system"]
+        system_messages = []
+        other_messages = []
+        
+        for m in messages:
+            msg_role = m.get("role", m.get("type", "")).lower()
+            if msg_role == "system":
+                system_messages.append(m)
+            else:
+                other_messages.append(m)
         
         # 计算系统消息的token数
         system_tokens = self.count_messages_tokens(system_messages)
@@ -366,11 +479,17 @@ class MessageOptimizer:
         llm_instance: Any
     ) -> str:
         """生成消息摘要"""
-        conversation = "\n".join([
-            f"{msg['role'].upper()}: {msg['content'][:500]}..."
-            if len(msg['content']) > 500 else f"{msg['role'].upper()}: {msg['content']}"
-            for msg in messages
-        ])
+        conversation_parts = []
+        for msg in messages:
+            # 获取角色，兼容 role 和 type
+            role = msg.get('role', msg.get('type', 'unknown')).upper()
+            content = msg.get('content', '')
+            if len(content) > 500:
+                conversation_parts.append(f"{role}: {content[:500]}...")
+            else:
+                conversation_parts.append(f"{role}: {content}")
+        
+        conversation = "\n".join(conversation_parts)
         
         prompt = f"""
 请将以下对话历史总结为关键要点，保留重要信息和上下文：
@@ -550,12 +669,48 @@ async def optimize_messages_if_needed(
             # 如果无法获取 LLM，禁用需要 LLM 的功能
             config.enable_map_reduce = False
             config.enable_compression = False
+        else:
+            logger.info(f"✅ LLM 实例已准备就绪，MapReduce={config.enable_map_reduce}, Compression={config.enable_compression}")
     
     # 执行优化
     optimizer = message_optimizer
     optimizer.config = config
     
     messages = graph_input["messages"]
+    message_count = len(messages)
+    total_tokens = optimizer.count_messages_tokens(messages)
+    
+    
+    # 分析每条消息的长度
+    message_details = []
+    max_single_tokens = 0
+    for i, msg in enumerate(messages):
+        msg_tokens = optimizer.count_tokens(msg.get("content", ""))
+        max_single_tokens = max(max_single_tokens, msg_tokens)
+        if msg_tokens > 100:  # 只记录较长的消息
+            role = msg.get('role', msg.get('type', 'unknown'))  # 兼容 role 或 type 字段
+            # 如果是第一条消息且角色未知，输出消息的键
+            if i == 0 and role == 'unknown':
+                msg_keys = list(msg.keys()) if isinstance(msg, dict) else []
+                message_details.append(f"    - {role}[{i}]: {msg_tokens:,} tokens (keys: {msg_keys})")
+            else:
+                message_details.append(f"    - {role}[{i}]: {msg_tokens:,} tokens")
+    
+    log_message = (
+        f"🚀 开始消息优化:\n"
+        f"  - 消息数量: {message_count}\n"
+        f"  - 总 tokens: {total_tokens:,}\n"
+        f"  - 最大单条: {max_single_tokens:,} tokens\n"
+        f"  - 上下文限制: {max_context_length:,}\n"
+        f"  - 使用率: {(total_tokens / max_context_length * 100):.1f}%\n"
+        f"  - MapReduce阈值: {config.single_message_threshold:,} tokens"
+    )
+    
+    if message_details:
+        log_message += f"\n  - 详细消息长度:\n" + "\n".join(message_details)
+    
+    logger.info(log_message)
+    
     optimized_messages, info = await optimizer.optimize_messages(
         messages, 
         max_context_length,
@@ -565,9 +720,9 @@ async def optimize_messages_if_needed(
     # 更新消息
     graph_input["messages"] = optimized_messages
     
-    # 记录日志
+    # 记录日志（简洁版，详细信息已在 optimize_messages 中输出）
     if info.get("optimized"):
         logger.info(
-            f"✅ 消息优化完成 - 策略: {', '.join(info.get('strategies_used', []))}, "
-            f"tokens: {info['original_tokens']} → {info['final_tokens']}"
+            f"🎯 优化器执行完成 - "
+            f"策略: {', '.join(info.get('strategies_used', []))}"
         )

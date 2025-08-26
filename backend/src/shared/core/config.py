@@ -109,6 +109,18 @@ class Settings(BaseSettings):
     # 多模态服务配置 (用于独立的多模态服务，现已集成到agent内部)
     MULTIMODAL_SERVICE_URL: Optional[str] = None
     MULTIMODAL_SERVICE_TIMEOUT: int = 30
+    
+    # 消息优化器配置
+    MESSAGE_OPTIMIZER_ENABLED: bool = False  # 总开关
+    MESSAGE_OPTIMIZER_MODEL_NAME: str = "deepseek-chat"  # 优化器使用的模型
+    # 单条消息优化（MapReduce）
+    SINGLE_MSG_ENABLE_MAP_REDUCE: bool = True
+    SINGLE_MSG_TOKEN_THRESHOLD: int = 50000
+    SINGLE_MSG_CHUNK_SIZE: int = 20000
+    # 多轮会话优化（压缩）
+    MULTI_TURN_ENABLE_COMPRESSION: bool = True
+    MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8
+    MULTI_TURN_COMPRESSION_TARGET: float = 0.6
     MULTIMODAL_SERVICE_API_KEY: Optional[str] = None
     
     class Config:
