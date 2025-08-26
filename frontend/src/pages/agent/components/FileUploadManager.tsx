@@ -101,7 +101,7 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
 };
 
 interface FileListDisplayProps {
-  files: Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed' }>;
+  files: Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed'; progress?: number }>;
   onRemove: (index: number) => void;
   isDark: boolean;
 }
@@ -136,7 +136,15 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
               )}
             >
               {item.status === 'uploading' ? (
-                <div className="animate-spin h-3 w-3 border-2 border-current border-t-transparent rounded-full" />
+                <div className="flex items-center gap-1">
+                  <div className="w-16 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${item.progress || 0}%` }}
+                    />
+                  </div>
+                  <span className="text-xs opacity-70">{item.progress || 0}%</span>
+                </div>
               ) : item.status === 'success' ? (
                 isImageFile(item.file.name) ? (
                   <Image className="h-3 w-3" />
@@ -281,7 +289,7 @@ export const fileUploadUtils = {
     const ext = getFileExtension(file.name);
     const allExtensions = Object.values(FILE_EXTENSIONS).flat();
     
-    return validTypes.includes(file.type) || allExtensions.includes(ext);
+    return validTypes.includes(file.type) || allExtensions.includes(ext as any);
   },
 
   // 验证文件大小（默认最大 10MB）

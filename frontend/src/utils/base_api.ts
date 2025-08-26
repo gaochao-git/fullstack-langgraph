@@ -211,6 +211,8 @@ export interface RequestConfig {
   returnRaw?: boolean;
   // 新增：是否显示全局loading（默认true）
   showLoading?: boolean;
+  // 新增：上传进度回调
+  onUploadProgress?: (progressEvent: any) => void;
 }
 
 // 流式请求配置接口
@@ -233,7 +235,8 @@ export async function omind_axios(url: string, config: RequestConfig = {}): Prom
     body,
     timeout = 30000,
     returnRaw = false,
-    showLoading = true
+    showLoading = true,
+    onUploadProgress
   } = config;
 
   // 构建 axios 配置
@@ -245,6 +248,11 @@ export async function omind_axios(url: string, config: RequestConfig = {}): Prom
     showLoading,
     returnRaw,
   };
+
+  // 添加上传进度回调
+  if (onUploadProgress) {
+    axiosConfig.onUploadProgress = onUploadProgress;
+  }
 
   // 添加请求体
   if (body) {
@@ -401,6 +409,9 @@ export const omind_del = (url: string, config: Omit<RequestConfig, 'method'> = {
 export const omind_patch = (url: string, body?: any, config: Omit<RequestConfig, 'method' | 'body'> = {}) => {
   return omind_axios(url, { ...config, method: 'PATCH', body });
 };
+
+// 导出 axios 实例，供需要自定义配置的场景使用
+export { axiosInstance };
 
 // 默认导出
 export default {

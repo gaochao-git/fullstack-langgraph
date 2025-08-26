@@ -1,4 +1,4 @@
-import { omind_post, omind_get } from '@/utils/base_api';
+import { omind_get, omind_post } from '@/utils/base_api';
 
 export interface FileUploadResponse {
   file_id: string;
@@ -27,38 +27,32 @@ export interface FileProcessStatus {
 }
 
 export const fileApi = {
-  // 上传文件
-  async uploadFile(file: File): Promise<FileUploadResponse> {
+  // 上传文件（支持进度回调）
+  async uploadFile(
+    file: File, 
+    onProgress?: (percent: number) => void
+  ): Promise<FileUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
     
-    // 使用原生 fetch，因为 omind_post 可能不支持 FormData
-    // 获取 token（如果需要认证）
-    const token = localStorage.getItem('access_token');
-    const headers: any = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    const response = await fetch('/api/v1/agents/files/upload', {
-      method: 'POST',
-      body: formData,
-      headers: headers
-      // 不要设置 Content-Type，让浏览器自动设置 multipart/form-data
+    const response = await omind_post('/api/v1/agents/files/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (progressEvent.total && onProgress) {
+          const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentComplete);
+        }
+      }
     });
     
-    const result = await response.json();
-    
-    if (!response.ok) {
-      // 如果HTTP状态码不是2xx，使用返回的错误消息
-      throw new Error(result.msg || `上传失败: ${response.statusText}`);
-    }
-    
-    if (result.status === 'ok' && result.data) {
-      return result.data;
+    // response 已经是处理后的数据
+    if (response.status === 'ok' && response.data) {
+      return response.data;
     } else {
       // 业务错误，使用返回的错误消息
-      throw new Error(result.msg || '上传失败');
+      throw new Error(response.msg || '上传失败');
     }
   },
 

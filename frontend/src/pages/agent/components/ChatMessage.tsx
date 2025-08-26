@@ -819,7 +819,7 @@ function ChatMessages({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed' }>>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ file: File; fileId: string; status: 'uploading' | 'success' | 'failed'; progress?: number }>>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [currentFileIds, setCurrentFileIds] = useState<string[]>([]);
   const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
@@ -972,7 +972,8 @@ function ChatMessages({
     const newUploadedFiles = files.map(file => ({
       file,
       fileId: '',
-      status: 'uploading' as const
+      status: 'uploading' as const,
+      progress: 0
     }));
     
     setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
@@ -982,7 +983,19 @@ function ChatMessages({
     const uploadPromises = files.map(async (file, index) => {
       const currentIndex = uploadedFiles.length + index;
       try {
-        const result = await fileApi.uploadFile(file);
+        const result = await fileApi.uploadFile(file, (progress) => {
+          // 更新上传进度
+          setUploadedFiles(prev => {
+            const updated = [...prev];
+            if (updated[currentIndex]) {
+              updated[currentIndex] = {
+                ...updated[currentIndex],
+                progress
+              };
+            }
+            return updated;
+          });
+        });
         
         // 等待文件处理完成
         await fileApi.waitForFileReady(result.file_id);
