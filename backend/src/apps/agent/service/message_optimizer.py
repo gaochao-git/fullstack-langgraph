@@ -62,8 +62,8 @@ class MessageOptimizer:
         """计算消息列表的总token数"""
         total = 0
         for msg in messages:
-            # 角色和内容的token
-            total += self.count_tokens(msg.get("role", ""))
+            # LangGraph使用type字段
+            total += self.count_tokens(msg.get("type", ""))
             total += self.count_tokens(msg.get("content", ""))
             # 消息格式的额外开销
             total += 4
@@ -153,22 +153,14 @@ class MessageOptimizer:
         for msg in messages:
             msg_tokens = self.count_tokens(msg.get("content", ""))
             
-            # 获取消息角色（兼容 role 或 type 字段）
-            msg_role = msg.get("role", msg.get("type", "")).lower()
-            
-            # 判断是否为用户消息
-            # role 字段: user → 用户消息
-            # type 字段: human → 用户消息
-            is_user_message = False
-            if "role" in msg:
-                is_user_message = msg.get("role", "").lower() == "user"
-            elif "type" in msg:
-                is_user_message = msg.get("type", "").lower() == "human"
+            # LangGraph使用type字段: human=用户, ai=助手, system=系统
+            msg_type = msg.get("type", "").lower()
+            is_user_message = (msg_type == "human")
             
             # 调试日志：显示消息结构
             if msg_tokens > 100:  # 只对较长消息输出调试信息
                 logger.debug(
-                    f"消息分析 - tokens: {msg_tokens}, role/type: '{msg_role}', "
+                    f"消息分析 - tokens: {msg_tokens}, type: '{msg_type}', "
                     f"是用户消息: {is_user_message}, 阈值: {self.config.single_message_threshold}"
                 )
             
@@ -687,6 +679,14 @@ async def optimize_messages_if_needed(
     for i, msg in enumerate(messages):
         msg_tokens = optimizer.count_tokens(msg.get("content", ""))
         max_single_tokens = max(max_single_tokens, msg_tokens)
+        
+        # 打印第一条消息的完整结构
+        if i == 0:
+            logger.info(f"🔍 第一条消息的完整结构: {msg}")
+            logger.info(f"🔍 消息类型: {type(msg)}")
+            if hasattr(msg, '__dict__'):
+                logger.info(f"🔍 消息属性: {msg.__dict__}")
+        
         if msg_tokens > 100:  # 只记录较长的消息
             role = msg.get('role', msg.get('type', 'unknown'))  # 兼容 role 或 type 字段
             # 如果是第一条消息且角色未知，输出消息的键
