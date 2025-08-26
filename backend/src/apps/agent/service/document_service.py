@@ -249,35 +249,104 @@ class DocumentService:
                     from .multimodal_service import multimodal_service
                     # 检查是否配置了视觉模型
                     if settings.VISION_API_KEY:
+                        # 收集所有图片数据
+                        images = []
                         image_count = 0
                         for rel in doc.part.rels.values():
                             if "image" in rel.reltype:
                                 image_count += 1
+                                images.append({
+                                    'index': image_count,
+                                    'data': rel.target_part.blob
+                                })
+                        
+                        if images:
+                            logger.info(f"Word文档包含 {len(images)} 张图片，开始并发处理...")
+                            
+                            # 创建并发任务
+                            async def process_single_image(image_info):
+                                """处理单张图片的异步函数"""
+                                index = image_info['index']
                                 try:
-                                    # 提取图片数据
-                                    image_data = rel.target_part.blob
-                                    
-                                    # 调用多模态服务
                                     result = await multimodal_service.extract_image_content(
-                                        image_data,
+                                        image_info['data'],
                                         options={
                                             'prompt': '请详细描述这张图片的内容，如果是图表请提取其中的数据和信息。'
                                         }
                                     )
                                     
                                     if result['success']:
-                                        content_parts.append(f"\n[图片 {image_count}]\n{result['content']}\n")
-                                        logger.info(f"成功提取图片 {image_count} 内容")
+                                        logger.info(f"成功提取图片 {index} 内容")
+                                        return {
+                                            'index': index,
+                                            'content': result['content'],
+                                            'success': True
+                                        }
                                     else:
-                                        content_parts.append(f"\n[图片 {image_count}：无法识别]\n")
-                                        logger.warning(f"图片 {image_count} 提取失败: {result.get('error', '未知错误')}")
-                                        
+                                        logger.warning(f"图片 {index} 提取失败: {result.get('error', '未知错误')}")
+                                        return {
+                                            'index': index,
+                                            'content': None,
+                                            'success': False,
+                                            'error': result.get('error', '未知错误')
+                                        }
                                 except Exception as e:
-                                    logger.error(f"处理图片 {image_count} 时出错: {e}")
-                                    content_parts.append(f"\n[图片 {image_count}：处理失败]\n")
-                        
-                        if image_count > 0:
-                            logger.info(f"Word文档包含 {image_count} 张图片")
+                                    logger.error(f"处理图片 {index} 时出错: {e}")
+                                    return {
+                                        'index': index,
+                                        'content': None,
+                                        'success': False,
+                                        'error': str(e)
+                                    }
+                            
+                            # 限制并发数，避免API限流
+                            import asyncio
+                            MAX_CONCURRENT = settings.IMAGE_PROCESS_MAX_CONCURRENT  # 从配置读取最大并发数
+                            
+                            # 使用信号量控制并发数
+                            semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+                            
+                            async def process_with_semaphore(image_info):
+                                async with semaphore:
+                                    try:
+                                        # 添加超时控制
+                                        return await asyncio.wait_for(
+                                            process_single_image(image_info), 
+                                            timeout=settings.IMAGE_PROCESS_TIMEOUT
+                                        )
+                                    except asyncio.TimeoutError:
+                                        logger.error(f"处理图片 {image_info['index']} 超时")
+                                        return {
+                                            'index': image_info['index'],
+                                            'content': None,
+                                            'success': False,
+                                            'error': f'处理超时（{settings.IMAGE_PROCESS_TIMEOUT}秒）'
+                                        }
+                            
+                            # 并发处理所有图片
+                            tasks = [process_with_semaphore(img) for img in images]
+                            results = await asyncio.gather(*tasks, return_exceptions=True)
+                            
+                            # 处理结果
+                            image_results = {}
+                            for result in results:
+                                if isinstance(result, Exception):
+                                    logger.error(f"图片处理任务异常: {result}")
+                                elif isinstance(result, dict):
+                                    image_results[result['index']] = result
+                            
+                            # 按顺序添加图片内容到文档
+                            for i in range(1, len(images) + 1):
+                                if i in image_results:
+                                    result = image_results[i]
+                                    if result['success'] and result['content']:
+                                        content_parts.append(f"\n[图片 {i}]\n{result['content']}\n")
+                                    else:
+                                        content_parts.append(f"\n[图片 {i}：无法识别 - {result.get('error', '未知错误')}]\n")
+                                else:
+                                    content_parts.append(f"\n[图片 {i}：处理失败]\n")
+                            
+                            logger.info(f"图片并发处理完成，成功处理 {sum(1 for r in image_results.values() if r['success'])} 张图片")
                     
                     # 处理表格
                     for table in doc.tables:

@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 50  # 最大上传文件大小（MB）- 增加到50MB以支持大文档
     UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".xlsx"]  # 允许的文件扩展名
     
+    # 图片处理并发配置
+    IMAGE_PROCESS_MAX_CONCURRENT: int = 5  # 图片处理最大并发数
+    IMAGE_PROCESS_TIMEOUT: int = 30  # 单张图片处理超时时间（秒）
+    
     # 文档目录配置
     DOCUMENT_DIR: str = "documents"  # 文档根目录，包含 uploads/, templates/, generated/ 子目录
 

@@ -1305,9 +1305,9 @@ function ChatMessages({
                       <div 
                         className="rounded-2xl break-words min-h-7 overflow-x-auto min-w-fit px-4 py-2.5 border"
                         style={{ 
-                          backgroundColor: token.colorPrimary,
+                          backgroundColor: isDark ? token.colorPrimaryBg : '#e6f4ff',
                           borderColor: token.colorPrimaryBorder,
-                          color: token.colorTextLightSolid
+                          color: isDark ? token.colorText : token.colorPrimaryText
                         }}
                       >
                         <span className="whitespace-pre-wrap">
