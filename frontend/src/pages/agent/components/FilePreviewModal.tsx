@@ -30,6 +30,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   // 支持预览的文本文件类型
   const isTextPreviewable = ['.txt', '.md'].includes(fileType.toLowerCase());
   
+  // 支持预览的表格文件类型
+  const isTablePreviewable = ['.csv'].includes(fileType.toLowerCase());
+  
   // 支持预览的图片文件类型
   const isImagePreviewable = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'].includes(fileType.toLowerCase());
   
@@ -37,7 +40,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const isPdfPreviewable = ['.pdf'].includes(fileType.toLowerCase());
   
   // 是否支持预览
-  const isPreviewable = isTextPreviewable || isImagePreviewable || isPdfPreviewable;
+  const isPreviewable = isTextPreviewable || isTablePreviewable || isImagePreviewable || isPdfPreviewable;
 
   useEffect(() => {
     if (visible && fileId && isPreviewable) {
@@ -75,8 +78,8 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         const blob = await fileApi.downloadDocument(fileId);
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
-      } else if (isTextPreviewable) {
-        // 获取文本内容
+      } else if (isTextPreviewable || isTablePreviewable) {
+        // 获取文本或表格内容
         const docContent = await fileApi.getDocumentContent(fileId);
         setContent(docContent.content || '文件内容为空');
       }
@@ -107,6 +110,93 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     } catch (error) {
       message.error('文件下载失败');
       console.error('下载失败:', error);
+    }
+  };
+
+  // 渲染CSV表格
+  const renderCsvTable = (csvContent: string) => {
+    try {
+      // 解析CSV内容
+      const lines = csvContent.split('\n').filter(line => line.trim());
+      const rows: string[][] = [];
+      let isHeader = true;
+      let headerIndex = -1;
+
+      // 查找表头标记
+      lines.forEach((line, index) => {
+        if (line.includes('[表头]')) {
+          headerIndex = index + 1;
+          return;
+        }
+        if (line.includes('[CSV文件]') || line.includes('编码:') || line.includes('行数:') || line === '') {
+          return;
+        }
+        
+        // 解析CSV行
+        const cells = line.split('|').map(cell => cell.trim());
+        if (cells.length > 1) {
+          rows.push(cells);
+        }
+      });
+
+      if (rows.length === 0) {
+        return <div className="text-center text-gray-500 py-8">CSV文件为空</div>;
+      }
+
+      // 渲染表格
+      return (
+        <table className={cn(
+          "min-w-full border-collapse",
+          isDark ? "bg-gray-800" : "bg-white"
+        )}>
+          <thead>
+            {rows[0] && (
+              <tr className={cn(
+                "border-b",
+                isDark ? "border-gray-700" : "border-gray-200"
+              )}>
+                {rows[0].map((cell, index) => (
+                  <th 
+                    key={index}
+                    className={cn(
+                      "px-4 py-2 text-left font-medium",
+                      isDark ? "text-gray-200 bg-gray-900" : "text-gray-900 bg-gray-50"
+                    )}
+                  >
+                    {cell}
+                  </th>
+                ))}
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {rows.slice(1).map((row, rowIndex) => (
+              <tr 
+                key={rowIndex}
+                className={cn(
+                  "border-b",
+                  isDark ? "border-gray-700 hover:bg-gray-700" : "border-gray-200 hover:bg-gray-50"
+                )}
+              >
+                {row.map((cell, cellIndex) => (
+                  <td 
+                    key={cellIndex}
+                    className={cn(
+                      "px-4 py-2",
+                      isDark ? "text-gray-300" : "text-gray-700"
+                    )}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    } catch (error) {
+      console.error('CSV解析错误:', error);
+      return <pre className="whitespace-pre-wrap">{csvContent}</pre>;
     }
   };
 
@@ -148,7 +238,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
           <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
             <FileText className="h-12 w-12 mb-2" />
             <p>该文件类型暂不支持预览</p>
-            <p className="text-sm mt-2">支持预览的格式：文本(.txt, .md) 图片(.png, .jpg, .jpeg, .gif, .bmp, .webp) PDF(.pdf)</p>
+            <p className="text-sm mt-2">支持预览的格式：文本(.txt, .md, .csv) 图片(.png, .jpg, .jpeg, .gif, .bmp, .webp) PDF(.pdf)</p>
           </div>
         ) : isImagePreviewable && imageUrl ? (
           <div className="flex items-center justify-center">
@@ -172,6 +262,13 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
               className="w-full h-full border-0 rounded-lg"
               title={`PDF Preview: ${fileName}`}
             />
+          </div>
+        ) : isTablePreviewable ? (
+          <div className={cn(
+            "overflow-auto",
+            isDark ? "text-gray-100" : "text-gray-800"
+          )}>
+            {renderCsvTable(content)}
           </div>
         ) : isTextPreviewable ? (
           <pre className={cn(
