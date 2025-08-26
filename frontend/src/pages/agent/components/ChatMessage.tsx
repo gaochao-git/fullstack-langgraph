@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@langchain/langgraph-sdk";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, ArrowDown, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image, FileSpreadsheet } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -25,28 +25,8 @@ const HIDDEN_TOOLS = [
   'IntentAnalysisOutput'         // 意图分析输出
 ];
 
-// 支持预览的文件类型
-const PREVIEWABLE_EXTENSIONS = ['.txt', '.md', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.pdf'];
-
-// 图片文件扩展名
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'];
-
-// 统一的文件预览判断函数
-const isFilePreviewable = (fileName: string): boolean => {
-  const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-  return PREVIEWABLE_EXTENSIONS.includes(ext);
-};
-
-// 判断文件是否是图片
-const isImageFile = (fileName: string): boolean => {
-  const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-  return IMAGE_EXTENSIONS.includes(ext);
-};
-
-const isExcelFile = (fileName: string): boolean => {
-  const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-  return ['.xlsx', '.xls'].includes(ext);
-};
+// 使用 fileUploadUtils 中的辅助函数
+const { isFilePreviewable, isImageFile, isExcelFile } = fileUploadUtils;
 
 // 诊断消息中的事件类型
 export interface ProcessedEvent {
@@ -791,14 +771,11 @@ function ChatMessages({
   const { token } = theme.useToken();
   const { message } = App.useApp();
   const [inputValue, setInputValue] = useState<string>("");
-  const [uploadingClipboard, setUploadingClipboard] = useState<boolean>(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [downloadingMessageId, setDownloadingMessageId] = useState<string | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
-  const [showScrollButton, setShowScrollButton] = useState<boolean>(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ 
     file: File; 
     fileId: string; 
@@ -809,12 +786,6 @@ function ChatMessages({
   const [isUploading, setIsUploading] = useState(false);
   const [currentFileIds, setCurrentFileIds] = useState<string[]>([]);
   const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
-  
-  // 处理故障诊断开始 - 将诊断消息设置到输入框
-  const handleStartDiagnosis = (message: string) => {
-    setInputValue(message);
-  };
-  
   
   const handleCopy = async (text: string, messageId: string) => {
     try {
@@ -1094,15 +1065,7 @@ function ChatMessages({
     
     const atBottom = isAtBottom();
     setIsAutoScrollEnabled(atBottom);
-    setShowScrollButton(!atBottom);
   }, [isAtBottom]);
-
-  // 点击滚动按钮
-  // const handleScrollButtonClick = useCallback(() => {
-  //   setIsAutoScrollEnabled(true);
-  //   setShowScrollButton(false);
-  //   scrollToBottom();
-  // }, [scrollToBottom]);
 
   // 监听消息变化，自动滚动
   useEffect(() => {
@@ -1689,7 +1652,7 @@ function ChatMessages({
               {/* 上传文件按钮 */}
               {!(isLoading || interrupt) && (
                 <FileUploadManager
-                  selectedFiles={uploadedFiles.map(f => f.file)}
+                  selectedFiles={[]} // FileUploadManager只需要处理新选择的文件
                   onFilesSelect={handleFilesSelect}
                   onFileRemove={handleRemoveFile}
                   isDark={isDark}
@@ -1738,10 +1701,10 @@ function ChatMessages({
               ) : (
                 <button
                   type="submit"
-                  disabled={(!inputValue.trim() && selectedFiles.length === 0) || isLoading || isUploading || !!interrupt}
+                  disabled={(!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading || !!interrupt}
                   className={cn(
                     "p-2 rounded transition-colors duration-200 mr-1",
-                    ((!inputValue.trim() && selectedFiles.length === 0) || isLoading || isUploading || !!interrupt)
+                    ((!inputValue.trim() && uploadedFiles.length === 0) || isLoading || isUploading || !!interrupt)
                       ? "text-gray-400 cursor-not-allowed"
                       : "text-cyan-500 hover:bg-cyan-50 hover:text-cyan-600"
                   )}
@@ -1749,7 +1712,7 @@ function ChatMessages({
                     isLoading ? "等待AI响应中..." : 
                     isUploading ? "文件上传中..." : 
                     interrupt ? "请先处理人工确认..." :
-                    (!inputValue.trim() && selectedFiles.length === 0) ? "请输入消息或选择文件" :
+                    (!inputValue.trim() && uploadedFiles.length === 0) ? "请输入消息或选择文件" :
                     "发送消息"
                   }
                 >
