@@ -4,6 +4,8 @@
 import os
 import uuid
 import json
+import csv
+import io
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -254,6 +256,59 @@ class DocumentService:
                 except Exception as e:
                     logger.error(f"Word文档解析错误: {e}")
                     full_text = f"Word文档解析失败: {str(e)}"
+            elif file_ext == '.csv':
+                # CSV文件解析
+                try:
+                    content_parts = ["[CSV文件]"]
+                    
+                    # 尝试不同的编码
+                    encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
+                    csv_content = None
+                    used_encoding = None
+                    
+                    for encoding in encodings:
+                        try:
+                            with open(file_path, 'r', encoding=encoding) as f:
+                                csv_content = f.read()
+                                used_encoding = encoding
+                                break
+                        except UnicodeDecodeError:
+                            continue
+                    
+                    if csv_content is None:
+                        raise Exception("无法识别文件编码")
+                    
+                    # 使用csv模块解析
+                    csv_reader = csv.reader(io.StringIO(csv_content))
+                    rows = list(csv_reader)
+                    
+                    if rows:
+                        # 添加编码信息
+                        content_parts.append(f"编码: {used_encoding}")
+                        content_parts.append(f"行数: {len(rows)}")
+                        content_parts.append("")
+                        
+                        # 将CSV内容转换为表格格式
+                        for i, row in enumerate(rows):
+                            if i == 0:  # 如果第一行是表头，可以特殊标记
+                                content_parts.append("[表头]")
+                            row_text = " | ".join([cell.strip() for cell in row])
+                            content_parts.append(row_text)
+                            
+                            # 对于大文件，限制显示行数
+                            if i > 1000 and len(rows) > 1100:
+                                content_parts.append(f"\n... 省略 {len(rows) - 1001} 行 ...\n")
+                                break
+                    else:
+                        content_parts.append("(空文件)")
+                    
+                    full_text = "\n".join(content_parts)
+                    logger.info(f"CSV文件解析成功: {file_name}, 编码: {used_encoding}, 行数: {len(rows)}")
+                    
+                except Exception as e:
+                    logger.error(f"CSV文件解析错误: {e}")
+                    full_text = f"CSV文件解析失败: {str(e)}"
+                    
             elif file_ext == '.xlsx' and HAS_OPENPYXL:
                 # Excel文件解析
                 try:
