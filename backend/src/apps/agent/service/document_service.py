@@ -56,6 +56,11 @@ from ..models import AgentDocumentUpload
 UPLOAD_DIR = Path(settings.UPLOAD_DIR)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# 创建临时目录（用于存储转换的临时文件）
+TEMP_DIR = UPLOAD_DIR.parent / 'temp'
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+logger.info(f"临时文件目录: {TEMP_DIR}")
+
 # 从配置中获取支持的文件类型
 SUPPORTED_FILE_TYPES = settings.UPLOAD_ALLOWED_EXTENSIONS
 
@@ -203,22 +208,28 @@ class DocumentService:
                 # .doc 文件需要先转换为 .docx
                 logger.info(f"开始转换 .doc 文件: {file_name}")
                 try:
-                    with tempfile.TemporaryDirectory() as temp_dir:
-                        # 使用 LibreOffice 转换
-                        cmd = ['soffice', '--headless', '--convert-to', 'docx', '--outdir', temp_dir, str(file_path)]
-                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                        
-                        if result.returncode == 0:
-                            # 转换成功，更新文件路径为临时的 docx 文件
-                            temp_docx = Path(temp_dir) / (file_path.stem + '.docx')
-                            if temp_docx.exists():
-                                file_path = temp_docx
-                                file_ext = '.docx'
-                                logger.info(f".doc 转换成功，继续处理为 .docx")
-                            else:
-                                raise Exception("转换后的文件未找到")
+                    # 使用固定的临时目录，避免自动清理
+                    # 为避免文件名冲突，使用时间戳和文件ID
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    temp_subdir = TEMP_DIR / f"doc_conversion_{timestamp}_{file_id[:8]}"
+                    temp_subdir.mkdir(parents=True, exist_ok=True)
+                    
+                    # 使用 LibreOffice 转换
+                    cmd = ['soffice', '--headless', '--convert-to', 'docx', '--outdir', str(temp_subdir), str(file_path)]
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                    
+                    if result.returncode == 0:
+                        # 转换成功，更新文件路径为临时的 docx 文件
+                        temp_docx = temp_subdir / (file_path.stem + '.docx')
+                        if temp_docx.exists():
+                            file_path = temp_docx
+                            file_ext = '.docx'
+                            logger.info(f".doc 转换成功，临时文件位置: {temp_docx}")
+                            logger.info("提示：临时文件保留在 temp 目录中，可以手动清理")
                         else:
-                            raise Exception(f"LibreOffice 转换失败: {result.stderr}")
+                            raise Exception("转换后的文件未找到")
+                    else:
+                        raise Exception(f"LibreOffice 转换失败: {result.stderr}")
                 except Exception as e:
                     logger.error(f".doc 转换失败: {e}")
                     full_text = f".doc 文件转换失败：请确保安装了 LibreOffice。错误: {str(e)}"
