@@ -110,17 +110,8 @@ class Settings(BaseSettings):
     MULTIMODAL_SERVICE_URL: Optional[str] = None
     MULTIMODAL_SERVICE_TIMEOUT: int = 30
     
-    # 消息优化器配置
-    MESSAGE_OPTIMIZER_ENABLED: bool = False  # 总开关
-    MESSAGE_OPTIMIZER_MODEL_NAME: str = "deepseek-chat"  # 优化器使用的模型
-    # 单条消息优化（MapReduce）
-    SINGLE_MSG_ENABLE_MAP_REDUCE: bool = True
-    SINGLE_MSG_TOKEN_THRESHOLD: int = 50000
-    SINGLE_MSG_CHUNK_SIZE: int = 20000
-    # 多轮会话优化（压缩）
-    MULTI_TURN_ENABLE_COMPRESSION: bool = True
-    MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8
-    MULTI_TURN_COMPRESSION_TARGET: float = 0.6
+    # 消息监控配置
+    MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8  # 当总消息量超过模型上下文长度的多少比例时触发警告（默认 0.8 = 80%）
     MULTIMODAL_SERVICE_API_KEY: Optional[str] = None
     
     class Config:

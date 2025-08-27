@@ -120,6 +120,9 @@ class AgentConfigService:
                     }
                     if model_info.get('api_key'):
                         result['api_key'] = model_info['api_key']
+                    # Include context_length if available
+                    if model_info.get('context_length'):
+                        result['context_length'] = model_info['context_length']
                     return result
         
         # 如果没有指定模型或没找到，使用第一个配置
@@ -145,6 +148,9 @@ class AgentConfigService:
         }
         if model_info.get('api_key'):
             result['api_key'] = model_info['api_key']
+        # Include context_length if available
+        if model_info.get('context_length'):
+            result['context_length'] = model_info['context_length']
         return result
     
     @staticmethod
@@ -227,12 +233,25 @@ class AgentConfigService:
             ).first()
             
             if model:
-                return {
+                result = {
                     'endpoint_url': model.endpoint_url,
                     'api_key': model.api_key_value,
                     'provider': model.model_provider,
                     'model_name': model.model_name
                 }
+                
+                # Include config_data if available
+                if model.config_data:
+                    try:
+                        config_data = json.loads(model.config_data) if isinstance(model.config_data, str) else model.config_data
+                        result['config_data'] = config_data
+                        # Extract context_length for convenience
+                        if 'context_length' in config_data:
+                            result['context_length'] = config_data['context_length']
+                    except Exception as e:
+                        logger.debug(f"Failed to parse config_data: {e}")
+                
+                return result
             
             return {}
             

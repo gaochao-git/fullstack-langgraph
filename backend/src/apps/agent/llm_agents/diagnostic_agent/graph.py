@@ -10,6 +10,7 @@ from .state import DiagnosticState
 from .utils import compile_graph_with_checkpointer
 from .prompts import get_system_prompt
 from .tools import get_diagnostic_tools
+from src.apps.agent.llm_agents.hooks import create_monitor_hook
 from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -41,8 +42,16 @@ def create_main_graph(enable_tool_approval: bool = False):
         logger.debug(f"[Agent请求] 工具数量: {len(tools)}, 工具列表: {[tool.name if hasattr(tool, 'name') else str(tool) for tool in tools]}")
         logger.debug(f"[Agent请求] 系统提示词: {system_prompt[:100] if system_prompt else 'N/A'}...")
         
+        # 创建消息监控 hook，传入 llm_config
+        monitor_hook = create_monitor_hook(llm_config)
+        
         # 创建并执行智能体
-        agent = create_react_agent(model=llm, tools=tools, prompt=system_prompt)
+        agent = create_react_agent(
+            model=llm, 
+            tools=tools, 
+            prompt=system_prompt,
+            pre_model_hook=monitor_hook
+        )
         response = await agent.ainvoke(state, config)
         
         # 记录响应信息（DEBUG级别）
