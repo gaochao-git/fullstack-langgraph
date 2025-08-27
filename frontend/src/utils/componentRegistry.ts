@@ -20,6 +20,8 @@ export const componentRegistry = {
   
   'ModelsManagement': lazy(() => import('../pages/ai_model').then(m => ({ default: m.ModelsManagement }))),
   'KnowledgeManagement': lazy(() => import('../pages/kb').then(m => ({ default: m.KnowledgeManagement }))),
+  'KnowledgeBaseList': lazy(() => import('../pages/kb').then(m => ({ default: m.KnowledgeBaseList }))),
+  'KnowledgeBaseDetail': lazy(() => import('../pages/kb').then(m => ({ default: m.KnowledgeBaseDetail }))),
   
   'SOPManagement': lazy(() => import('../pages/sop').then(m => ({ default: m.SOPManagement }))),
   'SOPList': lazy(() => import('../pages/sop').then(m => ({ default: m.SOPList }))),

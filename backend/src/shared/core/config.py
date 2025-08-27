@@ -105,7 +105,11 @@ class Settings(BaseSettings):
     VISION_MODEL_NAME: str = "gpt-4-vision-preview"  # 视觉模型名称
     VISION_API_BASE_URL: str = "https://api.openai.com/v1"  # API地址
     VISION_API_KEY: Optional[str] = None  # API密钥
-    
+    # AI 嵌入模型配置
+    EMBEDDING_MODEL_NAME: str = "gpt-4-embedding"  # 视觉模型名称
+    EMBEDDING_API_BASE_URL: str = "https://api.openai.com/v1"  # API地址
+    EMBEDDING_API_KEY: Optional[str] = None  # API密钥
+
     # 多模态服务配置 (用于独立的多模态服务，现已集成到agent内部)
     MULTIMODAL_SERVICE_URL: Optional[str] = None
     MULTIMODAL_SERVICE_TIMEOUT: int = 30
