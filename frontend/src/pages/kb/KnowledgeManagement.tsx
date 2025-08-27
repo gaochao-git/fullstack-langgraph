@@ -287,46 +287,107 @@ const KnowledgeManagement: React.FC = () => {
     setUploadVisible(true);
   };
 
-  // 上传文件到知识库
-  const uploadFiles = async () => {
-    if (!selectedKB || fileList.length === 0) {
-      message.warning('请选择要上传的文件');
+  // 处理文件上传
+  const handleUploadFiles = async (options: any) => {
+    const { file, onSuccess, onError, onProgress } = options;
+    
+    if (!selectedKB) {
+      onError(new Error('请先选择知识库'));
       return;
     }
-    
+
     try {
-      setUploading(true);
+      // 获取当前文件夹ID（如果选中的是文件夹）
+      const folderId = selectedNode?.type === 'folder' ? selectedNode.data?.folder_id : undefined;
       
-      // 确定目标目录ID
-      const folderId = selectedNode?.type === 'folder' 
-        ? (selectedNode.data?.folder_id || null) 
-        : null;
-      
-      // 这里应该调用实际的上传API
-      // 暂时模拟上传过程
-      for (let i = 0; i < fileList.length; i++) {
-        const file = fileList[i];
-        // TODO: 调用实际的文件上传API
-        // await kbApi.uploadDocument(selectedKB.kb_id, file, folderId);
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 模拟上传延迟
+      // 上传文件
+      const response = await kbApi.uploadDocument(
+        selectedKB.kb_id,
+        file,
+        folderId,
+        (percent) => {
+          onProgress({ percent });
+        }
+      );
+
+      if (response.status === 'ok') {
+        onSuccess(response.data);
+        message.success(`${file.name} 上传成功`);
+        
+        // 刷新文档列表
+        if (selectedNode?.type === 'folder' || selectedNode?.type === 'kb') {
+          // 如果是文件夹或知识库，刷新文档列表
+          const currentFolderId = selectedNode.type === 'folder' ? selectedNode.data?.folder_id : null;
+          await loadDocuments(selectedKB.kb_id, currentFolderId, currentPage);
+        }
+        
+        // 上传成功后更新文件列表状态
+        setFileList(prev => {
+          const updated = prev.map(f => 
+            f.uid === file.uid 
+              ? { ...f, status: 'done' as const }
+              : f
+          );
+          
+          // 检查是否所有文件都已上传完成
+          const allDone = updated.every(f => f.status === 'done' || f.status === 'error');
+          if (allDone) {
+            // 延迟关闭，让用户看到上传结果
+            setTimeout(() => {
+              setUploadVisible(false);
+              setFileList([]);
+            }, 1000);
+          }
+          
+          return updated;
+        });
+      } else {
+        onError(new Error(response.msg || '上传失败'));
+        // 上传失败后更新文件列表状态
+        setFileList(prev => prev.map(f => 
+          f.uid === file.uid 
+            ? { ...f, status: 'error' as const }
+            : f
+        ));
       }
-      
-      message.success(`成功上传 ${fileList.length} 个文件到${folderId ? '指定目录' : '根目录'}`);
-      setFileList([]);
-      setUploadVisible(false);
-      
-      // 上传完成后刷新文档列表
-      if (selectedNode?.type === 'folder' && selectedNode.kbId) {
-        loadDocuments(selectedNode.kbId, selectedNode.data?.folder_id || null, currentPage);
-      }
-      
-    } catch (error) {
-      console.error('上传失败:', error);
-      message.error('上传失败，请重试');
-    } finally {
-      setUploading(false);
+    } catch (error: any) {
+      onError(error);
+      message.error(`${file.name} 上传失败: ${error.message}`);
     }
   };
+
+  // 批量上传前的校验
+  const beforeUpload = async (file: File) => {
+    try {
+      // 获取上传配置
+      const config = await configService.getUploadConfig();
+      
+      // 检查文件大小
+      const maxSize = config.max_upload_size_mb * 1024 * 1024;
+      if (file.size > maxSize) {
+        message.error(`文件 ${file.name} 超过大小限制（最大 ${config.max_upload_size_mb}MB）`);
+        return false;
+      }
+      
+      // 检查文件类型
+      const fileExt = `.${file.name.split('.').pop()?.toLowerCase()}`;
+      if (!config.allowed_extensions.includes(fileExt)) {
+        message.error(`不支持的文件类型: ${fileExt}`);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      // 如果获取配置失败，使用默认限制
+      const defaultMaxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > defaultMaxSize) {
+        message.error(`文件 ${file.name} 超过大小限制（最大 10MB）`);
+        return false;
+      }
+      return true;
+    }
+  };
+
 
   // 置顶/取消置顶文档
   const handlePinDocument = async (document: any) => {
@@ -887,16 +948,12 @@ const KnowledgeManagement: React.FC = () => {
           </Space>
         }
         open={uploadVisible}
-        onOk={uploadFiles}
         onCancel={() => {
           setUploadVisible(false);
           setFileList([]);
         }}
         width={600}
-        okText="开始上传"
-        cancelText="取消"
-        confirmLoading={uploading}
-        okButtonProps={{ disabled: fileList.length === 0 }}
+        footer={null}
       >
         <div style={{ marginBottom: 16 }}>
           <Text type="secondary">
@@ -907,10 +964,11 @@ const KnowledgeManagement: React.FC = () => {
 
         <Upload.Dragger
           multiple
-          accept=".pdf,.docx,.txt,.md"
+          accept=".pdf,.docx,.doc,.txt,.md,.csv,.xlsx"
           fileList={fileList}
           onChange={({ fileList }) => setFileList(fileList)}
-          beforeUpload={() => false} // 禁止自动上传
+          beforeUpload={beforeUpload}
+          customRequest={handleUploadFiles}
           onRemove={(file) => {
             setFileList(fileList.filter(f => f.uid !== file.uid));
           }}
@@ -920,7 +978,7 @@ const KnowledgeManagement: React.FC = () => {
           </p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
           <p className="ant-upload-hint">
-            支持单个或批量上传。支持格式：PDF、Word文档、文本文件、Markdown
+            支持单个或批量上传。支持格式：PDF、Word文档、文本文件、Markdown、CSV、Excel
           </p>
         </Upload.Dragger>
 

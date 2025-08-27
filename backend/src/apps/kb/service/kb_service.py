@@ -526,6 +526,160 @@ class KnowledgeBaseService:
             .values(doc_count=doc_count)
         )
     
+    async def upload_document_to_kb(
+        self,
+        db: AsyncSession,
+        kb_id: str,
+        folder_id: Optional[str],
+        file_content: bytes,
+        filename: str,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """上传文档到知识库
+        
+        Args:
+            db: 数据库会话
+            kb_id: 知识库ID
+            folder_id: 目标文件夹ID，为None时上传到根目录
+            file_content: 文件内容
+            filename: 文件名
+            user_id: 用户ID
+            
+        Returns:
+            上传成功的文件信息
+        """
+        # 导入agent模块的文档服务
+        from src.apps.agent.service.document_service import DocumentService
+        from pathlib import Path
+        import os
+        
+        # 保存文件记录到数据库 - 整个操作在一个事务中完成
+        async with db.begin():
+            # 检查知识库权限
+            if not await self._check_permission(db, kb_id, user_id, 'write'):
+                raise BusinessException("无权限上传文档到此知识库", ResponseCode.FORBIDDEN)
+            
+            # 创建知识库专用的存储目录
+            kb_upload_dir = Path("/Users/gaochao/gaochao-git/gaochao_repo/fullstack-langgraph/backend/documents/kb")
+            kb_upload_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 如果指定了folder_id，创建对应的目录结构
+            if folder_id:
+                # 获取文件夹路径
+                folder_path_parts = await self._get_folder_path(db, folder_id)
+                folder_path = kb_upload_dir / kb_id / Path(*folder_path_parts)
+            else:
+                folder_path = kb_upload_dir / kb_id
+            
+            folder_path.mkdir(parents=True, exist_ok=True)
+            
+            # 创建一个自定义的上传方法
+            file_id = str(uuid.uuid4())
+            file_ext = Path(filename).suffix.lower()
+            safe_filename = f"{file_id}{file_ext}"
+            file_path = folder_path / safe_filename
+            
+            # 保存文件
+            import aiofiles
+            async with aiofiles.open(file_path, 'wb') as f:
+                await f.write(file_content)
+            # 保存到AgentDocumentUpload表
+            doc_upload = AgentDocumentUpload(
+                file_id=file_id,
+                file_name=filename,
+                file_size=len(file_content),
+                file_type=file_ext,
+                file_path=str(file_path),
+                process_status=0,  # UPLOADED
+                create_by=user_id,
+                update_by=user_id
+            )
+            db.add(doc_upload)
+            await db.flush()
+            
+            # 直接添加到知识库，避免嵌套事务
+            kb_doc = KBDocument(
+                kb_id=kb_id,
+                file_id=file_id,
+                doc_title=filename,
+                doc_category="uploaded",
+                create_by=user_id,
+                update_by=user_id
+            )
+            db.add(kb_doc)
+            
+            # 如果指定了文件夹，添加到文件夹
+            if folder_id:
+                from ..models import KBDocumentFolder
+                doc_folder = KBDocumentFolder(
+                    kb_id=kb_id,
+                    file_id=file_id,
+                    folder_id=folder_id,
+                    display_name=filename,
+                    sort_order=0,
+                    is_pinned=False,
+                    create_by=user_id,
+                    update_by=user_id
+                )
+                db.add(doc_folder)
+            
+            # 更新知识库文档计数
+            await self._update_kb_stats(db, kb_id)
+            
+            await db.flush()
+        
+        logger.info(f"文档上传到知识库成功: {filename} -> {kb_id}/{folder_id or 'root'}")
+        
+        # 触发异步文档处理
+        import asyncio
+        task = asyncio.create_task(self._process_document_async(file_id))
+        task.add_done_callback(lambda t: logger.error(f"文档处理任务异常: {t.exception()}") if t.exception() else None)
+        
+        return {
+            "file_id": file_id,
+            "file_name": filename,
+            "file_size": len(file_content),
+            "file_type": file_ext,
+            "kb_id": kb_id,
+            "folder_id": folder_id,
+            "upload_time": now_shanghai().isoformat(),
+            "status": "uploaded"
+        }
+    
+    async def _get_folder_path(self, db: AsyncSession, folder_id: str) -> List[str]:
+        """获取文件夹的完整路径"""
+        path_parts = []
+        current_folder_id = folder_id
+        
+        while current_folder_id:
+            result = await db.execute(
+                select(KBFolder.folder_name, KBFolder.parent_folder_id)
+                .where(KBFolder.folder_id == current_folder_id)
+            )
+            row = result.first()
+            if row:
+                folder_name, parent_id = row
+                path_parts.insert(0, folder_name)
+                current_folder_id = parent_id
+            else:
+                break
+        
+        return path_parts
+    
+    async def _process_document_async(self, file_id: str):
+        """异步处理文档"""
+        from src.shared.db.config import get_async_db_context
+        from src.apps.agent.service.document_service import DocumentService
+        
+        try:
+            # 使用新的数据库会话
+            async with get_async_db_context() as db:
+                doc_service = DocumentService()
+                await doc_service.process_document(db, file_id)
+        except Exception as e:
+            logger.error(f"处理文档失败 {file_id}: {str(e)}")
+            raise
+    
     def _kb_to_dict(self, kb: KnowledgeBase) -> Dict[str, Any]:
         """知识库模型转字典"""
         kb_dict = kb.to_dict()

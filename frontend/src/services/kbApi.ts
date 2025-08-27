@@ -273,6 +273,69 @@ export class KBApi {
     return await omind_post(`/api/v1/kb/knowledge-bases/${kbId}/permissions`, data);
   }
 
+  // ==================== 文件上传 ====================
+
+  /**
+   * 上传单个文档到知识库
+   * @param kbId 知识库ID
+   * @param file 要上传的文件
+   * @param folderId 目标文件夹ID，为空时上传到根目录
+   * @param onProgress 上传进度回调
+   */
+  async uploadDocument(
+    kbId: string, 
+    file: File, 
+    folderId?: string,
+    onProgress?: (percent: number) => void
+  ) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // 构建URL，如果有folderId则添加查询参数
+    let url = `/api/v1/kb/knowledge-bases/${kbId}/upload`;
+    if (folderId) {
+      url += `?folder_id=${folderId}`;
+    }
+    
+    return await omind_post(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (progressEvent.total && onProgress) {
+          const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentComplete);
+        }
+      }
+    });
+  }
+
+  /**
+   * 批量上传文档到知识库
+   * @param kbId 知识库ID
+   * @param files 要上传的文件数组
+   * @param folderId 目标文件夹ID，为空时上传到根目录
+   * @param onProgress 每个文件的上传进度回调
+   */
+  async uploadDocuments(
+    kbId: string,
+    files: File[],
+    folderId?: string,
+    onProgress?: (fileName: string, percent: number) => void
+  ) {
+    const uploadPromises = files.map(file => 
+      this.uploadDocument(
+        kbId,
+        file,
+        folderId,
+        (percent) => onProgress?.(file.name, percent)
+      )
+    );
+    
+    // 并行上传所有文件
+    return await Promise.all(uploadPromises);
+  }
+
   // ==================== 搜索 ====================
 
   /**

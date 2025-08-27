@@ -2,12 +2,14 @@
 知识库模块API端点
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.auth.dependencies import get_current_user
 from src.shared.db.config import get_async_db
 from src.shared.schemas.response import success_response, paginated_response
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 from .service import kb_service, kb_folder_service
 from .schema import (
     KBCreateRequest, KBUpdateRequest, KBResponse,
@@ -272,3 +274,43 @@ async def grant_permission(
         permission_data.permission_type, current_user['username']
     )
     return success_response({"message": "权限授予成功"})
+
+
+# ==================== 文件上传 ====================
+
+@router.post("/knowledge-bases/{kb_id}/upload")
+async def upload_document_to_kb(
+    kb_id: str,
+    folder_id: Optional[str] = Query(None, description="目标文件夹ID，为None时上传到根目录"),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """上传文档到知识库
+    
+    Args:
+        kb_id: 知识库ID
+        folder_id: 目标文件夹ID，为None时上传到根目录
+        file: 上传的文件
+        
+    Returns:
+        上传成功的文件信息
+    """
+    # 验证文件名是否为空
+    if not file.filename:
+        raise BusinessException("文件名不能为空", ResponseCode.BAD_REQUEST)
+    
+    # 读取文件内容
+    file_content = await file.read()
+    
+    # 调用服务层上传文件
+    file_info = await kb_service.upload_document_to_kb(
+        db=db,
+        kb_id=kb_id,
+        folder_id=folder_id,
+        file_content=file_content,
+        filename=file.filename,
+        user_id=current_user['username']
+    )
+    
+    return success_response(data=file_info, msg="文件上传成功")
