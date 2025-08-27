@@ -161,6 +161,26 @@ async def get_folder_tree(
     return success_response({"tree": tree})
 
 
+@router.get("/knowledge-bases/{kb_id}/folders/{folder_id}/has-children")
+async def check_has_children(
+    kb_id: str,
+    folder_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """检查知识库或目录是否有子元素（目录或文档）
+    
+    folder_id为'null'时检查知识库根目录
+    """
+    # 处理根目录的特殊情况
+    actual_folder_id = None if folder_id == 'null' else folder_id
+    
+    result = await kb_folder_service.check_has_children(
+        db, kb_id, actual_folder_id, current_user['username']
+    )
+    return success_response(result)
+
+
 @router.put("/folders/{folder_id}")
 async def update_folder(
     folder_id: str,

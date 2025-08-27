@@ -81,7 +81,12 @@ else:
     )
 
 # Create session makers
-AsyncSessionLocal = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
+AsyncSessionLocal = sessionmaker(
+    async_engine, 
+    class_=AsyncSession, 
+    expire_on_commit=False,
+    autoflush=False
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 # Create declarative base

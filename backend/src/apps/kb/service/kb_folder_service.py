@@ -1,5 +1,6 @@
 """
 知识库目录管理服务
+基于邻接列表模型（adjacency list）实现树形结构
 """
 import json
 import uuid
@@ -18,11 +19,39 @@ logger = get_logger(__name__)
 
 
 class KBFolderService:
-    """知识库目录管理服务"""
+    """知识库目录管理服务
+    
+    使用邻接列表模型（adjacency list）存储树形结构：
+    - 每个节点存储指向父节点的引用（parent_folder_id）
+    - 树的构建通过遍历所有节点并根据父子关系组装
+    - 这是业界标准的关系型数据库树存储方案
+    """
+    
+    # 目录最大层级深度（不包括知识库根层级）
+    MAX_FOLDER_DEPTH = 4
     
     def __init__(self):
         self.kb_service = KnowledgeBaseService()
     
+    async def _get_folder_depth(self, db: AsyncSession, folder_id: str) -> int:
+        """获取目录的层级深度"""
+        depth = 0
+        current_folder_id = folder_id
+        
+        while current_folder_id:
+            result = await db.execute(
+                select(KBFolder.parent_folder_id)
+                .where(KBFolder.folder_id == current_folder_id)
+            )
+            parent_id = result.scalar_one_or_none()
+            if parent_id:
+                depth += 1
+                current_folder_id = parent_id
+            else:
+                break
+                
+        return depth
+
     async def create_folder(
         self,
         db: AsyncSession,
@@ -31,56 +60,95 @@ class KBFolderService:
         user_id: str
     ) -> Dict[str, Any]:
         """创建目录"""
-        # 检查知识库权限
-        if not await self.kb_service._check_permission(db, kb_id, user_id, 'write'):
-            raise BusinessException("无权限在此知识库创建目录", ResponseCode.FORBIDDEN)
-        
-        folder_id = str(uuid.uuid4())
-        parent_folder_id = folder_data.get('parent_folder_id')
-        
-        # 验证父目录是否存在且属于同一知识库
-        if parent_folder_id:
-            parent_result = await db.execute(
-                select(KBFolder).where(
-                    and_(
-                        KBFolder.folder_id == parent_folder_id,
-                        KBFolder.kb_id == kb_id
+        async with db.begin():
+            # 检查知识库权限
+            if not await self.kb_service._check_permission(db, kb_id, user_id, 'write'):
+                raise BusinessException("无权限在此知识库创建目录", ResponseCode.FORBIDDEN)
+            folder_id = str(uuid.uuid4())
+            parent_folder_id = folder_data.get('parent_folder_id')
+            
+            # 验证父目录是否存在且属于同一知识库
+            if parent_folder_id:
+                parent_result = await db.execute(
+                    select(KBFolder).where(
+                        and_(
+                            KBFolder.folder_id == parent_folder_id,
+                            KBFolder.kb_id == kb_id
+                        )
                     )
                 )
+                parent_folder = parent_result.scalar_one_or_none()
+                if not parent_folder:
+                    raise BusinessException("父目录不存在", ResponseCode.NOT_FOUND)
+                
+                # 检查层级深度限制
+                parent_depth = await self._get_folder_depth(db, parent_folder_id)
+                if parent_depth >= self.MAX_FOLDER_DEPTH:
+                    raise BusinessException(f"目录层级深度不能超过{self.MAX_FOLDER_DEPTH}层", ResponseCode.BAD_REQUEST)
+            
+            folder = KBFolder(
+                folder_id=folder_id,
+                kb_id=kb_id,
+                parent_folder_id=parent_folder_id,
+                folder_name=folder_data['folder_name'],
+                folder_description=folder_data.get('folder_description'),
+                folder_type=folder_data.get('folder_type', 'folder'),
+                sort_order=folder_data.get('sort_order', 0),
+                create_by=user_id,
+                update_by=user_id
             )
-            if not parent_result.scalar_one_or_none():
-                raise BusinessException("父目录不存在", ResponseCode.NOT_FOUND)
-        
-        folder = KBFolder(
-            folder_id=folder_id,
-            kb_id=kb_id,
-            parent_folder_id=parent_folder_id,
-            folder_name=folder_data['folder_name'],
-            folder_description=folder_data.get('folder_description'),
-            folder_type=folder_data.get('folder_type', 'folder'),
-            sort_order=folder_data.get('sort_order', 0),
-            create_by=user_id,
-            update_by=user_id
-        )
-        
-        db.add(folder)
-        await db.commit()
-        await db.refresh(folder)
+            
+            db.add(folder)
+            await db.flush()
+            await db.refresh(folder)
         
         logger.info(f"目录创建成功: {folder_data['folder_name']} in {kb_id} by {user_id}")
         return self._folder_to_dict(folder)
     
+    async def get_folder_tree_optimized(
+        self,
+        db: AsyncSession,
+        kb_id: str,
+        user_id: str,
+        use_cache: bool = True
+    ) -> Dict[str, Any]:
+        """获取知识库目录树（简化版本，移除JSON缓存复杂性）"""
+        # 检查权限
+        if not await self.kb_service._check_permission(db, kb_id, user_id, 'read'):
+            raise BusinessException("无权限访问此知识库", ResponseCode.FORBIDDEN)
+        
+        # 直接构建树结构（基于父子ID关系的邻接列表模型）
+        tree = await self._build_tree_structure(db, kb_id)
+        
+        return {
+            "tree": tree,
+            "from_cache": False,
+            "has_children": len(tree) > 0
+        }
+
     async def get_folder_tree(
         self,
         db: AsyncSession,
         kb_id: str,
         user_id: str
     ) -> List[Dict[str, Any]]:
-        """获取知识库目录树"""
-        # 检查权限
-        if not await self.kb_service._check_permission(db, kb_id, user_id, 'read'):
-            raise BusinessException("无权限访问此知识库", ResponseCode.FORBIDDEN)
+        """获取知识库目录树（保持向后兼容）"""
+        result = await self.get_folder_tree_optimized(db, kb_id, user_id)
+        return result["tree"]
+    
+    async def _build_tree_structure(
+        self,
+        db: AsyncSession,
+        kb_id: str
+    ) -> List[Dict[str, Any]]:
+        """构建目录树结构（邻接列表模型实现）
         
+        算法步骤：
+        1. 获取知识库下的所有目录节点
+        2. 创建节点映射表（folder_id -> node_dict）
+        3. 遍历所有节点，根据 parent_folder_id 建立父子关系
+        4. 返回所有根节点（parent_folder_id 为空的节点）
+        """
         # 获取所有目录
         result = await db.execute(
             select(KBFolder).where(KBFolder.kb_id == kb_id)
@@ -92,23 +160,25 @@ class KBFolderService:
         folder_map = {}
         root_folders = []
         
-        # 先创建所有节点
+        # 步骤1: 先创建所有节点的映射
         for folder in folders:
             folder_dict = self._folder_to_dict(folder)
             folder_dict['children'] = []
             folder_map[folder.folder_id] = folder_dict
         
-        # 构建父子关系
+        # 步骤2: 构建父子关系（邻接列表转换为树）
         for folder in folders:
             folder_dict = folder_map[folder.folder_id]
             if folder.parent_folder_id and folder.parent_folder_id in folder_map:
                 # 添加到父目录的children中
                 folder_map[folder.parent_folder_id]['children'].append(folder_dict)
             else:
-                # 根目录
+                # 根目录（parent_folder_id为空）
                 root_folders.append(folder_dict)
         
         return root_folders
+    
+    # 移除JSON缓存方法 - 邻接列表模型已经足够高效
     
     async def update_folder(
         self,
@@ -249,11 +319,10 @@ class KBFolderService:
         user_id: str
     ) -> bool:
         """添加文档到目录"""
-        # 检查权限
-        if not await self.kb_service._check_permission(db, kb_id, user_id, 'write'):
-            raise BusinessException("无权限操作此知识库", ResponseCode.FORBIDDEN)
-        
         async with db.begin():
+            # 检查权限
+            if not await self.kb_service._check_permission(db, kb_id, user_id, 'write'):
+                raise BusinessException("无权限操作此知识库", ResponseCode.FORBIDDEN)
             # 验证目录是否存在且属于同一知识库
             if folder_id:
                 folder_result = await db.execute(
@@ -458,6 +527,109 @@ class KBFolderService:
             child_ids.update(grandchildren)
         
         return child_ids
+    
+    async def get_kb_tree_with_stats(
+        self,
+        db: AsyncSession,
+        kb_id: str,
+        user_id: str
+    ) -> Dict[str, Any]:
+        """获取知识库完整树结构和统计信息（一次性查询）"""
+        # 检查权限
+        if not await self.kb_service._check_permission(db, kb_id, user_id, 'read'):
+            raise BusinessException("无权限访问此知识库", ResponseCode.FORBIDDEN)
+        
+        # 获取完整目录树
+        tree = await self.get_folder_tree(db, kb_id, user_id)
+        
+        # 获取根目录文档数量
+        root_doc_result = await db.execute(
+            select(func.count()).select_from(KBDocumentFolder)
+            .join(
+                KBDocument,
+                and_(
+                    KBDocument.kb_id == KBDocumentFolder.kb_id,
+                    KBDocument.file_id == KBDocumentFolder.file_id
+                )
+            )
+            .where(
+                and_(
+                    KBDocumentFolder.kb_id == kb_id,
+                    KBDocumentFolder.folder_id.is_(None),
+                    KBDocument.doc_status == 1
+                )
+            )
+        )
+        root_doc_count = root_doc_result.scalar()
+        
+        # 计算是否有子元素
+        has_children = len(tree) > 0 or root_doc_count > 0
+        
+        return {
+            "tree": tree,
+            "has_children": has_children,
+            "has_folders": len(tree) > 0,
+            "has_documents": root_doc_count > 0,
+            "folder_count": len(tree),
+            "document_count": root_doc_count
+        }
+    
+    async def check_has_children(
+        self,
+        db: AsyncSession,
+        kb_id: str,
+        folder_id: Optional[str],
+        user_id: str
+    ) -> Dict[str, Any]:
+        """检查知识库或目录是否有子元素（简化版本）"""
+        if folder_id is None:
+            # 对于知识库根节点，使用更全面的检查
+            return await self.get_kb_tree_with_stats(db, kb_id, user_id)
+        
+        # 检查权限
+        if not await self.kb_service._check_permission(db, kb_id, user_id, 'read'):
+            raise BusinessException("无权限访问此知识库", ResponseCode.FORBIDDEN)
+        
+        # 对于具体目录，只检查直接子元素
+        folder_count_result = await db.execute(
+            select(func.count()).select_from(KBFolder)
+            .where(
+                and_(
+                    KBFolder.kb_id == kb_id,
+                    KBFolder.parent_folder_id == folder_id
+                )
+            )
+        )
+        folder_count = folder_count_result.scalar()
+        
+        doc_count_result = await db.execute(
+            select(func.count()).select_from(KBDocumentFolder)
+            .join(
+                KBDocument,
+                and_(
+                    KBDocument.kb_id == KBDocumentFolder.kb_id,
+                    KBDocument.file_id == KBDocumentFolder.file_id
+                )
+            )
+            .where(
+                and_(
+                    KBDocumentFolder.kb_id == kb_id,
+                    KBDocumentFolder.folder_id == folder_id,
+                    KBDocument.doc_status == 1
+                )
+            )
+        )
+        doc_count = doc_count_result.scalar()
+        
+        has_children = folder_count > 0 or doc_count > 0
+        
+        return {
+            "has_children": has_children,
+            "has_folders": folder_count > 0,
+            "has_documents": doc_count > 0,
+            "folder_count": folder_count,
+            "document_count": doc_count
+        }
     
     def _folder_to_dict(self, folder: KBFolder) -> Dict[str, Any]:
         """目录模型转字典"""

@@ -12,7 +12,8 @@ import {
   message,
   Spin,
   Empty,
-  Tooltip
+  Tooltip,
+  App
 } from 'antd';
 import {
   BookOutlined,
@@ -36,6 +37,7 @@ interface TreeNodeData extends DataNode {
   type: 'kb' | 'folder' | 'document';
   data?: KnowledgeBase | KBFolder | KBDocument;
   kbId?: string; // 所属知识库ID
+  hasChildren?: boolean; // 是否有子元素
 }
 
 interface KBTreeStructureProps {
@@ -65,12 +67,17 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
   onNodeSelect,
   searchText
 }) => {
+  // 使用 App.useApp 获取 modal 实例
+  const { modal } = App.useApp();
+  // 目录最大层级深度配置
+  const MAX_FOLDER_DEPTH = 4;
   const [treeData, setTreeData] = useState<TreeNodeData[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [hoveredNodeKey, setHoveredNodeKey] = useState<string>('');
   const [autoExpandParent, setAutoExpandParent] = useState(true);
   const [loadedKBs, setLoadedKBs] = useState<Set<string>>(new Set()); // 已加载的知识库缓存
+  const [nodeChildrenInfo, setNodeChildrenInfo] = useState<Map<string, boolean>>(new Map()); // 节点子元素信息缓存
   
   // Modal状态
   const [createFolderVisible, setCreateFolderVisible] = useState(false);
@@ -78,22 +85,49 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
   const [selectedNode, setSelectedNode] = useState<TreeNodeData | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
 
-  // 构建树形数据 - 优化版本，减少API调用
-  const buildTreeData = async (kbs: KnowledgeBase[]): Promise<TreeNodeData[]> => {
+  // 检查节点是否有子目录（不包括文档）
+  const checkNodeHasChildren = async (kbId: string, folderId: string | null): Promise<boolean> => {
+    const cacheKey = `${kbId}-${folderId || 'root'}`;
+    
+    if (nodeChildrenInfo.has(cacheKey)) {
+      return nodeChildrenInfo.get(cacheKey)!;
+    }
+    
+    try {
+      const response = await kbApi.checkHasChildren(kbId, folderId);
+      if (response.status === 'ok') {
+        // 只检查是否有子目录，不考虑文档
+        const hasFolders = response.data.has_folders || false;
+        setNodeChildrenInfo(prev => new Map(prev.set(cacheKey, hasFolders)));
+        return hasFolders;
+      }
+    } catch (error) {
+      console.error(`检查子元素失败: ${cacheKey}`, error);
+    }
+    
+    return false;
+  };
+
+  // 构建树形数据 - 基于实际内容决定是否可展开
+  const buildTreeData = (kbs: KnowledgeBase[]): TreeNodeData[] => {
     if (kbs.length === 0) return [];
     
     const treeNodes: TreeNodeData[] = [];
 
-    // 为每个知识库创建基础节点，延迟加载子节点
+    // 为每个知识库创建基础节点
     for (const kb of kbs) {
+      // 使用后端返回的has_folders信息决定是否显示展开按钮
+      const hasChildren = kb.has_folders || false;
+      
       const kbNode: TreeNodeData = {
         key: `kb-${kb.kb_id}`,
         title: kb.kb_name,
         icon: <BookOutlined />,
-        // 不设置 children 属性，让 Tree 组件认为这是一个可展开的节点
         type: 'kb',
         data: kb,
         kbId: kb.kb_id,
+        hasChildren: hasChildren, // 根据后端数据决定
+        isLeaf: !hasChildren, // 没有子目录则为叶子节点
       };
 
       treeNodes.push(kbNode);
@@ -107,28 +141,14 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
     try {
       const children: TreeNodeData[] = [];
       
-      // 获取目录树
+      // 获取目录树（只获取目录，不获取文档）
       const folderResponse = await kbApi.getFolderTree(kbId);
       if (folderResponse.status === 'ok' && folderResponse.data.tree) {
-        const folderNodes = buildFolderNodes(folderResponse.data.tree, kbId);
+        const folderNodes = await buildFolderNodes(folderResponse.data.tree, kbId);
         children.push(...folderNodes);
       }
 
-      // 获取根目录下的文档
-      const docsResponse = await kbApi.getFolderDocuments(kbId, null, { page: 1, page_size: 100 });
-      if (docsResponse.status === 'ok' && docsResponse.data.items) {
-        const docNodes: TreeNodeData[] = docsResponse.data.items.map((doc) => ({
-          key: `${kbId}-doc-${doc.file_id}`,
-          title: doc.display_name || doc.file_name,
-          icon: <FileTextOutlined />,
-          isLeaf: true,
-          type: 'document',
-          data: doc,
-          kbId: kbId,
-        }));
-        children.push(...docNodes);
-      }
-
+      // 不再在树形结构中显示文档，文档将在选中目录后显示
       return children;
     } catch (error) {
       console.error(`获取知识库 ${kbId} 的目录结构失败:`, error);
@@ -137,7 +157,7 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
   };
 
   // 构建目录节点 - 不再递归调用API，只构建结构
-  const buildFolderNodes = (folders: KBFolder[], kbId: string): TreeNodeData[] => {
+  const buildFolderNodes = async (folders: KBFolder[], kbId: string): Promise<TreeNodeData[]> => {
     const folderNodes: TreeNodeData[] = [];
 
     for (const folder of folders) {
@@ -146,18 +166,23 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
       
       // 递归构建子目录结构（不调用API）
       if (folder.children && folder.children.length > 0) {
-        const subFolderNodes = buildFolderNodes(folder.children, kbId);
+        const subFolderNodes = await buildFolderNodes(folder.children, kbId);
         childrenNodes.push(...subFolderNodes);
       }
+
+      // 检查目录是否有子目录（不考虑文档）
+      const hasChildren = childrenNodes.length > 0 || (folder.children && folder.children.length > 0);
 
       const folderNode: TreeNodeData = {
         key: `${kbId}-folder-${folder.folder_id}`,
         title: folder.folder_name,
         icon: expandedKeys.includes(`${kbId}-folder-${folder.folder_id}`) ? <FolderOpenOutlined /> : <FolderOutlined />,
-        children: childrenNodes.length > 0 ? childrenNodes : undefined,
+        children: childrenNodes.length > 0 ? childrenNodes : undefined, // 如果有子节点就设置，否则不设置
+        isLeaf: !hasChildren, // 根据是否有子元素来设置叶子节点标记
         type: 'folder',
         data: folder,
         kbId: kbId,
+        hasChildren,
       };
 
       folderNodes.push(folderNode);
@@ -166,14 +191,15 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
     return folderNodes;
   };
 
-  // 加载树形数据 - 优化版本，只加载基础结构
-  const loadTreeData = async () => {
+  // 加载树形数据 - 优化版本，减少API调用
+  const loadTreeData = () => {
     try {
-      const data = await buildTreeData(knowledgeBases);
+      const data = buildTreeData(knowledgeBases);
       setTreeData(data);
       
       // 清空已加载缓存，因为知识库列表可能已变化
       setLoadedKBs(new Set());
+      setNodeChildrenInfo(new Map()); // 清空子元素信息缓存
       
       // 不再默认展开，让用户按需展开以减少API调用
     } catch (error) {
@@ -237,6 +263,15 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
     return [];
   };
 
+  // 计算节点的文件夹层级深度（不包括知识库层级）
+  const getFolderDepth = (node: TreeNodeData): number => {
+    if (node.type === 'kb') return 0;
+    
+    const fullPath = findNodeFullPath(node.key as string, treeData);
+    // 减去知识库层级，只计算文件夹层级
+    return Math.max(0, fullPath.length - 1);
+  };
+
   // 选择节点处理
   const handleSelect = (selectedKeys: React.Key[], info: any) => {
     const key = selectedKeys[0] as string;
@@ -294,7 +329,9 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
             if (node.key === nodeData.key) {
               return {
                 ...node,
-                children: children.length > 0 ? children : []
+                children: children.length > 0 ? children : [],
+                isLeaf: children.length === 0, // 根据实际children数量设置叶子节点状态
+                hasChildren: children.length > 0 // 根据实际加载的children数量设置hasChildren
               };
             }
             return node;
@@ -305,6 +342,20 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
         setLoadedKBs(prev => new Set([...prev, kbId]));
       } catch (error) {
         console.error(`加载知识库 ${kbId} 内容失败:`, error);
+        // 加载失败时，将节点标记为叶子节点
+        setTreeData(prevTreeData => {
+          return prevTreeData.map(node => {
+            if (node.key === nodeData.key) {
+              return {
+                ...node,
+                children: [],
+                isLeaf: true,
+                hasChildren: false
+              };
+            }
+            return node;
+          });
+        });
         throw error;
       }
     }
@@ -322,6 +373,7 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
     
     if (node.type === 'kb') {
       const kb = node.data as KnowledgeBase;
+      // 知识库总是可以创建目录，不依赖hasChildren
       items.push(
         {
           key: 'create-folder',
@@ -359,18 +411,28 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
         }
       );
     } else if (node.type === 'folder') {
+      const currentDepth = getFolderDepth(node);
+      const canCreateSubFolder = currentDepth < MAX_FOLDER_DEPTH;
+      
       items.push(
         {
           key: 'create-folder',
           icon: <FolderAddOutlined />,
           label: '新建子目录',
-          onClick: () => handleCreateFolder(node),
+          onClick: () => {
+            console.log('点击新建子目录');
+            handleCreateFolder(node);
+          },
+          disabled: !canCreateSubFolder,
         },
         {
           key: 'rename',
           icon: <EditOutlined />,
           label: '重命名',
-          onClick: () => handleRenameFolder(node),
+          onClick: () => {
+            console.log('点击重命名');
+            handleRenameFolder(node);
+          },
         },
         {
           type: 'divider' as const,
@@ -379,7 +441,10 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
           key: 'delete',
           icon: <DeleteOutlined />,
           label: '删除目录',
-          onClick: () => handleDeleteFolder(node),
+          onClick: () => {
+            console.log('点击删除目录', node);
+            handleDeleteFolder(node);
+          },
           danger: true,
         }
       );
@@ -397,6 +462,15 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
 
   // 创建目录
   const handleCreateFolder = (parentNode: TreeNodeData) => {
+    // 检查层级深度限制
+    if (parentNode.type === 'folder') {
+      const currentDepth = getFolderDepth(parentNode);
+      if (currentDepth >= MAX_FOLDER_DEPTH) {
+        message.warning(`目录层级深度不能超过${MAX_FOLDER_DEPTH}层`);
+        return;
+      }
+    }
+    
     setSelectedNode(parentNode);
     setNewFolderName('');
     setCreateFolderVisible(true);
@@ -411,34 +485,64 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
 
   // 删除目录
   const handleDeleteFolder = (node: TreeNodeData) => {
-    if (node.type !== 'folder') return;
+    console.log('handleDeleteFolder called with node:', node);
+    if (node.type !== 'folder') {
+      console.log('Node type is not folder:', node.type);
+      return;
+    }
     
     const folder = node.data as KBFolder;
+    console.log('Folder data:', folder);
+    
     const folderName = node.title as string;
     const kbId = node.kbId!;
     
-    Modal.confirm({
-      title: '确认删除',
-      content: `确定要删除目录"${folderName}"吗？目录下的所有内容也会被删除。`,
-      onOk: async () => {
-        try {
-          await kbApi.deleteFolder(folder.folder_id);
-          message.success('目录删除成功');
-          
-          // 只刷新相关知识库的数据
-          await refreshKBData(kbId);
-        } catch (error) {
-          console.error('删除目录失败:', error);
-          message.error('删除失败，请重试');
-        }
-      },
-    });
+    // 使用 App.useApp 提供的 modal 实例，并通过 setTimeout 避免与 Dropdown 冲突
+    setTimeout(() => {
+      modal.confirm({
+        title: '确认删除',
+        content: `确定要删除目录"${folderName}"吗？目录下的所有内容也会被删除。`,
+        okText: '确定',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: async () => {
+          try {
+            console.log('Deleting folder with ID:', folder.folder_id);
+            const response = await kbApi.deleteFolder(folder.folder_id);
+            console.log('Delete response:', response);
+            
+            if (response.status === 'ok') {
+              message.success('目录删除成功');
+              // 只刷新相关知识库的数据
+              await refreshKBData(kbId);
+            } else {
+              message.error(response.msg || '删除失败');
+            }
+          } catch (error) {
+            console.error('删除目录失败:', error);
+            message.error('删除失败，请重试');
+          }
+        },
+        onCancel: () => {
+          console.log('取消删除');
+        },
+      });
+    }, 100); // 延迟 100ms，给 Dropdown 足够的时间关闭
   };
 
   // 刷新特定知识库的数据
   const refreshKBData = async (kbId: string) => {
     try {
+      // 清除相关缓存
+      const keysToRemove = Array.from(nodeChildrenInfo.keys()).filter(key => key.startsWith(`${kbId}-`));
+      const newChildrenInfo = new Map(nodeChildrenInfo);
+      keysToRemove.forEach(key => newChildrenInfo.delete(key));
+      setNodeChildrenInfo(newChildrenInfo);
+      
       const children = await loadKBChildren(kbId);
+      
+      // 检查知识库是否有子目录（children 只包含目录，不包含文档）
+      const hasChildren = children.length > 0;
       
       // 更新树数据
       setTreeData(prevTreeData => {
@@ -446,7 +550,9 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
           if (node.key === `kb-${kbId}`) {
             return {
               ...node,
-              children: children.length > 0 ? children : undefined
+              children: hasChildren ? children : [],
+              isLeaf: !hasChildren,
+              hasChildren
             };
           }
           return node;
@@ -613,9 +719,32 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
                 {/* 所有节点在悬停或选中时显示操作按钮 */}
                 {(hoveredNodeKey === nodeData.key || nodeData.key === selectedKeys[0]) && (
                   <Space size={2}>
-                    {/* 知识库和目录可以新建子目录 */}
-                    {((nodeData as TreeNodeData).type === 'kb' || (nodeData as TreeNodeData).type === 'folder') && (
-                      <Tooltip title="新建目录">
+                    {/* 知识库和目录可以新建子目录，但要检查层级限制和是否应该显示按钮 */}
+                    {(() => {
+                      const node = nodeData as TreeNodeData;
+                      const isKB = node.type === 'kb';
+                      const isFolder = node.type === 'folder';
+                      const canCreateInFolder = isFolder && getFolderDepth(node) < MAX_FOLDER_DEPTH;
+                      
+                      // 知识库管理场景的+按钮显示逻辑
+                      let shouldShowButton = false;
+                      if (isKB) {
+                        // 知识库节点：用户有写权限就显示+按钮（允许创建目录）
+                        const kbData = node.data as KnowledgeBase;
+                        const hasWritePermission = ['write', 'admin', 'owner'].includes(kbData.user_permission || '');
+                        shouldShowButton = hasWritePermission;
+                      } else if (canCreateInFolder) {
+                        // 目录节点：在层级限制内就显示+按钮（允许创建子目录）
+                        shouldShowButton = true;
+                      }
+                      
+                      return shouldShowButton;
+                    })() && (
+                      <Tooltip title={
+                        (nodeData as TreeNodeData).type === 'folder' && getFolderDepth(nodeData as TreeNodeData) >= MAX_FOLDER_DEPTH 
+                          ? `已达到最大层级深度（${MAX_FOLDER_DEPTH}层）` 
+                          : "新建目录"
+                      }>
                         <Button
                           type="text"
                           size="small"
@@ -625,6 +754,7 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
                             handleCreateFolder(nodeData as TreeNodeData);
                           }}
                           style={{ padding: '2px 4px' }}
+                          disabled={(nodeData as TreeNodeData).type === 'folder' && getFolderDepth(nodeData as TreeNodeData) >= MAX_FOLDER_DEPTH}
                         />
                       </Tooltip>
                     )}
@@ -634,7 +764,7 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
                         items: getContextMenuItems(nodeData as TreeNodeData)
                       }}
                       trigger={['click']}
-                      onClick={(e) => e.stopPropagation()}
+                      placement="bottomRight"
                     >
                       <Button
                         type="text"

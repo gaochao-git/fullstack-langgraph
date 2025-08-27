@@ -26,7 +26,8 @@ import {
   Breadcrumb,
   Divider,
   Table,
-  Tooltip
+  Tooltip,
+  App
 } from 'antd';
 import {
   BookOutlined,
@@ -91,6 +92,9 @@ const VISIBILITY_TEXTS = {
 
 const KnowledgeManagement: React.FC = () => {
   const navigate = useNavigate();
+  // 使用 App.useApp 获取 modal 实例
+  const { modal } = App.useApp();
+  
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -173,7 +177,7 @@ const KnowledgeManagement: React.FC = () => {
 
   // 删除知识库
   const handleDelete = (kb: KnowledgeBase) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: `确定要删除知识库"${kb.kb_name}"吗？此操作不可恢复。`,
       okText: '删除',
@@ -242,6 +246,16 @@ const KnowledgeManagement: React.FC = () => {
 
   // 处理目录或文档选择（从树组件回调中获取）
   const handleNodeSelect = (node: any, path: string[]) => {
+    // 处理节点为 null 的情况（比如删除后没有选中任何节点）
+    if (!node) {
+      setSelectedNode(null);
+      setSelectedKB(null);
+      setCurrentPath([]);
+      setDocuments([]);
+      setDocumentsTotal(0);
+      return;
+    }
+
     if (node.type === 'kb') {
       handleKBSelect(node.data as KnowledgeBase);
     } else {
@@ -339,16 +353,23 @@ const KnowledgeManagement: React.FC = () => {
   const handleDeleteDocument = (document: any) => {
     if (!selectedKB) return;
     
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: `确定要从知识库中删除文档"${document.file_name}"吗？`,
+      okText: '确定',
+      okType: 'danger',
+      cancelText: '取消',
       onOk: async () => {
         try {
-          await kbApi.removeDocumentFromKB(selectedKB.kb_id, document.file_id);
-          message.success('文档删除成功');
-          // 重新加载文档列表
-          if (selectedNode?.type === 'folder' && selectedNode.kbId) {
-            loadDocuments(selectedNode.kbId, selectedNode.data?.folder_id || null, currentPage);
+          const response = await kbApi.removeDocumentFromKB(selectedKB.kb_id, document.file_id);
+          if (response.status === 'ok') {
+            message.success('文档删除成功');
+            // 重新加载文档列表
+            if (selectedNode?.type === 'folder' && selectedNode.kbId) {
+              loadDocuments(selectedNode.kbId, selectedNode.data?.folder_id || null, currentPage);
+            }
+          } else {
+            message.error(response.msg || '删除失败');
           }
         } catch (error) {
           console.error('删除文档失败:', error);

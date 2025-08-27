@@ -11,7 +11,7 @@ from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.db.models import now_shanghai
-from ..models import KnowledgeBase, KBDocument, KBPermission
+from ..models import KnowledgeBase, KBDocument, KBPermission, KBFolder
 from ...agent.models import AgentDocumentUpload
 
 logger = get_logger(__name__)
@@ -126,6 +126,20 @@ class KnowledgeBaseService:
         for kb, permission in rows:
             kb_dict = self._kb_to_dict(kb)
             kb_dict['user_permission'] = permission or 'owner' if kb.owner_id == user_id else 'read'
+            
+            # 检查知识库是否有子目录
+            folder_count_result = await db.execute(
+                select(func.count()).select_from(KBFolder)
+                .where(
+                    and_(
+                        KBFolder.kb_id == kb.kb_id,
+                        KBFolder.parent_folder_id.is_(None)  # 只检查根目录
+                    )
+                )
+            )
+            folder_count = folder_count_result.scalar()
+            kb_dict['has_folders'] = folder_count > 0
+            
             kbs.append(kb_dict)
         
         return {
@@ -164,39 +178,40 @@ class KnowledgeBaseService:
         user_id: str
     ) -> Dict[str, Any]:
         """更新知识库"""
-        # 检查权限
-        if not await self._check_permission(db, kb_id, user_id, 'admin'):
-            raise BusinessException("无权限修改此知识库", ResponseCode.FORBIDDEN)
-        
-        result = await db.execute(
-            select(KnowledgeBase).where(KnowledgeBase.kb_id == kb_id)
-        )
-        kb = result.scalar_one_or_none()
-        
-        if not kb:
-            raise BusinessException("知识库不存在", ResponseCode.NOT_FOUND)
-        
-        # 更新字段
-        if 'kb_name' in update_data:
-            kb.kb_name = update_data['kb_name']
-        if 'kb_description' in update_data:
-            kb.kb_description = update_data['kb_description']
-        if 'kb_type' in update_data:
-            kb.kb_type = update_data['kb_type']
-        if 'visibility' in update_data:
-            kb.visibility = update_data['visibility']
-        if 'department' in update_data:
-            kb.department = update_data['department']
-        if 'tags' in update_data:
-            kb.tags = json.dumps(update_data['tags'], ensure_ascii=False)
-        
-        kb.update_by = user_id
-        
-        await db.commit()
-        await db.refresh(kb)
-        
-        logger.info(f"知识库更新成功: {kb_id} by {user_id}")
-        return self._kb_to_dict(kb)
+        async with db.begin():
+            # 检查权限
+            if not await self._check_permission(db, kb_id, user_id, 'admin'):
+                raise BusinessException("无权限修改此知识库", ResponseCode.FORBIDDEN)
+            
+            result = await db.execute(
+                select(KnowledgeBase).where(KnowledgeBase.kb_id == kb_id)
+            )
+            kb = result.scalar_one_or_none()
+            
+            if not kb:
+                raise BusinessException("知识库不存在", ResponseCode.NOT_FOUND)
+            
+            # 更新字段
+            if 'kb_name' in update_data:
+                kb.kb_name = update_data['kb_name']
+            if 'kb_description' in update_data:
+                kb.kb_description = update_data['kb_description']
+            if 'kb_type' in update_data:
+                kb.kb_type = update_data['kb_type']
+            if 'visibility' in update_data:
+                kb.visibility = update_data['visibility']
+            if 'department' in update_data:
+                kb.department = update_data['department']
+            if 'tags' in update_data:
+                kb.tags = json.dumps(update_data['tags'], ensure_ascii=False)
+            
+            kb.update_by = user_id
+            
+            await db.flush()
+            await db.refresh(kb)
+            
+            logger.info(f"知识库更新成功: {kb_id} by {user_id}")
+            return self._kb_to_dict(kb)
     
     async def delete_kb(
         self, 
@@ -205,11 +220,11 @@ class KnowledgeBaseService:
         user_id: str
     ) -> bool:
         """删除知识库"""
-        # 检查权限
-        if not await self._check_permission(db, kb_id, user_id, 'admin'):
-            raise BusinessException("无权限删除此知识库", ResponseCode.FORBIDDEN)
-        
         async with db.begin():
+            # 检查权限
+            if not await self._check_permission(db, kb_id, user_id, 'admin'):
+                raise BusinessException("无权限删除此知识库", ResponseCode.FORBIDDEN)
+            
             # 检查是否存在
             result = await db.execute(
                 select(KnowledgeBase).where(KnowledgeBase.kb_id == kb_id)
@@ -237,11 +252,10 @@ class KnowledgeBaseService:
         user_id: str
     ) -> bool:
         """将文档添加到知识库"""
-        # 检查权限
-        if not await self._check_permission(db, kb_id, user_id, 'write'):
-            raise BusinessException("无权限添加文档", ResponseCode.FORBIDDEN)
-        
         async with db.begin():
+            # 检查权限
+            if not await self._check_permission(db, kb_id, user_id, 'write'):
+                raise BusinessException("无权限添加文档", ResponseCode.FORBIDDEN)
             # 检查文档是否存在且向量已生成
             doc_result = await db.execute(
                 select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
@@ -291,11 +305,10 @@ class KnowledgeBaseService:
         user_id: str
     ) -> bool:
         """从知识库移除文档"""
-        # 检查权限
-        if not await self._check_permission(db, kb_id, user_id, 'write'):
-            raise BusinessException("无权限移除文档", ResponseCode.FORBIDDEN)
-        
         async with db.begin():
+            # 检查权限
+            if not await self._check_permission(db, kb_id, user_id, 'write'):
+                raise BusinessException("无权限移除文档", ResponseCode.FORBIDDEN)
             result = await db.execute(
                 delete(KBDocument).where(
                     and_(
@@ -395,11 +408,10 @@ class KnowledgeBaseService:
         user_id: str
     ) -> bool:
         """授予权限"""
-        # 检查权限
-        if not await self._check_permission(db, kb_id, user_id, 'admin'):
-            raise BusinessException("无权限管理此知识库权限", ResponseCode.FORBIDDEN)
-        
         async with db.begin():
+            # 检查权限
+            if not await self._check_permission(db, kb_id, user_id, 'admin'):
+                raise BusinessException("无权限管理此知识库权限", ResponseCode.FORBIDDEN)
             await self._grant_permission_internal(
                 db, kb_id, target_user_id, permission_type, user_id
             )

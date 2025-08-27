@@ -78,6 +78,34 @@ class ProcessStatus:
 class DocumentService:
     """文档处理服务"""
     
+    def __init__(self):
+        """初始化文档处理器映射"""
+        # 文件处理器映射表 - 策略模式
+        self._file_processors = {
+            # 文本文件
+            '.txt': self._process_text_file,
+            '.md': self._process_text_file,
+            
+            # PDF文件
+            '.pdf': self._process_pdf_file if HAS_PDF else None,
+            
+            # Word文档
+            '.doc': self._process_doc_file,
+            '.docx': self._process_docx_file if HAS_DOCX else None,
+            
+            # 表格文件
+            '.csv': self._process_csv_file,
+            '.xlsx': self._process_excel_file if HAS_OPENPYXL else None,
+            
+            # 图片文件
+            '.png': self._process_image_file,
+            '.jpg': self._process_image_file,
+            '.jpeg': self._process_image_file,
+            '.gif': self._process_image_file,
+            '.bmp': self._process_image_file,
+            '.webp': self._process_image_file,
+        }
+    
     async def upload_file(self, db: AsyncSession, file_content: bytes, filename: str, user_id: str) -> Dict[str, Any]:
         """
         上传文件
@@ -181,437 +209,17 @@ class DocumentService:
             file_ext = doc_upload.file_type
             file_name = doc_upload.file_name
             
-            # 根据文件类型提取文本
-            full_text = ""
-            
-            if file_ext == '.txt' or file_ext == '.md':
-                # 文本文件直接读取
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    full_text = f.read()
-                    
-            elif file_ext == '.pdf' and HAS_PDF:
-                # PDF文件解析
-                try:
-                    reader = PdfReader(str(file_path))
-                    text_parts = []
-                    for page_num, page in enumerate(reader.pages):
-                        text = page.extract_text()
-                        if text:
-                            text_parts.append(f"[第{page_num + 1}页]\n{text}")
-                    full_text = "\n\n".join(text_parts)
-                    logger.info(f"PDF解析成功: {file_name}, 页数: {len(reader.pages)}")
-                except Exception as e:
-                    logger.error(f"PDF解析错误: {e}")
-                    full_text = f"PDF文件解析失败: {str(e)}"
-                    
-            elif file_ext == '.doc':
-                # .doc 文件需要先转换为 .docx
-                logger.info(f"开始转换 .doc 文件: {file_name}")
-                try:
-                    # 使用固定的临时目录，避免自动清理
-                    # 为避免文件名冲突，使用时间戳和文件ID
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    temp_subdir = TEMP_DIR / f"doc_conversion_{timestamp}_{file_id[:8]}"
-                    temp_subdir.mkdir(parents=True, exist_ok=True)
-                    
-                    # 使用 LibreOffice 转换
-                    cmd = ['soffice', '--headless', '--convert-to', 'docx', '--outdir', str(temp_subdir), str(file_path)]
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-                    
-                    if result.returncode == 0:
-                        # 转换成功，更新文件路径为临时的 docx 文件
-                        temp_docx = temp_subdir / (file_path.stem + '.docx')
-                        if temp_docx.exists():
-                            file_path = temp_docx
-                            file_ext = '.docx'
-                            logger.info(f".doc 转换成功，临时文件位置: {temp_docx}")
-                            logger.info("提示：临时文件保留在 temp 目录中，可以手动清理")
-                        else:
-                            raise Exception("转换后的文件未找到")
-                    else:
-                        raise Exception(f"LibreOffice 转换失败: {result.stderr}")
-                except Exception as e:
-                    logger.error(f".doc 转换失败: {e}")
-                    full_text = f".doc 文件转换失败：请确保安装了 LibreOffice。错误: {str(e)}"
-                    
-            if file_ext == '.docx' and HAS_DOCX:
-                # Word文档解析
-                try:
-                    doc = docx.Document(str(file_path))
-                    content_parts = []
-                    
-                    # 导入必要的类型用于按顺序遍历文档元素
-                    from docx.document import Document as _Document
-                    from docx.oxml.text.paragraph import CT_P
-                    from docx.oxml.table import CT_Tbl
-                    from docx.table import _Cell, Table
-                    from docx.text.paragraph import Paragraph
-                    
-                    def iter_block_items(parent):
-                        """按文档顺序遍历段落和表格"""
-                        if isinstance(parent, _Document):
-                            parent_elm = parent.element.body
-                        elif isinstance(parent, _Cell):
-                            parent_elm = parent._tc
-                        else:
-                            raise ValueError("something's not right")
-                        
-                        for child in parent_elm.iterchildren():
-                            if isinstance(child, CT_P):
-                                yield Paragraph(child, parent)
-                            elif isinstance(child, CT_Tbl):
-                                yield Table(child, parent)
-                    
-                    # 第一阶段：按文档顺序遍历，收集内容和图片位置
-                    images_to_process = []  # 待处理的图片列表
-                    image_placeholders = {}  # 占位符映射
-                    image_count = 0
-                    
-                    # 首先收集所有图片的数据
-                    image_data_by_id = {}
-                    for rel_id, rel in doc.part.rels.items():
-                        if "image" in rel.reltype:
-                            image_data_by_id[rel_id] = rel.target_part.blob
-                    
-                    # 按文档顺序遍历元素
-                    for block in iter_block_items(doc):
-                        if isinstance(block, Paragraph):
-                            # 检查段落中是否有图片
-                            has_image = False
-                            para_text = block.text.strip()
-                            
-                            # 简化的图片检测方法 - 检查段落的_element是否包含drawing
-                            try:
-                                # 获取段落的XML字符串表示
-                                para_xml = block._element.xml
-                                if 'w:drawing' in para_xml:
-                                    # 这个段落包含图片，查找所有的r:embed属性
-                                    import re
-                                    # 使用正则表达式查找所有的r:embed引用
-                                    embed_pattern = r'r:embed="(rId\d+)"'
-                                    embed_matches = re.findall(embed_pattern, para_xml)
-                                    
-                                    for rel_id in embed_matches:
-                                        if rel_id in image_data_by_id:
-                                            has_image = True
-                                            image_count += 1
-                                            placeholder = f"[[IMAGE_PLACEHOLDER_{image_count}]]"
-                                            
-                                            # 记录图片信息
-                                            images_to_process.append({
-                                                'index': image_count,
-                                                'placeholder': placeholder,
-                                                'data': image_data_by_id[rel_id]
-                                            })
-                                            
-                                            # 如果段落有文字，先添加文字
-                                            if para_text:
-                                                content_parts.append(para_text)
-                                                para_text = ""  # 清空以避免重复添加
-                                            
-                                            # 添加图片占位符
-                                            content_parts.append(placeholder)
-                            except Exception as e:
-                                logger.debug(f"检查段落图片时出错: {e}")
-                            
-                            # 如果段落没有图片但有文字，添加文字
-                            if not has_image and para_text:
-                                content_parts.append(para_text)
-                                
-                        elif isinstance(block, Table):
-                            # 处理表格
-                            table_text = "\n[表格]\n"
-                            for row in block.rows:
-                                row_text = " | ".join([cell.text.strip() for cell in row.cells])
-                                table_text += row_text + "\n"
-                            content_parts.append(table_text)
-                    
-                    # 第二阶段：如果有图片需要处理，并发处理所有图片
-                    if images_to_process and settings.VISION_API_KEY:
-                        from .multimodal_service import multimodal_service
-                        logger.info(f"Word文档包含 {len(images_to_process)} 张图片，开始并发处理...")
-                        
-                        # 创建并发任务
-                        async def process_single_image(image_info):
-                            """处理单张图片的异步函数"""
-                            index = image_info['index']
-                            placeholder = image_info['placeholder']
-                            try:
-                                result = await multimodal_service.extract_image_content(
-                                    image_info['data'],
-                                    options={
-                                        'prompt': '请详细描述这张图片的内容，如果是图表请提取其中的数据和信息。'
-                                    }
-                                )
-                                
-                                if result['success']:
-                                    logger.info(f"成功提取图片 {index} 内容")
-                                    return {
-                                        'placeholder': placeholder,
-                                        'content': f"\n[图片 {index}]\n{result['content']}\n",
-                                        'success': True
-                                    }
-                                else:
-                                    logger.warning(f"图片 {index} 提取失败: {result.get('error', '未知错误')}")
-                                    return {
-                                        'placeholder': placeholder,
-                                        'content': f"\n[图片 {index}：无法识别 - {result.get('error', '未知错误')}]\n",
-                                        'success': False
-                                    }
-                            except Exception as e:
-                                logger.error(f"处理图片 {index} 时出错: {e}")
-                                return {
-                                    'placeholder': placeholder,
-                                    'content': f"\n[图片 {index}：处理失败 - {str(e)}]\n",
-                                    'success': False
-                                }
-                        
-                        # 限制并发数，避免API限流
-                        import asyncio
-                        MAX_CONCURRENT = settings.IMAGE_PROCESS_MAX_CONCURRENT
-                        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
-                        
-                        async def process_with_semaphore(image_info):
-                            async with semaphore:
-                                try:
-                                    return await asyncio.wait_for(
-                                        process_single_image(image_info), 
-                                        timeout=settings.IMAGE_PROCESS_TIMEOUT
-                                    )
-                                except asyncio.TimeoutError:
-                                    logger.error(f"处理图片 {image_info['index']} 超时")
-                                    return {
-                                        'placeholder': image_info['placeholder'],
-                                        'content': f"\n[图片 {image_info['index']}：处理超时]\n",
-                                        'success': False
-                                    }
-                        
-                        # 并发处理所有图片
-                        tasks = [process_with_semaphore(img) for img in images_to_process]
-                        results = await asyncio.gather(*tasks, return_exceptions=True)
-                        
-                        # 建立占位符到内容的映射
-                        placeholder_map = {}
-                        success_count = 0
-                        for result in results:
-                            if isinstance(result, Exception):
-                                logger.error(f"图片处理任务异常: {result}")
-                            elif isinstance(result, dict):
-                                placeholder_map[result['placeholder']] = result['content']
-                                if result.get('success'):
-                                    success_count += 1
-                        
-                        logger.info(f"图片并发处理完成，成功处理 {success_count} 张图片")
-                        
-                        # 第三阶段：替换占位符为实际内容
-                        for i, part in enumerate(content_parts):
-                            if part in placeholder_map:
-                                content_parts[i] = placeholder_map[part]
-                    elif images_to_process and not settings.VISION_API_KEY:
-                        # 如果有图片但没有配置视觉模型，替换占位符为提示信息
-                        for i, part in enumerate(content_parts):
-                            if part.startswith("[[IMAGE_PLACEHOLDER_"):
-                                image_num = part.split('_')[2].rstrip(']]')
-                                content_parts[i] = f"\n[图片 {image_num}：未配置视觉模型]\n"
-                    
-                    full_text = "\n\n".join(content_parts)
-                    logger.info(f"Word文档解析成功: {file_name}")
-                    
-                except Exception as e:
-                    logger.error(f"Word文档解析错误: {e}")
-                    full_text = f"Word文档解析失败: {str(e)}"
-            elif file_ext == '.csv':
-                # CSV文件解析
-                try:
-                    content_parts = ["[CSV文件]"]
-                    
-                    # 尝试不同的编码
-                    encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
-                    csv_content = None
-                    used_encoding = None
-                    
-                    for encoding in encodings:
-                        try:
-                            with open(file_path, 'r', encoding=encoding) as f:
-                                csv_content = f.read()
-                                used_encoding = encoding
-                                break
-                        except UnicodeDecodeError:
-                            continue
-                    
-                    if csv_content is None:
-                        raise Exception("无法识别文件编码")
-                    
-                    # 使用csv模块解析
-                    csv_reader = csv.reader(io.StringIO(csv_content))
-                    rows = list(csv_reader)
-                    
-                    if rows:
-                        # 添加编码信息
-                        content_parts.append(f"编码: {used_encoding}")
-                        content_parts.append(f"行数: {len(rows)}")
-                        content_parts.append("")
-                        
-                        # 将CSV内容转换为表格格式
-                        for i, row in enumerate(rows):
-                            if i == 0:  # 如果第一行是表头，可以特殊标记
-                                content_parts.append("[表头]")
-                            row_text = " | ".join([cell.strip() for cell in row])
-                            content_parts.append(row_text)
-                            
-                            # 对于大文件，限制显示行数
-                            if i > 1000 and len(rows) > 1100:
-                                content_parts.append(f"\n... 省略 {len(rows) - 1001} 行 ...\n")
-                                break
-                    else:
-                        content_parts.append("(空文件)")
-                    
-                    full_text = "\n".join(content_parts)
-                    logger.info(f"CSV文件解析成功: {file_name}, 编码: {used_encoding}, 行数: {len(rows)}")
-                    
-                except Exception as e:
-                    logger.error(f"CSV文件解析错误: {e}")
-                    full_text = f"CSV文件解析失败: {str(e)}"
-                    
-            elif file_ext == '.xlsx' and HAS_OPENPYXL:
-                # Excel文件解析
-                try:
-                    workbook = openpyxl.load_workbook(str(file_path), data_only=True)
-                    content_parts = []
-                    
-                    for sheet_name in workbook.sheetnames:
-                        sheet = workbook[sheet_name]
-                        content_parts.append(f"[工作表: {sheet_name}]")
-                        
-                        # 获取表格内容
-                        table_data = []
-                        for row in sheet.iter_rows(values_only=True):
-                            # 过滤空行
-                            if any(cell is not None for cell in row):
-                                row_text = " | ".join([str(cell) if cell is not None else "" for cell in row])
-                                table_data.append(row_text)
-                        
-                        if table_data:
-                            content_parts.append("\n".join(table_data))
-                        else:
-                            content_parts.append("(空表)")
-                        
-                        content_parts.append("")  # 添加空行分隔
-                    
-                    full_text = "\n".join(content_parts)
-                    logger.info(f"Excel文件解析成功: {file_name}, 工作表数: {len(workbook.sheetnames)}")
-                    
-                except Exception as e:
-                    logger.error(f"Excel文件解析错误: {e}")
-                    full_text = f"Excel文件解析失败: {str(e)}"
-                    
-            elif file_ext.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']:
-                # 处理图片文件
-                logger.info(f"开始处理图片文件: {file_name}")
-                
-                # 检查是否配置了视觉模型
-                if settings.VISION_API_KEY:
-                    try:
-                        from .multimodal_service import multimodal_service
-                        
-                        # 读取图片文件内容
-                        with open(file_path, 'rb') as f:
-                            file_content = f.read()
-                        
-                        # 调用视觉模型分析图片
-                        result = await multimodal_service.extract_image_content(
-                            image_data=file_content,
-                            options={
-                                'prompt': '请详细描述这张图片的内容，包括其中的文字、图表、数据等所有信息。'
-                            }
-                        )
-                        
-                        if result['success']:
-                            full_text = f"[图片文件: {file_name}]\n\n{result['content']}"
-                            logger.info(f"图片分析成功: {file_name}")
-                        else:
-                            full_text = f"[图片文件: {file_name}]\n\n图片分析失败: {result.get('error', '未知错误')}"
-                            logger.warning(f"图片分析失败: {file_name}, 错误: {result.get('error')}")
-                    except Exception as e:
-                        logger.error(f"图片处理异常: {e}", exc_info=True)
-                        full_text = f"[图片文件: {file_name}]\n\n图片处理出错: {str(e)}"
-                else:
-                    full_text = f"[图片文件: {file_name}]\n\n未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY。"
-            else:
-                # 不支持的格式或缺少依赖
-                unsupported_msg = f"[{file_ext} 文件: {file_name}]\n\n"
-                
-                # 检查是否是因为缺少依赖
-                if file_ext == '.xlsx' and not HAS_OPENPYXL:
-                    unsupported_msg += "Excel 文件解析功能未启用。请联系管理员安装 openpyxl 库。"
-                    logger.warning(f"用户尝试上传 Excel 文件，但未安装 openpyxl 库: {file_name}")
-                elif file_ext == '.pdf' and not HAS_PDF:
-                    unsupported_msg += "PDF 文件解析功能未启用。请联系管理员安装 pypdf 库。"
-                    logger.warning(f"用户尝试上传 PDF 文件，但未安装 pypdf 库: {file_name}")
-                elif file_ext == '.docx' and not HAS_DOCX:
-                    unsupported_msg += "Word 文档解析功能未启用。请联系管理员安装 python-docx 库。"
-                    logger.warning(f"用户尝试上传 Word 文档，但未安装 python-docx 库: {file_name}")
-                else:
-                    unsupported_msg += "暂不支持此格式的文档解析。"
-                
-                full_text = unsupported_msg
+            # 根据文件类型提取文本 - 使用策略模式
+            full_text = await self._dispatch_file_processing(file_path, file_ext, file_name, file_id)
             
             # 如果没有提取到内容
             if not full_text.strip():
                 full_text = f"[{file_name}]\n\n文档内容为空或无法提取文本内容。"
             
-            # 分块处理 - 优化分块策略
-            # 对于大文档，使用更大的分块尺寸以减少分块数量
-            base_chunk_size = 1000
-            if len(full_text) > 100000:  # 超过10万字符的大文档
-                chunk_size = 2000  # 使用更大的分块
-                chunk_overlap = 400
-            elif len(full_text) > 50000:  # 5万-10万字符的中等文档
-                chunk_size = 1500
-                chunk_overlap = 300
-            else:  # 小文档
-                chunk_size = base_chunk_size
-                chunk_overlap = 200
+            # 处理文档内容，分块并更新数据库
+            char_count = await self._finalize_document_processing(db, file_id, full_text, file_ext)
             
-            chunks = []
-            
-            if len(full_text) <= chunk_size:
-                chunks = [full_text]
-            else:
-                for i in range(0, len(full_text), chunk_size - chunk_overlap):
-                    chunk = full_text[i:i + chunk_size]
-                    chunks.append(chunk)
-            
-            # 提取元数据
-            metadata = {
-                "char_count": len(full_text),
-                "chunk_count": len(chunks),
-                "file_type": file_ext
-            }
-            
-            # 更新数据库
-            async with db.begin():
-                # 重新查询文档记录
-                result = await db.execute(
-                    select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
-                )
-                doc_upload = result.scalar_one_or_none()
-                if doc_upload:
-                    doc_upload.process_status = ProcessStatus.READY
-                    # MEDIUMTEXT 支持 16MB，约 1600万字符，这里限制为 500万字符以保留余量
-                    doc_upload.doc_content = full_text[:5000000] if len(full_text) > 5000000 else full_text
-                    
-                    # 限制分块数量，避免 JSON 过大
-                    # 每个分块 1000 字符，存储前 1000 个分块（约 100万字符的内容）
-                    max_chunks = 1000
-                    chunks_to_store = chunks[:max_chunks]
-                    doc_upload.doc_chunks = json.dumps([{"id": i, "content": chunk} for i, chunk in enumerate(chunks_to_store)])
-                    
-                    doc_upload.doc_metadata = json.dumps(metadata)
-                    doc_upload.process_end_time = now_shanghai()
-                    await db.flush()
-            
-            logger.info(f"文档处理完成: {file_id}, 类型: {file_ext}, 字符数: {metadata['char_count']}")
+            logger.info(f"文档处理完成: {file_id}, 类型: {file_ext}, 字符数: {char_count}")
             
         except Exception as e:
             logger.error(f"文档处理失败: {file_id}, 错误: {str(e)}")
@@ -756,6 +364,490 @@ class DocumentService:
         
         return "\n\n".join(context_parts)
 
+
+    async def _process_text_file(self, file_path: Path, file_name: str) -> str:
+        """处理文本文件"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"文本文件读取错误: {e}")
+            return f"文本文件读取失败: {str(e)}"
+    
+    async def _process_pdf_file(self, file_path: Path, file_name: str) -> str:
+        """处理PDF文件"""
+        try:
+            reader = PdfReader(str(file_path))
+            text_parts = []
+            for page_num, page in enumerate(reader.pages):
+                text = page.extract_text()
+                if text:
+                    text_parts.append(f"[第{page_num + 1}页]\n{text}")
+            full_text = "\n\n".join(text_parts)
+            logger.info(f"PDF解析成功: {file_name}, 页数: {len(reader.pages)}")
+            return full_text
+        except Exception as e:
+            logger.error(f"PDF解析错误: {e}")
+            return f"PDF文件解析失败: {str(e)}"
+    
+    async def _process_doc_file(self, file_path: Path, file_name: str, file_id: str) -> tuple[str, Path, str]:
+        """处理.doc文件，返回处理结果和可能更新的文件路径"""
+        logger.info(f"开始转换 .doc 文件: {file_name}")
+        try:
+            # 使用固定的临时目录，避免自动清理
+            # 为避免文件名冲突，使用时间戳和文件ID
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_subdir = TEMP_DIR / f"doc_conversion_{timestamp}_{file_id[:8]}"
+            temp_subdir.mkdir(parents=True, exist_ok=True)
+            
+            # 使用 LibreOffice 转换
+            cmd = ['soffice', '--headless', '--convert-to', 'docx', '--outdir', str(temp_subdir), str(file_path)]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            
+            if result.returncode == 0:
+                # 转换成功，更新文件路径为临时的 docx 文件
+                temp_docx = temp_subdir / (file_path.stem + '.docx')
+                if temp_docx.exists():
+                    logger.info(f".doc 转换成功，临时文件位置: {temp_docx}")
+                    logger.info("提示：临时文件保留在 temp 目录中，可以手动清理")
+                    return "", temp_docx, '.docx'
+                else:
+                    raise Exception("转换后的文件未找到")
+            else:
+                raise Exception(f"LibreOffice 转换失败: {result.stderr}")
+        except FileNotFoundError:
+            # LibreOffice未安装的情况
+            logger.error(f".doc 转换失败: LibreOffice未安装")
+            return f"[.doc 文件: {file_name}]\n\n文档解析失败：系统未安装 LibreOffice，无法处理 .doc 格式文件。请联系管理员安装 LibreOffice 或将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+        except subprocess.TimeoutExpired:
+            # 转换超时的情况
+            logger.error(f".doc 转换失败: 转换超时")
+            return f"[.doc 文件: {file_name}]\n\n文档解析失败：.doc 文件转换超时，可能文件过大或系统繁忙。请尝试将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+        except Exception as e:
+            # 其他错误情况
+            logger.error(f".doc 转换失败: {e}")
+            error_msg = str(e).lower()
+            if 'no such file' in error_msg or 'not found' in error_msg:
+                return f"[.doc 文件: {file_name}]\n\n文档解析失败：系统未安装 LibreOffice，无法处理 .doc 格式文件。请联系管理员安装 LibreOffice 或将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+            else:
+                return f"[.doc 文件: {file_name}]\n\n文档解析失败：.doc 文件转换出错 - {str(e)}。建议将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+    
+    async def _process_docx_file(self, file_path: Path, file_name: str) -> str:
+        """处理Word文档"""
+        try:
+            doc = docx.Document(str(file_path))
+            content_parts = []
+            
+            # 导入必要的类型用于按顺序遍历文档元素
+            from docx.document import Document as _Document
+            from docx.oxml.text.paragraph import CT_P
+            from docx.oxml.table import CT_Tbl
+            from docx.table import _Cell, Table
+            from docx.text.paragraph import Paragraph
+            
+            def iter_block_items(parent):
+                """按文档顺序遍历段落和表格"""
+                if isinstance(parent, _Document):
+                    parent_elm = parent.element.body
+                elif isinstance(parent, _Cell):
+                    parent_elm = parent._tc
+                else:
+                    raise ValueError("something's not right")
+                
+                for child in parent_elm.iterchildren():
+                    if isinstance(child, CT_P):
+                        yield Paragraph(child, parent)
+                    elif isinstance(child, CT_Tbl):
+                        yield Table(child, parent)
+            
+            # 第一阶段：按文档顺序遍历，收集内容和图片位置
+            images_to_process = []  # 待处理的图片列表
+            image_placeholders = {}  # 占位符映射
+            image_count = 0
+            
+            # 首先收集所有图片的数据
+            image_data_by_id = {}
+            for rel_id, rel in doc.part.rels.items():
+                if "image" in rel.reltype:
+                    image_data_by_id[rel_id] = rel.target_part.blob
+            
+            # 按文档顺序遍历元素
+            for block in iter_block_items(doc):
+                if isinstance(block, Paragraph):
+                    # 检查段落中是否有图片
+                    has_image = False
+                    para_text = block.text.strip()
+                    
+                    # 简化的图片检测方法 - 检查段落的_element是否包含drawing
+                    try:
+                        # 获取段落的XML字符串表示
+                        para_xml = block._element.xml
+                        if 'w:drawing' in para_xml:
+                            # 这个段落包含图片，查找所有的r:embed属性
+                            import re
+                            # 使用正则表达式查找所有的r:embed引用
+                            embed_pattern = r'r:embed="(rId\d+)"'
+                            embed_matches = re.findall(embed_pattern, para_xml)
+                            
+                            for rel_id in embed_matches:
+                                if rel_id in image_data_by_id:
+                                    has_image = True
+                                    image_count += 1
+                                    placeholder = f"[[IMAGE_PLACEHOLDER_{image_count}]]"
+                                    
+                                    # 记录图片信息
+                                    images_to_process.append({
+                                        'index': image_count,
+                                        'placeholder': placeholder,
+                                        'data': image_data_by_id[rel_id]
+                                    })
+                                    
+                                    # 如果段落有文字，先添加文字
+                                    if para_text:
+                                        content_parts.append(para_text)
+                                        para_text = ""  # 清空以避免重复添加
+                                    
+                                    # 添加图片占位符
+                                    content_parts.append(placeholder)
+                    except Exception as e:
+                        logger.debug(f"检查段落图片时出错: {e}")
+                    
+                    # 如果段落没有图片但有文字，添加文字
+                    if not has_image and para_text:
+                        content_parts.append(para_text)
+                        
+                elif isinstance(block, Table):
+                    # 处理表格
+                    table_text = "\n[表格]\n"
+                    for row in block.rows:
+                        row_text = " | ".join([cell.text.strip() for cell in row.cells])
+                        table_text += row_text + "\n"
+                    content_parts.append(table_text)
+            
+            # 第二阶段：如果有图片需要处理，并发处理所有图片
+            if images_to_process and settings.VISION_API_KEY:
+                from .multimodal_service import multimodal_service
+                logger.info(f"Word文档包含 {len(images_to_process)} 张图片，开始并发处理...")
+                
+                # 创建并发任务
+                async def process_single_image(image_info):
+                    """处理单张图片的异步函数"""
+                    index = image_info['index']
+                    placeholder = image_info['placeholder']
+                    try:
+                        result = await multimodal_service.extract_image_content(
+                            image_info['data'],
+                            options={
+                                'prompt': '请详细描述这张图片的内容，如果是图表请提取其中的数据和信息。'
+                            }
+                        )
+                        
+                        if result['success']:
+                            logger.info(f"成功提取图片 {index} 内容")
+                            return {
+                                'placeholder': placeholder,
+                                'content': f"\n[图片 {index}]\n{result['content']}\n",
+                                'success': True
+                            }
+                        else:
+                            logger.warning(f"图片 {index} 提取失败: {result.get('error', '未知错误')}")
+                            return {
+                                'placeholder': placeholder,
+                                'content': f"\n[图片 {index}：无法识别 - {result.get('error', '未知错误')}]\n",
+                                'success': False
+                            }
+                    except Exception as e:
+                        logger.error(f"处理图片 {index} 时出错: {e}")
+                        return {
+                            'placeholder': placeholder,
+                            'content': f"\n[图片 {index}：处理失败 - {str(e)}]\n",
+                            'success': False
+                        }
+                
+                # 限制并发数，避免API限流
+                import asyncio
+                MAX_CONCURRENT = settings.IMAGE_PROCESS_MAX_CONCURRENT
+                semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+                
+                async def process_with_semaphore(image_info):
+                    async with semaphore:
+                        try:
+                            return await asyncio.wait_for(
+                                process_single_image(image_info), 
+                                timeout=settings.IMAGE_PROCESS_TIMEOUT
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error(f"处理图片 {image_info['index']} 超时")
+                            return {
+                                'placeholder': image_info['placeholder'],
+                                'content': f"\n[图片 {image_info['index']}：处理超时]\n",
+                                'success': False
+                            }
+                
+                # 并发处理所有图片
+                tasks = [process_with_semaphore(img) for img in images_to_process]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # 建立占位符到内容的映射
+                placeholder_map = {}
+                success_count = 0
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.error(f"图片处理任务异常: {result}")
+                    elif isinstance(result, dict):
+                        placeholder_map[result['placeholder']] = result['content']
+                        if result.get('success'):
+                            success_count += 1
+                
+                logger.info(f"图片并发处理完成，成功处理 {success_count} 张图片")
+                
+                # 第三阶段：替换占位符为实际内容
+                for i, part in enumerate(content_parts):
+                    if part in placeholder_map:
+                        content_parts[i] = placeholder_map[part]
+            elif images_to_process and not settings.VISION_API_KEY:
+                # 如果有图片但没有配置视觉模型，替换占位符为提示信息
+                for i, part in enumerate(content_parts):
+                    if part.startswith("[[IMAGE_PLACEHOLDER_"):
+                        image_num = part.split('_')[2].rstrip(']]')
+                        content_parts[i] = f"\n[图片 {image_num}：未配置视觉模型]\n"
+            
+            full_text = "\n\n".join(content_parts)
+            logger.info(f"Word文档解析成功: {file_name}")
+            return full_text
+            
+        except Exception as e:
+            logger.error(f"Word文档解析错误: {e}")
+            return f"Word文档解析失败: {str(e)}"
+    
+    async def _process_csv_file(self, file_path: Path, file_name: str) -> str:
+        """处理CSV文件"""
+        try:
+            content_parts = ["[CSV文件]"]
+            
+            # 尝试不同的编码
+            encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
+            csv_content = None
+            used_encoding = None
+            
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        csv_content = f.read()
+                        used_encoding = encoding
+                        break
+                except UnicodeDecodeError:
+                    continue
+            
+            if csv_content is None:
+                raise Exception("无法识别文件编码")
+            
+            # 使用csv模块解析
+            csv_reader = csv.reader(io.StringIO(csv_content))
+            rows = list(csv_reader)
+            
+            if rows:
+                # 添加编码信息
+                content_parts.append(f"编码: {used_encoding}")
+                content_parts.append(f"行数: {len(rows)}")
+                content_parts.append("")
+                
+                # 将CSV内容转换为表格格式
+                for i, row in enumerate(rows):
+                    if i == 0:  # 如果第一行是表头，可以特殊标记
+                        content_parts.append("[表头]")
+                    row_text = " | ".join([cell.strip() for cell in row])
+                    content_parts.append(row_text)
+                    
+                    # 对于大文件，限制显示行数
+                    if i > 1000 and len(rows) > 1100:
+                        content_parts.append(f"\n... 省略 {len(rows) - 1001} 行 ...\n")
+                        break
+            else:
+                content_parts.append("(空文件)")
+            
+            full_text = "\n".join(content_parts)
+            logger.info(f"CSV文件解析成功: {file_name}, 编码: {used_encoding}, 行数: {len(rows)}")
+            return full_text
+            
+        except Exception as e:
+            logger.error(f"CSV文件解析错误: {e}")
+            return f"CSV文件解析失败: {str(e)}"
+    
+    async def _process_excel_file(self, file_path: Path, file_name: str) -> str:
+        """处理Excel文件"""
+        try:
+            workbook = openpyxl.load_workbook(str(file_path), data_only=True)
+            content_parts = []
+            
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                content_parts.append(f"[工作表: {sheet_name}]")
+                
+                # 获取表格内容
+                table_data = []
+                for row in sheet.iter_rows(values_only=True):
+                    # 过滤空行
+                    if any(cell is not None for cell in row):
+                        row_text = " | ".join([str(cell) if cell is not None else "" for cell in row])
+                        table_data.append(row_text)
+                
+                if table_data:
+                    content_parts.append("\n".join(table_data))
+                else:
+                    content_parts.append("(空表)")
+                
+                content_parts.append("")  # 添加空行分隔
+            
+            full_text = "\n".join(content_parts)
+            logger.info(f"Excel文件解析成功: {file_name}, 工作表数: {len(workbook.sheetnames)}")
+            return full_text
+            
+        except Exception as e:
+            logger.error(f"Excel文件解析错误: {e}")
+            return f"Excel文件解析失败: {str(e)}"
+    
+    async def _process_image_file(self, file_path: Path, file_name: str) -> str:
+        """处理图片文件"""
+        logger.info(f"开始处理图片文件: {file_name}")
+        
+        # 检查是否配置了视觉模型
+        if settings.VISION_API_KEY:
+            try:
+                from .multimodal_service import multimodal_service
+                
+                # 读取图片文件内容
+                with open(file_path, 'rb') as f:
+                    file_content = f.read()
+                
+                # 调用视觉模型分析图片
+                result = await multimodal_service.extract_image_content(
+                    image_data=file_content,
+                    options={
+                        'prompt': '请详细描述这张图片的内容，包括其中的文字、图表、数据等所有信息。'
+                    }
+                )
+                
+                if result['success']:
+                    logger.info(f"图片分析成功: {file_name}")
+                    return f"[图片文件: {file_name}]\n\n{result['content']}"
+                else:
+                    logger.warning(f"图片分析失败: {file_name}, 错误: {result.get('error')}")
+                    return f"[图片文件: {file_name}]\n\n图片分析失败: {result.get('error', '未知错误')}"
+            except Exception as e:
+                logger.error(f"图片处理异常: {e}", exc_info=True)
+                return f"[图片文件: {file_name}]\n\n图片处理出错: {str(e)}"
+        else:
+            return f"[图片文件: {file_name}]\n\n未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY。"
+    
+    def _handle_unsupported_file(self, file_ext: str, file_name: str) -> str:
+        """处理不支持的文件格式"""
+        unsupported_msg = f"[{file_ext} 文件: {file_name}]\n\n"
+        
+        # 检查是否是因为缺少依赖
+        if file_ext == '.xlsx' and not HAS_OPENPYXL:
+            unsupported_msg += "Excel 文件解析功能未启用。请联系管理员安装 openpyxl 库。"
+            logger.warning(f"用户尝试上传 Excel 文件，但未安装 openpyxl 库: {file_name}")
+        elif file_ext == '.pdf' and not HAS_PDF:
+            unsupported_msg += "PDF 文件解析功能未启用。请联系管理员安装 pypdf 库。"
+            logger.warning(f"用户尝试上传 PDF 文件，但未安装 pypdf 库: {file_name}")
+        elif file_ext == '.docx' and not HAS_DOCX:
+            unsupported_msg += "Word 文档解析功能未启用。请联系管理员安装 python-docx 库。"
+            logger.warning(f"用户尝试上传 Word 文档，但未安装 python-docx 库: {file_name}")
+        else:
+            unsupported_msg += "暂不支持此格式的文档解析。"
+        
+        return unsupported_msg
+    
+    async def _dispatch_file_processing(self, file_path: Path, file_ext: str, file_name: str, file_id: str) -> str:
+        """文件处理分发器 - 根据文件类型调用相应的处理器"""
+        # 获取对应的处理器
+        processor = self._file_processors.get(file_ext.lower())
+        
+        if processor is None:
+            # 检查是否是因为缺少依赖导致处理器为None
+            if file_ext.lower() in ['.pdf', '.docx', '.xlsx']:
+                return self._handle_unsupported_file(file_ext, file_name)
+            else:
+                return self._handle_unsupported_file(file_ext, file_name)
+        
+        # 特殊处理.doc文件（返回三元组）
+        if file_ext == '.doc':
+            result = await processor(file_path, file_name, file_id)
+            if isinstance(result, tuple):
+                full_text, new_file_path, new_file_ext = result
+                # 如果.doc转换成功，继续处理.docx
+                if new_file_ext == '.docx' and full_text == "":
+                    docx_processor = self._file_processors.get('.docx')
+                    if docx_processor:
+                        return await docx_processor(new_file_path, file_name)
+                return full_text
+            return result
+        
+        # 普通文件处理
+        return await processor(file_path, file_name)
+    
+    def _create_document_chunks(self, text: str) -> List[str]:
+        """将文档文本分块"""
+        # 分块处理 - 优化分块策略
+        # 对于大文档，使用更大的分块尺寸以减少分块数量
+        base_chunk_size = 1000
+        if len(text) > 100000:  # 超过10万字符的大文档
+            chunk_size = 2000  # 使用更大的分块
+            chunk_overlap = 400
+        elif len(text) > 50000:  # 5万-10万字符的中等文档
+            chunk_size = 1500
+            chunk_overlap = 300
+        else:  # 小文档
+            chunk_size = base_chunk_size
+            chunk_overlap = 200
+        
+        chunks = []
+        
+        if len(text) <= chunk_size:
+            chunks = [text]
+        else:
+            for i in range(0, len(text), chunk_size - chunk_overlap):
+                chunk = text[i:i + chunk_size]
+                chunks.append(chunk)
+        
+        return chunks
+    
+    async def _finalize_document_processing(self, db: AsyncSession, file_id: str, full_text: str, file_ext: str) -> int:
+        """完成文档处理，分块并更新数据库"""
+        # 创建分块
+        chunks = self._create_document_chunks(full_text)
+        
+        # 提取元数据
+        metadata = {
+            "char_count": len(full_text),
+            "chunk_count": len(chunks),
+            "file_type": file_ext
+        }
+        
+        # 更新数据库
+        async with db.begin():
+            # 重新查询文档记录
+            result = await db.execute(
+                select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
+            )
+            doc_upload = result.scalar_one_or_none()
+            if doc_upload:
+                doc_upload.process_status = ProcessStatus.READY
+                # MEDIUMTEXT 支持 16MB，约 1600万字符，这里限制为 500万字符以保留余量
+                doc_upload.doc_content = full_text[:5000000] if len(full_text) > 5000000 else full_text
+                
+                # 限制分块数量，避免 JSON 过大
+                # 每个分块 1000 字符，存储前 1000 个分块（约 100万字符的内容）
+                max_chunks = 1000
+                chunks_to_store = chunks[:max_chunks]
+                doc_upload.doc_chunks = json.dumps([{"id": i, "content": chunk} for i, chunk in enumerate(chunks_to_store)])
+                
+                doc_upload.doc_metadata = json.dumps(metadata)
+                doc_upload.process_end_time = now_shanghai()
+                await db.flush()
+        
+        return len(full_text)
 
     async def _process_document_async(self, file_id: str) -> None:
         """

@@ -21,6 +21,7 @@ export interface KnowledgeBase {
   create_time: string;
   update_time: string;
   user_permission?: 'read' | 'write' | 'admin' | 'owner';
+  has_folders?: boolean; // 是否有子目录
 }
 
 export interface KBFolder {
@@ -198,6 +199,21 @@ export class KBApi {
    */
   async getFolderTree(kbId: string) {
     return await omind_get(`/api/v1/kb/knowledge-bases/${kbId}/folders/tree`);
+  }
+
+  /**
+   * 检查知识库或目录是否有子元素
+   * @param kbId 知识库ID
+   * @param folderId 目录ID，null表示检查知识库根目录
+   */
+  async checkHasChildren(kbId: string, folderId: string | null = null) {
+    // 构建正确的API路径
+    if (folderId) {
+      return await omind_get(`/api/v1/kb/knowledge-bases/${kbId}/folders/${folderId}/has-children`);
+    } else {
+      // 对于根目录，使用特殊的路径处理
+      return await omind_get(`/api/v1/kb/knowledge-bases/${kbId}/folders/null/has-children`);
+    }
   }
 
   /**

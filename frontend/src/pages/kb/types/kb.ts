@@ -19,6 +19,7 @@ export interface KnowledgeBase {
   create_time: string;
   update_time: string;
   user_permission?: 'read' | 'write' | 'admin' | 'owner';
+  has_folders?: boolean; // 是否有子目录
 }
 
 // 目录类型
@@ -35,7 +36,8 @@ export interface KBFolder {
   create_by: string;
   create_time: string;
   update_time: string;
-  children?: KBFolder[];
+  // 树结构相关属性（后端返回时包含）
+  children?: KBFolder[]; // 子目录列表，由后端的邻接列表模型构造
 }
 
 // 文档类型
