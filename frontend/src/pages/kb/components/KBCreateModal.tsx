@@ -55,7 +55,7 @@ const KBCreateModal: React.FC<KBModalProps> = ({
         const response = await kbApi.updateKnowledgeBase(initialData.kb_id, requestData as KBUpdateRequest);
         if (response.status === 'ok') {
           message.success('知识库更新成功');
-          onSuccess?.();
+          onSuccess?.(response.data); // 传递更新后的数据
           onCancel();
         } else {
           message.error(response.msg || '更新失败');
@@ -64,7 +64,7 @@ const KBCreateModal: React.FC<KBModalProps> = ({
         const response = await kbApi.createKnowledgeBase(requestData as KBCreateRequest);
         if (response.status === 'ok') {
           message.success('知识库创建成功');
-          onSuccess?.();
+          onSuccess?.(response.data); // 传递创建后的数据
           onCancel();
         } else {
           message.error(response.msg || '创建失败');

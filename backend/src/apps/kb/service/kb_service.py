@@ -168,36 +168,35 @@ class KnowledgeBaseService:
         if not await self._check_permission(db, kb_id, user_id, 'admin'):
             raise BusinessException("无权限修改此知识库", ResponseCode.FORBIDDEN)
         
-        async with db.begin():
-            result = await db.execute(
-                select(KnowledgeBase).where(KnowledgeBase.kb_id == kb_id)
-            )
-            kb = result.scalar_one_or_none()
-            
-            if not kb:
-                raise BusinessException("知识库不存在", ResponseCode.NOT_FOUND)
-            
-            # 更新字段
-            if 'kb_name' in update_data:
-                kb.kb_name = update_data['kb_name']
-            if 'kb_description' in update_data:
-                kb.kb_description = update_data['kb_description']
-            if 'kb_type' in update_data:
-                kb.kb_type = update_data['kb_type']
-            if 'visibility' in update_data:
-                kb.visibility = update_data['visibility']
-            if 'department' in update_data:
-                kb.department = update_data['department']
-            if 'tags' in update_data:
-                kb.tags = json.dumps(update_data['tags'], ensure_ascii=False)
-            
-            kb.update_by = user_id
-            
-            await db.flush()
-            await db.refresh(kb)
-            
-            logger.info(f"知识库更新成功: {kb_id} by {user_id}")
-            return self._kb_to_dict(kb)
+        result = await db.execute(
+            select(KnowledgeBase).where(KnowledgeBase.kb_id == kb_id)
+        )
+        kb = result.scalar_one_or_none()
+        
+        if not kb:
+            raise BusinessException("知识库不存在", ResponseCode.NOT_FOUND)
+        
+        # 更新字段
+        if 'kb_name' in update_data:
+            kb.kb_name = update_data['kb_name']
+        if 'kb_description' in update_data:
+            kb.kb_description = update_data['kb_description']
+        if 'kb_type' in update_data:
+            kb.kb_type = update_data['kb_type']
+        if 'visibility' in update_data:
+            kb.visibility = update_data['visibility']
+        if 'department' in update_data:
+            kb.department = update_data['department']
+        if 'tags' in update_data:
+            kb.tags = json.dumps(update_data['tags'], ensure_ascii=False)
+        
+        kb.update_by = user_id
+        
+        await db.commit()
+        await db.refresh(kb)
+        
+        logger.info(f"知识库更新成功: {kb_id} by {user_id}")
+        return self._kb_to_dict(kb)
     
     async def delete_kb(
         self, 

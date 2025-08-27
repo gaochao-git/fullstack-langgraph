@@ -31,6 +31,7 @@ import {
   DownloadOutlined,
   PushpinOutlined,
   PushpinFilled,
+  PlusOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -337,46 +338,78 @@ const KnowledgeBaseDetail: React.FC = () => {
         )}
       </div>
 
-      {/* 主要内容区域 */}
-      <Row gutter={24} style={{ height: 'calc(100vh - 200px)' }}>
-        {/* 左侧目录树 */}
-        <Col xs={24} sm={24} md={8} lg={6} xl={5}>
+      {/* 主要内容区域 - 参考菜单管理的左右分栏布局 */}
+      <div style={{ 
+        display: 'flex', 
+        height: 'calc(100vh - 200px)', 
+        border: '1px solid #f0f0f0',
+        borderRadius: '6px',
+        overflow: 'hidden'
+      }}>
+        {/* 左侧目录树 - 固定宽度 */}
+        <div style={{ 
+          width: '300px', 
+          borderRight: '1px solid #f0f0f0',
+          backgroundColor: '#fafafa'
+        }}>
           <KBFolderTree
             kbId={kbId!}
             onFolderSelect={handleFolderSelect}
             onDocumentSelect={handleDocumentSelect}
             selectedFolderId={selectedFolderId}
           />
-        </Col>
+        </div>
 
-        {/* 右侧文档列表 */}
-        <Col xs={24} sm={24} md={16} lg={18} xl={19}>
-          <Card
-            title={
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Space>
-                  <Breadcrumb>
-                    {folderPath.map((path, index) => (
-                      <Breadcrumb.Item key={index}>
-                        <FolderOutlined />
-                        {path}
-                      </Breadcrumb.Item>
-                    ))}
-                  </Breadcrumb>
-                  <Text type="secondary">({totalDocs} 个文档)</Text>
-                </Space>
-                <Button
-                  type="primary"
-                  icon={<UploadOutlined />}
-                  onClick={() => setUploadVisible(true)}
-                >
-                  上传文档
-                </Button>
-              </div>
-            }
-            style={{ height: '100%' }}
-            bodyStyle={{ height: 'calc(100% - 57px)', padding: 0 }}
-          >
+        {/* 右侧详情管理区域 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          {/* 顶部标题栏 */}
+          <div style={{
+            padding: '16px 24px',
+            borderBottom: '1px solid #f0f0f0',
+            backgroundColor: '#fff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <Space>
+                <Breadcrumb>
+                  {folderPath.map((path, index) => (
+                    <Breadcrumb.Item key={index}>
+                      <FolderOutlined />
+                      {path}
+                    </Breadcrumb.Item>
+                  ))}
+                </Breadcrumb>
+                <Text type="secondary">({totalDocs} 个文档)</Text>
+              </Space>
+            </div>
+            <Space>
+              <Button
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  // 创建新目录
+                  message.info('创建目录功能请在左侧目录树中右键操作');
+                }}
+              >
+                新建目录
+              </Button>
+              <Button
+                type="primary"
+                icon={<UploadOutlined />}
+                onClick={() => setUploadVisible(true)}
+              >
+                上传文档
+              </Button>
+            </Space>
+          </div>
+
+          {/* 内容区域 */}
+          <div style={{ 
+            flex: 1, 
+            backgroundColor: '#fff',
+            overflow: 'hidden'
+          }}>
             <Spin spinning={documentsLoading}>
               <Table
                 columns={columns}
@@ -396,12 +429,13 @@ const KnowledgeBaseDetail: React.FC = () => {
                     `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
                 }}
                 scroll={{ y: 'calc(100vh - 350px)' }}
-                size="small"
+                size="middle"
+                style={{ padding: '0 24px' }}
               />
             </Spin>
-          </Card>
-        </Col>
-      </Row>
+          </div>
+        </div>
+      </div>
 
       {/* 上传文档弹窗 */}
       <Modal

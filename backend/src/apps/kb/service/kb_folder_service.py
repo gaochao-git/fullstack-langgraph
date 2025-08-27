@@ -35,41 +35,40 @@ class KBFolderService:
         if not await self.kb_service._check_permission(db, kb_id, user_id, 'write'):
             raise BusinessException("无权限在此知识库创建目录", ResponseCode.FORBIDDEN)
         
-        async with db.begin():
-            folder_id = str(uuid.uuid4())
-            parent_folder_id = folder_data.get('parent_folder_id')
-            
-            # 验证父目录是否存在且属于同一知识库
-            if parent_folder_id:
-                parent_result = await db.execute(
-                    select(KBFolder).where(
-                        and_(
-                            KBFolder.folder_id == parent_folder_id,
-                            KBFolder.kb_id == kb_id
-                        )
+        folder_id = str(uuid.uuid4())
+        parent_folder_id = folder_data.get('parent_folder_id')
+        
+        # 验证父目录是否存在且属于同一知识库
+        if parent_folder_id:
+            parent_result = await db.execute(
+                select(KBFolder).where(
+                    and_(
+                        KBFolder.folder_id == parent_folder_id,
+                        KBFolder.kb_id == kb_id
                     )
                 )
-                if not parent_result.scalar_one_or_none():
-                    raise BusinessException("父目录不存在", ResponseCode.NOT_FOUND)
-            
-            folder = KBFolder(
-                folder_id=folder_id,
-                kb_id=kb_id,
-                parent_folder_id=parent_folder_id,
-                folder_name=folder_data['folder_name'],
-                folder_description=folder_data.get('folder_description'),
-                folder_type=folder_data.get('folder_type', 'folder'),
-                sort_order=folder_data.get('sort_order', 0),
-                create_by=user_id,
-                update_by=user_id
             )
-            
-            db.add(folder)
-            await db.flush()
-            await db.refresh(folder)
-            
-            logger.info(f"目录创建成功: {folder_data['folder_name']} in {kb_id} by {user_id}")
-            return self._folder_to_dict(folder)
+            if not parent_result.scalar_one_or_none():
+                raise BusinessException("父目录不存在", ResponseCode.NOT_FOUND)
+        
+        folder = KBFolder(
+            folder_id=folder_id,
+            kb_id=kb_id,
+            parent_folder_id=parent_folder_id,
+            folder_name=folder_data['folder_name'],
+            folder_description=folder_data.get('folder_description'),
+            folder_type=folder_data.get('folder_type', 'folder'),
+            sort_order=folder_data.get('sort_order', 0),
+            create_by=user_id,
+            update_by=user_id
+        )
+        
+        db.add(folder)
+        await db.commit()
+        await db.refresh(folder)
+        
+        logger.info(f"目录创建成功: {folder_data['folder_name']} in {kb_id} by {user_id}")
+        return self._folder_to_dict(folder)
     
     async def get_folder_tree(
         self,

@@ -13,7 +13,8 @@ import {
   Modal,
   message,
   Spin,
-  Empty
+  Empty,
+  Tooltip
 } from 'antd';
 import {
   FolderOutlined,
@@ -52,6 +53,7 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [searchValue, setSearchValue] = useState('');
   const [autoExpandParent, setAutoExpandParent] = useState(true);
+  const [hoveredNodeKey, setHoveredNodeKey] = useState<string>(''); // 悬停节点状态
 
   // Modal状态
   const [createFolderVisible, setCreateFolderVisible] = useState(false);
@@ -129,7 +131,7 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
         return {
           key: `folder-${folder.folder_id}`,
           title: folder.folder_name,
-          icon: <FolderOutlined />,
+          icon: expandedKeys.includes(`folder-${folder.folder_id}`) ? <FolderOpenOutlined /> : <FolderOutlined />,
           children: childrenNodes.length > 0 ? childrenNodes : undefined,
           data: folder,
           type: 'folder',
@@ -201,39 +203,44 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
     const items = [];
     
     if (node.type === 'folder') {
-      items.push(
-        {
-          key: 'create-folder',
-          icon: <FolderAddOutlined />,
-          label: '新建子目录',
-          onClick: () => handleCreateFolder(node),
-        },
-        {
-          key: 'rename',
-          icon: <EditOutlined />,
-          label: '重命名',
-          onClick: () => handleRenameFolder(node),
-          disabled: node.key === 'root',
-        },
-        {
-          key: 'delete',
-          icon: <DeleteOutlined />,
-          label: '删除',
-          onClick: () => handleDeleteFolder(node),
-          disabled: node.key === 'root',
-          danger: true,
-        }
-      );
-    } else {
-      items.push(
-        {
-          key: 'remove',
-          icon: <ScissorOutlined />,
-          label: '从知识库移除',
-          onClick: () => handleRemoveDocument(node),
-          danger: true,
-        }
-      );
+      // 所有目录节点都可以新建子目录，包括根目录
+      items.push({
+        key: 'create-folder',
+        icon: <FolderAddOutlined />,
+        label: '新建子目录',
+        onClick: () => handleCreateFolder(node),
+      });
+      
+      // 除根目录外，其他目录可以重命名和删除
+      if (node.key !== 'root') {
+        items.push(
+          {
+            key: 'rename',
+            icon: <EditOutlined />,
+            label: '重命名',
+            onClick: () => handleRenameFolder(node),
+          },
+          {
+            type: 'divider' as const,
+          },
+          {
+            key: 'delete',
+            icon: <DeleteOutlined />,
+            label: '删除目录',
+            onClick: () => handleDeleteFolder(node),
+            danger: true,
+          }
+        );
+      }
+    } else if (node.type === 'document') {
+      // 文档节点的操作菜单
+      items.push({
+        key: 'remove',
+        icon: <ScissorOutlined />,
+        label: '从知识库移除',
+        onClick: () => handleRemoveDocument(node),
+        danger: true,
+      });
     }
     
     return items;
@@ -396,89 +403,139 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
   const filteredTreeData = useMemo(() => filterTreeData(treeData), [treeData, searchValue]);
 
   return (
-    <Card
-      title="目录结构"
-      size="small"
-      extra={
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* 顶部标题栏 */}
+      <div style={{
+        padding: '12px 16px',
+        borderBottom: '1px solid #f0f0f0',
+        backgroundColor: '#fff',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <span style={{ fontWeight: 500 }}>目录结构</span>
         <Button
-          type="text"
+          type="primary"
           size="small"
-          icon={<PlusOutlined />}
+          icon={<FolderAddOutlined />}
           onClick={() => handleCreateFolder({ key: 'root', title: '根目录', type: 'folder' } as TreeNode)}
         >
           新建目录
         </Button>
-      }
-      style={{ height: '100%' }}
-      bodyStyle={{ height: 'calc(100% - 57px)', padding: '8px' }}
-    >
-      <Space direction="vertical" style={{ width: '100%' }} size="small">
-        {/* 搜索框 */}
-        <Search
-          placeholder="搜索目录或文档"
-          allowClear
-          size="small"
-          onSearch={handleSearch}
-          style={{ marginBottom: 8 }}
-        />
-        
-        {/* 目录树 */}
-        <div style={{ height: 'calc(100vh - 300px)', overflow: 'auto' }}>
-          <Spin spinning={loading}>
-            {filteredTreeData.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="暂无目录"
-                style={{ padding: '20px 0' }}
-              />
-            ) : (
-              <Tree
-                treeData={filteredTreeData}
-                selectedKeys={selectedKeys}
-                expandedKeys={expandedKeys}
-                autoExpandParent={autoExpandParent}
-                onSelect={handleSelect}
-                onExpand={handleExpand}
-                // 暂时移除拖拽功能
-                // draggable={{
-                //   icon: false,
-                //   nodeDraggable: (node) => node.key !== 'root',
-                // }}
-                titleRender={(nodeData) => (
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      width: '100%',
-                    }}
-                  >
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {nodeData.title}
-                    </span>
-                    {nodeData.key !== 'root' && (
-                      <Dropdown
-                        menu={{
-                          items: getContextMenuItems(nodeData as TreeNode)
-                        }}
-                        trigger={['click']}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          type="text"
-                          size="small"
-                          icon={<MoreOutlined />}
+      </div>
+      
+      {/* 内容区域 */}
+      <div style={{ flex: 1, padding: '8px', overflow: 'hidden' }}>
+        <Space direction="vertical" style={{ width: '100%' }} size="small">
+          {/* 搜索框 */}
+          <Search
+            placeholder="搜索目录或文档"
+            allowClear
+            size="small"
+            onSearch={handleSearch}
+            style={{ marginBottom: 8 }}
+          />
+          
+          {/* 目录树 */}
+          <div style={{ height: 'calc(100vh - 300px)', overflow: 'auto' }}>
+            <Spin spinning={loading}>
+              {filteredTreeData.length === 0 ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="暂无目录"
+                  style={{ padding: '20px 0' }}
+                />
+              ) : (
+                <Tree
+                  treeData={filteredTreeData}
+                  selectedKeys={selectedKeys}
+                  expandedKeys={expandedKeys}
+                  autoExpandParent={autoExpandParent}
+                  onSelect={handleSelect}
+                  onExpand={handleExpand}
+                  showLine={{ showLeafIcon: false }}
+                  blockNode
+                  // 暂时移除拖拽功能
+                  // draggable={{
+                  //   icon: false,
+                  //   nodeDraggable: (node) => node.key !== 'root',
+                  // }}
+                  titleRender={(nodeData) => (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        width: '100%',
+                      }}
+                      onMouseEnter={() => setHoveredNodeKey(nodeData.key as string)}
+                      onMouseLeave={() => setHoveredNodeKey('')}
+                    >
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {nodeData.title}
+                      </span>
+                      {/* 所有目录节点都显示操作按钮，包括根目录 */}
+                      {nodeData.type === 'folder' && (hoveredNodeKey === nodeData.key || nodeData.key === selectedKeys[0]) && (
+                        <Space size={2}>
+                          {/* 新建子目录按钮 */}
+                          <Tooltip title="新建子目录">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<PlusOutlined />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCreateFolder(nodeData as TreeNode);
+                              }}
+                              style={{ padding: '2px 4px' }}
+                            />
+                          </Tooltip>
+                          {/* 更多操作按钮（除根目录外） */}
+                          {nodeData.key !== 'root' && (
+                            <Dropdown
+                              menu={{
+                                items: getContextMenuItems(nodeData as TreeNode)
+                              }}
+                              trigger={['click']}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={<MoreOutlined />}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ padding: '2px 4px' }}
+                              />
+                            </Dropdown>
+                          )}
+                        </Space>
+                      )}
+                      {/* 文档节点只显示更多操作 */}
+                      {nodeData.type === 'document' && (hoveredNodeKey === nodeData.key || nodeData.key === selectedKeys[0]) && (
+                        <Dropdown
+                          menu={{
+                            items: getContextMenuItems(nodeData as TreeNode)
+                          }}
+                          trigger={['click']}
                           onClick={(e) => e.stopPropagation()}
-                        />
-                      </Dropdown>
-                    )}
-                  </div>
-                )}
-              />
-            )}
-          </Spin>
-        </div>
-      </Space>
+                        >
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<MoreOutlined />}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ padding: '2px 4px' }}
+                          />
+                        </Dropdown>
+                      )}
+                    </div>
+                  )}
+                />
+              )}
+            </Spin>
+          </div>
+        </Space>
+      </div>
 
       {/* 创建目录弹窗 */}
       <Modal
@@ -521,7 +578,7 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
           maxLength={100}
         />
       </Modal>
-    </Card>
+    </div>
   );
 };
 

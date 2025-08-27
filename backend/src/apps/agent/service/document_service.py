@@ -39,13 +39,13 @@ logger = get_logger(__name__)
 
 # 在模块加载时检查依赖并给出警告
 if not HAS_PDF:
-    logger.warning("⚠️  未安装 pypdf 库，PDF 文件解析功能将不可用。请运行: pip install pypdf")
+    logger.warning("未安装 pypdf 库，PDF 文件解析功能将不可用。请运行: pip install pypdf")
     
 if not HAS_DOCX:
-    logger.warning("⚠️  未安装 python-docx 库，Word 文档解析功能将不可用。请运行: pip install python-docx")
+    logger.warning("未安装 python-docx 库，Word 文档解析功能将不可用。请运行: pip install python-docx")
     
 if not HAS_OPENPYXL:
-    logger.warning("⚠️  未安装 openpyxl 库，Excel 文件解析功能将不可用。请运行: pip install openpyxl")
+    logger.warning("未安装 openpyxl 库，Excel 文件解析功能将不可用。请运行: pip install openpyxl")
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.db.models import now_shanghai

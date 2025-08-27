@@ -183,7 +183,7 @@ export interface DragInfo {
 export interface KBModalProps {
   open: boolean;
   onCancel: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (data?: KnowledgeBase) => void;
   initialData?: Partial<KnowledgeBase>;
 }
 
