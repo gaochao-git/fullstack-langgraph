@@ -362,7 +362,7 @@ export function DiagnosticChatView({
           formData.append('file', blob, `paste-image-${Date.now()}.png`);
 
           // 调用文件上传 API
-          const response = await fetch('/api/v1/agents/files/upload', {
+          const response = await fetch('/api/chat/files/upload', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,

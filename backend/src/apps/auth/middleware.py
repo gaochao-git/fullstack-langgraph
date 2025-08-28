@@ -33,7 +33,6 @@ AUTH_EXCLUDE_PATHS = [
     "/api/v1/config/system",  # 系统配置（公开）
     "/api/v1/mcp/gateway/configs/all",  # MCP Gateway配置（公开）
     "/api/chat/threads",  # 智能体聊天接口（通过agent_key认证）
-    "/api/chat/files",    # 智能体文件接口（通过agent_key认证）
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -47,7 +46,6 @@ RBAC_EXCLUDE_PATHS = [
     "/api/v1/agent/ws",  # WebSocket不需要权限检查
     "/api/v1/agent/sse",  # SSE流式接口
     "/api/chat/threads",  # 智能体聊天接口（通过agent_key认证）
-    "/api/chat/files",    # 智能体文件接口（通过agent_key认证）
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -106,8 +104,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                                 from src.apps.agent.models import AgentConfig
                                 
                                 stmt = select(AgentConfig).where(
-                                    AgentConfig.agent_key == token,
-                                    AgentConfig.status == 'enabled'
+                                    AgentConfig.agent_key == token
                                 )
                                 result = await db.execute(stmt)
                                 agent = result.scalar_one_or_none()
@@ -243,6 +240,11 @@ class RBACMiddleware(BaseHTTPMiddleware):
             user = getattr(request.state, "current_user", None)
             if not user:
                 # 如果没有用户信息，说明是公开接口或认证中间件没有正确设置
+                return await call_next(request)
+            
+            # 检查认证类型，如果是agent_key认证，跳过权限检查
+            auth_type = getattr(request.state, "auth_type", None)
+            if auth_type == "agent_key":
                 return await call_next(request)
             
             # 检查权限

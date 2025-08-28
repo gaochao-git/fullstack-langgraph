@@ -391,6 +391,14 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     elif request_body.input and isinstance(request_body.input, dict) and "user_name" in request_body.input:
         user_name = request_body.input["user_name"]
     
+    # 对于agent_key认证，用户名是必须的
+    if auth_type == "agent_key" and not user_name:
+        raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+    
+    # 对于JWT认证，如果没有提供用户名，使用当前登录用户的用户名
+    if auth_type == "jwt" and not user_name and current_user:
+        user_name = current_user.get('username')
+    
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
         try:

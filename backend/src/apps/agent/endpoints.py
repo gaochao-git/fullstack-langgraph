@@ -304,31 +304,28 @@ async def get_user_threads_endpoint(
 @router.post("/chat/files/upload", response_model=UnifiedResponse)
 async def upload_file(
     file: UploadFile = File(...),
-    user_name: str = Query(..., description="上传文件的用户名"),
+    user_name: Optional[str] = Query(None, description="上传文件的用户名（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     request: Request = None
 ):
-    """上传文档文件（需要 agent_key 认证）"""
-    # 验证 agent_key
-    if request:
-        auth_header = request.headers.get('authorization', '')
-        if auth_header.startswith('Bearer '):
-            token = auth_header.replace('Bearer ', '').strip()
-            if not token.startswith('agent_'):
-                raise BusinessException("需要使用智能体密钥认证", ResponseCode.UNAUTHORIZED)
+    """上传文档文件（通过AuthMiddleware认证）"""
+    # 从request.state获取认证信息
+    auth_type = None
+    if request and hasattr(request.state, 'auth_type'):
+        auth_type = request.state.auth_type
+        current_user = request.state.current_user
+        
+        # 对于agent_key认证，user_name是必须的
+        if auth_type == "agent_key" and not user_name:
+            raise BusinessException("使用agent_key认证时必须提供user_name参数", ResponseCode.BAD_REQUEST)
             
-            # 验证 agent_key 是否有效
-            from .models import AgentConfig
-            from sqlalchemy import select
-            result = await db.execute(
-                select(AgentConfig).where(AgentConfig.agent_key == token)
-            )
-            agent = result.scalar_one_or_none()
-            if not agent:
-                raise BusinessException("智能体调用密钥错误", ResponseCode.INVALID_API_KEY)
-            logger.info(f"文件上传认证成功 - 智能体: {agent.agent_id}, 用户: {user_name}")
-        else:
-            raise BusinessException("缺少认证信息", ResponseCode.UNAUTHORIZED)
+        # 对于JWT认证，如果没有提供user_name，使用当前用户名
+        if auth_type == "jwt" and not user_name and current_user:
+            user_name = current_user.get('username')
+            
+        logger.info(f"文件上传 - 认证类型: {auth_type}, 用户: {user_name}")
+    else:
+        raise BusinessException("未通过认证", ResponseCode.UNAUTHORIZED)
     
     # 验证文件名是否为空
     if not file.filename:
