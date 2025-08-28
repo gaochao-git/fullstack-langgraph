@@ -69,8 +69,8 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
 }) => {
   // 使用 App.useApp 获取 modal 实例
   const { modal } = App.useApp();
-  // 目录最大层级深度配置
-  const MAX_FOLDER_DEPTH = 4;
+  // 目录最大层级深度配置（支持3级目录）
+  const MAX_FOLDER_DEPTH = 3;
   const [treeData, setTreeData] = useState<TreeNodeData[]>([]);
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
@@ -263,13 +263,13 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
     return [];
   };
 
-  // 计算节点的文件夹层级深度（不包括知识库层级）
+  // 计算节点的文件夹层级深度（从1开始计算）
   const getFolderDepth = (node: TreeNodeData): number => {
     if (node.type === 'kb') return 0;
     
     const fullPath = findNodeFullPath(node.key as string, treeData);
-    // 减去知识库层级，只计算文件夹层级
-    return Math.max(0, fullPath.length - 1);
+    // 返回文件夹层级深度，从1开始
+    return fullPath.length - 1;
   };
 
   // 选择节点处理
