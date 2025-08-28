@@ -11,7 +11,7 @@ from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.db.models import now_shanghai
-from ..models import KnowledgeBase, KBDocument, KBPermission, KBFolder
+from ..models import KnowledgeBase, KBDocument, KBPermission, KBFolder, KBDocumentFolder
 from ...agent.models import AgentDocumentUpload
 
 logger = get_logger(__name__)
@@ -139,6 +139,28 @@ class KnowledgeBaseService:
             )
             folder_count = folder_count_result.scalar()
             kb_dict['has_folders'] = folder_count > 0
+            
+            # 统计根目录下的文件数量（不包括子目录中的文件）
+            # 需要通过 KBDocument 表统计，因为根目录下的文件没有 folder_id
+            root_file_count_result = await db.execute(
+                select(func.count()).select_from(KBDocument)
+                .outerjoin(
+                    KBDocumentFolder,
+                    and_(
+                        KBDocument.file_id == KBDocumentFolder.file_id,
+                        KBDocument.kb_id == KBDocumentFolder.kb_id
+                    )
+                )
+                .where(
+                    and_(
+                        KBDocument.kb_id == kb.kb_id,
+                        KBDocument.doc_status == 1,
+                        KBDocumentFolder.folder_id.is_(None)  # 没有分配到任何文件夹的文件
+                    )
+                )
+            )
+            root_file_count = root_file_count_result.scalar()
+            kb_dict['file_count'] = root_file_count
             
             kbs.append(kb_dict)
         

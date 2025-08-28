@@ -121,7 +121,7 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
       
       const kbNode: TreeNodeData = {
         key: `kb-${kb.kb_id}`,
-        title: kb.kb_name,
+        title: `${kb.kb_name}${kb.file_count ? ` (${kb.file_count})` : ''}`,
         icon: <BookOutlined />,
         type: 'kb',
         data: kb,
@@ -175,7 +175,7 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
 
       const folderNode: TreeNodeData = {
         key: `${kbId}-folder-${folder.folder_id}`,
-        title: folder.folder_name,
+        title: `${folder.folder_name}${folder.file_count ? ` (${folder.file_count})` : ''}`,
         icon: expandedKeys.includes(`${kbId}-folder-${folder.folder_id}`) ? <FolderOpenOutlined /> : <FolderOutlined />,
         children: childrenNodes.length > 0 ? childrenNodes : undefined, // 如果有子节点就设置，否则不设置
         isLeaf: !hasChildren, // 根据是否有子元素来设置叶子节点标记

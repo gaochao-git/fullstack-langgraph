@@ -156,6 +156,22 @@ class KBFolderService:
         )
         folders = result.scalars().all()
         
+        # 获取每个文件夹的文件数量
+        folder_file_counts = {}
+        if folders:
+            folder_ids = [f.folder_id for f in folders]
+            # 统计每个文件夹下的文件数量
+            file_count_result = await db.execute(
+                select(
+                    KBDocumentFolder.folder_id,
+                    func.count(KBDocumentFolder.file_id).label('file_count')
+                )
+                .where(KBDocumentFolder.folder_id.in_(folder_ids))
+                .group_by(KBDocumentFolder.folder_id)
+            )
+            for folder_id, count in file_count_result:
+                folder_file_counts[folder_id] = count
+        
         # 构建树形结构
         folder_map = {}
         root_folders = []
@@ -164,6 +180,7 @@ class KBFolderService:
         for folder in folders:
             folder_dict = self._folder_to_dict(folder)
             folder_dict['children'] = []
+            folder_dict['file_count'] = folder_file_counts.get(folder.folder_id, 0)
             folder_map[folder.folder_id] = folder_dict
         
         # 步骤2: 构建父子关系（邻接列表转换为树）

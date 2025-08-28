@@ -20,6 +20,7 @@ export interface KnowledgeBase {
   update_time: string;
   user_permission?: 'read' | 'write' | 'admin' | 'owner';
   has_folders?: boolean; // 是否有子目录
+  file_count?: number; // 根目录下的文件数量（不包括子目录中的文件）
 }
 
 // 目录类型
@@ -38,6 +39,7 @@ export interface KBFolder {
   update_time: string;
   // 树结构相关属性（后端返回时包含）
   children?: KBFolder[]; // 子目录列表，由后端的邻接列表模型构造
+  file_count?: number; // 文件数量（不包括子目录中的文件）
 }
 
 // 文档类型
