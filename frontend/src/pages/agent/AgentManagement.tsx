@@ -797,6 +797,8 @@ const AgentManagement: React.FC = () => {
         mcpServers={mcpServers}
         availableModels={availableModels}
         loading={formSubmitting}
+        onRefresh={loadData}
+        currentUser={user}
       />
 
       {/* 确认删除模态框 */}

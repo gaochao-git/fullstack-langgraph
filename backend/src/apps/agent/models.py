@@ -38,6 +38,8 @@ class AgentConfig(BaseModel):
     visibility_type = Column(String(100), nullable=False, default='public')  # 可见权限级别
     visibility_additional_users = Column(Text, nullable=True)  # 额外授权用户列表(JSON)
     favorite_users = Column(Text, nullable=True)  # 主动收藏该智能体的人员列表(JSON)
+    # API调用密钥
+    agent_key = Column(String(64), nullable=True, unique=True, comment="智能体调用密钥")
     create_by = Column(String(100), nullable=False, default='system')
     update_by = Column(String(100), nullable=True)
     create_time = Column(DateTime, default=now_shanghai, nullable=False)

@@ -122,7 +122,9 @@ async def get_thread_history_post(thread_id: str, request_body: Optional[Dict[st
     logger.info(f"请求history(POST) - thread_id: {thread_id}")
     thread_data = await recover_thread_from_postgres(thread_id)
     if not thread_data:
-        raise BusinessException("Thread not found", ResponseCode.NOT_FOUND)
+        # 对于新创建的线程，返回空历史记录而不是抛出错误
+        logger.info(f"Thread {thread_id} 尚未有对话历史，返回空历史")
+        return []
     messages = thread_data.get("state", {}).get("messages", [])
     interrupts = thread_data.get("state", {}).get("interrupts", [])
     history = [

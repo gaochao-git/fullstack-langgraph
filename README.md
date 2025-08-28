@@ -158,7 +158,12 @@ https://gofastmcp.com/getting-started/welcome
 
 ## api调用
 1.agent调用
-- 初始化会话
+- 上传文件
+```python
+url = "http://localhost:3000/api/v1/agents/files/upload"
+xxxxx
+```
+- 初始化会话id
 ```python
 import requests
 import json
@@ -174,22 +179,38 @@ response = requests.post(
 thread_data = response.json()
 thread_id = thread_data.get("thread_id")
 ```
-- 调用agent
+- 调用agent对话
 ```python
 payload = {
     "input": {
         "messages": [{"type": "human", "content": "你好", "id": str(int(datetime.now().timestamp() * 1000))}],
         "user_name": "gaochao",
     },
-    "config": {"configurable": {"selected_model": "deepseek-chat"}},
+    "config": {"configurable": {"selected_model": "deepseek-chat", "file_ids": ["9b521165-a223-4934-8f35-ae2021a831a9"]}},
     "stream_mode": ["messages-tuple", "values", "updates"],
-    "assistant_id": "diagnostic_agent",
+    "assistant_id": "{智能体id}",
     "on_disconnect": "cancel",
 }
-api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{conversation_id}/runs/stream"
+api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/runs/stream"
 response = requests.post(
-    f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/messages",
-    json={"content": "你好"},
+    api_url,
+    json=payload,
+    headers={"Content-Type": "application/json"},
+    timeout=10
+)
+```
+
+- 取消对话
+```python
+url = f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/runs/cancel"
+xxxxx
+```
+
+- 获取历史消息
+```python
+url = f"http://localhost:3000/api/chat/threads/{thread_id}/history"
+response = requests.get(
+    url,
     headers={"Content-Type": "application/json"},
     timeout=10
 )

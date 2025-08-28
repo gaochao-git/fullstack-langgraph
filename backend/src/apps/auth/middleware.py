@@ -32,6 +32,7 @@ AUTH_EXCLUDE_PATHS = [
     "/api/v1/auth/init",
     "/api/v1/config/system",  # 系统配置（公开）
     "/api/v1/mcp/gateway/configs/all",  # MCP Gateway配置（公开）
+    "/api/chat/threads",  # 智能体聊天接口（通过agent_key认证）
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -44,6 +45,7 @@ RBAC_EXCLUDE_PATHS = [
     "/api/v1/auth",
     "/api/v1/agent/ws",  # WebSocket不需要权限检查
     "/api/v1/agent/sse",  # SSE流式接口
+    "/api/chat/threads",  # 智能体聊天接口（通过agent_key认证）
     "/docs",
     "/redoc",
     "/openapi.json",

@@ -3,7 +3,7 @@ import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import ChatMessages, { type ProcessedEvent } from "./ChatMessage";
-import { Drawer } from "antd";
+import { Drawer, App } from "antd";
 import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";
 import { omind_get, getBaseUrl } from "@/utils/base_api";
@@ -48,6 +48,7 @@ export default function ChatEngine({
   onNewSession 
 }: ChatEngineProps) {
   const { isDark } = useTheme();
+  const { message } = App.useApp();
   const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
   const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
   const hasFinalizeEventOccurredRef = useRef(false);
@@ -133,6 +134,16 @@ export default function ChatEngine({
       }
     },
     onError: (error: any) => {
+      // 检查是否是智能体密钥错误
+      if (error.code === 461 || error.status === 461) {
+        message.error(error.message || '智能体调用密钥错误');
+      } else if (error.code === 401 || error.status === 401) {
+        // 401 是用户认证错误，不处理，让全局拦截器处理
+        // 不显示消息，避免重复
+      } else {
+        // 其他错误显示错误消息
+        message.error(error.message || '请求失败');
+      }
       setError(error.message);
     },
   });

@@ -2,16 +2,18 @@
 流式处理相关接口和函数
 """
 import json
+import os
 from typing import Dict, Any, List
 from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
-from src.shared.schemas.response import ResponseCode
+from src.shared.schemas.response import ResponseCode, success_response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.shared.db.config import get_async_db_context
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from ..utils import (prepare_graph_config, serialize_value,CHECK_POINT_URI,recover_thread_from_postgres)
 from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping,init_user_threads_db)
@@ -228,7 +230,7 @@ async def handle_postgres_streaming(request_body, thread_id):
         async for item in stream_with_graph_postgres(graph, request_body, thread_id):
             yield item
 
-async def stream_run_standard(thread_id: str, request_body: RunCreate):
+async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     from .agent_config_service import AgentConfigService
     
@@ -241,13 +243,39 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
     db = next(db_gen)
     try:
         agent_config = AgentConfigService.get_agent_config(agent_id, db)
+        
+        if not agent_config:
+            raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
+        
+        # 验证调用密钥（如果智能体配置了密钥）
+        from ..models import AgentConfig
+        agent_record = db.query(AgentConfig).filter(AgentConfig.agent_id == agent_id).first()
+        
+        if agent_record and agent_record.agent_key:
+            # 检查授权头
+            auth_header = request.headers.get('authorization', '') if request else ''
+            
+            if auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '').strip()
+                
+                # 通过前缀判断是 agent_key（API调用）还是 JWT（页面调用）
+                if token.startswith('agent_'):
+                    # API调用：token 以 agent_ 开头，验证 agent_key
+                    if token != agent_record.agent_key:
+                        logger.warning(f"智能体 {agent_id} 密钥验证失败 (API调用)")
+                        raise BusinessException("智能体调用密钥错误", ResponseCode.INVALID_API_KEY)
+                    logger.info(f"智能体 {agent_id} 密钥验证成功 (API调用)")
+                else:
+                    # 页面调用：token 不以 agent_ 开头，认为是 JWT
+                    logger.info(f"智能体 {agent_id} 页面调用（JWT认证）")
+            else:
+                # 没有 Bearer token，可能是未认证的页面调用
+                logger.info(f"智能体 {agent_id} 未认证调用")
+        elif not agent_record:
+            logger.warning(f"无法获取智能体 {agent_id} 的记录")
+            
     finally:
         db.close()
-    
-    if not agent_config:
-        raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
-    
-    # 移除验证逻辑，直接根据数据库配置处理智能体
     
     # 更新智能体使用统计
     from src.shared.db.config import get_async_db_context
@@ -301,6 +329,151 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate):
             "Content-Type": "text/event-stream"
         }
     )
+
+
+async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=None):
+    """Standard LangGraph non-streaming endpoint - 非流式调用"""
+    from .agent_config_service import AgentConfigService
+    
+    # LangGraph SDK使用assistant_id，转换为内部的agent_id
+    agent_id = request_body.assistant_id
+    
+    # 检查数据库中是否存在该智能体
+    from src.shared.db.config import get_sync_db
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
+        agent_config = AgentConfigService.get_agent_config(agent_id, db)
+        
+        if not agent_config:
+            raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
+        
+        # 验证调用密钥（如果智能体配置了密钥）
+        from ..models import AgentConfig
+        agent_record = db.query(AgentConfig).filter(AgentConfig.agent_id == agent_id).first()
+        
+        if agent_record and agent_record.agent_key:
+            # 检查授权头
+            auth_header = request.headers.get('authorization', '') if request else ''
+            
+            if auth_header.startswith('Bearer '):
+                token = auth_header.replace('Bearer ', '').strip()
+                
+                # 通过前缀判断是 agent_key（API调用）还是 JWT（页面调用）
+                if token.startswith('agent_'):
+                    # API调用：token 以 agent_ 开头，验证 agent_key
+                    if token != agent_record.agent_key:
+                        logger.warning(f"智能体 {agent_id} 密钥验证失败 (API调用)")
+                        raise BusinessException("智能体调用密钥错误", ResponseCode.INVALID_API_KEY)
+                    logger.info(f"智能体 {agent_id} 密钥验证成功 (API调用)")
+                else:
+                    # 页面调用：token 不以 agent_ 开头，认为是 JWT
+                    logger.info(f"智能体 {agent_id} 页面调用（JWT认证）")
+            else:
+                # 没有 Bearer token，可能是未认证的页面调用
+                logger.info(f"智能体 {agent_id} 未认证调用")
+                
+    finally:
+        db.close()
+    
+    # 更新智能体使用统计
+    from src.shared.db.config import get_async_db_context
+    from .agent_service import agent_service
+    try:
+        async with get_async_db_context() as async_db:
+            await agent_service.increment_run_count(async_db, agent_id)
+            logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
+    except Exception as e:
+        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
+    
+    # 创建用户线程关联
+    user_name = None
+    if request_body.user_name:
+        user_name = request_body.user_name
+    elif request_body.input and isinstance(request_body.input, dict) and "user_name" in request_body.input:
+        user_name = request_body.input["user_name"]
+    
+    if user_name:
+        logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
+        try:
+            await ensure_user_thread_mapping(user_name, thread_id, request_body)
+        except Exception as e:
+            logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
+    
+    # PostgreSQL 模式下的非流式处理
+    is_builtin = agent_config.get('is_builtin') == 'yes'
+    return await handle_postgres_invoke(thread_id, request_body, agent_id, is_builtin)
+
+
+async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_id: str, is_builtin: bool):
+    """PostgreSQL 模式下的非流式处理"""
+    from ..utils import CHECK_POINT_URI
+    if not CHECK_POINT_URI:
+        raise Exception("未配置检查点存储")
+    
+    async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
+        await checkpointer.setup()
+        
+        # 动态编译图
+        if is_builtin:
+            if agent_id == 'diagnostic_agent':
+                from ..llm_agents.diagnostic_agent.graph import builder
+                graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+            else:
+                raise Exception(f"不支持的内置智能体: {agent_id}")
+        else:
+            from ..llm_agents.generic_agent.graph import builder
+            graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
+        
+        # 准备配置和输入
+        config, graph_input, _, checkpoint = prepare_graph_config(request_body, thread_id)
+        
+        # 在配置中添加 agent_id
+        config["configurable"]["agent_id"] = agent_id
+        
+        # 保存文档关联（如果有）
+        file_ids = request_body.input.get("files", []) if request_body.input else []
+        user_name = request_body.user_name or (request_body.input.get("user_name") if request_body.input else None)
+        if file_ids and user_name:
+            await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
+        
+        # 非流式调用
+        try:
+            result = await graph.ainvoke(graph_input, config=config)
+            
+            # 处理结果
+            final_response = {
+                "thread_id": thread_id,
+                "status": "completed",
+                "result": result
+            }
+            
+            # 如果结果中有messages，提取最后一条AI消息
+            if isinstance(result, dict) and "messages" in result:
+                messages = result["messages"]
+                # 找到最后一条AI消息
+                for message in reversed(messages):
+                    if hasattr(message, "type") and message.type == "ai":
+                        final_response["last_message"] = {
+                            "content": message.content,
+                            "type": "ai"
+                        }
+                        break
+            
+            # 检查是否有中断
+            state = await checkpointer.aget(config)
+            if state:
+                # state 可能是一个字典或对象
+                next_nodes = state.get("next") if isinstance(state, dict) else getattr(state, "next", None)
+                if next_nodes:
+                    final_response["status"] = "interrupted"
+                    final_response["interrupted_at"] = list(next_nodes)
+            
+            return success_response(final_response)
+            
+        except Exception as e:
+            logger.error(f"非流式调用失败: {e}", exc_info=True)
+            raise BusinessException(f"处理请求时出错: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
 async def save_thread_file_associations(thread_id: str, file_ids: List[str], agent_id: str, user_name: str) -> None:

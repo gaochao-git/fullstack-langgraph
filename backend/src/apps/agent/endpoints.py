@@ -1,7 +1,7 @@
 """Agent API routes - 使用全局统一响应格式"""
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, Query, UploadFile, File
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -240,6 +240,24 @@ async def get_user_favorite_agents(
     return paginated_response(items=agents, total=total, page=page, size=size, msg="获取收藏列表成功")
 
 
+@router.post("/v1/agents/{agent_id}/reset-key", response_model=UnifiedResponse)
+async def reset_agent_key(
+    agent_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """重置智能体调用密钥"""
+    if not current_user:
+        raise BusinessException("需要登录才能重置密钥", ResponseCode.UNAUTHORIZED)
+    
+    username = current_user.get('username')
+    if not username:
+        raise BusinessException("无法获取当前用户信息", ResponseCode.UNAUTHORIZED)
+    
+    result = await agent_service.reset_agent_key(db, agent_id, username)
+    return success_response(data=result, msg="密钥重置成功")
+
+
 # ==================== LLM智能体流式处理路由 ====================
 
 @router.post("/chat/threads", response_model=ThreadResponse)
@@ -255,9 +273,16 @@ async def get_thread_history_post_endpoint(thread_id: str, request_body: Optiona
 
 
 @router.post("/chat/threads/{thread_id}/runs/stream")
-async def stream_run_standard_endpoint(thread_id: str, request_body: RunCreate):
+async def stream_run_standard_endpoint(thread_id: str, request_body: RunCreate, request: Request):
     """智能体流式对话处理"""
-    return await stream_run_standard(thread_id, request_body)
+    return await stream_run_standard(thread_id, request_body, request)
+
+
+@router.post("/chat/threads/{thread_id}/runs/invoke")
+async def invoke_run_standard_endpoint(thread_id: str, request_body: RunCreate, request: Request):
+    """智能体非流式对话处理"""
+    from .service.streaming import invoke_run_standard
+    return await invoke_run_standard(thread_id, request_body, request)
 
 
 @router.get("/chat/users/{user_name}/threads")

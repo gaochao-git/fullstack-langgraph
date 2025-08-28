@@ -27,6 +27,7 @@ class ResponseCode(int, Enum):
     METHOD_NOT_ALLOWED = 405
     CONFLICT = 409
     VALIDATION_ERROR = 422
+    INVALID_API_KEY = 461  # 自定义错误码：API密钥无效
     
     # 服务器错误
     INTERNAL_ERROR = 500

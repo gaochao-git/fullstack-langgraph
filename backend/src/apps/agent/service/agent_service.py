@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_, func, case, text, bindparam, exists
 import uuid
 import json
+import secrets
+import hashlib
 
 from src.apps.agent.models import AgentConfig
 from src.apps.user.models import RbacUser
@@ -50,6 +52,11 @@ class AgentService:
             agent_data.setdefault('avg_response_time', 0.0)
             agent_data.setdefault('create_time', now_shanghai())
             agent_data.setdefault('update_time', now_shanghai()) 
+            
+            # 生成唯一的调用密钥
+            if not agent_data.get('agent_key'):
+                # 生成16字节的随机密钥，并转换为32位十六进制字符串
+                agent_data['agent_key'] = secrets.token_hex(16)
             # 处理capabilities字段映射
             if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):agent_data['agent_capabilities'] = agent_data.pop('capabilities')
             
@@ -636,6 +643,45 @@ class AgentService:
             agents.append(agent_dict)
         
         return agents, total
+    
+    async def reset_agent_key(
+        self,
+        db: AsyncSession,
+        agent_id: str,
+        current_user: str
+    ) -> Dict[str, Any]:
+        """重置智能体调用密钥"""
+        async with db.begin():
+            # 获取智能体信息
+            result = await db.execute(
+                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+            )
+            agent = result.scalar_one_or_none()
+            if not agent:
+                raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+            
+            # 检查权限：只有所有者可以重置密钥
+            if agent.agent_owner != current_user:
+                raise BusinessException("只有智能体所有者可以重置密钥", ResponseCode.FORBIDDEN)
+            
+            # 生成新的密钥（添加 agent_ 前缀，总长度不超过64）
+            # agent_ (6) + token_hex(29) (58) = 64
+            new_key = f"agent_{secrets.token_hex(29)}"
+            agent.agent_key = new_key
+            agent.update_by = current_user
+            agent.update_time = now_shanghai()
+            
+            await db.flush()
+            await db.refresh(agent)
+            
+            logger.info(f"智能体 {agent_id} 密钥已重置 by {current_user}")
+            
+            # 返回新的密钥信息
+            return {
+                "agent_id": agent_id,
+                "agent_key": new_key,
+                "updated_at": agent.update_time.strftime('%Y-%m-%d %H:%M:%S')
+            }
 
 
 # 创建全局实例

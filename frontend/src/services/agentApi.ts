@@ -77,6 +77,8 @@ export interface Agent {
   visibility_additional_users?: string[];
   favorite_users?: string[];
   is_favorited?: boolean; // 当前用户是否收藏
+  // API调用密钥
+  agent_key?: string;
 }
 
 export interface CreateAgentRequest {
@@ -340,6 +342,13 @@ class AgentApiService {
 
     const url = `/api/v1/agents/favorites${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
     return await omind_get(url);
+  }
+
+  /**
+   * 重置智能体调用密钥
+   */
+  async resetAgentKey(agentId: string) {
+    return await omind_post(`/api/v1/agents/${agentId}/reset-key`);
   }
 
 }
