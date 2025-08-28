@@ -24,6 +24,89 @@ from ..utils import CHECK_POINT_URI
 from ..models import AgentDocumentSession
 logger = get_logger(__name__)
 
+class RunCreate(BaseModel):
+    assistant_id: str
+    input: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    stream_mode: Optional[List[str]] = ["values"]
+    interrupt_before: Optional[List[str]] = None
+    interrupt_after: Optional[List[str]] = None
+    on_disconnect: Optional[str] = None
+    command: Optional[Dict[str, Any]] = None
+    checkpoint: Optional[Dict[str, Any]] = None
+    user_name: Optional[str] = None  # 用户名，用于线程关联
+    file_ids: Optional[List[str]] = None  # 关联的文件ID列表
+    
+
+async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
+    """验证和准备运行参数 - 公共方法，提取stream_run_standard和invoke_run_standard的重复逻辑"""
+    
+    # LangGraph SDK使用assistant_id，转换为内部的agent_id
+    agent_id = request_body.assistant_id
+    
+    # 检查数据库中是否存在该智能体
+    db_gen = get_sync_db()
+    db = next(db_gen)
+    try:
+        agent_config = AgentConfigService.get_agent_config(agent_id, db)
+        
+        if not agent_config:
+            raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
+        
+        # 从request.state获取认证信息（由AuthMiddleware设置）
+        current_user = None
+        auth_type = None
+        if request and hasattr(request.state, 'current_user'):
+            current_user = request.state.current_user
+            auth_type = request.state.auth_type
+            
+            # 如果是agent_key认证，验证agent_id是否匹配
+            if auth_type == "agent_key":
+                agent_id_from_auth = current_user.get('agent_id')
+                if agent_id_from_auth != agent_id:
+                    logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
+                    raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
+                logger.info(f"智能体 {agent_id} agent_key认证验证成功")
+            elif auth_type == "jwt":
+                logger.info(f"智能体 {agent_id} JWT认证验证成功")
+            else:
+                logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
+        else:
+            logger.warning(f"智能体 {agent_id} 未通过认证中间件")
+            
+    finally:
+        db.close()
+    
+    # 更新智能体使用统计
+    try:
+        async with get_async_db_context() as async_db:
+            await agent_service.increment_run_count(async_db, agent_id)
+            logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
+    except Exception as e:
+        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
+        # 统计更新失败不影响主流程
+    
+    # 创建用户线程关联,接口需传递用户名
+    user_name = request_body.config["configurable"].get("user_name")
+    
+    # 用户名是必须的
+    if not user_name:
+        raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
+    
+    if user_name:
+        logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
+        try:
+            await ensure_user_thread_mapping(user_name, thread_id, request_body)
+        except Exception as e:
+            logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
+            # 不影响主流程，继续执行
+    else:
+        logger.warning(f"⚠️ 请求中没有提供用户名，跳过用户线程关联创建")
+    
+    return agent_id, agent_config, user_name
+
+
 async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
     确保用户和线程的归属已写入user_threads表，如不存在则自动写入。
@@ -47,20 +130,6 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
         
         logger.info(f"[ensure_user_thread_mapping] creating mapping: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
         await create_user_thread_mapping(user_name, thread_id, thread_title, agent_id)
-
-class RunCreate(BaseModel):
-    assistant_id: str
-    input: Optional[Dict[str, Any]] = None
-    config: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
-    stream_mode: Optional[List[str]] = ["values"]
-    interrupt_before: Optional[List[str]] = None
-    interrupt_after: Optional[List[str]] = None
-    on_disconnect: Optional[str] = None
-    command: Optional[Dict[str, Any]] = None
-    checkpoint: Optional[Dict[str, Any]] = None
-    user_name: Optional[str] = None  # 用户名，用于线程关联
-    file_ids: Optional[List[str]] = None  # 关联的文件ID列表
 
 async def process_stream_chunk(chunk, event_id, thread_id):
     """处理单个流式数据块"""    
@@ -222,66 +291,8 @@ async def handle_postgres_streaming(request_body, thread_id):
 async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     
-    # LangGraph SDK使用assistant_id，转换为内部的agent_id
-    agent_id = request_body.assistant_id
-    
-    # 检查数据库中是否存在该智能体
-    db_gen = get_sync_db()
-    db = next(db_gen)
-    try:
-        agent_config = AgentConfigService.get_agent_config(agent_id, db)
-        
-        if not agent_config: raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
-        
-        # 从request.state获取认证信息（由AuthMiddleware设置）
-        current_user = None
-        auth_type = None
-        if request and hasattr(request.state, 'current_user'):
-            current_user = request.state.current_user
-            auth_type = request.state.auth_type
-            
-            # 如果是agent_key认证，验证agent_id是否匹配
-            if auth_type == "agent_key":
-                agent_id_from_auth = current_user.get('agent_id')
-                if agent_id_from_auth != agent_id:
-                    logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
-                    raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
-                logger.info(f"智能体 {agent_id} agent_key认证验证成功")
-            elif auth_type == "jwt":
-                logger.info(f"智能体 {agent_id} JWT认证验证成功")
-            else:
-                logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
-        else:
-            logger.warning(f"智能体 {agent_id} 未通过认证中间件")
-            
-    finally:
-        db.close()
-    
-    # 更新智能体使用统计
-    try:
-        async with get_async_db_context() as async_db:
-            await agent_service.increment_run_count(async_db, agent_id)
-            logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
-    except Exception as e:
-        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
-        # 统计更新失败不影响主流程
-    
-    # 创建用户线程关联,接口需传递用户名
-    user_name = request_body.config["configurable"].get("user_name")
-    
-    # 用户名是必须的
-    if not user_name:raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
-    
-    
-    if user_name:
-        logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
-        try:
-            await ensure_user_thread_mapping(user_name, thread_id, request_body)
-        except Exception as e:
-            logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
-            # 不影响主流程，继续执行
-    else:
-        logger.warning(f"⚠️ 请求中没有提供用户名，跳过用户线程关联创建")
+    # 使用公共方法验证和准备运行参数
+    agent_id, agent_config, user_name = await validate_and_prepare_run(thread_id, request_body, request)
 
     async def generate():
         try:
@@ -311,62 +322,8 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
 async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph non-streaming endpoint - 非流式调用"""
     
-    # LangGraph SDK使用assistant_id，转换为内部的agent_id
-    agent_id = request_body.assistant_id
-    
-    # 检查数据库中是否存在该智能体
-    db_gen = get_sync_db()
-    db = next(db_gen)
-    try:
-        agent_config = AgentConfigService.get_agent_config(agent_id, db)
-        if not agent_config: raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
-        
-        # 从request.state获取认证信息（由AuthMiddleware设置）
-        current_user = None
-        auth_type = None
-        if request and hasattr(request.state, 'current_user'):
-            current_user = request.state.current_user
-            auth_type = request.state.auth_type
-            
-            # 如果是agent_key认证，验证agent_id是否匹配
-            if auth_type == "agent_key":
-                agent_id_from_auth = current_user.get('agent_id')
-                if agent_id_from_auth != agent_id:
-                    logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
-                    raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
-                logger.info(f"智能体 {agent_id} agent_key认证验证成功")
-            elif auth_type == "jwt":
-                logger.info(f"智能体 {agent_id} JWT认证验证成功")
-            else:
-                logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
-        else:
-            logger.warning(f"智能体 {agent_id} 未通过认证中间件")
-                
-    finally:
-        db.close()
-    
-    # 更新智能体使用统计
-    try:
-        async with get_async_db_context() as async_db:
-            await agent_service.increment_run_count(async_db, agent_id)
-            logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
-    except Exception as e:
-        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
-    
-    # 创建用户线程关联
-    # 用户名必须在 request_body.configurable.user_name 中
-    user_name = request_body.config["configurable"].get("user_name")
-    
-    # 用户名是必须的
-    if not user_name: raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
-    
-    
-    if user_name:
-        logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
-        try:
-            await ensure_user_thread_mapping(user_name, thread_id, request_body)
-        except Exception as e:
-            logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
+    # 使用公共方法验证和准备运行参数
+    agent_id, agent_config, user_name = await validate_and_prepare_run(thread_id, request_body, request)
     
     # PostgreSQL 模式下的非流式处理
     is_builtin = agent_config.get('is_builtin') == 'yes'
