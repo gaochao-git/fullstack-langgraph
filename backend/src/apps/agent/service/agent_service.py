@@ -55,8 +55,9 @@ class AgentService:
             
             # 生成唯一的调用密钥
             if not agent_data.get('agent_key'):
-                # 生成16字节的随机密钥，并转换为32位十六进制字符串
-                agent_data['agent_key'] = secrets.token_hex(16)
+                # 生成密钥：sk- (3) + 29 字符 = 32 总长度
+                # 使用 token_urlsafe(22) 会生成约30个字符，截取前29个
+                agent_data['agent_key'] = f"sk-{secrets.token_urlsafe(22)[:29]}"
             # 处理capabilities字段映射
             if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):agent_data['agent_capabilities'] = agent_data.pop('capabilities')
             
@@ -664,9 +665,9 @@ class AgentService:
             if agent.agent_owner != current_user:
                 raise BusinessException("只有智能体所有者可以重置密钥", ResponseCode.FORBIDDEN)
             
-            # 生成新的密钥（添加 agent_ 前缀，总长度不超过64）
-            # agent_ (6) + token_hex(29) (58) = 64
-            new_key = f"agent_{secrets.token_hex(29)}"
+            # 生成新的密钥：sk- (3) + 29 字符 = 32 总长度
+            # 使用 token_urlsafe(22) 会生成约30个字符，截取前29个
+            new_key = f"sk-{secrets.token_urlsafe(22)[:29]}"
             agent.agent_key = new_key
             agent.update_by = current_user
             agent.update_time = now_shanghai()

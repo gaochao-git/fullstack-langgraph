@@ -9,7 +9,7 @@
 ```bash
 # API 基础配置
 export API_BASE_URL="http://localhost:8000"
-export AGENT_KEY="agent_c794582e36607cbbdcf7fe16dffb51580d5c424f61f3b3e0e03d8494b4"
+export AGENT_KEY="sk-abcdefghijklmnopqrstuvwxyz123"
 export AGENT_ID="diagnostic_agent"
 ```
 
@@ -18,7 +18,7 @@ export AGENT_ID="diagnostic_agent"
 系统支持两种认证方式：
 
 1. **agent_key 认证**（API调用）
-   - Bearer token 格式：`Bearer agent_xxxxx`
+   - Bearer token 格式：`Bearer sk-xxxxx`
    - 必须在请求中提供 `user_name` 参数
    - 用于程序化API调用
 
@@ -274,7 +274,7 @@ data: {"error": "使用agent_key认证时必须提供user_name"}
 ```bash
 # 错误的 agent_key
 curl -X POST "${API_BASE_URL}/api/chat/threads" \
-  -H "Authorization: Bearer agent_invalid_key" \
+  -H "Authorization: Bearer sk_invalid_key" \
   -H "Content-Type: application/json" \
   -d '{"metadata": {}}'
 
@@ -311,7 +311,7 @@ curl -X POST "${API_BASE_URL}/api/chat/files/upload?user_name=api_test_user" \
 
 # 配置
 API_BASE_URL="http://localhost:8000"
-AGENT_KEY="agent_c794582e36607cbbdcf7fe16dffb51580d5c424f61f3b3e0e03d8494b4"
+AGENT_KEY="sk-abcdefghijklmnopqrstuvwxyz123"
 AGENT_ID="diagnostic_agent"
 USER_NAME="api_test_user"
 

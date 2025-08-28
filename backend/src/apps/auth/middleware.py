@@ -97,7 +97,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                         
                     except Exception:
                         # JWT验证失败，检查是否是agent_key
-                        if token.startswith("agent_"):
+                        if token.startswith("sk-"):
                             # 这是一个agent_key，验证它
                             async with AsyncSessionLocal() as db:
                                 from sqlalchemy import select
@@ -126,7 +126,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                                     request.state.agent = agent
                                 else:
                                     # agent_key无效
-                                    logger.warning(f"Invalid agent_key: {token[:20]}...")
+                                    logger.warning(f"Invalid agent_key: {token[:10]}...")
                                     pass
                         else:
                             # 不是agent_key格式，继续其他认证方式
