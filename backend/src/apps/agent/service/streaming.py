@@ -247,32 +247,26 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
         if not agent_config:
             raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
         
-        # 验证调用密钥（如果智能体配置了密钥）
-        from ..models import AgentConfig
-        agent_record = db.query(AgentConfig).filter(AgentConfig.agent_id == agent_id).first()
-        
-        if agent_record and agent_record.agent_key:
-            # 检查授权头
-            auth_header = request.headers.get('authorization', '') if request else ''
+        # 从request.state获取认证信息（由AuthMiddleware设置）
+        current_user = None
+        auth_type = None
+        if request and hasattr(request.state, 'current_user'):
+            current_user = request.state.current_user
+            auth_type = request.state.auth_type
             
-            if auth_header.startswith('Bearer '):
-                token = auth_header.replace('Bearer ', '').strip()
-                
-                # 通过前缀判断是 agent_key（API调用）还是 JWT（页面调用）
-                if token.startswith('agent_'):
-                    # API调用：token 以 agent_ 开头，验证 agent_key
-                    if token != agent_record.agent_key:
-                        logger.warning(f"智能体 {agent_id} 密钥验证失败 (API调用)")
-                        raise BusinessException("智能体调用密钥错误", ResponseCode.INVALID_API_KEY)
-                    logger.info(f"智能体 {agent_id} 密钥验证成功 (API调用)")
-                else:
-                    # 页面调用：token 不以 agent_ 开头，认为是 JWT
-                    logger.info(f"智能体 {agent_id} 页面调用（JWT认证）")
+            # 如果是agent_key认证，验证agent_id是否匹配
+            if auth_type == "agent_key":
+                agent_id_from_auth = current_user.get('agent_id')
+                if agent_id_from_auth != agent_id:
+                    logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
+                    raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
+                logger.info(f"智能体 {agent_id} agent_key认证验证成功")
+            elif auth_type == "jwt":
+                logger.info(f"智能体 {agent_id} JWT认证验证成功")
             else:
-                # 没有 Bearer token，可能是未认证的页面调用
-                logger.info(f"智能体 {agent_id} 未认证调用")
-        elif not agent_record:
-            logger.warning(f"无法获取智能体 {agent_id} 的记录")
+                logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
+        else:
+            logger.warning(f"智能体 {agent_id} 未通过认证中间件")
             
     finally:
         db.close()
@@ -295,6 +289,14 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
         user_name = request_body.user_name
     elif request_body.input and isinstance(request_body.input, dict) and "user_name" in request_body.input:
         user_name = request_body.input["user_name"]
+    
+    # 对于agent_key认证，用户名是必须的
+    if auth_type == "agent_key" and not user_name:
+        raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+    
+    # 对于JWT认证，如果没有提供用户名，使用当前登录用户的用户名
+    if auth_type == "jwt" and not user_name and current_user:
+        user_name = current_user.get('username')
     
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
@@ -348,30 +350,26 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
         if not agent_config:
             raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
         
-        # 验证调用密钥（如果智能体配置了密钥）
-        from ..models import AgentConfig
-        agent_record = db.query(AgentConfig).filter(AgentConfig.agent_id == agent_id).first()
-        
-        if agent_record and agent_record.agent_key:
-            # 检查授权头
-            auth_header = request.headers.get('authorization', '') if request else ''
+        # 从request.state获取认证信息（由AuthMiddleware设置）
+        current_user = None
+        auth_type = None
+        if request and hasattr(request.state, 'current_user'):
+            current_user = request.state.current_user
+            auth_type = request.state.auth_type
             
-            if auth_header.startswith('Bearer '):
-                token = auth_header.replace('Bearer ', '').strip()
-                
-                # 通过前缀判断是 agent_key（API调用）还是 JWT（页面调用）
-                if token.startswith('agent_'):
-                    # API调用：token 以 agent_ 开头，验证 agent_key
-                    if token != agent_record.agent_key:
-                        logger.warning(f"智能体 {agent_id} 密钥验证失败 (API调用)")
-                        raise BusinessException("智能体调用密钥错误", ResponseCode.INVALID_API_KEY)
-                    logger.info(f"智能体 {agent_id} 密钥验证成功 (API调用)")
-                else:
-                    # 页面调用：token 不以 agent_ 开头，认为是 JWT
-                    logger.info(f"智能体 {agent_id} 页面调用（JWT认证）")
+            # 如果是agent_key认证，验证agent_id是否匹配
+            if auth_type == "agent_key":
+                agent_id_from_auth = current_user.get('agent_id')
+                if agent_id_from_auth != agent_id:
+                    logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
+                    raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
+                logger.info(f"智能体 {agent_id} agent_key认证验证成功")
+            elif auth_type == "jwt":
+                logger.info(f"智能体 {agent_id} JWT认证验证成功")
             else:
-                # 没有 Bearer token，可能是未认证的页面调用
-                logger.info(f"智能体 {agent_id} 未认证调用")
+                logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
+        else:
+            logger.warning(f"智能体 {agent_id} 未通过认证中间件")
                 
     finally:
         db.close()

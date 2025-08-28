@@ -33,6 +33,7 @@ AUTH_EXCLUDE_PATHS = [
     "/api/v1/config/system",  # 系统配置（公开）
     "/api/v1/mcp/gateway/configs/all",  # MCP Gateway配置（公开）
     "/api/chat/threads",  # 智能体聊天接口（通过agent_key认证）
+    "/api/chat/files",    # 智能体文件接口（通过agent_key认证）
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -46,6 +47,7 @@ RBAC_EXCLUDE_PATHS = [
     "/api/v1/agent/ws",  # WebSocket不需要权限检查
     "/api/v1/agent/sse",  # SSE流式接口
     "/api/chat/threads",  # 智能体聊天接口（通过agent_key认证）
+    "/api/chat/files",    # 智能体文件接口（通过agent_key认证）
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -96,8 +98,42 @@ class AuthMiddleware(BaseHTTPMiddleware):
                         auth_type = "jwt"
                         
                     except Exception:
-                        # JWT验证失败，继续尝试其他认证方式
-                        pass
+                        # JWT验证失败，检查是否是agent_key
+                        if token.startswith("agent_"):
+                            # 这是一个agent_key，验证它
+                            async with AsyncSessionLocal() as db:
+                                from sqlalchemy import select
+                                from src.apps.agent.models import AgentConfig
+                                
+                                stmt = select(AgentConfig).where(
+                                    AgentConfig.agent_key == token,
+                                    AgentConfig.status == 'enabled'
+                                )
+                                result = await db.execute(stmt)
+                                agent = result.scalar_one_or_none()
+                                
+                                if agent:
+                                    # agent_key验证成功，构建用户信息
+                                    # 注意：使用agent_key时，用户名必须从请求body中获取
+                                    user_info = {
+                                        "sub": f"agent_{agent.agent_id}",
+                                        "username": f"agent_{agent.agent_id}",  # 临时用户名，实际应从body获取
+                                        "agent_id": agent.agent_id,
+                                        "agent_name": agent.agent_name,
+                                        "auth_type": "agent_key",
+                                        "roles": [],  # 智能体不需要角色
+                                        "is_agent": True
+                                    }
+                                    auth_type = "agent_key"
+                                    # 保存agent信息到request.state供后续使用
+                                    request.state.agent = agent
+                                else:
+                                    # agent_key无效
+                                    logger.warning(f"Invalid agent_key: {token[:20]}...")
+                                    pass
+                        else:
+                            # 不是agent_key格式，继续其他认证方式
+                            pass
             
             # 2. 检查CAS认证（Cookie）
             if not user_info:

@@ -106,7 +106,7 @@ class DocumentService:
             '.webp': self._process_image_file,
         }
     
-    async def upload_file(self, db: AsyncSession, file_content: bytes, filename: str, user_id: str) -> Dict[str, Any]:
+    async def upload_file(self, db: AsyncSession, file_content: bytes, filename: str, user_name: str) -> Dict[str, Any]:
         """
         上传文件
         
@@ -114,7 +114,7 @@ class DocumentService:
             db: 数据库会话
             file_content: 文件内容
             filename: 文件名
-            user_id: 用户ID
+            user_name: 用户名
             
         Returns:
             文件信息
@@ -154,8 +154,8 @@ class DocumentService:
                 file_type=file_ext,
                 file_path=str(file_path),
                 process_status=ProcessStatus.UPLOADED,
-                create_by=user_id,
-                update_by=user_id
+                create_by=user_name,
+                update_by=user_name
             )
             db.add(doc_upload)
             await db.flush()
@@ -236,14 +236,14 @@ class DocumentService:
                     doc_upload.process_end_time = now_shanghai()
                     await error_db.commit()
     
-    async def get_document_content(self, db: AsyncSession, file_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_document_content(self, db: AsyncSession, file_id: str, user_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         获取文档内容
         
         Args:
             db: 数据库会话
             file_id: 文件ID
-            user_id: 用户ID（用于权限检查）
+            user_name: 用户名（用于权限检查）
             
         Returns:
             文档内容
@@ -251,9 +251,9 @@ class DocumentService:
         # 查询文档
         query = select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
         
-        # 如果提供了用户ID，检查所有权
-        if user_id:
-            query = query.where(AgentDocumentUpload.create_by == user_id)
+        # 如果提供了用户名，检查所有权
+        if user_name:
+            query = query.where(AgentDocumentUpload.create_by == user_name)
         
         result = await db.execute(query)
         doc_upload = result.scalar_one_or_none()
@@ -861,14 +861,14 @@ class DocumentService:
         except Exception as e:
             logger.error(f"异步处理文档失败: {file_id}, 错误: {str(e)}")
 
-    async def get_file_info(self, db: AsyncSession, file_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_file_info(self, db: AsyncSession, file_id: str, user_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         获取文件信息（用于下载）
         
         Args:
             db: 数据库会话
             file_id: 文件ID
-            user_id: 用户ID（用于权限检查）
+            user_name: 用户名（用于权限检查）
             
         Returns:
             文件信息字典，包含 file_path 和 file_name
@@ -876,9 +876,9 @@ class DocumentService:
         # 查询文档
         query = select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
         
-        # 如果提供了用户ID，检查所有权
-        if user_id:
-            query = query.where(AgentDocumentUpload.create_by == user_id)
+        # 如果提供了用户名，检查所有权
+        if user_name:
+            query = query.where(AgentDocumentUpload.create_by == user_name)
         
         result = await db.execute(query)
         doc_upload = result.scalar_one_or_none()

@@ -18,6 +18,7 @@ from src.shared.schemas.response import (
 )
 from src.shared.core.exceptions import BusinessException
 from src.apps.auth.dependencies import get_current_user_optional
+from .dependencies import verify_agent_key
 
 # 导入LLM路由功能
 from .service.streaming import stream_run_standard, RunCreate
@@ -300,13 +301,35 @@ async def get_user_threads_endpoint(
 
 # ==================== 文档上传和处理路由 ====================
 
-@router.post("/v1/agents/files/upload", response_model=UnifiedResponse)
+@router.post("/chat/files/upload", response_model=UnifiedResponse)
 async def upload_file(
     file: UploadFile = File(...),
+    user_name: str = Query(..., description="上传文件的用户名"),
     db: AsyncSession = Depends(get_async_db),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    request: Request = None
 ):
-    """上传文档文件"""
+    """上传文档文件（需要 agent_key 认证）"""
+    # 验证 agent_key
+    if request:
+        auth_header = request.headers.get('authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header.replace('Bearer ', '').strip()
+            if not token.startswith('agent_'):
+                raise BusinessException("需要使用智能体密钥认证", ResponseCode.UNAUTHORIZED)
+            
+            # 验证 agent_key 是否有效
+            from .models import AgentConfig
+            from sqlalchemy import select
+            result = await db.execute(
+                select(AgentConfig).where(AgentConfig.agent_key == token)
+            )
+            agent = result.scalar_one_or_none()
+            if not agent:
+                raise BusinessException("智能体调用密钥错误", ResponseCode.INVALID_API_KEY)
+            logger.info(f"文件上传认证成功 - 智能体: {agent.agent_id}, 用户: {user_name}")
+        else:
+            raise BusinessException("缺少认证信息", ResponseCode.UNAUTHORIZED)
+    
     # 验证文件名是否为空
     if not file.filename:
         raise BusinessException("文件名不能为空", ResponseCode.BAD_REQUEST)
@@ -324,15 +347,12 @@ async def upload_file(
     # 读取文件内容
     file_content = await file.read()
     
-    # 获取用户ID
-    user_id = current_user.get('username') if current_user else 'anonymous'
-    
     # 上传文件
     file_info = await document_service.upload_file(
         db=db,
         file_content=file_content,
         filename=file.filename,
-        user_id=user_id
+        user_name=user_name  # 使用传入的用户名
     )
     
     return success_response(
@@ -341,17 +361,17 @@ async def upload_file(
     )
 
 
-@router.get("/v1/agents/files/{file_id}/content", response_model=UnifiedResponse)
+@router.get("/chat/files/{file_id}/content", response_model=UnifiedResponse)
 async def get_document_content(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取文档内容"""
-    # 获取当前用户ID用于权限检查
-    user_id = current_user.get('username') if current_user else None
+    # 获取当前用户名用于权限检查
+    user_name = current_user.get('username') if current_user else None
     
-    content = await document_service.get_document_content(db, file_id, user_id)
+    content = await document_service.get_document_content(db, file_id, user_name)
     if not content:
         raise BusinessException("文档不存在、正在处理中或无权访问", ResponseCode.NOT_FOUND)
     
@@ -361,7 +381,7 @@ async def get_document_content(
     )
 
 
-@router.get("/v1/agents/files/{file_id}/status", response_model=UnifiedResponse)
+@router.get("/chat/files/{file_id}/status", response_model=UnifiedResponse)
 async def get_file_status(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
@@ -378,7 +398,7 @@ async def get_file_status(
     )
 
 
-@router.get("/v1/agents/files/{file_id}/download")
+@router.get("/chat/files/{file_id}/download")
 async def download_file(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
@@ -390,11 +410,11 @@ async def download_file(
     import os
     
     try:
-        # 获取当前用户ID用于权限检查
-        user_id = current_user.get('username') if current_user else None
+        # 获取当前用户名用于权限检查
+        user_name = current_user.get('username') if current_user else None
         
         # 获取文件信息
-        file_info = await document_service.get_file_info(db, file_id, user_id)
+        file_info = await document_service.get_file_info(db, file_id, user_name)
         if not file_info:
             raise BusinessException("文件不存在或无权访问", ResponseCode.NOT_FOUND)
         
