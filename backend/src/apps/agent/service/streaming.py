@@ -14,9 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.shared.db.config import get_async_db_context
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-
+from .document_service import document_service
+from src.shared.db.config import get_sync_db
 from ..utils import (prepare_graph_config, serialize_value,CHECK_POINT_URI,recover_thread_from_postgres)
 from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping,init_user_threads_db)
+from ..llm_agents.generic_agent.graph import builder as generic_builder
+from ..llm_agents.diagnostic_agent.graph import builder as diagnostic_builder
 
 logger = get_logger(__name__)
 
@@ -32,8 +35,6 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     确保用户和线程的归属已写入user_threads表，如不存在则自动写入。
     自动提取thread_title（取消息内容前20字）。
     """
-    import asyncio
-    from .user_threads_db import check_user_thread_exists, create_user_thread_mapping
     logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
     exists = await check_user_thread_exists(user_name, thread_id)
     logger.info(f"[ensure_user_thread_mapping] exists={exists}")
@@ -139,7 +140,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
     # 如果有关联的文档，将文档内容添加到消息上下文中
     if file_ids and graph_input and "messages" in graph_input:
         logger.info(f"📄 检测到关联文档: {file_ids}")
-        from .document_service import document_service
+        
         
         # 获取文档上下文
         doc_context = document_service.get_document_context(file_ids)
@@ -190,7 +191,6 @@ async def handle_postgres_streaming(request_body, thread_id):
     # LangGraph SDK使用assistant_id，转换为内部的agent_id
     agent_id = request_body.assistant_id
     # 从数据库获取智能体配置
-    from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
     db = next(db_gen)
     try:
@@ -210,14 +210,12 @@ async def handle_postgres_streaming(request_body, thread_id):
         if is_builtin:
             # 内置智能体使用专用图
             if agent_id == 'diagnostic_agent':
-                from ..llm_agents.diagnostic_agent.graph import builder
-                graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+                graph = diagnostic_builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
             else:
                 raise Exception(f"不支持的内置智能体: {agent_id}")
         else:
             # 自定义智能体使用generic_agent图
-            from ..llm_agents.generic_agent.graph import builder
-            graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
+            graph = generic_builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
         
         # 将agent_id添加到config中，传递给graph
         if not request_body.config:
@@ -238,7 +236,6 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
     agent_id = request_body.assistant_id
     
     # 检查数据库中是否存在该智能体
-    from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
     db = next(db_gen)
     try:
@@ -334,7 +331,6 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     agent_id = request_body.assistant_id
     
     # 检查数据库中是否存在该智能体
-    from src.shared.db.config import get_sync_db
     db_gen = get_sync_db()
     db = next(db_gen)
     try:
