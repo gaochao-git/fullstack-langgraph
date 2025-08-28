@@ -2,33 +2,27 @@
 流式处理相关接口和函数
 """
 import json
-import os
 from typing import Dict, Any, List
 from src.shared.core.logging import get_logger
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode, success_response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.shared.db.config import get_async_db_context
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from .document_service import document_service
 from src.shared.db.config import get_sync_db
-from ..utils import (prepare_graph_config, serialize_value,CHECK_POINT_URI,recover_thread_from_postgres)
-from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping,init_user_threads_db)
+from ..utils import (prepare_graph_config, serialize_value,CHECK_POINT_URI)
+from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping)
 from ..llm_agents.generic_agent.graph import builder as generic_builder
 from ..llm_agents.diagnostic_agent.graph import builder as diagnostic_builder
-
+from .agent_config_service import AgentConfigService
+from .agent_service import agent_service
+from ..utils import CHECK_POINT_URI
+from ..models import AgentDocumentSession
 logger = get_logger(__name__)
-
-# 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和相关操作
-# 智能体配置完全基于数据库，无需静态全局变量
-
-def init_refs(ASSISTANTS_param):
-    """保留函数签名以兼容现有调用，但实际不做任何操作"""
-    pass
 
 async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
@@ -139,7 +133,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
     
     # 如果有关联的文档，将文档内容添加到消息上下文中
     if file_ids and graph_input and "messages" in graph_input:
-        logger.info(f"📄 检测到关联文档: {file_ids}")
+        logger.info(f"检测到关联文档: {file_ids}")
         
         
         # 获取文档上下文
@@ -151,7 +145,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
                 "content": f"请参考以下文档内容回答用户问题：\n\n{doc_context}"
             }
             graph_input["messages"].insert(0, doc_message)
-            logger.info(f"✅ 已添加文档上下文，长度: {len(doc_context)} 字符")
+            logger.info(f"已添加文档上下文，长度: {len(doc_context)} 字符")
             
             # 保存会话和文档的关联
             agent_id = config.get("configurable", {}).get("agent_id", "diagnostic_agent")
@@ -184,10 +178,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
         logger.info("Skipping end event due to interrupt - waiting for user approval")
 
 async def handle_postgres_streaming(request_body, thread_id):
-    """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""
-    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from .agent_config_service import AgentConfigService
-    
+    """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""    
     # LangGraph SDK使用assistant_id，转换为内部的agent_id
     agent_id = request_body.assistant_id
     # 从数据库获取智能体配置
@@ -230,7 +221,6 @@ async def handle_postgres_streaming(request_body, thread_id):
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
-    from .agent_config_service import AgentConfigService
     
     # LangGraph SDK使用assistant_id，转换为内部的agent_id
     agent_id = request_body.assistant_id
@@ -269,8 +259,6 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
         db.close()
     
     # 更新智能体使用统计
-    from src.shared.db.config import get_async_db_context
-    from .agent_service import agent_service
     try:
         async with get_async_db_context() as async_db:
             await agent_service.increment_run_count(async_db, agent_id)
@@ -325,7 +313,6 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
 
 async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph non-streaming endpoint - 非流式调用"""
-    from .agent_config_service import AgentConfigService
     
     # LangGraph SDK使用assistant_id，转换为内部的agent_id
     agent_id = request_body.assistant_id
@@ -364,8 +351,6 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
         db.close()
     
     # 更新智能体使用统计
-    from src.shared.db.config import get_async_db_context
-    from .agent_service import agent_service
     try:
         async with get_async_db_context() as async_db:
             await agent_service.increment_run_count(async_db, agent_id)
@@ -396,7 +381,6 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
 
 async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_id: str, is_builtin: bool):
     """PostgreSQL 模式下的非流式处理"""
-    from ..utils import CHECK_POINT_URI
     if not CHECK_POINT_URI:
         raise Exception("未配置检查点存储")
     
@@ -406,13 +390,11 @@ async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_
         # 动态编译图
         if is_builtin:
             if agent_id == 'diagnostic_agent':
-                from ..llm_agents.diagnostic_agent.graph import builder
-                graph = builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
+                graph = diagnostic_builder.compile(checkpointer=checkpointer, name="diagnostic-agent")
             else:
                 raise Exception(f"不支持的内置智能体: {agent_id}")
         else:
-            from ..llm_agents.generic_agent.graph import builder
-            graph = builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
+            graph = generic_builder.compile(checkpointer=checkpointer, name=f"{agent_id}-agent")
         
         # 准备配置和输入
         config, graph_input, _, checkpoint = prepare_graph_config(request_body, thread_id)
@@ -474,9 +456,7 @@ async def save_thread_file_associations(thread_id: str, file_ids: List[str], age
         file_ids: 文件ID列表
         agent_id: 智能体ID
         user_name: 用户名
-    """
-    from ..models import AgentDocumentSession
-    
+    """    
     try:
         async with get_async_db_context() as db:
             for file_id in file_ids:
@@ -516,7 +496,7 @@ async def get_thread_file_ids(thread_id: str) -> List[str]:
     Returns:
         文件ID列表
     """
-    from ..models import AgentDocumentSession
+    
     
     try:
         async with get_async_db_context() as db:
