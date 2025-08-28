@@ -186,10 +186,10 @@ payload = {
     "assistant_id": "diagnostic_agent",
     "on_disconnect": "cancel",
 }
-api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/runs/stream"
+api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{conversation_id}/runs/stream"
 response = requests.post(
-    api_url,
-    json=payload,
+    f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/messages",
+    json={"content": "你好"},
     headers={"Content-Type": "application/json"},
     timeout=10
 )
