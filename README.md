@@ -155,3 +155,42 @@ https://gofastmcp.com/getting-started/welcome
 4. 端口是否被占用
 
 更多帮助请查看项目文档或提交 Issue。
+
+## api调用
+1.agent调用
+- 初始化会话
+```python
+import requests
+import json
+from datetime import datetime
+AGENT_API_BASE_URL = "http://localhost:8000"
+AGENT_API_KEY = "your_api_key"
+response = requests.post(
+    f"{AGENT_API_BASE_URL}/api/chat/threads",
+    json={"metadata": {}},
+    headers={"Content-Type": "application/json"},
+    timeout=10
+)
+thread_data = response.json()
+thread_id = thread_data.get("thread_id")
+```
+- 调用agent
+```python
+payload = {
+    "input": {
+        "messages": [{"type": "human", "content": "你好", "id": str(int(datetime.now().timestamp() * 1000))}],
+        "user_name": "gaochao",
+    },
+    "config": {"configurable": {"selected_model": "deepseek-chat"}},
+    "stream_mode": ["messages-tuple", "values", "updates"],
+    "assistant_id": "diagnostic_agent",
+    "on_disconnect": "cancel",
+}
+api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/runs/stream"
+response = requests.post(
+    api_url,
+    json=payload,
+    headers={"Content-Type": "application/json"},
+    timeout=10
+)
+```
