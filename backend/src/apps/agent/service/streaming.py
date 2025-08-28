@@ -231,8 +231,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
     try:
         agent_config = AgentConfigService.get_agent_config(agent_id, db)
         
-        if not agent_config:
-            raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
+        if not agent_config: raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
         
         # 从request.state获取认证信息（由AuthMiddleware设置）
         current_user = None
@@ -267,13 +266,11 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
         logger.error(f"更新智能体统计失败: {e}", exc_info=True)
         # 统计更新失败不影响主流程
     
-    # 创建用户线程关联（如果提供了用户名且关联不存在）
-    # 用户名必须在 request_body.user_name 中
+    # 创建用户线程关联,接口需传递用户名
     user_name = request_body.config["configurable"].get("user_name")
     
     # 用户名是必须的
-    if not user_name:
-        raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
+    if not user_name:raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
     
     
     if user_name:
@@ -322,9 +319,7 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     db = next(db_gen)
     try:
         agent_config = AgentConfigService.get_agent_config(agent_id, db)
-        
-        if not agent_config:
-            raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
+        if not agent_config: raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
         
         # 从request.state获取认证信息（由AuthMiddleware设置）
         current_user = None
@@ -363,8 +358,7 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     user_name = request_body.config["configurable"].get("user_name")
     
     # 用户名是必须的
-    if not user_name:
-        raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
+    if not user_name: raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
     
     
     if user_name:
