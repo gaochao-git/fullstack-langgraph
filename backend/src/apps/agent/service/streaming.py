@@ -283,20 +283,13 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
         # 统计更新失败不影响主流程
     
     # 创建用户线程关联（如果提供了用户名且关联不存在）
-    # 用户名可能在 request_body.user_name 或 request_body.input.user_name 中
-    user_name = None
-    if request_body.user_name:
-        user_name = request_body.user_name
-    elif request_body.input and isinstance(request_body.input, dict) and "user_name" in request_body.input:
-        user_name = request_body.input["user_name"]
+    # 用户名必须在 request_body.user_name 中
+    user_name = request_body.config["configurable"].get("user_name")
     
-    # 对于agent_key认证，用户名是必须的
-    if auth_type == "agent_key" and not user_name:
-        raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+    # 用户名是必须的
+    if not user_name:
+        raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
     
-    # 对于JWT认证，如果没有提供用户名，使用当前登录用户的用户名
-    if auth_type == "jwt" and not user_name and current_user:
-        user_name = current_user.get('username')
     
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
@@ -385,19 +378,13 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
         logger.error(f"更新智能体统计失败: {e}", exc_info=True)
     
     # 创建用户线程关联
-    user_name = None
-    if request_body.user_name:
-        user_name = request_body.user_name
-    elif request_body.input and isinstance(request_body.input, dict) and "user_name" in request_body.input:
-        user_name = request_body.input["user_name"]
+    # 用户名必须在 request_body.configurable.user_name 中
+    user_name = request_body.config["configurable"].get("user_name")
     
-    # 对于agent_key认证，用户名是必须的
-    if auth_type == "agent_key" and not user_name:
-        raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+    # 用户名是必须的
+    if not user_name:
+        raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
     
-    # 对于JWT认证，如果没有提供用户名，使用当前登录用户的用户名
-    if auth_type == "jwt" and not user_name and current_user:
-        user_name = current_user.get('username')
     
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")

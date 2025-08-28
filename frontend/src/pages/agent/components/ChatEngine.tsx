@@ -241,34 +241,30 @@ export default function ChatEngine({
       const newMessages: Message[] = [
         ...(thread.messages || []),
         {
-          type: "human",
+          role: "human",
           content: submittedInputValue,
-          id: Date.now().toString(),
-        },
+        } as Message,
       ];
       
-      // 构建完整的提交数据，包含模型选择信息
+      // 构建完整的提交数据，移除 user_name
       const submitData = {
         messages: newMessages,
-        user_name: getCurrentUsername(),
       };
       
       const submitConfig = {
         configurable: {
           ...(currentModel && { selected_model: currentModel }),
-          ...(fileIds && fileIds.length > 0 && { file_ids: fileIds })
+          ...(fileIds && fileIds.length > 0 && { file_ids: fileIds }),
+          ...(getCurrentUsername() && { user_name: getCurrentUsername() }),
+
         }
       };
       
-      // 前端提交数据
-      // 前端提交配置
-      
+      // 构建提交选项，user_name 放在顶层
       const submitOptions = {
-        config: submitConfig,
-        user_name: getCurrentUsername()
-      };
+        config: submitConfig      };
       
-      // 最终提交选项
+      // 最终提交
       thread.submit(submitData as any, submitOptions as any);
     },
     [thread, currentModel, agentId]
