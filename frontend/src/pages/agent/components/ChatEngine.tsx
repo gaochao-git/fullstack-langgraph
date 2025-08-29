@@ -238,17 +238,15 @@ export default function ChatEngine({
       setProcessedEventsTimeline([]);
       hasFinalizeEventOccurredRef.current = false;
 
-      const newMessages: Message[] = [
-        ...(thread.messages || []),
-        {
-          type: "human",
-          content: submittedInputValue,
-        } as Message,
-      ];
+      // 只发送当前消息，不需要历史消息（后端有checkpoint）
+      const currentMessage: Message = {
+        type: "human",
+        content: submittedInputValue,
+      } as Message;
       
-      // 构建完整的提交数据，移除 user_name
+      // 构建提交数据，只包含当前消息
       const submitData = {
-        messages: newMessages,
+        messages: [currentMessage],
       };
       
       const submitConfig = {
