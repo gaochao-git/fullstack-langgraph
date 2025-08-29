@@ -329,13 +329,24 @@ export default function ChatEngine({
     }
     
     try {
-      // 添加agent_id参数，只获取当前智能体的会话
+      // 使用新的API路径
       const username = getCurrentUsername();
       const offset = append ? currentOffset : 0;
-      const url = `/api/chat/users/${encodeURIComponent(username)}/threads?limit=20&offset=${offset}&agent_id=${encodeURIComponent(agentId)}`;
-      const data = await omind_get(url);
+      const params = new URLSearchParams({
+        limit: '20',
+        offset: offset.toString(),
+        assistant_id: agentId,
+        user_name: username
+      });
+      const url = `/api/chat/threads?${params.toString()}`;
+      const response = await omind_get(url);
       
-      // omind_get 直接返回解析后的数据
+      // 检查响应状态
+      if (response.status !== 'ok') {
+        throw new Error(response.msg || '获取历史会话失败');
+      }
+      
+      const data = response.data || {};
       const threads = data.threads || [];
       
       if (append) {

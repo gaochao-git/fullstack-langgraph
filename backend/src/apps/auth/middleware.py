@@ -55,12 +55,181 @@ RBAC_EXCLUDE_PATHS = [
 class AuthMiddleware(BaseHTTPMiddleware):
     """
     认证中间件
-    支持JWT和CAS双重认证
+    支持JWT、CAS、Agent Key等多种认证方式
     """
     
     def __init__(self, app, exclude_paths: Optional[List[str]] = None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or AUTH_EXCLUDE_PATHS
+    
+    async def _authenticate_jwt(self, token: str) -> Optional[dict]:
+        """
+        JWT认证
+        """
+        try:
+            # 验证JWT
+            payload = JWTUtils.decode_token(token)
+            
+            # 检查黑名单
+            jti = payload.get("jti")
+            if jti and TokenBlacklist.is_blacklisted(jti):
+                raise BusinessException("令牌已失效", ResponseCode.UNAUTHORIZED)
+            
+            return {
+                "user_info": payload,
+                "auth_type": "jwt"
+            }
+        except Exception as e:
+            logger.debug(f"JWT认证失败: {e}")
+            return None
+    
+    async def _authenticate_agent_key(self, token: str, request: Request) -> Optional[dict]:
+        """
+        Agent Key认证
+        """
+        if not token.startswith("sk-"):
+            return None
+        
+        try:
+            # 获取assistant_id和user_name
+            agent_id = request.query_params.get("assistant_id")
+            user_name = request.query_params.get("user_name")
+            
+            # 如果是POST请求且查询参数中没有，尝试从请求体获取
+            if request.method == "POST" and (not agent_id or not user_name):
+                content_type = request.headers.get("content-type", "")
+                
+                if "application/json" in content_type:
+                    body = await request.body()
+                    request._body = body  # 保存以供后续使用
+                    
+                    if body:
+                        import json
+                        try:
+                            data = json.loads(body)
+                            if not agent_id:
+                                agent_id = data.get("assistant_id")
+                            
+                            if not user_name:
+                                # 尝试从不同位置获取user_name
+                                if data.get("metadata") and data["metadata"].get("user_name"):
+                                    user_name = data["metadata"]["user_name"]
+                                elif data.get("config") and data["config"].get("configurable") and data["config"]["configurable"].get("user_name"):
+                                    user_name = data["config"]["configurable"]["user_name"]
+                                elif data.get("user_name"):
+                                    user_name = data["user_name"]
+                        except json.JSONDecodeError:
+                            pass
+            
+            # 验证必要参数
+            if not agent_id:
+                raise BusinessException("使用agent_key认证时必须提供assistant_id", ResponseCode.BAD_REQUEST)
+            
+            if not user_name:
+                raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+            
+            # 验证agent_key
+            async with AsyncSessionLocal() as db:
+                from sqlalchemy import select
+                from src.apps.agent.models import AgentConfig
+                
+                stmt = select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+                result = await db.execute(stmt)
+                agent = result.scalar_one_or_none()
+                
+                if not agent:
+                    raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+                
+                if agent.agent_key != token:
+                    logger.warning(f"agent_key不匹配: 期望 {agent.agent_key[:10]}..., 实际 {token[:10]}...")
+                    raise BusinessException("agent_key与assistant_id不匹配", ResponseCode.FORBIDDEN)
+                
+                # 验证用户是否存在
+                from src.apps.user.models import RbacUser
+                user_stmt = select(RbacUser).where(RbacUser.user_name == user_name)
+                user_result = await db.execute(user_stmt)
+                user = user_result.scalar_one_or_none()
+                
+                if not user:
+                    raise BusinessException(f"用户 {user_name} 不存在", ResponseCode.NOT_FOUND)
+                
+                # 保存agent信息到request
+                request.state.agent = agent
+                
+                return {
+                    "user_info": {
+                        "sub": user.user_id,
+                        "user_id": user.user_id,
+                        "username": user.user_name,
+                        "display_name": user.display_name,
+                        "agent_id": agent.agent_id,
+                        "agent_name": agent.agent_name,
+                        "auth_type": "agent_key",
+                        "roles": [],  # TODO: 可以加载用户的实际角色
+                        "is_agent": True
+                    },
+                    "auth_type": "agent_key"
+                }
+                
+        except BusinessException:
+            raise
+        except Exception as e:
+            logger.error(f"Agent Key认证失败: {e}")
+            return None
+    
+    async def _authenticate_cas(self, request: Request) -> Optional[dict]:
+        """
+        CAS认证（通过Cookie）
+        """
+        cas_session_id = request.cookies.get("cas_session_id")
+        if not cas_session_id:
+            return None
+        
+        try:
+            async with AsyncSessionLocal() as db:
+                from sqlalchemy import select
+                from src.apps.auth.models import AuthSession
+                from datetime import datetime, timezone
+                
+                stmt = select(AuthSession).where(
+                    AuthSession.session_id == cas_session_id,
+                    AuthSession.is_active == True
+                )
+                result = await db.execute(stmt)
+                session = result.scalar_one_or_none()
+                
+                if session and session.expires_at > datetime.now():
+                    # 获取用户详细信息
+                    from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
+                    user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
+                    user_result = await db.execute(user_stmt)
+                    user = user_result.scalar_one_or_none()
+                    
+                    if user and user.is_active:
+                        # 获取用户角色
+                        roles_stmt = select(RbacRole).join(
+                            RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
+                        ).where(RbacUsersRoles.user_id == user.user_id)
+                        
+                        roles_result = await db.execute(roles_stmt)
+                        roles = list(roles_result.scalars().all())
+                        
+                        return {
+                            "user_info": {
+                                "sub": session.user_id,
+                                "username": user.user_name,
+                                "email": user.email,
+                                "display_name": user.display_name,
+                                "auth_type": "cas",
+                                "session_id": session.session_id,
+                                "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
+                            },
+                            "auth_type": "cas"
+                        }
+        except Exception as e:
+            logger.error(f"CAS认证失败: {e}")
+            
+        return None
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # 检查是否是排除的路径
@@ -69,200 +238,40 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         try:
-            # 尝试获取认证信息
-            user_info = None
-            auth_type = None
+            # 尝试各种认证方式
+            auth_result = None
             
-            # 1. 检查JWT认证（Authorization头）
+            # 1. 检查Authorization头
             authorization = request.headers.get("Authorization")
             if authorization:
                 scheme, token = get_authorization_scheme_param(authorization)
                 if scheme.lower() == "bearer":
-                    try:
-                        # 验证JWT
-                        payload = JWTUtils.decode_token(token)
-                        
-                        # 检查黑名单
-                        jti = payload.get("jti")
-                        if jti and TokenBlacklist.is_blacklisted(jti):
-                            raise BusinessException(
-                                "令牌已失效",
-                                ResponseCode.UNAUTHORIZED
-                            )
-                        
-                        user_info = payload
-                        auth_type = "jwt"
-                        
-                    except Exception:
-                        # JWT验证失败，检查是否是agent_key
-                        if token.startswith("sk-"):
-                            # 这是一个agent_key，需要从请求体获取assistant_id来验证
-                            if request.method == "POST":
-                                agent_id = None
-                                user_name = None
-                                
-                                # 先尝试从查询参数获取（适用于文件上传等场景）
-                                agent_id = request.query_params.get("assistant_id")
-                                user_name = request.query_params.get("user_name")
-                                
-                                # 如果查询参数中没有，再尝试从请求体获取
-                                if not agent_id or not user_name:
-                                    # 检查Content-Type
-                                    content_type = request.headers.get("content-type", "")
-                                    
-                                    if "application/json" in content_type:
-                                        # 处理JSON格式
-                                        body = await request.body()
-                                        request._body = body  # 保存以供后续使用
-                                        
-                                        if body:
-                                            import json
-                                            try:
-                                                data = json.loads(body)
-                                                # 使用 assistant_id（与 LangGraph SDK 保持一致）
-                                                if not agent_id:
-                                                    agent_id = data.get("assistant_id")
-                                                
-                                                # 尝试从不同位置获取user_name
-                                                if not user_name:
-                                                    # 1. metadata.user_name (创建线程时)
-                                                    if data.get("metadata") and data["metadata"].get("user_name"):
-                                                        user_name = data["metadata"]["user_name"]
-                                                    # 2. config.configurable.user_name (对话时)
-                                                    elif data.get("config") and data["config"].get("configurable") and data["config"]["configurable"].get("user_name"):
-                                                        user_name = data["config"]["configurable"]["user_name"]
-                                                    # 3. 直接的user_name字段
-                                                    elif data.get("user_name"):
-                                                        user_name = data["user_name"]
-                                            except json.JSONDecodeError:
-                                                pass
-                                
-                                if not agent_id:
-                                    raise BusinessException(
-                                        "使用agent_key认证时必须提供assistant_id",
-                                        ResponseCode.BAD_REQUEST
-                                    )
-                                
-                                if not user_name:
-                                    raise BusinessException(
-                                        "使用agent_key认证时必须提供user_name",
-                                        ResponseCode.BAD_REQUEST
-                                    )
-                                
-                                # 根据agent_id查询对应的agent_key
-                                async with AsyncSessionLocal() as db:
-                                    from sqlalchemy import select
-                                    from src.apps.agent.models import AgentConfig
-                                    
-                                    stmt = select(AgentConfig).where(
-                                        AgentConfig.agent_id == agent_id
-                                    )
-                                    result = await db.execute(stmt)
-                                    agent = result.scalar_one_or_none()
-                                    
-                                    if not agent:
-                                        raise BusinessException(
-                                            f"智能体 {agent_id} 不存在",
-                                            ResponseCode.NOT_FOUND
-                                        )
-                                    
-                                    # 验证agent_key是否匹配
-                                    if agent.agent_key != token:
-                                        logger.warning(f"agent_key不匹配: 期望 {agent.agent_key[:10]}..., 实际 {token[:10]}...")
-                                        raise BusinessException(
-                                            "agent_key与assistant_id不匹配",
-                                            ResponseCode.FORBIDDEN
-                                        )
-                                    
-                                    # 验证通过后，检查用户是否存在于用户表中
-                                    from src.apps.user.models import RbacUser
-                                    user_stmt = select(RbacUser).where(RbacUser.user_name == user_name)
-                                    user_result = await db.execute(user_stmt)
-                                    user = user_result.scalar_one_or_none()
-                                    
-                                    if not user:
-                                        raise BusinessException(
-                                            f"用户 {user_name} 不存在",
-                                            ResponseCode.NOT_FOUND
-                                        )
-                                    
-                                    user_info = {
-                                        "sub": user.user_id,  # 使用用户ID
-                                        "user_id": user.user_id,
-                                        "username": user.user_name,
-                                        "display_name": user.display_name,
-                                        "agent_id": agent.agent_id,
-                                        "agent_name": agent.agent_name,
-                                        "auth_type": "agent_key",
-                                        "roles": [],  # TODO: 可以加载用户的实际角色
-                                        "is_agent": True
-                                    }
-                                    auth_type = "agent_key"
-                                    request.state.agent = agent
-                        else:
-                            # 不是agent_key格式，继续其他认证方式
-                            pass
+                    # 尝试JWT认证
+                    auth_result = await self._authenticate_jwt(token)
+                    
+                    # 如果JWT失败，尝试Agent Key认证
+                    if not auth_result:
+                        auth_result = await self._authenticate_agent_key(token, request)
             
-            # 2. 检查CAS认证（Cookie）
-            if not user_info:
-                cas_session_id = request.cookies.get("cas_session_id")
-                if cas_session_id:
-                    # 创建数据库会话检查CAS session
-                    async with AsyncSessionLocal() as db:
-                        from sqlalchemy import select
-                        from src.apps.auth.models import AuthSession
-                        from datetime import datetime, timezone
-                        
-                        stmt = select(AuthSession).where(
-                            AuthSession.session_id == cas_session_id,
-                            AuthSession.is_active == True
-                        )
-                        result = await db.execute(stmt)
-                        session = result.scalar_one_or_none()
-                        
-                        if session and session.expires_at > datetime.now():
-                            # 获取用户详细信息
-                            from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
-                            user_stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
-                            user_result = await db.execute(user_stmt)
-                            user = user_result.scalar_one_or_none()
-                            
-                            if user and user.is_active:
-                                # 获取用户角色
-                                roles_stmt = select(RbacRole).join(
-                                    RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
-                                ).where(RbacUsersRoles.user_id == user.user_id)
-                                
-                                roles_result = await db.execute(roles_stmt)
-                                roles = list(roles_result.scalars().all())
-                                
-                                user_info = {
-                                    "sub": session.user_id,
-                                    "username": user.user_name,
-                                    "email": user.email,
-                                    "display_name": user.display_name,
-                                    "auth_type": "cas",
-                                    "session_id": session.session_id,
-                                    "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
-                                }
-                                auth_type = "cas"
+            # 2. 如果Authorization认证失败，尝试CAS认证
+            if not auth_result:
+                auth_result = await self._authenticate_cas(request)
             
-            # 3. 检查API Key认证
-            if not user_info:
+            # 3. TODO: 其他认证方式（如API Key）
+            if not auth_result:
                 api_key = request.headers.get("X-API-Key")
                 if api_key:
                     # TODO: 实现API Key验证
                     pass
             
-            # 如果没有任何有效的认证信息
-            if not user_info:
-                # 记录请求路径，方便调试
+            # 检查是否有有效的认证
+            if not auth_result:
                 logger.info(f"No authentication provided for path: {request.url.path}")
-                raise BusinessException("未提供有效的认证凭据",ResponseCode.UNAUTHORIZED)
+                raise BusinessException("未提供有效的认证凭据", ResponseCode.UNAUTHORIZED)
             
-            # 将用户信息和认证类型添加到请求状态
-            request.state.current_user = user_info
-            request.state.auth_type = auth_type
+            # 设置请求状态
+            request.state.current_user = auth_result["user_info"]
+            request.state.auth_type = auth_result["auth_type"]
             
             # 继续处理请求
             response = await call_next(request)

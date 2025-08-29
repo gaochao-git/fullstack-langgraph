@@ -267,9 +267,30 @@ async def create_thread_endpoint(thread_create: ThreadCreate):
     return await create_thread(thread_create)
 
 
-@router.post("/chat/threads/{thread_id}/history")
-async def get_thread_history_post_endpoint(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
+@router.get("/chat/threads/{thread_id}/history")
+async def get_thread_history_endpoint(
+    thread_id: str,
+    limit: int = Query(50, ge=1, le=100, description="返回的消息数量"),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     """获取线程历史记录"""
+    from .service.threads import get_thread_history_post
+    
+    # 调用原有的服务方法
+    history = await get_thread_history_post(thread_id, None)
+    
+    return success_response(
+        data={
+            "thread_id": thread_id,
+            "history": history[:limit] if history else []
+        },
+        msg="获取对话历史成功"
+    )
+
+
+@router.post("/chat/threads/{thread_id}/history", deprecated=True)
+async def get_thread_history_post_endpoint(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
+    """获取线程历史记录（已废弃，请使用 GET /chat/threads/{thread_id}/history）"""
     return await get_thread_history_post(thread_id, request_body)
 
 
@@ -286,14 +307,47 @@ async def invoke_run_standard_endpoint(thread_id: str, request_body: RunCreate, 
     return await invoke_run_standard(thread_id, request_body, request)
 
 
-@router.get("/chat/users/{user_name}/threads")
+@router.get("/chat/threads")
+async def get_threads(
+    user_name: Optional[str] = Query(None, description="用户名"), 
+    assistant_id: Optional[str] = Query(None, description="智能体ID"),
+    limit: int = Query(10, ge=1, le=100, description="每页数量"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取会话线程列表"""
+    from .service.user_threads_db import get_user_threads
+    
+    # 如果没有提供user_name，尝试从当前用户获取
+    if not user_name and current_user:
+        user_name = current_user.get('username')
+    
+    if not user_name:
+        raise BusinessException("必须提供用户名", ResponseCode.INVALID_PARAMETER)
+    
+    threads = await get_user_threads(user_name, limit, offset, agent_id=assistant_id)
+    
+    return success_response(
+        data={
+            "user_name": user_name,
+            "agent_id": assistant_id,
+            "threads": threads,
+            "total": len(threads),
+            "limit": limit,
+            "offset": offset
+        },
+        msg="获取会话列表成功"
+    )
+
+
+@router.get("/chat/users/{user_name}/threads", deprecated=True)
 async def get_user_threads_endpoint(
     user_name: str, 
     limit: int = 10, 
     offset: int = 0,
     agent_id: Optional[str] = None
 ):
-    """获取用户的所有线程"""
+    """获取用户的所有线程（已废弃，请使用 GET /chat/threads）"""
     from .service.user_threads_db import get_user_threads
     threads = await get_user_threads(user_name, limit, offset, agent_id=agent_id)
     return {"user_name": user_name, "threads": threads, "total": len(threads)}
