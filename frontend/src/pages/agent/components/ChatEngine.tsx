@@ -55,6 +55,7 @@ export default function ChatEngine({
   const [error, setError] = useState<string | null>(null);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
+  const [createdThreadId, setCreatedThreadId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [threadFileIds, setThreadFileIds] = useState<string[]>([]);
   // 分页相关状态
@@ -89,15 +90,49 @@ export default function ChatEngine({
     return urlParams.get('thread_id') || null;
   };
 
-  // 获取线程ID配置 - 只有当URL中有线程ID时才传递，否则让LangGraph自动生成
+  // 获取线程ID配置 - 优先使用URL中的线程ID，其次使用创建的线程ID
   const getThreadIdConfig = () => {
     const threadIdFromUrl = getThreadIdFromUrl();
-    return threadIdFromUrl ? { threadId: threadIdFromUrl } : {};
+    if (threadIdFromUrl) {
+      return { threadId: threadIdFromUrl };
+    }
+    if (createdThreadId) {
+      return { threadId: createdThreadId };
+    }
+    return {};
   };
 
   // 构造完整的 API URL
   const baseUrl = getBaseUrl() || window.location.origin;
   const apiUrl = `${baseUrl}/api/chat`;
+  
+  // 在组件初始化时创建线程（如果没有URL中的thread_id）
+  useEffect(() => {
+    const initThread = async () => {
+      const threadIdFromUrl = getThreadIdFromUrl();
+      if (!threadIdFromUrl && !createdThreadId) {
+        try {
+          const newThread = await threadApi.create({
+            assistant_id: getAgentId(),  // 使用 assistant_id，与 LangGraph SDK 保持一致
+            user_name: getCurrentUsername(),
+          });
+          setCreatedThreadId(newThread.thread_id);
+          
+          // 更新URL
+          const url = new URL(window.location.href);
+          url.searchParams.set('thread_id', newThread.thread_id);
+          window.history.replaceState({}, '', url.toString());
+          
+          console.log('✅ 初始化时创建新线程成功:', newThread.thread_id);
+        } catch (error) {
+          console.error('创建线程失败:', error);
+          message.error('创建会话失败，请重试');
+        }
+      }
+    };
+    
+    initThread();
+  }, []); // 只在组件挂载时运行一次
   
   // 如果agent不存在，使用占位的agent_id
   const thread = useStream<{

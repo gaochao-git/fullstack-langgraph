@@ -96,36 +96,109 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     except Exception:
                         # JWT验证失败，检查是否是agent_key
                         if token.startswith("sk-"):
-                            # 这是一个agent_key，验证它
-                            async with AsyncSessionLocal() as db:
-                                from sqlalchemy import select
-                                from src.apps.agent.models import AgentConfig
+                            # 这是一个agent_key，需要从请求体获取assistant_id来验证
+                            if request.method == "POST":
+                                agent_id = None
+                                user_name = None
                                 
-                                stmt = select(AgentConfig).where(
-                                    AgentConfig.agent_key == token
-                                )
-                                result = await db.execute(stmt)
-                                agent = result.scalar_one_or_none()
+                                # 先尝试从查询参数获取（适用于文件上传等场景）
+                                agent_id = request.query_params.get("assistant_id")
+                                user_name = request.query_params.get("user_name")
                                 
-                                if agent:
-                                    # agent_key验证成功，构建用户信息
-                                    # 注意：使用agent_key时，用户名必须从请求body中获取
+                                # 如果查询参数中没有，再尝试从请求体获取
+                                if not agent_id or not user_name:
+                                    # 检查Content-Type
+                                    content_type = request.headers.get("content-type", "")
+                                    
+                                    if "application/json" in content_type:
+                                        # 处理JSON格式
+                                        body = await request.body()
+                                        request._body = body  # 保存以供后续使用
+                                        
+                                        if body:
+                                            import json
+                                            try:
+                                                data = json.loads(body)
+                                                # 使用 assistant_id（与 LangGraph SDK 保持一致）
+                                                if not agent_id:
+                                                    agent_id = data.get("assistant_id")
+                                                
+                                                # 尝试从不同位置获取user_name
+                                                if not user_name:
+                                                    # 1. metadata.user_name (创建线程时)
+                                                    if data.get("metadata") and data["metadata"].get("user_name"):
+                                                        user_name = data["metadata"]["user_name"]
+                                                    # 2. config.configurable.user_name (对话时)
+                                                    elif data.get("config") and data["config"].get("configurable") and data["config"]["configurable"].get("user_name"):
+                                                        user_name = data["config"]["configurable"]["user_name"]
+                                                    # 3. 直接的user_name字段
+                                                    elif data.get("user_name"):
+                                                        user_name = data["user_name"]
+                                            except json.JSONDecodeError:
+                                                pass
+                                
+                                if not agent_id:
+                                    raise BusinessException(
+                                        "使用agent_key认证时必须提供assistant_id",
+                                        ResponseCode.BAD_REQUEST
+                                    )
+                                
+                                if not user_name:
+                                    raise BusinessException(
+                                        "使用agent_key认证时必须提供user_name",
+                                        ResponseCode.BAD_REQUEST
+                                    )
+                                
+                                # 根据agent_id查询对应的agent_key
+                                async with AsyncSessionLocal() as db:
+                                    from sqlalchemy import select
+                                    from src.apps.agent.models import AgentConfig
+                                    
+                                    stmt = select(AgentConfig).where(
+                                        AgentConfig.agent_id == agent_id
+                                    )
+                                    result = await db.execute(stmt)
+                                    agent = result.scalar_one_or_none()
+                                    
+                                    if not agent:
+                                        raise BusinessException(
+                                            f"智能体 {agent_id} 不存在",
+                                            ResponseCode.NOT_FOUND
+                                        )
+                                    
+                                    # 验证agent_key是否匹配
+                                    if agent.agent_key != token:
+                                        logger.warning(f"agent_key不匹配: 期望 {agent.agent_key[:10]}..., 实际 {token[:10]}...")
+                                        raise BusinessException(
+                                            "agent_key与assistant_id不匹配",
+                                            ResponseCode.FORBIDDEN
+                                        )
+                                    
+                                    # 验证通过后，检查用户是否存在于用户表中
+                                    from src.apps.user.models import RbacUser
+                                    user_stmt = select(RbacUser).where(RbacUser.user_name == user_name)
+                                    user_result = await db.execute(user_stmt)
+                                    user = user_result.scalar_one_or_none()
+                                    
+                                    if not user:
+                                        raise BusinessException(
+                                            f"用户 {user_name} 不存在",
+                                            ResponseCode.NOT_FOUND
+                                        )
+                                    
                                     user_info = {
-                                        "sub": f"agent_{agent.agent_id}",
-                                        "username": f"agent_{agent.agent_id}",  # 临时用户名，实际应从body获取
+                                        "sub": user.user_id,  # 使用用户ID
+                                        "user_id": user.user_id,
+                                        "username": user.user_name,
+                                        "display_name": user.display_name,
                                         "agent_id": agent.agent_id,
                                         "agent_name": agent.agent_name,
                                         "auth_type": "agent_key",
-                                        "roles": [],  # 智能体不需要角色
+                                        "roles": [],  # TODO: 可以加载用户的实际角色
                                         "is_agent": True
                                     }
                                     auth_type = "agent_key"
-                                    # 保存agent信息到request.state供后续使用
                                     request.state.agent = agent
-                                else:
-                                    # agent_key无效
-                                    logger.warning(f"Invalid agent_key: {token[:10]}...")
-                                    pass
                         else:
                             # 不是agent_key格式，继续其他认证方式
                             pass

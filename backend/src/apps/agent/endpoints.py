@@ -304,29 +304,12 @@ async def get_user_threads_endpoint(
 @router.post("/chat/files/upload", response_model=UnifiedResponse)
 async def upload_file(
     file: UploadFile = File(...),
+    assistant_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
     user_name: Optional[str] = Query(None, description="上传文件的用户名（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     request: Request = None
 ):
-    """上传文档文件（通过AuthMiddleware认证）"""
-    # 从request.state获取认证信息
-    auth_type = None
-    if request and hasattr(request.state, 'auth_type'):
-        auth_type = request.state.auth_type
-        current_user = request.state.current_user
-        
-        # 对于agent_key认证，user_name是必须的
-        if auth_type == "agent_key" and not user_name:
-            raise BusinessException("使用agent_key认证时必须提供user_name参数", ResponseCode.BAD_REQUEST)
-            
-        # 对于JWT认证，如果没有提供user_name，使用当前用户名
-        if auth_type == "jwt" and not user_name and current_user:
-            user_name = current_user.get('username')
-            
-        logger.info(f"文件上传 - 认证类型: {auth_type}, 用户: {user_name}")
-    else:
-        raise BusinessException("未通过认证", ResponseCode.UNAUTHORIZED)
-    
+    """上传文档文件（通过AuthMiddleware认证）"""    
     # 验证文件名是否为空
     if not file.filename:
         raise BusinessException("文件名不能为空", ResponseCode.BAD_REQUEST)

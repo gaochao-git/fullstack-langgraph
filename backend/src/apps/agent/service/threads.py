@@ -17,7 +17,9 @@ logger = get_logger(__name__)
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
 class ThreadCreate(BaseModel):
-    metadata: Optional[Dict[str, Any]] = None
+    assistant_id: str  # 使用 assistant_id，与 LangGraph SDK 保持一致
+    user_name: str
+    metadata: Optional[Dict[str, Any]] = None  # 保留用于其他扩展信息
 
 class ThreadResponse(BaseModel):
     thread_id: str
@@ -27,16 +29,25 @@ class ThreadResponse(BaseModel):
 async def create_thread(thread_create: ThreadCreate):
     """Create a new thread"""
     thread_id = str(uuid.uuid4())
+    
+    # 构建metadata，包含assistant_id和user_name
+    metadata = thread_create.metadata or {}
+    metadata.update({
+        "assistant_id": thread_create.assistant_id,  # 保持与请求参数一致
+        "user_name": thread_create.user_name,
+        "created_at": now_shanghai().isoformat()
+    })
+    
     thread_data = {
         "thread_id": thread_id,
         "created_at": now_shanghai().isoformat(),
-        "metadata": thread_create.metadata or {},
+        "metadata": metadata,
         "state": {}
     }
     # 持久化到PostgreSQL
     # 这里需要一个PostgreSQL客户端来执行插入操作
     # 例如：await postgres_client.insert_thread(thread_id, thread_data)
-    logger.info(f"Created thread: {thread_id}")
+    logger.info(f"Created thread: {thread_id} for agent: {thread_create.assistant_id}, user: {thread_create.user_name}")
     return ThreadResponse(**thread_data)
 
 async def get_thread(thread_id: str):

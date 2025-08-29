@@ -17,6 +17,7 @@ import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
 import { exportToWordWithImages } from "@/services/documentExportApi";
 import type { Agent } from "@/services/agentApi";
+import { getCurrentUsername } from "@/utils/authInterceptor";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -936,11 +937,15 @@ function ChatMessages({
     setUploadedFiles(prev => [...prev, ...newUploadedFiles]);
     setIsUploading(true);
     
+    // 获取assistantId和userName
+    const assistantId = agent?.agent_id || agent?.id?.toString() || '';
+    const userName = getCurrentUsername() || '';
+    
     // 并行上传所有文件
     const uploadPromises = files.map(async (file, index) => {
       const currentIndex = uploadedFiles.length + index;
       try {
-        const result = await fileApi.uploadFile(file, (progress) => {
+        const result = await fileApi.uploadFile(file, assistantId, userName, (progress) => {
           // 更新上传进度
           setUploadedFiles(prev => {
             const updated = [...prev];

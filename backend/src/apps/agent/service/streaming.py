@@ -25,7 +25,7 @@ from ..models import AgentDocumentSession
 logger = get_logger(__name__)
 
 class RunCreate(BaseModel):
-    assistant_id: str
+    assistant_id: str  # 统一使用 assistant_id 与 LangGraph SDK 保持一致
     input: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -42,7 +42,7 @@ class RunCreate(BaseModel):
 async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
     """验证和准备运行参数 - 公共方法，提取stream_run_standard和invoke_run_standard的重复逻辑"""
     
-    # LangGraph SDK使用assistant_id，转换为内部的agent_id
+    # 从 assistant_id 获取内部使用的 agent_id
     agent_id = request_body.assistant_id
     
     # 检查数据库中是否存在该智能体
@@ -128,7 +128,7 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
                     content = str(last_msg["content"])
                     thread_title = content[:20] + "..." if len(content) > 20 else content
         
-        # 从request_body中获取agent_id (assistant_id)
+        # 从request_body中获取assistant_id，内部作为agent_id使用
         agent_id = getattr(request_body, 'assistant_id', None)
         
         logger.info(f"[ensure_user_thread_mapping] creating mapping: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
@@ -251,7 +251,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 
 async def handle_postgres_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""    
-    # LangGraph SDK使用assistant_id，转换为内部的agent_id
+    # 从 assistant_id 获取内部使用的 agent_id
     agent_id = request_body.assistant_id
     # 从数据库获取智能体配置
     db_gen = get_sync_db()

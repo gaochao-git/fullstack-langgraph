@@ -30,12 +30,25 @@ export const fileApi = {
   // 上传文件（支持进度回调）
   async uploadFile(
     file: File, 
+    assistantId?: string,
+    userName?: string,
     onProgress?: (percent: number) => void
   ): Promise<FileUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await omind_post('/api/chat/files/upload', formData, {
+    // 构建URL，如果有assistantId和userName，添加到查询参数中
+    const params = new URLSearchParams();
+    if (assistantId) {
+      params.append('assistant_id', assistantId);
+    }
+    if (userName) {
+      params.append('user_name', userName);
+    }
+    
+    const url = params.toString() ? `/api/chat/files/upload?${params.toString()}` : '/api/chat/files/upload';
+    
+    const response = await omind_post(url, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       },

@@ -7,6 +7,7 @@ from src.shared.db.config import get_async_db
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.logging import get_logger
+from typing import Dict, Any, Optional
 
 logger = get_logger(__name__)
 
