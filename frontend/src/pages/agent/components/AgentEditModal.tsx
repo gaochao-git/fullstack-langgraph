@@ -25,13 +25,15 @@ import {
   GlobalOutlined,
   UserOutlined,
   PlusOutlined,
-  CloseOutlined
+  CloseOutlined,
+  SafetyOutlined
 } from '@ant-design/icons';
 import { 
   iconConfig,
   renderIcon
 } from './AgentIconSystem';
 import ScheduledTaskManager from './ScheduledTaskManager';
+import AgentPermissionManager from './AgentPermissionManager';
 import type { DataNode } from 'antd/es/tree';
 import { agentApi } from '@/services/agentApi';
 
@@ -1192,6 +1194,27 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
               agentId={agent?.agent_id || ''}
             />
           </TabPane>
+
+          {/* 接口权限配置 - 只在编辑模式且是所有者时显示 */}
+          {!isCreating && agent && currentUser && agent.agent_owner === currentUser.username && (
+            <TabPane tab={<span><SafetyOutlined />接口权限</span>} key="permissions">
+              <div className="mb-3 p-3 bg-blue-50 rounded">
+                <div className="text-sm text-blue-600">
+                  <div className="font-medium mb-1">接口权限说明：</div>
+                  <ul className="list-disc list-inside space-y-1 text-xs">
+                    <li>为用户分配独立的 API 密钥，用于调用智能体接口</li>
+                    <li>每个用户使用独立密钥，便于权限管理和审计</li>
+                    <li>可以随时撤销或重新生成密钥</li>
+                    <li>工单号用于记录授权原因，便于追溯</li>
+                  </ul>
+                </div>
+              </div>
+              <AgentPermissionManager 
+                agentId={agent?.agent_id || ''}
+                isEditable={true}
+              />
+            </TabPane>
+          )}
         </Tabs>
 
         <div className="flex justify-end space-x-2 mt-4 pt-4 border-t">

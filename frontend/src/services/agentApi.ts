@@ -351,6 +351,56 @@ class AgentApiService {
     return await omind_post(`/api/v1/agents/${agentId}/reset-key`);
   }
 
+  /**
+   * 创建智能体权限
+   */
+  async createAgentPermission(agentId: string, userName: string, markComment?: string) {
+    const params = new URLSearchParams({
+      user_name: userName,
+      ...(markComment && { mark_comment: markComment })
+    });
+    return await omind_post(`/api/v1/agents/${agentId}/permissions?${params}`);
+  }
+
+  /**
+   * 获取智能体权限列表
+   */
+  async listAgentPermissions(agentId: string, params?: {
+    page?: number;
+    size?: number;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.size) searchParams.set('size', params.size.toString());
+
+    const url = `/api/v1/agents/${agentId}/permissions${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+
+  /**
+   * 撤销智能体权限
+   */
+  async revokeAgentPermission(permissionId: number) {
+    return await omind_del(`/api/v1/agents/permissions/${permissionId}`);
+  }
+
+  /**
+   * 重新生成权限密钥
+   */
+  async regeneratePermissionKey(permissionId: number) {
+    return await omind_post(`/api/v1/agents/permissions/${permissionId}/regenerate-key`);
+  }
+
+  /**
+   * 切换权限状态
+   */
+  async togglePermissionStatus(permissionId: number, isActive: boolean) {
+    const params = new URLSearchParams({
+      is_active: isActive.toString()
+    });
+    return await omind_put(`/api/v1/agents/permissions/${permissionId}/status?${params}`);
+  }
+
 }
 
 // 导出服务实例

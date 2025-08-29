@@ -12,6 +12,7 @@ from src.apps.agent.schema import (
     AgentOwnerTransfer, FileUploadResponse, DocumentContent, FileProcessStatus
 )
 from src.apps.agent.service.agent_service import agent_service
+from src.apps.agent.service.agent_permission_service import agent_permission_service
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
@@ -259,11 +260,172 @@ async def reset_agent_key(
     return success_response(data=result, msg="密钥重置成功")
 
 
+# ==================== 智能体权限管理路由 ====================
+
+@router.post("/v1/agents/{agent_id}/permissions", response_model=UnifiedResponse)
+async def create_agent_permission(
+    agent_id: str,
+    user_name: str = Query(..., description="授权用户名"),
+    mark_comment: str = Query('', description="工单号"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """为智能体创建访问权限"""
+    if not current_user:
+        raise BusinessException("需要登录才能创建权限", ResponseCode.UNAUTHORIZED)
+    
+    create_by = current_user.get('username', 'system')
+    
+    permission = await agent_permission_service.create_permission(
+        db, agent_id, user_name, mark_comment, create_by
+    )
+    
+    return success_response(
+        data={
+            "id": permission.id,
+            "agent_id": permission.agent_id,
+            "user_name": permission.user_name,
+            "agent_key": permission.agent_key,
+            "mark_comment": permission.mark_comment,
+            "is_active": permission.is_active,
+            "create_time": permission.create_time.isoformat()
+        },
+        msg="权限创建成功"
+    )
+
+
+@router.get("/v1/agents/{agent_id}/permissions", response_model=UnifiedResponse)
+async def list_agent_permissions(
+    agent_id: str,
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取智能体的权限列表"""
+    permissions, total = await agent_permission_service.list_permissions(
+        db, agent_id=agent_id, page=page, size=size
+    )
+    
+    items = [
+        {
+            "id": p.id,
+            "agent_id": p.agent_id,
+            "user_name": p.user_name,
+            "agent_key": p.agent_key,  # 返回完整密钥，前端负责显示处理
+            "agent_key_preview": p.agent_key[:10] + "...",  # 提供预览版本
+            "mark_comment": p.mark_comment,
+            "is_active": p.is_active,
+            "create_by": p.create_by,
+            "create_time": p.create_time.strftime("%Y-%m-%d %H:%M:%S")  # 后端格式化时间
+        }
+        for p in permissions
+    ]
+    
+    return paginated_response(
+        items=items,
+        total=total,
+        page=page,
+        size=size,
+        msg="获取权限列表成功"
+    )
+
+
+@router.delete("/v1/agents/permissions/{permission_id}", response_model=UnifiedResponse)
+async def revoke_agent_permission(
+    permission_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """撤销智能体权限"""
+    if not current_user:
+        raise BusinessException("需要登录才能撤销权限", ResponseCode.UNAUTHORIZED)
+    
+    update_by = current_user.get('username', 'system')
+    
+    success = await agent_permission_service.revoke_permission(
+        db, permission_id, update_by
+    )
+    
+    return success_response(
+        data={"success": success},
+        msg="权限撤销成功"
+    )
+
+
+@router.post("/v1/agents/permissions/{permission_id}/regenerate-key", response_model=UnifiedResponse)
+async def regenerate_permission_key(
+    permission_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """重新生成权限密钥"""
+    if not current_user:
+        raise BusinessException("需要登录才能重新生成密钥", ResponseCode.UNAUTHORIZED)
+    
+    update_by = current_user.get('username', 'system')
+    
+    new_key = await agent_permission_service.regenerate_key(
+        db, permission_id, update_by
+    )
+    
+    return success_response(
+        data={"agent_key": new_key},
+        msg="密钥重新生成成功"
+    )
+
+
+@router.put("/v1/agents/permissions/{permission_id}/status", response_model=UnifiedResponse)
+async def toggle_permission_status(
+    permission_id: int,
+    is_active: bool = Query(..., description="是否启用"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """切换权限状态（启用/禁用）"""
+    if not current_user:
+        raise BusinessException("需要登录才能更改权限状态", ResponseCode.UNAUTHORIZED)
+    
+    update_by = current_user.get('username', 'system')
+    
+    permission = await agent_permission_service.toggle_permission_status(
+        db, permission_id, is_active, update_by
+    )
+    
+    return success_response(
+        data={
+            "id": permission.id,
+            "is_active": permission.is_active,
+            "update_time": permission.update_time.strftime("%Y-%m-%d %H:%M:%S")
+        },
+        msg=f"权限已{'启用' if is_active else '禁用'}"
+    )
+
+
 # ==================== LLM智能体流式处理路由 ====================
 
 @router.post("/chat/threads", response_model=ThreadResponse)
-async def create_thread_endpoint(thread_create: ThreadCreate):
+async def create_thread_endpoint(
+    thread_create: Optional[ThreadCreate] = None,
+    request: Request = None,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
     """创建新的对话线程"""
+    # 如果没有提供 user_name，从认证信息中获取
+    if not thread_create.user_name and current_user:
+        thread_create.user_name = current_user.get('username')
+    
+    # 如果是 agent_key 认证且没有提供 assistant_id，从认证信息中获取
+    if not thread_create.assistant_id and current_user and current_user.get('auth_type') == 'agent_key':
+        thread_create.assistant_id = current_user.get('agent_id')
+    
+    # 验证必需参数
+    if not thread_create.assistant_id:
+        raise BusinessException("必须提供智能体ID", ResponseCode.INVALID_PARAMETER)
+    
+    if not thread_create.user_name:
+        raise BusinessException("无法获取用户名", ResponseCode.INVALID_PARAMETER)
+    
     return await create_thread(thread_create)
 
 
@@ -309,6 +471,7 @@ async def get_threads(
     assistant_id: Optional[str] = Query(None, description="智能体ID"),
     limit: int = Query(10, ge=1, le=100, description="每页数量"),
     offset: int = Query(0, ge=0, description="偏移量"),
+    request: Request = None,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取会话线程列表"""
@@ -317,6 +480,10 @@ async def get_threads(
     # 如果没有提供user_name，尝试从当前用户获取
     if not user_name and current_user:
         user_name = current_user.get('username')
+    
+    # 如果是agent_key认证且没有传assistant_id，从认证信息中获取
+    if not assistant_id and current_user and current_user.get('auth_type') == 'agent_key':
+        assistant_id = current_user.get('agent_id')
     
     if not user_name:
         raise BusinessException("必须提供用户名", ResponseCode.INVALID_PARAMETER)

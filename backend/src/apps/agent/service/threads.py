@@ -17,8 +17,8 @@ logger = get_logger(__name__)
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
 class ThreadCreate(BaseModel):
-    assistant_id: str  # 使用 assistant_id，与 LangGraph SDK 保持一致
-    user_name: str
+    assistant_id: Optional[str] = None  # 前端调用时传递，API调用时可从认证信息获取
+    user_name: Optional[str] = None  # 可从认证信息获取
     metadata: Optional[Dict[str, Any]] = None  # 保留用于其他扩展信息
 
 class ThreadResponse(BaseModel):

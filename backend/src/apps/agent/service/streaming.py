@@ -25,7 +25,7 @@ from ..models import AgentDocumentSession
 logger = get_logger(__name__)
 
 class RunCreate(BaseModel):
-    assistant_id: str  # 统一使用 assistant_id 与 LangGraph SDK 保持一致
+    assistant_id: Optional[str] = None  # 前端调用时传递，API调用时可从认证信息获取
     input: Optional[Dict[str, Any]] = None
     config: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
@@ -42,8 +42,23 @@ class RunCreate(BaseModel):
 async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
     """验证和准备运行参数 - 公共方法，提取stream_run_standard和invoke_run_standard的重复逻辑"""
     
-    # 从 assistant_id 获取内部使用的 agent_id
+    # 获取认证信息
+    current_user = None
+    auth_type = None
+    if request and hasattr(request.state, 'current_user'):
+        current_user = request.state.current_user
+        auth_type = request.state.auth_type
+    
+    # 获取 agent_id，优先从请求体获取，其次从认证信息获取
     agent_id = request_body.assistant_id
+    
+    # 如果是 agent_key 认证且没有提供 assistant_id，从认证信息中获取
+    if not agent_id and current_user and auth_type == 'agent_key':
+        agent_id = current_user.get('agent_id')
+        logger.info(f"从agent_key认证信息中获取到agent_id: {agent_id}")
+    
+    if not agent_id:
+        raise BusinessException("必须提供智能体ID", ResponseCode.INVALID_PARAMETER)
     
     # 检查数据库中是否存在该智能体
     db_gen = get_sync_db()
@@ -54,24 +69,17 @@ async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, requ
         if not agent_config:
             raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
         
-        # 从request.state获取认证信息（由AuthMiddleware设置）
-        current_user = None
-        auth_type = None
-        if request and hasattr(request.state, 'current_user'):
-            current_user = request.state.current_user
-            auth_type = request.state.auth_type
-            
-            # 如果是agent_key认证，验证agent_id是否匹配
-            if auth_type == "agent_key":
-                agent_id_from_auth = current_user.get('agent_id')
-                if agent_id_from_auth != agent_id:
-                    logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
-                    raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
-                logger.info(f"智能体 {agent_id} agent_key认证验证成功")
-            elif auth_type == "jwt":
-                logger.info(f"智能体 {agent_id} JWT认证验证成功")
-            else:
-                logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
+        # 如果是agent_key认证，验证agent_id是否匹配（只在请求体中提供了agent_id时验证）
+        if auth_type == "agent_key" and request_body.assistant_id:
+            agent_id_from_auth = current_user.get('agent_id')
+            if agent_id_from_auth and agent_id_from_auth != agent_id:
+                logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
+                raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
+            logger.info(f"智能体 {agent_id} agent_key认证验证成功")
+        elif auth_type == "jwt":
+            logger.info(f"智能体 {agent_id} JWT认证验证成功")
+        elif auth_type:
+            logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
         else:
             logger.warning(f"智能体 {agent_id} 未通过认证中间件")
             
@@ -87,15 +95,22 @@ async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, requ
         logger.error(f"更新智能体统计失败: {e}", exc_info=True)
         # 统计更新失败不影响主流程
     
-    # 创建用户线程关联,接口需传递用户名
-    # user_name 在 config.configurable.user_name 中
+    # 获取用户名，优先从认证信息中获取
     user_name = None
-    if request_body.config and request_body.config.get("configurable"):
+    
+    # 1. 首先尝试从认证信息中获取（agent_key认证会自动带用户名）
+    if current_user:
+        user_name = current_user.get('username')
+        logger.info(f"从认证信息中获取到用户名: {user_name}")
+    
+    # 2. 如果认证信息中没有，再从请求参数中获取
+    if not user_name and request_body.config and request_body.config.get("configurable"):
         user_name = request_body.config["configurable"].get("user_name")
+        logger.info(f"从请求参数中获取到用户名: {user_name}")
     
     # 用户名是必须的
     if not user_name:
-        raise BusinessException("必须提供user_name", ResponseCode.BAD_REQUEST)
+        raise BusinessException("无法获取用户名", ResponseCode.BAD_REQUEST)
     
     if user_name:
         logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")

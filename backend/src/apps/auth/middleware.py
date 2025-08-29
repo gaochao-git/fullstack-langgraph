@@ -85,68 +85,93 @@ class AuthMiddleware(BaseHTTPMiddleware):
     
     async def _authenticate_agent_key(self, token: str, request: Request) -> Optional[dict]:
         """
-        Agent Key认证
+        Agent Key认证 - 通过agent_permission表查找关联信息
         """
         if not token.startswith("sk-"):
             return None
         
         try:
-            # 获取assistant_id和user_name - 从查询参数获取
-            agent_id = request.query_params.get("assistant_id")
-            user_name = request.query_params.get("user_name")
-            
-            # 如果是POST请求且查询参数中没有，尝试从请求体获取（仅限JSON请求）
-            if request.method == "POST" and (not agent_id or not user_name):
-                content_type = request.headers.get("content-type", "")
-                
-                # 只处理JSON请求，form-data请求必须通过URL传参
-                if "application/json" in content_type:
-                    body = await request.body()
-                    request._body = body  # 保存以供后续使用
-                    
-                    if body:
-                        import json
-                        try:
-                            data = json.loads(body)
-                            if not agent_id:
-                                agent_id = data.get("assistant_id")
-                            
-                            if not user_name:
-                                # 尝试从不同位置获取user_name
-                                if data.get("metadata") and data["metadata"].get("user_name"):
-                                    user_name = data["metadata"]["user_name"]
-                                elif data.get("config") and data["config"].get("configurable") and data["config"]["configurable"].get("user_name"):
-                                    user_name = data["config"]["configurable"]["user_name"]
-                                elif data.get("user_name"):
-                                    user_name = data["user_name"]
-                        except json.JSONDecodeError:
-                            pass
-            
-            # 验证必要参数
-            if not agent_id:
-                raise BusinessException("使用agent_key认证时必须提供assistant_id", ResponseCode.BAD_REQUEST)
-            
-            if not user_name:
-                raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
-            
-            # 验证agent_key
             async with AsyncSessionLocal() as db:
                 from sqlalchemy import select
-                from src.apps.agent.models import AgentConfig
-                
-                stmt = select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-                result = await db.execute(stmt)
-                agent = result.scalar_one_or_none()
-                
-                if not agent:
-                    raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-                
-                if agent.agent_key != token:
-                    logger.warning(f"agent_key不匹配: 期望 {agent.agent_key[:10]}..., 实际 {token[:10]}...")
-                    raise BusinessException("agent_key与assistant_id不匹配", ResponseCode.FORBIDDEN)
-                
-                # 验证用户是否存在
+                from src.apps.agent.models import AgentConfig, AgentPermission
                 from src.apps.user.models import RbacUser
+                
+                # 1. 首先通过agent_key在permission表中查找
+                perm_stmt = select(AgentPermission).where(
+                    AgentPermission.agent_key == token,
+                    AgentPermission.is_active == True
+                )
+                perm_result = await db.execute(perm_stmt)
+                permission = perm_result.scalar_one_or_none()
+                
+                if permission:
+                    # 使用permission表中的agent_id和user_name
+                    agent_id = permission.agent_id
+                    user_name = permission.user_name
+                    logger.info(f"通过agent_permission表找到权限配置: agent_id={agent_id}, user_name={user_name}")
+                else:
+                    # 2. 如果permission表中没找到，降级到原有逻辑（向后兼容）
+                    # 获取assistant_id和user_name - 从查询参数获取
+                    agent_id = request.query_params.get("assistant_id")
+                    user_name = request.query_params.get("user_name")
+                    
+                    # 如果是POST请求且查询参数中没有，尝试从请求体获取（仅限JSON请求）
+                    if request.method == "POST" and (not agent_id or not user_name):
+                        content_type = request.headers.get("content-type", "")
+                        
+                        # 只处理JSON请求，form-data请求必须通过URL传参
+                        if "application/json" in content_type:
+                            body = await request.body()
+                            request._body = body  # 保存以供后续使用
+                            
+                            if body:
+                                import json
+                                try:
+                                    data = json.loads(body)
+                                    if not agent_id:
+                                        agent_id = data.get("assistant_id")
+                                    
+                                    if not user_name:
+                                        # 尝试从不同位置获取user_name
+                                        if data.get("metadata") and data["metadata"].get("user_name"):
+                                            user_name = data["metadata"]["user_name"]
+                                        elif data.get("config") and data["config"].get("configurable") and data["config"]["configurable"].get("user_name"):
+                                            user_name = data["config"]["configurable"]["user_name"]
+                                        elif data.get("user_name"):
+                                            user_name = data["user_name"]
+                                except json.JSONDecodeError:
+                                    pass
+                    
+                    # 对于某些接口，agent_id 是可选的
+                    path = request.url.path
+                    agent_id_optional_paths = [
+                        "/api/chat/threads",  # 获取线程列表
+                    ]
+                    
+                    # 验证必要参数
+                    if not agent_id and not any(path.startswith(p) for p in agent_id_optional_paths):
+                        raise BusinessException("使用agent_key认证时必须提供assistant_id", ResponseCode.BAD_REQUEST)
+                    
+                    if not user_name:
+                        raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+                
+                # 3. 验证agent是否存在（如果提供了agent_id）
+                agent = None
+                if agent_id:
+                    stmt = select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+                    result = await db.execute(stmt)
+                    agent = result.scalar_one_or_none()
+                    
+                    if not agent:
+                        raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
+                    
+                    # 4. 如果没有通过permission表找到，验证agent_key是否匹配
+                    if not permission:
+                        if agent.agent_key != token:
+                            logger.warning(f"agent_key不匹配: 期望 {agent.agent_key[:10]}..., 实际 {token[:10]}...")
+                            raise BusinessException("agent_key与assistant_id不匹配", ResponseCode.FORBIDDEN)
+                
+                # 5. 验证用户是否存在
                 user_stmt = select(RbacUser).where(RbacUser.user_name == user_name)
                 user_result = await db.execute(user_stmt)
                 user = user_result.scalar_one_or_none()
@@ -154,21 +179,28 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 if not user:
                     raise BusinessException(f"用户 {user_name} 不存在", ResponseCode.NOT_FOUND)
                 
-                # 保存agent信息到request
-                request.state.agent = agent
+                # 保存agent信息到request（如果有）
+                if agent:
+                    request.state.agent = agent
+                
+                # 构建用户信息
+                user_info = {
+                    "sub": user.user_id,
+                    "user_id": user.user_id,
+                    "username": user.user_name,
+                    "display_name": user.display_name,
+                    "auth_type": "agent_key",
+                    "roles": [],  # TODO: 可以加载用户的实际角色
+                    "is_agent": True
+                }
+                
+                # 如果有agent信息，添加到用户信息中
+                if agent:
+                    user_info["agent_id"] = agent.agent_id
+                    user_info["agent_name"] = agent.agent_name
                 
                 return {
-                    "user_info": {
-                        "sub": user.user_id,
-                        "user_id": user.user_id,
-                        "username": user.user_name,
-                        "display_name": user.display_name,
-                        "agent_id": agent.agent_id,
-                        "agent_name": agent.agent_name,
-                        "auth_type": "agent_key",
-                        "roles": [],  # TODO: 可以加载用户的实际角色
-                        "is_agent": True
-                    },
+                    "user_info": user_info,
                     "auth_type": "agent_key"
                 }
                 

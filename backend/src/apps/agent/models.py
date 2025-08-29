@@ -2,7 +2,7 @@
 Agent Configuration Model
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, BigInteger, Index, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, BigInteger, Index, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.sql import func
 from src.shared.db.models import JSONType, now_shanghai, BaseModel
 
@@ -147,4 +147,26 @@ class AgentDocumentSession(BaseModel):
         Index('idx_session_file', 'file_id'),
         Index('idx_session_agent', 'agent_id'),
         Index('idx_session_thread_file', 'thread_id', 'file_id', unique=True),
+    )
+
+
+class AgentPermission(BaseModel):
+    """智能体权限表 - 管理agent_key与agent_id和user_name的关联"""
+    __tablename__ = 'agent_permission'
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID，自增')
+    agent_id = Column(String(100), nullable=False, comment='智能体id')
+    agent_key = Column(String(64), nullable=True, unique=True, index=True, comment='分配的密钥')
+    user_name = Column(String(64), nullable=True, comment='分配的用户名')
+    is_active = Column(Boolean, nullable=False, default=True, comment='是否处于活跃状态')
+    mark_comment = Column(String(100), nullable=False, default='', comment='工单号')
+    create_by = Column(String(100), nullable=False, default='system', comment='创建人用户名')
+    update_by = Column(String(100), nullable=True, comment='最后更新人用户名')
+    create_time = Column(DateTime, nullable=False, default=now_shanghai, comment='创建时间')
+    update_time = Column(DateTime, nullable=False, default=now_shanghai, onupdate=now_shanghai, comment='更新时间')
+    
+    __table_args__ = (
+        UniqueConstraint('agent_id', 'user_name', name='agent_id_user'),
+        Index('idx_permission_agent', 'agent_id'),
+        Index('idx_permission_user', 'user_name'),
     )
