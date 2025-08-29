@@ -628,7 +628,11 @@ async def get_file(
             'md': 'text/markdown',
             'pdf': 'application/pdf',
             'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'doc': 'application/msword'
+            'doc': 'application/msword',
+            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'ppt': 'application/vnd.ms-powerpoint',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'xls': 'application/vnd.ms-excel'
         }
         content_type = mime_types.get(ext, content_type)
         

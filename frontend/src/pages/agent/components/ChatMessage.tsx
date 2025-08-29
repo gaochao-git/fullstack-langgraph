@@ -675,6 +675,7 @@ interface SystemMessageProps {
 const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
+  const { message: antMessage } = App.useApp();
   const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
   
   if (message.type !== 'system' || !message.content) return null;
@@ -714,22 +715,53 @@ const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
                 <FileText className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
               )}
               <span>{doc.fileName}</span>
-              {isFilePreviewable(doc.fileName) && fileIds && fileIds[index] && (
-                <button
-                  type="button"
-                  onClick={() => setPreviewFile({
-                    fileId: fileIds[index],
-                    fileName: doc.fileName,
-                    fileType: getFileExtension(doc.fileName)
-                  })}
-                  className={cn(
-                    "ml-1 p-0.5 rounded hover:opacity-70 transition-opacity",
-                    isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+              {fileIds && fileIds[index] && (
+                <div className="flex items-center gap-1 ml-2">
+                  {isFilePreviewable(doc.fileName) && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewFile({
+                        fileId: fileIds[index],
+                        fileName: doc.fileName,
+                        fileType: getFileExtension(doc.fileName)
+                      })}
+                      className={cn(
+                        "p-0.5 rounded hover:opacity-70 transition-opacity",
+                        isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                      )}
+                      title="预览"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                    </button>
                   )}
-                  title="预览"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const blob = await fileApi.downloadDocument(fileIds[index]);
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = doc.fileName;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+                        antMessage.success('文件下载成功');
+                      } catch (error) {
+                        antMessage.error('文件下载失败');
+                        console.error('下载失败:', error);
+                      }
+                    }}
+                    className={cn(
+                      "p-0.5 rounded hover:opacity-70 transition-opacity",
+                      isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                    )}
+                    title="下载"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               )}
             </div>
           ))}
@@ -1280,22 +1312,53 @@ function ChatMessages({
                                   <span>{doc.fileName}</span>
                                   {(() => {
                                     const ext = doc.fileName.substring(doc.fileName.lastIndexOf('.')).toLowerCase();
-                                    return isFilePreviewable(doc.fileName) && systemFileIds && systemFileIds[index] && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewFile({
-                                          fileId: systemFileIds[index],
-                                          fileName: doc.fileName,
-                                          fileType: ext
-                                        })}
-                                        className={cn(
-                                          "ml-1 p-0.5 rounded hover:opacity-70 transition-opacity",
-                                          isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                                    return systemFileIds && systemFileIds[index] && (
+                                      <div className="flex items-center gap-1 ml-2">
+                                        {isFilePreviewable(doc.fileName) && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setPreviewFile({
+                                              fileId: systemFileIds[index],
+                                              fileName: doc.fileName,
+                                              fileType: ext
+                                            })}
+                                            className={cn(
+                                              "p-0.5 rounded hover:opacity-70 transition-opacity",
+                                              isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                                            )}
+                                            title="预览"
+                                          >
+                                            <Eye className="h-3.5 w-3.5" />
+                                          </button>
                                         )}
-                                        title="预览"
-                                      >
-                                        <Eye className="h-3.5 w-3.5" />
-                                      </button>
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            try {
+                                              const blob = await fileApi.downloadDocument(systemFileIds[index]);
+                                              const url = window.URL.createObjectURL(blob);
+                                              const link = document.createElement('a');
+                                              link.href = url;
+                                              link.download = doc.fileName;
+                                              document.body.appendChild(link);
+                                              link.click();
+                                              document.body.removeChild(link);
+                                              window.URL.revokeObjectURL(url);
+                                              antMessage.success('文件下载成功');
+                                            } catch (error) {
+                                              antMessage.error('文件下载失败');
+                                              console.error('下载失败:', error);
+                                            }
+                                          }}
+                                          className={cn(
+                                            "p-0.5 rounded hover:opacity-70 transition-opacity",
+                                            isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                                          )}
+                                          title="下载"
+                                        >
+                                          <Download className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
                                     );
                                   })()}
                                 </div>
