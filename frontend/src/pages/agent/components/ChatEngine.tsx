@@ -241,7 +241,7 @@ export default function ChatEngine({
       const newMessages: Message[] = [
         ...(thread.messages || []),
         {
-          role: "human",
+          type: "human",
           content: submittedInputValue,
         } as Message,
       ];

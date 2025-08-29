@@ -88,7 +88,10 @@ async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, requ
         # 统计更新失败不影响主流程
     
     # 创建用户线程关联,接口需传递用户名
-    user_name = request_body.config["configurable"].get("user_name")
+    # user_name 在 config.configurable.user_name 中
+    user_name = None
+    if request_body.config and request_body.config.get("configurable"):
+        user_name = request_body.config["configurable"].get("user_name")
     
     # 用户名是必须的
     if not user_name:
@@ -354,8 +357,15 @@ async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_
         config["configurable"]["agent_id"] = agent_id
         
         # 保存文档关联（如果有）
-        file_ids = request_body.input.get("files", []) if request_body.input else []
-        user_name = request_body.user_name or (request_body.input.get("user_name") if request_body.input else None)
+        file_ids = None
+        if request_body.config and request_body.config.get("configurable"):
+            file_ids = request_body.config["configurable"].get("file_ids", [])
+        
+        # user_name 从 config.configurable 获取
+        user_name = None
+        if request_body.config and request_body.config.get("configurable"):
+            user_name = request_body.config["configurable"].get("user_name")
+        
         if file_ids and user_name:
             await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
         
@@ -375,10 +385,17 @@ async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_
                 messages = result["messages"]
                 # 找到最后一条AI消息
                 for message in reversed(messages):
-                    if hasattr(message, "type") and message.type == "ai":
+                    # 检查 role 或 type 字段
+                    is_ai_message = False
+                    if hasattr(message, "role") and message.role == "assistant":
+                        is_ai_message = True
+                    elif hasattr(message, "type") and message.type == "ai":
+                        is_ai_message = True
+                    
+                    if is_ai_message:
                         final_response["last_message"] = {
-                            "content": message.content,
-                            "type": "ai"
+                            "content": getattr(message, "content", str(message)),
+                            "role": "assistant"
                         }
                         break
             
