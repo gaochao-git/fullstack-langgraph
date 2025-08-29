@@ -288,10 +288,6 @@ async def get_thread_history_endpoint(
     )
 
 
-@router.post("/chat/threads/{thread_id}/history", deprecated=True)
-async def get_thread_history_post_endpoint(thread_id: str, request_body: Optional[Dict[str, Any]] = None):
-    """获取线程历史记录（已废弃，请使用 GET /chat/threads/{thread_id}/history）"""
-    return await get_thread_history_post(thread_id, request_body)
 
 
 @router.post("/chat/threads/{thread_id}/runs/stream")
@@ -340,17 +336,6 @@ async def get_threads(
     )
 
 
-@router.get("/chat/users/{user_name}/threads", deprecated=True)
-async def get_user_threads_endpoint(
-    user_name: str, 
-    limit: int = 10, 
-    offset: int = 0,
-    agent_id: Optional[str] = None
-):
-    """获取用户的所有线程（已废弃，请使用 GET /chat/threads）"""
-    from .service.user_threads_db import get_user_threads
-    threads = await get_user_threads(user_name, limit, offset, agent_id=agent_id)
-    return {"user_name": user_name, "threads": threads, "total": len(threads)}
 
 
 # ==================== 文档上传和处理路由 ====================
@@ -401,16 +386,6 @@ async def create_file(
     )
 
 
-@router.post("/chat/files/upload", response_model=UnifiedResponse, deprecated=True)
-async def upload_file(
-    file: UploadFile = File(...),
-    assistant_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
-    user_name: Optional[str] = Query(None, description="上传文件的用户名（agent_key认证时必须）"),
-    db: AsyncSession = Depends(get_async_db),
-    request: Request = None
-):
-    """上传文档文件（已废弃，请使用 POST /chat/files）"""
-    return await create_file(file, assistant_id, user_name, db, request)
 
 
 @router.get("/chat/files/{file_id}/content", response_model=UnifiedResponse)
@@ -509,14 +484,6 @@ async def get_file(
         raise BusinessException(f"文件下载失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
-@router.get("/chat/files/{file_id}/download", deprecated=True)
-async def download_file(
-    file_id: str,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
-):
-    """下载上传的文件（已废弃，请使用 GET /chat/files/{file_id}）"""
-    return await get_file(file_id, db, current_user)
 
 
 @router.get("/v1/agents/threads/{thread_id}/files", response_model=UnifiedResponse)
