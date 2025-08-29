@@ -1344,9 +1344,9 @@ function ChatMessages({
                                               link.click();
                                               document.body.removeChild(link);
                                               window.URL.revokeObjectURL(url);
-                                              antMessage.success('文件下载成功');
+                                              message.success('文件下载成功');
                                             } catch (error) {
-                                              antMessage.error('文件下载失败');
+                                              message.error('文件下载失败');
                                               console.error('下载失败:', error);
                                             }
                                           }}
