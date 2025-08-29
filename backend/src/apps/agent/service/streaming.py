@@ -395,7 +395,7 @@ async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_
                     if is_ai_message:
                         final_response["last_message"] = {
                             "content": getattr(message, "content", str(message)),
-                            "role": "assistant"
+                            "type": "ai"  # 统一使用 type，与 LangGraph 消息格式保持一致
                         }
                         break
             
