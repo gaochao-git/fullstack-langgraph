@@ -795,27 +795,54 @@ class DocumentService:
             has_tables = False
             has_notes = False
             
+            # 收集待处理的图片
+            images_to_process = []
+            image_placeholders = {}
+            image_count = 0
+            
             # 遍历每一页幻灯片
             for slide_idx, slide in enumerate(prs.slides, 1):
-                content_parts.append(f"=== 幻灯片 {slide_idx} ===")
+                slide_content = []
+                slide_content.append(f"=== 幻灯片 {slide_idx} ===")
                 
                 # 提取标题
                 if slide.shapes.title:
                     title = slide.shapes.title.text.strip()
                     if title:
-                        content_parts.append(f"标题: {title}")
+                        slide_content.append(f"标题: {title}")
                 
-                # 提取文本内容
+                # 提取文本内容和图片
                 text_content = []
+                slide_images = []  # 该幻灯片的图片
+                
                 for shape in slide.shapes:
                     if hasattr(shape, "text") and shape.text.strip():
                         # 避免重复添加标题
                         if shape != slide.shapes.title:
                             text_content.append(shape.text.strip())
                     
-                    # 检测图片
+                    # 检测并提取图片
                     if shape.shape_type == 13:  # MSO_SHAPE_TYPE.PICTURE
                         has_images = True
+                        try:
+                            # 获取图片数据
+                            image = shape.image
+                            image_bytes = image.blob
+                            
+                            image_count += 1
+                            placeholder = f"[[PPT_IMAGE_PLACEHOLDER_{image_count}]]"
+                            
+                            # 记录图片信息
+                            images_to_process.append({
+                                'index': image_count,
+                                'slide_idx': slide_idx,
+                                'placeholder': placeholder,
+                                'data': image_bytes
+                            })
+                            
+                            slide_images.append(placeholder)
+                        except Exception as e:
+                            logger.warning(f"无法提取幻灯片 {slide_idx} 的图片: {e}")
                     
                     # 检测表格
                     if hasattr(shape, 'table'):
@@ -832,16 +859,110 @@ class DocumentService:
                             text_content.extend(table_data)
                 
                 if text_content:
-                    content_parts.append("内容:")
-                    content_parts.extend(text_content)
+                    slide_content.append("内容:")
+                    slide_content.extend(text_content)
+                
+                # 添加图片占位符
+                if slide_images:
+                    slide_content.extend(slide_images)
                 
                 # 提取演讲者备注
                 if slide.has_notes_slide and slide.notes_slide.notes_text_frame.text.strip():
                     has_notes = True
                     notes = slide.notes_slide.notes_text_frame.text.strip()
-                    content_parts.append(f"备注: {notes}")
+                    slide_content.append(f"备注: {notes}")
                 
-                content_parts.append("")  # 添加空行分隔
+                slide_content.append("")  # 添加空行分隔
+                content_parts.extend(slide_content)
+            
+            # 如果有图片需要处理，并发处理所有图片
+            if images_to_process and settings.VISION_API_KEY:
+                from .multimodal_service import multimodal_service
+                logger.info(f"PowerPoint文档包含 {len(images_to_process)} 张图片，开始并发处理...")
+                
+                # 创建并发任务
+                async def process_single_image(image_info):
+                    """处理单张图片的异步函数"""
+                    index = image_info['index']
+                    slide_idx = image_info['slide_idx']
+                    placeholder = image_info['placeholder']
+                    try:
+                        result = await multimodal_service.extract_image_content(
+                            image_info['data'],
+                            options={
+                                'prompt': '请详细描述这张图片的内容，如果是图表请提取其中的数据和信息，如果有文字请准确识别。'
+                            }
+                        )
+                        
+                        if result['success']:
+                            logger.info(f"成功提取幻灯片 {slide_idx} 图片 {index} 内容")
+                            return {
+                                'placeholder': placeholder,
+                                'content': f"\n[图片 {index}]\n{result['content']}\n",
+                                'success': True
+                            }
+                        else:
+                            logger.warning(f"图片 {index} 提取失败: {result.get('error', '未知错误')}")
+                            return {
+                                'placeholder': placeholder,
+                                'content': f"\n[图片 {index}：无法识别 - {result.get('error', '未知错误')}]\n",
+                                'success': False
+                            }
+                    except Exception as e:
+                        logger.error(f"处理图片 {index} 时出错: {e}")
+                        return {
+                            'placeholder': placeholder,
+                            'content': f"\n[图片 {index}：处理失败 - {str(e)}]\n",
+                            'success': False
+                        }
+                
+                # 限制并发数，避免API限流
+                import asyncio
+                MAX_CONCURRENT = settings.IMAGE_PROCESS_MAX_CONCURRENT
+                semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+                
+                async def process_with_semaphore(image_info):
+                    async with semaphore:
+                        try:
+                            return await asyncio.wait_for(
+                                process_single_image(image_info), 
+                                timeout=settings.IMAGE_PROCESS_TIMEOUT
+                            )
+                        except asyncio.TimeoutError:
+                            logger.error(f"处理图片 {image_info['index']} 超时")
+                            return {
+                                'placeholder': image_info['placeholder'],
+                                'content': f"\n[图片 {image_info['index']}：处理超时]\n",
+                                'success': False
+                            }
+                
+                # 并发处理所有图片
+                tasks = [process_with_semaphore(img) for img in images_to_process]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # 建立占位符到内容的映射
+                placeholder_map = {}
+                success_count = 0
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.error(f"图片处理任务异常: {result}")
+                    elif isinstance(result, dict):
+                        placeholder_map[result['placeholder']] = result['content']
+                        if result.get('success'):
+                            success_count += 1
+                
+                logger.info(f"图片并发处理完成，成功处理 {success_count} 张图片")
+                
+                # 替换占位符为实际内容
+                for i, part in enumerate(content_parts):
+                    if part in placeholder_map:
+                        content_parts[i] = placeholder_map[part]
+            elif images_to_process and not settings.VISION_API_KEY:
+                # 如果有图片但没有配置视觉模型，替换占位符为提示信息
+                for i, part in enumerate(content_parts):
+                    if part.startswith("[[PPT_IMAGE_PLACEHOLDER_"):
+                        image_num = part.split('_')[3].rstrip(']]')
+                        content_parts[i] = f"\n[图片 {image_num}：未配置视觉模型]\n"
             
             # 添加文件特性摘要
             features = []
@@ -853,7 +974,11 @@ class DocumentService:
                 features.append("包含演讲者备注")
             
             if features:
-                content_parts.insert(4, f"文件特性: {', '.join(features)}")
+                # 在文件基本信息后面插入特性摘要
+                for i, part in enumerate(content_parts):
+                    if part == "":  # 找到第一个空行
+                        content_parts.insert(i, f"文件特性: {', '.join(features)}")
+                        break
             
             full_text = "\n".join(content_parts)
             logger.info(f"PowerPoint文件解析成功: {file_name}, 幻灯片数: {slides_count}")
