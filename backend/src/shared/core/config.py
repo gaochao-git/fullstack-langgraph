@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 50  # 最大上传文件大小（MB）- 增加到50MB以支持大文档
     UPLOAD_ALLOWED_EXTENSIONS: List[str] = [
         # 文档类
-        ".pdf", ".doc", ".docx", ".txt", ".md", 
+        ".pdf", ".doc", ".docx", ".txt", ".md", ".pptx", ".ppt",
         # 表格类
         ".csv", ".xlsx", ".xls",
         # 图片类

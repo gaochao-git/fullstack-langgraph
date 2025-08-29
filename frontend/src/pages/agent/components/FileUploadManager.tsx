@@ -238,7 +238,7 @@ const FILE_EXTENSIONS = {
   SCRIPT: ['sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd'],
   WEB: ['html', 'htm', 'css', 'scss', 'sass', 'less'],
   IMAGE: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'],
-  DOCUMENT: ['pdf', 'docx', 'doc'],
+  DOCUMENT: ['pdf', 'docx', 'doc', 'pptx', 'ppt'],
   SPREADSHEET: ['xlsx', 'xls'],
   LOG: ['log', 'out', 'err', 'trace'],
 } as const;

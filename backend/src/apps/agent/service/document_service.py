@@ -34,6 +34,12 @@ try:
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
+    
+try:
+    from pptx import Presentation
+    HAS_PPTX = True
+except ImportError:
+    HAS_PPTX = False
 
 logger = get_logger(__name__)
 
@@ -46,6 +52,9 @@ if not HAS_DOCX:
     
 if not HAS_OPENPYXL:
     logger.warning("未安装 openpyxl 库，Excel 文件解析功能将不可用。请运行: pip install openpyxl")
+    
+if not HAS_PPTX:
+    logger.warning("未安装 python-pptx 库，PowerPoint 文件解析功能将不可用。请运行: pip install python-pptx")
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.db.models import now_shanghai
@@ -92,6 +101,9 @@ class DocumentService:
             # Word文档
             '.doc': self._process_doc_file,
             '.docx': self._process_docx_file if HAS_DOCX else None,
+            
+            # PowerPoint演示文稿
+            '.pptx': self._process_pptx_file if HAS_PPTX else None,
             
             # 表格文件
             '.csv': self._process_csv_file,
@@ -764,6 +776,95 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Excel文件解析错误: {e}")
             return f"Excel文件解析失败: {str(e)}"
+    
+    async def _process_pptx_file(self, file_path: Path, file_name: str) -> str:
+        """处理PowerPoint文件"""
+        try:
+            from pptx import Presentation
+            
+            prs = Presentation(file_path)
+            slides_count = len(prs.slides)
+            
+            content_parts = []
+            content_parts.append(f"[PowerPoint文件]")
+            content_parts.append(f"文件名: {file_name}")
+            content_parts.append(f"幻灯片数量: {slides_count}")
+            content_parts.append("")
+            
+            has_images = False
+            has_tables = False
+            has_notes = False
+            
+            # 遍历每一页幻灯片
+            for slide_idx, slide in enumerate(prs.slides, 1):
+                content_parts.append(f"=== 幻灯片 {slide_idx} ===")
+                
+                # 提取标题
+                if slide.shapes.title:
+                    title = slide.shapes.title.text.strip()
+                    if title:
+                        content_parts.append(f"标题: {title}")
+                
+                # 提取文本内容
+                text_content = []
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text.strip():
+                        # 避免重复添加标题
+                        if shape != slide.shapes.title:
+                            text_content.append(shape.text.strip())
+                    
+                    # 检测图片
+                    if shape.shape_type == 13:  # MSO_SHAPE_TYPE.PICTURE
+                        has_images = True
+                    
+                    # 检测表格
+                    if hasattr(shape, 'table'):
+                        has_tables = True
+                        # 提取表格内容
+                        table_data = []
+                        for row in shape.table.rows:
+                            row_data = []
+                            for cell in row.cells:
+                                row_data.append(cell.text.strip())
+                            table_data.append(" | ".join(row_data))
+                        if table_data:
+                            text_content.append("\n表格内容:")
+                            text_content.extend(table_data)
+                
+                if text_content:
+                    content_parts.append("内容:")
+                    content_parts.extend(text_content)
+                
+                # 提取演讲者备注
+                if slide.has_notes_slide and slide.notes_slide.notes_text_frame.text.strip():
+                    has_notes = True
+                    notes = slide.notes_slide.notes_text_frame.text.strip()
+                    content_parts.append(f"备注: {notes}")
+                
+                content_parts.append("")  # 添加空行分隔
+            
+            # 添加文件特性摘要
+            features = []
+            if has_images:
+                features.append("包含图片")
+            if has_tables:
+                features.append("包含表格")
+            if has_notes:
+                features.append("包含演讲者备注")
+            
+            if features:
+                content_parts.insert(4, f"文件特性: {', '.join(features)}")
+            
+            full_text = "\n".join(content_parts)
+            logger.info(f"PowerPoint文件解析成功: {file_name}, 幻灯片数: {slides_count}")
+            return full_text
+            
+        except ImportError:
+            logger.warning(f"缺少python-pptx库，无法解析PowerPoint文件: {file_name}")
+            return f"[PowerPoint文件: {file_name}]\n\n需要安装 python-pptx 库才能解析PowerPoint文件。请运行: pip install python-pptx"
+        except Exception as e:
+            logger.error(f"PowerPoint文件解析错误: {e}")
+            return f"PowerPoint文件解析失败: {str(e)}"
     
     async def _process_image_file(self, file_path: Path, file_name: str) -> str:
         """处理图片文件"""
