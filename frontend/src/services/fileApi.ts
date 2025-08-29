@@ -46,7 +46,7 @@ export const fileApi = {
       params.append('user_name', userName);
     }
     
-    const url = params.toString() ? `/api/chat/files/upload?${params.toString()}` : '/api/chat/files/upload';
+    const url = params.toString() ? `/api/chat/files?${params.toString()}` : '/api/chat/files';
     
     const response = await omind_post(url, formData, {
       headers: {
@@ -129,7 +129,7 @@ export const fileApi = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`/api/chat/files/${fileId}/download`, {
+    const response = await fetch(`/api/chat/files/${fileId}`, {
       method: 'GET',
       headers: headers
     });

@@ -355,15 +355,21 @@ async def get_user_threads_endpoint(
 
 # ==================== 文档上传和处理路由 ====================
 
-@router.post("/chat/files/upload", response_model=UnifiedResponse)
-async def upload_file(
+@router.post("/chat/files", response_model=UnifiedResponse)
+async def create_file(
     file: UploadFile = File(...),
     assistant_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
     user_name: Optional[str] = Query(None, description="上传文件的用户名（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
-    request: Request = None
+    request: Request = None,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """上传文档文件（通过AuthMiddleware认证）"""    
+    """上传文档文件"""
+    # 如果是 agent_key 认证，assistant_id 和 user_name 应该已经在中间件验证过了
+    # 如果是 JWT 认证，从 current_user 获取用户名
+    if not user_name and current_user:
+        user_name = current_user.get('username')
+    
     # 验证文件名是否为空
     if not file.filename:
         raise BusinessException("文件名不能为空", ResponseCode.BAD_REQUEST)
@@ -393,6 +399,18 @@ async def upload_file(
         data=FileUploadResponse(**file_info).model_dump(),
         msg="文件上传成功"
     )
+
+
+@router.post("/chat/files/upload", response_model=UnifiedResponse, deprecated=True)
+async def upload_file(
+    file: UploadFile = File(...),
+    assistant_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
+    user_name: Optional[str] = Query(None, description="上传文件的用户名（agent_key认证时必须）"),
+    db: AsyncSession = Depends(get_async_db),
+    request: Request = None
+):
+    """上传文档文件（已废弃，请使用 POST /chat/files）"""
+    return await create_file(file, assistant_id, user_name, db, request)
 
 
 @router.get("/chat/files/{file_id}/content", response_model=UnifiedResponse)
@@ -432,8 +450,8 @@ async def get_file_status(
     )
 
 
-@router.get("/chat/files/{file_id}/download")
-async def download_file(
+@router.get("/chat/files/{file_id}")
+async def get_file(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -489,6 +507,16 @@ async def download_file(
     except Exception as e:
         logger.error(f"文件下载失败: {str(e)}", exc_info=True)
         raise BusinessException(f"文件下载失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/chat/files/{file_id}/download", deprecated=True)
+async def download_file(
+    file_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """下载上传的文件（已废弃，请使用 GET /chat/files/{file_id}）"""
+    return await get_file(file_id, db, current_user)
 
 
 @router.get("/v1/agents/threads/{thread_id}/files", response_model=UnifiedResponse)

@@ -91,14 +91,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return None
         
         try:
-            # 获取assistant_id和user_name
+            # 获取assistant_id和user_name - 从查询参数获取
             agent_id = request.query_params.get("assistant_id")
             user_name = request.query_params.get("user_name")
             
-            # 如果是POST请求且查询参数中没有，尝试从请求体获取
+            # 如果是POST请求且查询参数中没有，尝试从请求体获取（仅限JSON请求）
             if request.method == "POST" and (not agent_id or not user_name):
                 content_type = request.headers.get("content-type", "")
                 
+                # 只处理JSON请求，form-data请求必须通过URL传参
                 if "application/json" in content_type:
                     body = await request.body()
                     request._body = body  # 保存以供后续使用
