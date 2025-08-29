@@ -233,15 +233,25 @@ export const FileListDisplay: React.FC<FileListDisplayProps> = ({
 // 文件类型常量定义
 const FILE_EXTENSIONS = {
   TEXT: ['txt', 'md'],
+  CODE: ['py', 'js', 'ts', 'jsx', 'tsx', 'java', 'cpp', 'c', 'h', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt'],
+  CONFIG: ['sql', 'yaml', 'yml', 'json', 'xml', 'ini', 'conf', 'cfg', 'properties', 'env', 'toml'],
+  SCRIPT: ['sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd'],
+  WEB: ['html', 'htm', 'css', 'scss', 'sass', 'less'],
   IMAGE: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'],
   DOCUMENT: ['pdf', 'docx', 'doc'],
   SPREADSHEET: ['xlsx', 'xls'],
+  LOG: ['log', 'out', 'err', 'trace'],
 } as const;
 
 // 可预览的文件扩展名
 const PREVIEWABLE_EXTENSIONS = [
   ...FILE_EXTENSIONS.TEXT,
+  ...FILE_EXTENSIONS.CODE,
+  ...FILE_EXTENSIONS.CONFIG,
+  ...FILE_EXTENSIONS.SCRIPT,
+  ...FILE_EXTENSIONS.WEB,
   ...FILE_EXTENSIONS.IMAGE,
+  ...FILE_EXTENSIONS.LOG,
   'pdf', // 添加PDF支持
 ];
 

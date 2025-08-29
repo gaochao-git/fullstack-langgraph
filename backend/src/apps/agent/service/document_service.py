@@ -96,6 +96,7 @@ class DocumentService:
             # 表格文件
             '.csv': self._process_csv_file,
             '.xlsx': self._process_excel_file if HAS_OPENPYXL else None,
+            '.xls': self._process_excel_file if HAS_OPENPYXL else None,
             
             # 图片文件
             '.png': self._process_image_file,
@@ -104,6 +105,63 @@ class DocumentService:
             '.gif': self._process_image_file,
             '.bmp': self._process_image_file,
             '.webp': self._process_image_file,
+            
+            # 代码和配置文件 - 作为文本处理
+            '.sql': self._process_text_file,
+            '.yaml': self._process_text_file,
+            '.yml': self._process_text_file,
+            '.json': self._process_text_file,
+            '.xml': self._process_text_file,
+            '.ini': self._process_text_file,
+            '.conf': self._process_text_file,
+            '.cfg': self._process_text_file,
+            '.properties': self._process_text_file,
+            '.env': self._process_text_file,
+            '.toml': self._process_text_file,
+            
+            # 编程语言文件 - 作为文本处理
+            '.py': self._process_text_file,
+            '.js': self._process_text_file,
+            '.ts': self._process_text_file,
+            '.jsx': self._process_text_file,
+            '.tsx': self._process_text_file,
+            '.java': self._process_text_file,
+            '.cpp': self._process_text_file,
+            '.c': self._process_text_file,
+            '.h': self._process_text_file,
+            '.cs': self._process_text_file,
+            '.php': self._process_text_file,
+            '.rb': self._process_text_file,
+            '.go': self._process_text_file,
+            '.rs': self._process_text_file,
+            '.swift': self._process_text_file,
+            '.kt': self._process_text_file,
+            
+            # 脚本文件 - 作为文本处理
+            '.sh': self._process_text_file,
+            '.bash': self._process_text_file,
+            '.zsh': self._process_text_file,
+            '.ps1': self._process_text_file,
+            '.bat': self._process_text_file,
+            '.cmd': self._process_text_file,
+            
+            # Web相关文件 - 作为文本处理
+            '.html': self._process_text_file,
+            '.htm': self._process_text_file,
+            '.css': self._process_text_file,
+            '.scss': self._process_text_file,
+            '.sass': self._process_text_file,
+            '.less': self._process_text_file,
+            
+            # 日志和文档文件 - 作为文本处理
+            '.log': self._process_text_file,
+            '.out': self._process_text_file,
+            '.err': self._process_text_file,
+            '.trace': self._process_text_file,
+            '.rst': self._process_text_file,
+            '.org': self._process_text_file,
+            '.tex': self._process_text_file,
+            '.rtf': self._process_text_file,
         }
     
     async def upload_file(self, db: AsyncSession, file_content: bytes, filename: str, user_name: str) -> Dict[str, Any]:
@@ -317,14 +375,14 @@ class DocumentService:
             "processed_at": doc_upload.process_end_time.isoformat() if doc_upload.process_end_time else None
         }
     
-    def get_document_context(self, file_ids: List[str], max_length: int = 10000) -> str:
+    def get_document_context(self, file_ids: List[str], max_length: int = 10000000) -> str:
         """
         获取文档上下文（用于对话）
         注意：这是同步方法，因为在 streaming.py 中被同步调用
         
         Args:
             file_ids: 文件ID列表
-            max_length: 最大长度限制
+            max_length: 最大长度限制，太小会导致前端看不到对应的文档,这里不做控制，在模型处控制内容大小吧
             
         Returns:
             文档上下文文本
@@ -353,7 +411,7 @@ class DocumentService:
                 if current_length + len(content) > max_length:
                     remaining = max_length - current_length
                     if remaining > 100:  # 至少保留100字符
-                        content = content[:remaining] + "..."
+                        content = content[:remaining] + "内容过长，只获取部分信息，要通知用户，部分信息已丢失"
                     else:
                         break
                 

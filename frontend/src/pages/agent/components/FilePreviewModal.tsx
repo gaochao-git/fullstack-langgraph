@@ -28,7 +28,23 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   const [pdfUrl, setPdfUrl] = useState<string>('');
 
   // 支持预览的文本文件类型
-  const isTextPreviewable = ['.txt', '.md'].includes(fileType.toLowerCase());
+  const isTextPreviewable = [
+    '.txt', '.md',
+    // 代码文件
+    '.py', '.js', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', 
+    '.cs', '.php', '.rb', '.go', '.rs', '.swift', '.kt',
+    // 配置文件
+    '.sql', '.yaml', '.yml', '.json', '.xml', '.ini', '.conf', '.cfg',
+    '.properties', '.env', '.toml',
+    // 脚本文件
+    '.sh', '.bash', '.zsh', '.ps1', '.bat', '.cmd',
+    // Web文件
+    '.html', '.htm', '.css', '.scss', '.sass', '.less',
+    // 日志文件
+    '.log', '.out', '.err', '.trace',
+    // 其他文档
+    '.rst', '.org', '.tex', '.rtf'
+  ].includes(fileType.toLowerCase());
   
   // 支持预览的表格文件类型
   const isTablePreviewable = ['.csv'].includes(fileType.toLowerCase());

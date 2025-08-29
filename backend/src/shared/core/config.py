@@ -80,7 +80,24 @@ class Settings(BaseSettings):
     
     # 文件上传配置
     MAX_UPLOAD_SIZE_MB: int = 50  # 最大上传文件大小（MB）- 增加到50MB以支持大文档
-    UPLOAD_ALLOWED_EXTENSIONS: List[str] = [".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".xlsx"]  # 允许的文件扩展名
+    UPLOAD_ALLOWED_EXTENSIONS: List[str] = [
+        # 文档类
+        ".pdf", ".doc", ".docx", ".txt", ".md", 
+        # 表格类
+        ".csv", ".xlsx", ".xls",
+        # 图片类
+        ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp",
+        # 代码和配置文件类
+        ".sql", ".yaml", ".yml", ".json", ".xml", ".ini", ".conf", ".cfg",
+        ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".cpp", ".c", ".h",
+        ".cs", ".php", ".rb", ".go", ".rs", ".swift", ".kt", 
+        ".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd",
+        ".html", ".htm", ".css", ".scss", ".sass", ".less",
+        # 日志和其他文本文件
+        ".log", ".out", ".err", ".trace",
+        ".properties", ".env", ".toml",
+        ".rst", ".org", ".tex", ".rtf"
+    ]  # 允许的文件扩展名
     
     # 图片处理并发配置
     IMAGE_PROCESS_MAX_CONCURRENT: int = 5  # 图片处理最大并发数
