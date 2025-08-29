@@ -53,11 +53,7 @@ class AgentService:
             agent_data.setdefault('create_time', now_shanghai())
             agent_data.setdefault('update_time', now_shanghai()) 
             
-            # 生成唯一的调用密钥
-            if not agent_data.get('agent_key'):
-                # 生成密钥：sk- (3) + 29 字符 = 32 总长度
-                # 使用 token_urlsafe(22) 会生成约30个字符，截取前29个
-                agent_data['agent_key'] = f"sk-{secrets.token_urlsafe(22)[:29]}"
+            # agent_key 字段已移除，密钥管理通过 agent_permission 表进行
             # 处理capabilities字段映射
             if 'capabilities' in agent_data and isinstance(agent_data['capabilities'], list):agent_data['agent_capabilities'] = agent_data.pop('capabilities')
             
@@ -645,44 +641,7 @@ class AgentService:
         
         return agents, total
     
-    async def reset_agent_key(
-        self,
-        db: AsyncSession,
-        agent_id: str,
-        current_user: str
-    ) -> Dict[str, Any]:
-        """重置智能体调用密钥"""
-        async with db.begin():
-            # 获取智能体信息
-            result = await db.execute(
-                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-            )
-            agent = result.scalar_one_or_none()
-            if not agent:
-                raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-            
-            # 检查权限：只有所有者可以重置密钥
-            if agent.agent_owner != current_user:
-                raise BusinessException("只有智能体所有者可以重置密钥", ResponseCode.FORBIDDEN)
-            
-            # 生成新的密钥：sk- (3) + 29 字符 = 32 总长度
-            # 使用 token_urlsafe(22) 会生成约30个字符，截取前29个
-            new_key = f"sk-{secrets.token_urlsafe(22)[:29]}"
-            agent.agent_key = new_key
-            agent.update_by = current_user
-            agent.update_time = now_shanghai()
-            
-            await db.flush()
-            await db.refresh(agent)
-            
-            logger.info(f"智能体 {agent_id} 密钥已重置 by {current_user}")
-            
-            # 返回新的密钥信息
-            return {
-                "agent_id": agent_id,
-                "agent_key": new_key,
-                "updated_at": agent.update_time.strftime('%Y-%m-%d %H:%M:%S')
-            }
+    # reset_agent_key 方法已移除，密钥管理通过 agent_permission_service 进行
 
 
 # 创建全局实例

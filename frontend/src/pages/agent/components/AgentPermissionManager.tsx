@@ -94,7 +94,11 @@ const AgentPermissionManager: React.FC<AgentPermissionManagerProps> = ({
         form.resetFields();
         loadPermissions();
       } else {
-        message.error(response.msg || '权限创建失败');
+        // 使用 antd v5 的 message 用法
+        message.error({
+          content: response.msg || '权限创建失败',
+          duration: 3,
+        });
       }
     } catch (error) {
       message.error('权限创建失败');

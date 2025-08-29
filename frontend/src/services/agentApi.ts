@@ -77,8 +77,7 @@ export interface Agent {
   visibility_additional_users?: string[];
   favorite_users?: string[];
   is_favorited?: boolean; // 当前用户是否收藏
-  // API调用密钥
-  agent_key?: string;
+  // agent_key 字段已移除，密钥管理通过权限系统进行
 }
 
 export interface CreateAgentRequest {
@@ -344,22 +343,17 @@ class AgentApiService {
     return await omind_get(url);
   }
 
-  /**
-   * 重置智能体调用密钥
-   */
-  async resetAgentKey(agentId: string) {
-    return await omind_post(`/api/v1/agents/${agentId}/reset-key`);
-  }
+  // resetAgentKey 方法已移除，密钥管理通过权限系统进行
 
   /**
    * 创建智能体权限
    */
   async createAgentPermission(agentId: string, userName: string, markComment?: string) {
-    const params = new URLSearchParams({
+    const data = {
       user_name: userName,
-      ...(markComment && { mark_comment: markComment })
-    });
-    return await omind_post(`/api/v1/agents/${agentId}/permissions?${params}`);
+      mark_comment: markComment || ''
+    };
+    return await omind_post(`/api/v1/agents/${agentId}/permissions`, data);
   }
 
   /**

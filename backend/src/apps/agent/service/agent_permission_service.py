@@ -22,9 +22,9 @@ class AgentPermissionService:
     @staticmethod
     def generate_agent_key() -> str:
         """生成新的agent_key"""
-        # 生成一个安全的随机字符串
+        # 生成一个安全的随机字符串，总长度32位（sk-前缀3位 + 29位随机字符）
         alphabet = string.ascii_letters + string.digits
-        random_string = ''.join(secrets.choice(alphabet) for _ in range(32))
+        random_string = ''.join(secrets.choice(alphabet) for _ in range(29))
         return f"sk-{random_string}"
     
     async def create_permission(
@@ -70,7 +70,7 @@ class AgentPermissionService:
             if existing:
                 if existing.is_active:
                     raise BusinessException(
-                        f"用户 {user_name} 已经拥有智能体 {agent_id} 的权限",
+                        f"用户 {user_name} 已经拥有该智能体的访问权限",
                         ResponseCode.DUPLICATE_ERROR
                     )
                 else:
@@ -80,6 +80,7 @@ class AgentPermissionService:
                     existing.mark_comment = mark_comment
                     existing.update_by = create_by
                     await db.flush()
+                    logger.info(f"重新激活权限: agent_id={agent_id}, user_name={user_name}")
                     return existing
             
             # 创建新权限

@@ -158,8 +158,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
   const [editExpandedKeys, setEditExpandedKeys] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [modelConfigs, setModelConfigs] = useState<Record<string, any>>({});
-  const [showAgentKey, setShowAgentKey] = useState(false); // 控制密钥显示
-  const [resetKeyLoading, setResetKeyLoading] = useState(false); // 重置密钥loading状态
+  // showAgentKey 和 resetKeyLoading 状态已移除，密钥管理通过权限系统进行
 
   // 将图标配置转换为选择器需要的格式
   const availableIcons = iconConfig.map(icon => ({
@@ -597,37 +596,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     await onSave(formData);
   };
 
-  const handleResetKey = async () => {
-    if (!agent?.agent_id) return;
-    
-    try {
-      setResetKeyLoading(true);
-      const result = await agentApi.resetAgentKey(agent.agent_id);
-      
-      if (result.status === 'ok' && result.data) {
-        message.success(agent?.agent_key ? '密钥重置成功' : '密钥创建成功');
-        
-        // 直接更新当前智能体的密钥
-        if (agent && result.data.agent_key) {
-          agent.agent_key = result.data.agent_key;
-          // 触发重新加载详情以获取最新数据
-          await loadAgentDetails();
-        }
-        
-        // 同时刷新列表
-        if (onRefresh) {
-          await onRefresh();
-        }
-      } else {
-        message.error(result.message || (agent?.agent_key ? '密钥重置失败' : '密钥创建失败'));
-      }
-    } catch (error) {
-      console.error('密钥操作失败:', error);
-      message.error(agent?.agent_key ? '密钥重置失败' : '密钥创建失败');
-    } finally {
-      setResetKeyLoading(false);
-    }
-  };
+  // handleResetKey 函数已移除，密钥管理通过权限系统进行
 
   const handleCancel = () => {
     form.resetFields();
@@ -849,34 +818,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
               />
             </Form.Item>
 
-            {/* API密钥管理 - 只在编辑模式且是所有者时显示 */}
-            {!isCreating && agent && currentUser && agent.agent_owner === currentUser.username && (
-              <Form.Item
-                label="API调用密钥"
-                extra="密钥用于API调用时的身份验证，请妥善保管"
-              >
-                <Space.Compact style={{ width: '100%' }}>
-                  <Input.Password
-                    value={agent?.agent_key || ''}
-                    placeholder={agent?.agent_key ? undefined : '尚未创建密钥'}
-                    readOnly
-                    visibilityToggle={{
-                      visible: showAgentKey,
-                      onVisibleChange: setShowAgentKey,
-                    }}
-                    style={{ fontFamily: 'monospace' }}
-                  />
-                  <Button
-                    type="default"
-                    icon={<ApiOutlined />}
-                    onClick={handleResetKey}
-                    loading={resetKeyLoading}
-                  >
-                    {agent?.agent_key ? '重置密钥' : '创建密钥'}
-                  </Button>
-                </Space.Compact>
-              </Form.Item>
-            )}
+            {/* agent_key 管理功能已移除，密钥管理通过权限系统进行 */}
           </TabPane>
 
           {/* 工具配置 */}

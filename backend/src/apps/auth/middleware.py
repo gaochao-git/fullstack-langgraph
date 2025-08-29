@@ -153,7 +153,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                         raise BusinessException("使用agent_key认证时必须提供assistant_id", ResponseCode.BAD_REQUEST)
                     
                     if not user_name:
-                        raise BusinessException("使用agent_key认证时必须提供user_name", ResponseCode.BAD_REQUEST)
+                        raise BusinessException("未获取到用户信息", ResponseCode.BAD_REQUEST)
                 
                 # 3. 验证agent是否存在（如果提供了agent_id）
                 agent = None
@@ -165,11 +165,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     if not agent:
                         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
                     
-                    # 4. 如果没有通过permission表找到，验证agent_key是否匹配
+                    # 4. 如果没有通过permission表找到，说明这个key无效
                     if not permission:
-                        if agent.agent_key != token:
-                            logger.warning(f"agent_key不匹配: 期望 {agent.agent_key[:10]}..., 实际 {token[:10]}...")
-                            raise BusinessException("agent_key与assistant_id不匹配", ResponseCode.FORBIDDEN)
+                        logger.warning(f"agent_key无效或未授权: {token[:10]}...")
+                        raise BusinessException("agent_key无效或未授权", ResponseCode.FORBIDDEN)
                 
                 # 5. 验证用户是否存在
                 user_stmt = select(RbacUser).where(RbacUser.user_name == user_name)

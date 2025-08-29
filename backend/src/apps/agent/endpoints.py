@@ -242,31 +242,17 @@ async def get_user_favorite_agents(
     return paginated_response(items=agents, total=total, page=page, size=size, msg="获取收藏列表成功")
 
 
-@router.post("/v1/agents/{agent_id}/reset-key", response_model=UnifiedResponse)
-async def reset_agent_key(
-    agent_id: str,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
-):
-    """重置智能体调用密钥"""
-    if not current_user:
-        raise BusinessException("需要登录才能重置密钥", ResponseCode.UNAUTHORIZED)
-    
-    username = current_user.get('username')
-    if not username:
-        raise BusinessException("无法获取当前用户信息", ResponseCode.UNAUTHORIZED)
-    
-    result = await agent_service.reset_agent_key(db, agent_id, username)
-    return success_response(data=result, msg="密钥重置成功")
-
 
 # ==================== 智能体权限管理路由 ====================
+
+class CreatePermissionRequest(BaseModel):
+    user_name: str
+    mark_comment: Optional[str] = ''
 
 @router.post("/v1/agents/{agent_id}/permissions", response_model=UnifiedResponse)
 async def create_agent_permission(
     agent_id: str,
-    user_name: str = Query(..., description="授权用户名"),
-    mark_comment: str = Query('', description="工单号"),
+    request: CreatePermissionRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -277,7 +263,7 @@ async def create_agent_permission(
     create_by = current_user.get('username', 'system')
     
     permission = await agent_permission_service.create_permission(
-        db, agent_id, user_name, mark_comment, create_by
+        db, agent_id, request.user_name, request.mark_comment, create_by
     )
     
     return success_response(
@@ -411,6 +397,10 @@ async def create_thread_endpoint(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """创建新的对话线程"""
+    # 如果没有传递 body，创建一个空的 ThreadCreate 对象
+    if thread_create is None:
+        thread_create = ThreadCreate()
+    
     # 如果没有提供 user_name，从认证信息中获取
     if not thread_create.user_name and current_user:
         thread_create.user_name = current_user.get('username')
@@ -453,14 +443,28 @@ async def get_thread_history_endpoint(
 
 
 @router.post("/chat/threads/{thread_id}/runs/stream")
-async def stream_run_standard_endpoint(thread_id: str, request_body: RunCreate, request: Request):
+async def stream_run_standard_endpoint(
+    thread_id: str, 
+    request_body: Optional[RunCreate] = None, 
+    request: Request = None
+):
     """智能体流式对话处理"""
+    # 如果没有传递 body，创建一个空的 RunCreate 对象
+    if request_body is None:
+        request_body = RunCreate()
     return await stream_run_standard(thread_id, request_body, request)
 
 
 @router.post("/chat/threads/{thread_id}/runs/invoke")
-async def invoke_run_standard_endpoint(thread_id: str, request_body: RunCreate, request: Request):
+async def invoke_run_standard_endpoint(
+    thread_id: str, 
+    request_body: Optional[RunCreate] = None, 
+    request: Request = None
+):
     """智能体非流式对话处理"""
+    # 如果没有传递 body，创建一个空的 RunCreate 对象
+    if request_body is None:
+        request_body = RunCreate()
     from .service.streaming import invoke_run_standard
     return await invoke_run_standard(thread_id, request_body, request)
 
