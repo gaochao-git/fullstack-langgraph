@@ -419,7 +419,7 @@ async def create_thread_endpoint(
     return await create_thread(thread_create)
 
 
-@router.get("/chat/threads/{thread_id}/history")
+@router.post("/chat/threads/{thread_id}/history")
 async def get_thread_history_endpoint(
     thread_id: str,
     limit: int = Query(50, ge=1, le=100, description="返回的消息数量"),
@@ -431,13 +431,7 @@ async def get_thread_history_endpoint(
     # 调用原有的服务方法
     history = await get_thread_history_post(thread_id, None)
     
-    return success_response(
-        data={
-            "thread_id": thread_id,
-            "history": history[:limit] if history else []
-        },
-        msg="获取对话历史成功"
-    )
+    return history[:limit] if history else []
 
 
 
