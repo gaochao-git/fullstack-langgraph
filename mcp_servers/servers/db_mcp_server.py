@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 Database Tools MCP Server
-基于现有MySQL工具实现的MCP服务器
+基于Web Console API的数据库工具MCP服务器
 """
 
 import json
 import logging
 from typing import Dict, Any, Optional
 import os
-import pymysql
+import requests
 from fastmcp import FastMCP
 from base_config import MCPServerConfig
 
@@ -22,97 +22,133 @@ mcp = FastMCP("Database Tools Server")
 # 加载配置
 config = MCPServerConfig('db_query')
 
-def _create_mysql_connection():
-    """创建新的MySQL连接，每次调用都重新连接"""
-    try:
-        connection_config = {
-            'host': config.get('host'),
-            'port': config.get('port'),
-            'user': config.get('username'),
-            'password': config.get('password'),
-            'charset': 'utf8mb4',
-            'autocommit': True,
-            'database': config.get('database', 'information_schema')
-        }
-        
-        connection = pymysql.connect(**connection_config)
-        logger.info(f"MySQL连接成功，主机: {config.get('host')}, 用户: {config.get('username')}")
-        return connection
-        
-    except Exception as e:
-        logger.error(f"MySQL连接失败: {e}")
-        raise Exception(f"无法建立MySQL连接: {str(e)}")
+# API配置
+API_BASE_URL = config.get('api_base_url', 'http://172.20.10.2:8111')
+API_TOKEN = config.get('api_token', 'app-tbCzKza1riIJ6M3Grn4nWSQa')
 
 @mcp.tool()
-async def execute_mysql_query(
-    connection_name: str = "default",
-    query: str = "",
-    limit: int = 100
+async def get_all_table_names_and_comments(
+    instance_name: str,
+    schema_name: str
 ) -> str:
-    """执行诊断SQL查询。用于执行自定义的数据库诊断查询。
+    """获取数据库中所有表的名称和注释信息。
     
     Args:
-        connection_name: MySQL连接名称
-        query: SQL查询语句
-        limit: 结果限制数量
+        instance_name: 数据库实例名称（格式: host_port，如: 82.156.146.51_3306）
+        schema_name: 数据库schema名称（如: cloud4db）
     
     Returns:
-        包含查询结果的JSON字符串
+        包含表名和注释的JSON字符串
     """
-    # 安全检查：只允许SELECT查询和特定的SHOW语句
-    query_upper = query.strip().upper()
-    allowed_commands = ['SELECT', 'SHOW', 'EXPLAIN', 'DESCRIBE', 'DESC', 'KILL']
+    url = f"{API_BASE_URL}/api/web_console/v1/get_all_table_names_and_comments/"
     
-    if not any(query_upper.startswith(cmd) for cmd in allowed_commands):
-        return json.dumps({
-            "error": "Only SELECT, SHOW, EXPLAIN, and DESCRIBE statements are allowed for diagnostic queries"
-        })
+    payload = {
+        "instance_name": instance_name,
+        "schema_name": schema_name
+    }
     
-    connection = None
+    headers = {
+        'Authorization': f'Bearer {API_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
     try:
-        connection = _create_mysql_connection()
-        cursor = connection.cursor(pymysql.cursors.DictCursor)
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
         
-        # 添加LIMIT子句以防止返回过多数据
-        if query_upper.startswith('SELECT') and 'LIMIT' not in query_upper:
-            query += f" LIMIT {limit}"
+        data = response.json()
+        return json.dumps(data, indent=2, ensure_ascii=False)
         
-        cursor.execute(query)
-        results = cursor.fetchall()
-        
-        # 获取列信息
-        columns = [desc[0] for desc in cursor.description] if cursor.description else []
-        
-        cursor.close()
-        
+    except requests.exceptions.Timeout:
+        logger.error(f"请求超时: {url}")
         return json.dumps({
-            "query": query,
-            "columns": columns,
-            "row_count": len(results),
-            "results": results
-        }, indent=2, default=str)  # default=str 处理datetime等类型
+            "error": "请求超时",
+            "message": "获取表信息超时，请稍后重试"
+        }, ensure_ascii=False)
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"请求失败: {e}")
+        return json.dumps({
+            "error": "请求失败",
+            "message": str(e),
+            "status_code": getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+        }, ensure_ascii=False)
         
     except Exception as e:
-        logger.error(f"Error executing diagnostic query: {e}")
-        return json.dumps({"error": f"Failed to execute query: {str(e)}"})
-    finally:
-        if connection:
-            connection.close()
+        logger.error(f"未预期的错误: {e}")
+        return json.dumps({
+            "error": "内部错误",
+            "message": str(e)
+        }, ensure_ascii=False)
+
+@mcp.tool()
+async def get_table_structure(
+    instance_name: str,
+    schema_name: str,
+    table_names: str
+) -> str:
+    """获取指定表的结构信息。
+    
+    Args:
+        instance_name: 数据库实例名称（格式: host_port，如: 82.156.146.51_3306）
+        schema_name: 数据库schema名称（如: cloud4db）
+        table_names: 表名，逗号分隔的字符串，如: "table1,table2,table3"
+    
+    Returns:
+        包含表结构信息的JSON字符串
+    """
+    # 假设有一个获取表结构的API端点
+    url = f"{API_BASE_URL}/api/web_console/v1/get_table_structures/"
+    
+    payload = {
+        "instance_name": instance_name,
+        "schema_name": schema_name,
+        "table_names": table_names
+    }
+    
+    headers = {
+        'Authorization': f'Bearer {API_TOKEN}',
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        
+        data = response.json()
+        return json.dumps(data, indent=2, ensure_ascii=False)
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"请求失败: {e}")
+        return json.dumps({
+            "error": "请求失败",
+            "message": str(e),
+            "status_code": getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+        }, ensure_ascii=False)
+        
+    except Exception as e:
+        logger.error(f"未预期的错误: {e}")
+        return json.dumps({
+            "error": "内部错误",
+            "message": str(e)
+        }, ensure_ascii=False)
 
 if __name__ == "__main__":
     # 获取端口（从环境变量或配置）
     port = int(os.environ.get('MCP_SERVER_PORT', config.port))
     
     logger.info(f"Starting {config.display_name} on port {port}")
-    logger.info(f"Database config: host={config.get('host')}, user={config.get('username')}")
+    logger.info(f"API Base URL: {API_BASE_URL}")
+    logger.info(f"Available tools: get_all_table_names_and_comments, get_table_structure")
     
-    # 测试数据库连接
+    # 测试API连接
     try:
-        conn = _create_mysql_connection()
-        conn.close()
-        logger.info("数据库连接测试成功")
+        test_url = f"{API_BASE_URL}/api/health"  # 假设有健康检查端点
+        response = requests.get(test_url, timeout=5)
+        logger.info(f"API连接测试成功: {response.status_code}")
     except Exception as e:
-        logger.error(f"数据库连接测试失败: {e}")
+        logger.warning(f"API连接测试失败: {e}")
+        logger.warning("继续启动服务器，但请确保API服务可用")
     
     # 使用SSE传输方式启动服务器
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)

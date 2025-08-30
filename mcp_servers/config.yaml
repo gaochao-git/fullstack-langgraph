@@ -6,13 +6,10 @@ servers:
     enabled: true
     port: 3001
     script: "servers/db_mcp_server.py"
-    display_name: "MySQL数据库服务"
+    display_name: "数据库查询服务"
     config:
-      host: 82.156.146.51
-      port: 3306
-      username: gaochao
-      password: "fffjjj"
-      database: information_schema
+      api_base_url: "http://172.20.10.2:8111"
+      api_token: "app-tbCzKza1riIJ6M3Grn4nWSQa"
       
   ssh_exec:
     enabled: true
