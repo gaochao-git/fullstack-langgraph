@@ -151,40 +151,6 @@ def get_llm_config_for_agent(
         db.close()
 
 
-def get_system_prompt_from_db(agent_name: str) -> str:
-    """
-    统一从数据库获取智能体的系统提示词（同步版本）
-    
-    Args:
-        agent_name: 智能体名称（agent_id）
-        
-    Returns:
-        系统提示词字符串
-        
-    Raises:
-        ValueError: 如果数据库中没有找到有效的系统提示词
-    """
-    if not agent_name: 
-        raise ValueError("智能体名称不能为空")
-    
-    try:
-        db_gen = get_sync_db()
-        db = next(db_gen)
-        try:
-            prompt_config = AgentConfigService.get_prompt_config_from_agent(agent_name, db)
-        finally:
-            db.close()
-            
-        system_prompt = prompt_config.get('system_prompt', '').strip()
-        # 必须从数据库中获取有效的系统提示词
-        if system_prompt:
-            return system_prompt
-        else:
-            raise ValueError(f"数据库中没有找到智能体 '{agent_name}' 的系统提示词配置")
-    except Exception as e:
-        error_msg = f"获取智能体 '{agent_name}' 的系统提示词失败: {e}"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
 
 
 def validate_system_prompt(system_prompt: str, agent_name: str = "unknown") -> None:
@@ -254,25 +220,6 @@ def get_tools_config_from_db(agent_id: str) -> Dict[str, Any]:
         raise ValueError(error_msg)
 
 
-def get_agent_config_for_graph(
-    agent_id: str, 
-    selected_model: Optional[str] = None
-) -> Dict[str, Any]:
-    """
-    获取图所需的所有智能体配置（一次性获取所有配置）
-    
-    Args:
-        agent_id: 智能体ID
-        selected_model: 可选的指定模型名称
-        
-    Returns:
-        包含llm_config、system_prompt和tools_config的字典
-    """
-    return {
-        "llm_config": get_llm_config_for_agent(agent_id, selected_model),
-        "system_prompt": get_system_prompt_from_db(agent_id),
-        "tools_config": get_tools_config_from_db(agent_id)
-    }
 
 
 async def get_system_prompt_from_db_async(agent_name: str) -> str:
@@ -325,9 +272,7 @@ async def get_system_prompt_from_db_async(agent_name: str) -> str:
 # 导出函数
 __all__ = [
     "get_llm_config_for_agent",
-    "get_system_prompt_from_db",
     "get_system_prompt_from_db_async",
     "get_tools_config_from_db",
-    "get_agent_config_for_graph",
     "validate_system_prompt"
 ]
