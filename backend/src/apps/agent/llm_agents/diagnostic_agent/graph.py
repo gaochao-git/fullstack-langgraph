@@ -18,8 +18,7 @@ async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
     # 参数验证
     configurable = config.get("configurable", {}) if config else {}
     agent_id = configurable.get("agent_id")
-    if not agent_id:
-        raise ValueError("配置中缺少必需的agent_id参数")
+    if not agent_id: raise ValueError("配置中缺少必需的agent_id参数")
     
     # 获取配置
     configuration = Configuration.from_runnable_config(config)
