@@ -199,6 +199,14 @@ def get_redis_url() -> str:
 
 def get_checkpoint_uri() -> str:
     """获取checkpoint连接url"""
-    if not all([settings.CHECKPOINTER_HOST, settings.CHECKPOINTER_PORT, settings.CHECKPOINTER_USER, settings.CHECKPOINTER_PASSWORD, settings.CHECKPOINTER_DB]):
+    if not all([settings.CHECKPOINTER_HOST, settings.CHECKPOINTER_PORT, 
+               settings.CHECKPOINTER_USER, settings.CHECKPOINTER_PASSWORD, 
+               settings.CHECKPOINTER_DB]):
         return None
-    return f"postgresql://{settings.CHECKPOINTER_USER}:{settings.CHECKPOINTER_PASSWORD}@{settings.CHECKPOINTER_HOST}:{settings.CHECKPOINTER_PORT}/{settings.CHECKPOINTER_DB}"
+    
+    if settings.CHECKPOINTER_TYPE.lower() == "mysql":
+        return (f"mysql://{settings.CHECKPOINTER_USER}:{settings.CHECKPOINTER_PASSWORD}"
+                f"@{settings.CHECKPOINTER_HOST}:{settings.CHECKPOINTER_PORT}/{settings.CHECKPOINTER_DB}")
+    else:
+        return (f"postgresql://{settings.CHECKPOINTER_USER}:{settings.CHECKPOINTER_PASSWORD}"
+                f"@{settings.CHECKPOINTER_HOST}:{settings.CHECKPOINTER_PORT}/{settings.CHECKPOINTER_DB}")

@@ -11,16 +11,15 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy import select
 from src.shared.db.config import get_async_db_context
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from ..checkpoint_factory import create_checkpointer
 from .document_service import document_service
 from src.shared.db.config import get_sync_db
-from ..utils import (prepare_graph_config, serialize_value,CHECK_POINT_URI)
+from ..utils import (prepare_graph_config, serialize_value)
 from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping)
 from ..llm_agents.generic_agent.graph import builder as generic_builder
 from ..llm_agents.diagnostic_agent.graph import builder as diagnostic_builder
 from .agent_config_service import AgentConfigService
 from .agent_service import agent_service
-from ..utils import CHECK_POINT_URI
 from ..models import AgentDocumentSession
 logger = get_logger(__name__)
 
@@ -282,7 +281,7 @@ async def handle_postgres_streaming(request_body, thread_id):
     # 根据数据库中的is_builtin字段判断使用哪个图
     is_builtin = agent_config.get('is_builtin') == 'yes'
     # 按照官方模式：在async with内完成整个请求周期
-    async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
+    async with create_checkpointer() as checkpointer:
         await checkpointer.setup()
         
         if is_builtin:
@@ -353,7 +352,7 @@ async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_
     if not CHECK_POINT_URI:
         raise Exception("未配置检查点存储")
     
-    async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
+    async with create_checkpointer() as checkpointer:
         await checkpointer.setup()
         
         # 动态编译图

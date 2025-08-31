@@ -8,50 +8,14 @@ from src.shared.core.logging import get_logger
 from datetime import datetime
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.types import Command
+from .checkpoint_factory import create_checkpointer, test_checkpoint_connection, recover_thread_from_checkpoint as recover_thread_impl
 
 logger = get_logger(__name__)
 
-# 全局连接字符串配置 - 从环境变量读取
-from src.shared.core.config import get_checkpoint_uri
-CHECK_POINT_URI = get_checkpoint_uri()
-
-# 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
-
-async def test_postgres_connection():
-    """启动时测试PostgreSQL连接"""
-    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    try:
-        async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
-            await checkpointer.setup()
-            logger.info("✅ PostgreSQL连接测试成功")
-    except Exception as e:
-        logger.error(f"❌ PostgreSQL连接测试失败: {e}")
-        raise e
-
-async def recover_thread_from_postgres(thread_id: str):
-    """从PostgreSQL checkpointer中恢复线程信息，查到返回dict，查不到返回None"""
-    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    try:
-        async with AsyncPostgresSaver.from_conn_string(CHECK_POINT_URI) as checkpointer:
-            await checkpointer.setup()
-            config = {"configurable": {"thread_id": thread_id}}
-            history = [c async for c in checkpointer.alist(config, limit=1)]
-            if history:
-                checkpoint_tuple = history[0]
-                thread_data = {
-                    "thread_id": thread_id,
-                    "created_at": checkpoint_tuple.metadata.get("created_at") if checkpoint_tuple.metadata else None,
-                    "metadata": checkpoint_tuple.metadata or {},
-                    "state": checkpoint_tuple.checkpoint.get("channel_values", {}) if checkpoint_tuple.checkpoint else {},
-                }
-                return thread_data
-            else:
-                return None
-    except Exception as e:
-        logger.error(f"恢复线程失败: {e}")
-        return None
+# 重新导出函数，保持接口兼容性
+test_postgres_connection = test_checkpoint_connection
+recover_thread_from_postgres = recover_thread_impl
 
 def prepare_graph_config(request_body, thread_id):
     """准备图执行配置"""
