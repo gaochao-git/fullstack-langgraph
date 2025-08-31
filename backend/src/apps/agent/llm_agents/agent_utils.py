@@ -7,8 +7,9 @@ import os
 import json
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.agent.service.agent_config_service import AgentConfigService
-from src.shared.db.config import get_sync_db
+from src.shared.db.config import get_sync_db, get_async_db_context
 from src.shared.core.logging import get_logger
 import httpx
 
@@ -152,7 +153,7 @@ def get_llm_config_for_agent(
 
 def get_system_prompt_from_db(agent_name: str) -> str:
     """
-    统一从数据库获取智能体的系统提示词
+    统一从数据库获取智能体的系统提示词（同步版本）
     
     Args:
         agent_name: 智能体名称（agent_id）
@@ -274,10 +275,58 @@ def get_agent_config_for_graph(
     }
 
 
+async def get_system_prompt_from_db_async(agent_name: str) -> str:
+    """
+    统一从数据库获取智能体的系统提示词（异步版本）
+    
+    Args:
+        agent_name: 智能体名称（agent_id）
+        
+    Returns:
+        系统提示词字符串
+        
+    Raises:
+        ValueError: 如果数据库中没有找到有效的系统提示词
+    """
+    if not agent_name: 
+        raise ValueError("智能体名称不能为空")
+    
+    try:
+        async with get_async_db_context() as db:
+            # 由于 AgentConfigService.get_prompt_config_from_agent 是同步的，
+            # 我们需要直接查询数据库
+            from sqlalchemy import select
+            from src.apps.agent.models import AgentConfig
+            
+            result = await db.execute(
+                select(AgentConfig).where(AgentConfig.agent_id == agent_name)
+            )
+            agent = result.scalar_one_or_none()
+            
+            if not agent:
+                raise ValueError(f"未找到智能体 '{agent_name}'")
+            
+            # 获取提示词配置
+            # prompt_info 字段已经是 JSON 类型，不需要 json.loads
+            prompt_config = agent.prompt_info if agent.prompt_info else {}
+            system_prompt = prompt_config.get('system_prompt', '').strip()
+            
+            if system_prompt:
+                return system_prompt
+            else:
+                raise ValueError(f"数据库中没有找到智能体 '{agent_name}' 的系统提示词配置")
+                
+    except Exception as e:
+        error_msg = f"获取智能体 '{agent_name}' 的系统提示词失败: {e}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+
 # 导出函数
 __all__ = [
     "get_llm_config_for_agent",
-    "get_system_prompt_from_db", 
+    "get_system_prompt_from_db",
+    "get_system_prompt_from_db_async",
     "get_tools_config_from_db",
     "get_agent_config_for_graph",
     "validate_system_prompt"

@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
 from .configuration import Configuration
-from .prompts import get_system_prompt
+from .prompts import get_system_prompt_async
 from .tools import get_diagnostic_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
 from src.shared.core.logging import get_logger
@@ -29,7 +29,7 @@ async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
     
     # 获取工具和提示词
     tools = await get_diagnostic_tools(agent_id)
-    system_prompt = get_system_prompt(agent_id)
+    system_prompt = await get_system_prompt_async(agent_id)
     
     # 记录请求信息（DEBUG级别）
     logger.debug(f"[Agent创建] agent_id: {agent_id}")

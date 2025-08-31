@@ -6,7 +6,7 @@
 from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
-from .prompts import get_system_prompt
+from .prompts import get_system_prompt_async
 from .configuration import Configuration
 from .tools import get_generic_agent_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
@@ -32,7 +32,7 @@ async def create_generic_agent(config: RunnableConfig, checkpointer=None):
     
     # 获取工具和提示词
     tools = await get_generic_agent_tools(agent_id)
-    system_prompt = get_system_prompt(agent_id)
+    system_prompt = await get_system_prompt_async(agent_id)
     
     # 记录请求信息（DEBUG级别）
     logger.debug(f"[Agent创建] agent_id: {agent_id}")
