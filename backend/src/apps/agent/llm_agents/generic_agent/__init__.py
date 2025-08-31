@@ -7,6 +7,6 @@
 - 支持ReAct和自定义工作流
 """
 
-from .graph import graph
+from .graph import create_generic_agent
 
-__all__ = ["graph"]
+__all__ = ["create_generic_agent"]

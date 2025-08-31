@@ -1,3 +1,3 @@
-from .graph import graph
+from .graph import create_diagnostic_agent
 
-__all__ = ["graph"]
+__all__ = ["create_diagnostic_agent"]
