@@ -263,7 +263,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
     else:
         logger.info("Skipping end event due to interrupt - waiting for user approval")
 
-async def handle_postgres_streaming(request_body, thread_id):
+async def handle_chat_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""    
     # 从 assistant_id 获取内部使用的 agent_id
     agent_id = request_body.assistant_id
@@ -314,7 +314,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
     async def generate():
         try:
             # 只保留PostgreSQL处理逻辑
-            async for item in handle_postgres_streaming(request_body, thread_id):
+            async for item in handle_chat_streaming(request_body, thread_id):
                 yield item
         except Exception as e:
             import traceback
@@ -344,10 +344,10 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     
     # PostgreSQL 模式下的非流式处理
     is_builtin = agent_config.get('is_builtin') == 'yes'
-    return await handle_postgres_invoke(thread_id, request_body, agent_id, is_builtin)
+    return await handle_chat_invoke(thread_id, request_body, agent_id, is_builtin)
 
 
-async def handle_postgres_invoke(thread_id: str, request_body: RunCreate, agent_id: str, is_builtin: bool):
+async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: str, is_builtin: bool):
     """PostgreSQL 模式下的非流式处理"""
     if not CHECK_POINT_URI:
         raise Exception("未配置检查点存储")
