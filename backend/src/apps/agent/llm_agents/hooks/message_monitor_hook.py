@@ -14,11 +14,12 @@ from src.shared.core.config import settings
 
 logger = get_logger(__name__)
 
-# 设置 tiktoken 缓存目录为当前目录（hooks目录）
-# cl100k_base 文件直接放在这个目录下
-tiktoken_cache_dir = Path(__file__).parent
-os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir)
-logger.info(f"使用内置 tiktoken 缓存: {tiktoken_cache_dir}")
+# 设置 tiktoken 缓存目录为 hooks/tiktoken 子目录
+# 所有 tiktoken 编码器文件都放在这个目录下
+tiktoken_cache_dir = Path(__file__).parent / "tiktoken"
+if tiktoken_cache_dir.exists():
+    os.environ["TIKTOKEN_CACHE_DIR"] = str(tiktoken_cache_dir)
+    logger.info(f"使用内置 tiktoken 缓存: {tiktoken_cache_dir}")
 
 # 特殊标记，用于删除所有消息
 REMOVE_ALL_MESSAGES = "__all__"
