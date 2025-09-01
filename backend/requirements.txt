@@ -132,6 +132,7 @@ pyperclip==1.9.0
 pytest==8.4.1
 python-dateutil==2.9.0.post0
 python-docx==1.2.0
+python-pptx==1.0.2
 python-dotenv==1.1.1
 openpyxl==3.1.5
 python-iso639==2025.2.18
