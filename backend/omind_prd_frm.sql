@@ -17,7 +17,7 @@
 -- Position to start replication or point-in-time recovery from
 --
 
--- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000025', MASTER_LOG_POS=351352823;
+-- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000026', MASTER_LOG_POS=484545444;
 
 --
 -- Table structure for table `agent_configs`
@@ -60,7 +60,7 @@ CREATE TABLE `agent_configs` (
   KEY `idx_agent_owner` (`agent_owner`),
   KEY `idx_visibility_type` (`visibility_type`),
   KEY `idx_create_by` (`create_by`)
-) ENGINE=InnoDB AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4 COMMENT='智能体配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COMMENT='智能体配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -103,8 +103,8 @@ CREATE TABLE `agent_document_upload` (
   `file_path` varchar(500) NOT NULL COMMENT '文件存储路径',
   `process_status` tinyint(4) NOT NULL DEFAULT '0' COMMENT '处理状态:0->uploaded,1->processing,2->ready,3->failed',
   `error_message` text COMMENT '错误信息',
-  `doc_content` text COMMENT '提取的文档内容(限制长度)',
-  `doc_chunks` text COMMENT '文档分块内容',
+  `doc_content` mediumtext COMMENT '提取的文档内容',
+  `doc_chunks` mediumtext COMMENT '文档分块内容',
   `doc_metadata` text COMMENT '文档元数据(字符数、分块数等)',
   `upload_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `process_start_time` datetime DEFAULT NULL COMMENT '处理开始时间',
@@ -120,6 +120,30 @@ CREATE TABLE `agent_document_upload` (
   KEY `idx_doc_status` (`process_status`),
   KEY `idx_doc_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能体文档上传表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `agent_permission`
+--
+
+DROP TABLE IF EXISTS `agent_permission`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `agent_permission` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `agent_id` varchar(100) NOT NULL COMMENT '智能体id',
+  `agent_key` varchar(64) DEFAULT NULL COMMENT '分配的密钥',
+  `user_name` varchar(64) DEFAULT NULL COMMENT '分配的用户名',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否处于活跃状态',
+  `mark_comment` varchar(100) NOT NULL DEFAULT '' COMMENT '工单号',
+  `create_by` varchar(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `agent_key` (`agent_key`),
+  UNIQUE KEY `agent_id_user` (`agent_id`,`user_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能权限表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -146,7 +170,7 @@ CREATE TABLE `ai_model_configs` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `model_id` (`model_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COMMENT='AI模型配置表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI模型配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -207,7 +231,7 @@ CREATE TABLE `auth_login_history` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_login_time` (`login_time`),
   KEY `idx_success` (`success`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='登录历史记录表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='登录历史记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -239,7 +263,7 @@ CREATE TABLE `auth_sessions` (
   KEY `idx_sso_provider` (`sso_provider`),
   KEY `idx_expires_at` (`expires_at`),
   KEY `idx_is_active` (`is_active`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COMMENT='SSO会话管理表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='SSO会话管理表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -271,7 +295,7 @@ CREATE TABLE `auth_tokens` (
   KEY `idx_expires_at` (`expires_at`),
   KEY `idx_revoked` (`revoked`),
   KEY `idx_auth_tokens_user_device` (`user_id`,`device_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COMMENT='JWT令牌管理表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='JWT令牌管理表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -405,6 +429,171 @@ CREATE TABLE `celery_tasksetmeta` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `kb_categories`
+--
+
+DROP TABLE IF EXISTS `kb_categories`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `kb_categories` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `kb_id` varchar(36) NOT NULL COMMENT '知识库ID',
+  `category_name` varchar(100) NOT NULL COMMENT '分类名称',
+  `parent_id` bigint(20) DEFAULT NULL COMMENT '父分类ID',
+  `sort_order` int(11) DEFAULT '0' COMMENT '排序权重',
+  `category_description` text COMMENT '分类描述',
+  `create_by` varchar(100) NOT NULL COMMENT '创建人',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_kb_category` (`kb_id`,`parent_id`),
+  KEY `idx_sort_order` (`kb_id`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='知识库分类表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `kb_document_folders`
+--
+
+DROP TABLE IF EXISTS `kb_document_folders`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `kb_document_folders` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `kb_id` varchar(36) NOT NULL COMMENT '知识库ID',
+  `file_id` varchar(36) NOT NULL COMMENT '文件ID',
+  `folder_id` varchar(36) DEFAULT NULL COMMENT '目录ID，NULL表示根目录',
+  `display_name` varchar(255) DEFAULT NULL COMMENT '在此目录中的显示名',
+  `sort_order` int(11) DEFAULT '0' COMMENT '排序权重',
+  `is_pinned` tinyint(1) DEFAULT '0' COMMENT '是否置顶',
+  `create_by` varchar(100) NOT NULL COMMENT '操作人',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_file_folder` (`kb_id`,`file_id`,`folder_id`),
+  KEY `idx_folder_sort` (`folder_id`,`sort_order`),
+  KEY `idx_kb_folder` (`kb_id`,`folder_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='文档目录关联表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `kb_documents`
+--
+
+DROP TABLE IF EXISTS `kb_documents`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `kb_documents` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `kb_id` varchar(36) NOT NULL COMMENT '知识库ID',
+  `file_id` varchar(36) NOT NULL COMMENT '文件ID',
+  `doc_title` varchar(500) DEFAULT NULL COMMENT '文档标题(可重命名)',
+  `doc_category` varchar(100) DEFAULT NULL COMMENT '文档分类',
+  `doc_priority` int(11) DEFAULT '0' COMMENT '权重',
+  `doc_status` tinyint(4) DEFAULT '1' COMMENT '在此知识库中的状态: 1-正常, 0-禁用',
+  `create_by` varchar(100) NOT NULL COMMENT '添加人',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '添加时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_file` (`kb_id`,`file_id`),
+  KEY `idx_kb_status` (`kb_id`,`doc_status`),
+  KEY `idx_category` (`kb_id`,`doc_category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='知识库文档关联表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `kb_folders`
+--
+
+DROP TABLE IF EXISTS `kb_folders`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `kb_folders` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `folder_id` varchar(36) NOT NULL COMMENT '目录唯一标识',
+  `kb_id` varchar(36) NOT NULL COMMENT '所属知识库ID',
+  `parent_folder_id` varchar(36) DEFAULT NULL COMMENT '父目录ID，NULL表示根目录',
+  `folder_name` varchar(255) NOT NULL COMMENT '目录名称',
+  `folder_description` text COMMENT '目录描述',
+  `folder_type` varchar(50) DEFAULT 'folder' COMMENT '目录类型',
+  `sort_order` int(11) DEFAULT '0' COMMENT '排序权重',
+  `inherit_permissions` tinyint(1) DEFAULT '1' COMMENT '是否继承权限',
+  `custom_permissions` text COMMENT '自定义权限(JSON格式)',
+  `create_by` varchar(100) NOT NULL COMMENT '创建人',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `folder_id` (`folder_id`),
+  KEY `idx_kb_id` (`kb_id`),
+  KEY `idx_parent_folder` (`parent_folder_id`),
+  KEY `idx_sort_order` (`kb_id`,`parent_folder_id`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='知识库目录表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `kb_permissions`
+--
+
+DROP TABLE IF EXISTS `kb_permissions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `kb_permissions` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `kb_id` varchar(36) NOT NULL COMMENT '知识库ID',
+  `user_id` varchar(100) NOT NULL COMMENT '用户ID',
+  `permission_type` varchar(20) NOT NULL COMMENT '权限类型: read, write, admin',
+  `granted_by` varchar(100) DEFAULT NULL COMMENT '授权人',
+  `granted_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '授权时间',
+  `expire_time` datetime DEFAULT NULL COMMENT '过期时间，NULL表示永不过期',
+  `create_by` varchar(100) NOT NULL COMMENT '创建人',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_kb_user` (`kb_id`,`user_id`),
+  KEY `idx_user_permission` (`user_id`,`permission_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='知识库权限表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `knowledge_bases`
+--
+
+DROP TABLE IF EXISTS `knowledge_bases`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `knowledge_bases` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `kb_id` varchar(36) NOT NULL COMMENT '知识库唯一标识',
+  `kb_name` varchar(255) NOT NULL COMMENT '知识库名称',
+  `kb_description` text COMMENT '知识库描述',
+  `kb_type` varchar(50) DEFAULT 'general' COMMENT '知识库类型: general, technical, faq, training',
+  `kb_status` tinyint(4) DEFAULT '1' COMMENT '状态: 1-启用, 0-禁用',
+  `visibility` varchar(20) DEFAULT 'private' COMMENT '可见性: private, internal, public',
+  `owner_id` varchar(100) NOT NULL COMMENT '所有者用户名',
+  `department` varchar(100) DEFAULT NULL COMMENT '部门',
+  `tags` text COMMENT '标签(JSON格式)',
+  `settings` text COMMENT '设置(JSON格式，搜索配置、权限设置等)',
+  `doc_count` int(11) DEFAULT '0' COMMENT '文档数量',
+  `total_chunks` int(11) DEFAULT '0' COMMENT '总分块数',
+  `create_by` varchar(100) NOT NULL COMMENT '创建人',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '更新人',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `kb_id` (`kb_id`),
+  KEY `idx_owner` (`owner_id`),
+  KEY `idx_status` (`kb_status`),
+  KEY `idx_type` (`kb_type`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='知识库表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `mcp_configs`
 --
 
@@ -516,7 +705,7 @@ CREATE TABLE `rbac_permissions` (
   UNIQUE KEY `permission_id` (`permission_id`),
   UNIQUE KEY `uniq_name_method` (`permission_name`,`http_method`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=928 DEFAULT CHARSET=utf8 COMMENT='api权限表';
+) ENGINE=InnoDB AUTO_INCREMENT=964 DEFAULT CHARSET=utf8 COMMENT='api权限表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -561,7 +750,7 @@ CREATE TABLE `rbac_roles_permissions` (
   `update_by` varchar(50) NOT NULL DEFAULT '' COMMENT '更新人',
   PRIMARY KEY (`id`),
   UNIQUE KEY `role_back_front_id` (`role_id`,`back_permission_id`,`front_permission_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2403 DEFAULT CHARSET=utf8 COMMENT='角色-权限关联表';
+) ENGINE=InnoDB AUTO_INCREMENT=3556 DEFAULT CHARSET=utf8 COMMENT='角色-权限关联表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -596,7 +785,7 @@ CREATE TABLE `rbac_users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`),
   UNIQUE KEY `user_name` (`user_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8 COMMENT='用户表';
+) ENGINE=InnoDB AUTO_INCREMENT=33 DEFAULT CHARSET=utf8 COMMENT='用户表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -617,7 +806,7 @@ CREATE TABLE `rbac_users_roles` (
   `update_by` varchar(50) NOT NULL DEFAULT '' COMMENT '更新人',
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`,`role_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8 COMMENT='用户-角色关联表';
+) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8 COMMENT='用户-角色关联表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -703,4 +892,4 @@ CREATE TABLE `user_threads` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-08-18 21:29:17
+-- Dump completed on 2025-09-01 10:45:06
