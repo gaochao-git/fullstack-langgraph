@@ -1,5 +1,6 @@
 """
-流式处理相关接口和函数
+Agent 运行处理模块
+处理 LangGraph Agent 的流式和非流式运行请求
 """
 import json
 from typing import Dict, Any, List

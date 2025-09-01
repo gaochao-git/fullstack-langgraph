@@ -22,7 +22,7 @@ from src.apps.auth.dependencies import get_current_user_optional
 from .dependencies import verify_agent_key
 
 # 导入LLM路由功能
-from .service.streaming import stream_run_standard, RunCreate
+from .service.run_handler import stream_run_standard, invoke_run_standard, RunCreate, get_thread_file_ids
 from .service.threads import create_thread, get_thread_history_post, ThreadCreate, ThreadResponse
 from .service.document_service import document_service
 from .service.document_export_service import document_export_service
@@ -459,7 +459,6 @@ async def invoke_run_standard_endpoint(
     # 如果没有传递 body，创建一个空的 RunCreate 对象
     if request_body is None:
         request_body = RunCreate()
-    from .service.streaming import invoke_run_standard
     return await invoke_run_standard(thread_id, request_body, request)
 
 
@@ -661,8 +660,6 @@ async def get_thread_files(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取会话关联的文件ID列表"""
-    from .service.streaming import get_thread_file_ids
-    
     file_ids = await get_thread_file_ids(thread_id)
     return success_response(data={"file_ids": file_ids}, msg="获取会话文件成功")
 
