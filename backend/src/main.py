@@ -78,6 +78,15 @@ def create_app() -> FastAPI:
         logger.info("🚀 测试PostgreSQL连接")
         await test_postgres_connection()
         
+        # 初始化 checkpoint（只在启动时执行一次）
+        try:
+            from .apps.agent.checkpoint_factory import setup_checkpoint_once
+            await setup_checkpoint_once()
+            logger.info("✅ Checkpoint 初始化完成")
+        except Exception as e:
+            logger.error(f"❌ Checkpoint 初始化失败: {e}", exc_info=True)
+            # 不阻止应用启动
+        
         # 自动扫描并同步API权限
         try:
             from .shared.core.api_permission_scanner import scan_and_sync_api_permissions

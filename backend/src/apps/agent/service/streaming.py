@@ -282,7 +282,7 @@ async def handle_chat_streaming(request_body, thread_id):
     is_builtin = agent_config.get('is_builtin') == 'yes'
     # 按照官方模式：在async with内完成整个请求周期
     async with create_checkpointer() as checkpointer:
-        await checkpointer.setup()
+        # 不再调用 setup()，表结构已在应用启动时创建
         
         # 将agent_id添加到config中
         if not request_body.config:
@@ -351,7 +351,7 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
 async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: str, is_builtin: bool):
     """PostgreSQL 模式下的非流式处理"""
     async with create_checkpointer() as checkpointer:
-        await checkpointer.setup()
+        # 不再调用 setup()，表结构已在应用启动时创建
         
         # 准备配置和输入
         config, graph_input, _, checkpoint = prepare_graph_config(request_body, thread_id)
