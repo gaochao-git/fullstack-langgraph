@@ -44,7 +44,7 @@ class UserService:
         async with db.begin():
             # 业务验证
             if not user_data.get('user_name'):
-                raise BusinessException("用户名是必需的", ResponseCode.INVALID_PARAMETER)
+                raise BusinessException("用户名是必需的", ResponseCode.BAD_REQUEST)
             
             # 检查用户名是否已存在
             result = await db.execute(
@@ -267,9 +267,9 @@ class UserThreadService:
         async with db.begin():
             # 验证必要字段
             if not thread_data.get('user_name'):
-                raise BusinessException("用户名是必需的", ResponseCode.INVALID_PARAMETER)
+                raise BusinessException("用户名是必需的", ResponseCode.BAD_REQUEST)
             if not thread_data.get('thread_id'):
-                raise BusinessException("会话ID是必需的", ResponseCode.INVALID_PARAMETER)
+                raise BusinessException("会话ID是必需的", ResponseCode.BAD_REQUEST)
             
             # 检查是否已存在
             result = await db.execute(

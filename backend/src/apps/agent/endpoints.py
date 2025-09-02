@@ -96,7 +96,7 @@ async def update_agent(
     """更新智能体"""
     update_dict = agent_data.model_dump(exclude_none=True)
     if not update_dict: 
-        raise BusinessException("更新数据不能为空", ResponseCode.INVALID_PARAMETER)
+        raise BusinessException("更新数据不能为空", ResponseCode.BAD_REQUEST)
     
     # 设置更新者信息
     current_username = None
@@ -411,10 +411,10 @@ async def create_thread_endpoint(
     
     # 验证必需参数
     if not thread_create.assistant_id:
-        raise BusinessException("必须提供智能体ID", ResponseCode.INVALID_PARAMETER)
+        raise BusinessException("必须提供智能体ID", ResponseCode.BAD_REQUEST)
     
     if not thread_create.user_name:
-        raise BusinessException("无法获取用户名", ResponseCode.INVALID_PARAMETER)
+        raise BusinessException("无法获取用户名", ResponseCode.BAD_REQUEST)
     
     return await create_thread(thread_create)
 
@@ -483,7 +483,7 @@ async def get_threads(
         assistant_id = current_user.get('agent_id')
     
     if not user_name:
-        raise BusinessException("必须提供用户名", ResponseCode.INVALID_PARAMETER)
+        raise BusinessException("必须提供用户名", ResponseCode.BAD_REQUEST)
     
     threads = await get_user_threads(user_name, limit, offset, agent_id=assistant_id)
     

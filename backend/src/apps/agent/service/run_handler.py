@@ -58,7 +58,7 @@ async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, requ
         logger.info(f"从agent_key认证信息中获取到agent_id: {agent_id}")
     
     if not agent_id:
-        raise BusinessException("必须提供智能体ID", ResponseCode.INVALID_PARAMETER)
+        raise BusinessException("必须提供智能体ID", ResponseCode.BAD_REQUEST)
     
     # 检查数据库中是否存在该智能体
     db_gen = get_sync_db()
