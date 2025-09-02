@@ -337,10 +337,7 @@ export default function ChatEngine({
     url.searchParams.set('thread_id', threadId);
     window.location.href = url.toString();
   }, []);
-
-  // 如果有自定义欢迎组件且没有消息，显示自定义欢迎页面
-  const shouldShowCustomWelcome = WelcomeComponent && (!thread.messages || thread.messages.length === 0);
-
+  
   return (
     <>
       {error ? (
