@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/utils/lib-utils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import { ActivityTimeline } from "@/components/ActivityTimeline";
 import DiagnosticAgentWelcome from "./DiagnosticAgentWelcome";
 import ZabbixDataRenderer, { canRenderChart } from "./ZabbixDataRenderer";
 import { useTheme } from "@/hooks/ThemeContext";
@@ -29,11 +28,6 @@ const HIDDEN_TOOLS = [
 // 使用 fileUploadUtils 中的辅助函数
 const { isFilePreviewable, isImageFile, isExcelFile } = fileUploadUtils;
 
-// 诊断消息中的事件类型
-export interface ProcessedEvent {
-  title: string;
-  data: any;
-}
 
 // 文档引用信息
 interface DocumentReference {
@@ -652,8 +646,6 @@ interface ChatMessagesProps {
   isLoading: boolean;
   onSubmit: (input: string, fileIds?: string[]) => void;
   onCancel: () => void;
-  liveActivityEvents: ProcessedEvent[];
-  historicalActivities: Record<string, ProcessedEvent[]>;
   interrupt?: any;
   onInterruptResume?: (approved: boolean | string[]) => void;
   onNewSession?: () => void; // 新增：新建会话回调
@@ -787,8 +779,6 @@ function ChatMessages({
   isLoading,
   onSubmit,
   onCancel,
-  liveActivityEvents,
-  historicalActivities,
   interrupt,
   onInterruptResume,
   onNewSession,
@@ -1438,19 +1428,9 @@ function ChatMessages({
                         
                         round.assistant.forEach((msg, i) => {
                           if (msg.type === 'ai') {
-                            const activityForThisMessage = historicalActivities[msg.id!] || [];
-                            
                             // AI 消息内容
                             renderItems.push(
                               <div key={msg.id || `ai-${i}`} className="min-w-0 w-full mb-3">
-                                {activityForThisMessage.length > 0 && (
-                                  <div className="mb-3 border-b border-blue-300 pb-3 text-xs overflow-x-auto">
-                                    <ActivityTimeline
-                                      processedEvents={activityForThisMessage}
-                                      isLoading={false}
-                                    />
-                                  </div>
-                                )}
                                 {/* AI 内容 - 过滤空内容 */}
                                 {msg.content && String(msg.content).trim() && (
                                   <div className="mb-2 overflow-x-auto min-w-0">

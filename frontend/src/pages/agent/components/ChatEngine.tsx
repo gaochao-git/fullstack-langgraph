@@ -2,7 +2,7 @@ import { useStream } from "@langchain/langgraph-sdk/react";
 import type { Message } from "@langchain/langgraph-sdk";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import ChatMessages, { type ProcessedEvent } from "./ChatMessage";
+import ChatMessages from "./ChatMessage";
 import { Drawer, App } from "antd";
 import { useTheme } from "@/hooks/ThemeContext";
 import { cn } from "@/utils/lib-utils";
@@ -49,9 +49,6 @@ export default function ChatEngine({
 }: ChatEngineProps) {
   const { isDark } = useTheme();
   const { message } = App.useApp();
-  const [processedEventsTimeline, setProcessedEventsTimeline] = useState<ProcessedEvent[]>([]);
-  const [historicalActivities, setHistoricalActivities] = useState<Record<string, ProcessedEvent[]>>({});
-  const hasFinalizeEventOccurredRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
@@ -142,32 +139,6 @@ export default function ChatEngine({
     assistantId: getAgentId(),
     messagesKey: "messages",
     ...getThreadIdConfig(),
-    onUpdateEvent: (event: any) => {
-      let processedEvent: ProcessedEvent | null = null;
-      if (event.diagnostic_step) {
-        processedEvent = {
-          title: "Diagnostic Step",
-          data: event.diagnostic_step || "",
-        };
-      } else if (event.analysis) {
-        processedEvent = {
-          title: "Analysis",
-          data: event.analysis || "",
-        };
-      } else if (event.finalize_diagnosis) {
-        processedEvent = {
-          title: "Finalizing Diagnosis",
-          data: "Composing final diagnostic report.",
-        };
-        hasFinalizeEventOccurredRef.current = true;
-      }
-      if (processedEvent) {
-        setProcessedEventsTimeline((prevEvents) => [
-          ...prevEvents,
-          processedEvent!,
-        ]);
-      }
-    },
     onError: (error: any) => {
       // 检查是否是智能体密钥错误
       if (error.code === 461 || error.status === 461) {
@@ -250,28 +221,10 @@ export default function ChatEngine({
     }
   }, []);
 
-  useEffect(() => {
-    if (
-      hasFinalizeEventOccurredRef.current &&
-      !thread.isLoading &&
-      thread.messages.length > 0
-    ) {
-      const lastMessage = thread.messages[thread.messages.length - 1];
-      if (lastMessage && lastMessage.type === "ai" && lastMessage.id) {
-        setHistoricalActivities((prev) => ({
-          ...prev,
-          [lastMessage.id!]: [...processedEventsTimeline],
-        }));
-      }
-      hasFinalizeEventOccurredRef.current = false;
-    }
-  }, [thread.messages, thread.isLoading, processedEventsTimeline]);
 
   const handleSubmit = useCallback(
     (submittedInputValue: string, fileIds?: string[]) => {
       if (!submittedInputValue.trim() && !fileIds?.length) return;
-      setProcessedEventsTimeline([]);
-      hasFinalizeEventOccurredRef.current = false;
 
       // 只发送当前消息，不需要历史消息（后端有checkpoint）
       const currentMessage: Message = {
@@ -295,7 +248,9 @@ export default function ChatEngine({
       
       // 构建提交选项，user_name 放在顶层
       const submitOptions = {
-        config: submitConfig      };
+        config: submitConfig,
+        streamMode: ["updates", "messages"]
+      };
       
       // 最终提交
       thread.submit(submitData as any, submitOptions as any);
@@ -429,8 +384,6 @@ export default function ChatEngine({
             isLoading={thread.isLoading}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            liveActivityEvents={processedEventsTimeline}
-            historicalActivities={historicalActivities}
             interrupt={thread.interrupt}
             onInterruptResume={handleInterruptResume}
             onNewSession={onNewSession}

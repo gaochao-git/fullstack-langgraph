@@ -16,7 +16,6 @@ export const componentRegistry = {
   'AgentManagement': lazy(() => import('../pages/agent/AgentManagement')),
   'AgentMarketplace': lazy(() => import('../pages/agent/AgentMarketplace')),
   'AgentChat': lazy(() => import('../pages/agent/AgentChat')),
-  'DiagnosticChatView': lazy(() => import('../pages/agent/DiagnosticChatView').then(m => ({ default: m.DiagnosticChatView }))),
   
   'ModelsManagement': lazy(() => import('../pages/ai_model').then(m => ({ default: m.ModelsManagement }))),
   'KnowledgeManagement': lazy(() => import('../pages/kb').then(m => ({ default: m.KnowledgeManagement }))),
