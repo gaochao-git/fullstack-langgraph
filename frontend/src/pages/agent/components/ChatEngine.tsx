@@ -62,6 +62,9 @@ export default function ChatEngine({
   // 模型管理状态
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
+  
+  // 用于跟踪当前线程ID的状态 - 先不初始化，稍后在定义getThreadIdFromUrl后再设置
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
   // 获取agentId，用于LangGraph SDK的assistantId字段
   const getAgentId = (): string => {
@@ -86,18 +89,17 @@ export default function ChatEngine({
     return urlParams.get('thread_id') || null;
   };
 
-  // 获取线程ID配置 - 优先使用URL中的线程ID，其次使用创建的线程ID
-  const getThreadIdConfig = () => {
-    const threadIdFromUrl = getThreadIdFromUrl();
-    if (threadIdFromUrl) {
-      return { threadId: threadIdFromUrl };
-    }
-    return {};
-  };
-
   // 构造完整的 API URL
   const baseUrl = getBaseUrl() || window.location.origin;
   const apiUrl = `${baseUrl}/api/chat`;
+  
+  // 初始化currentThreadId
+  useEffect(() => {
+    const threadIdFromUrl = getThreadIdFromUrl();
+    if (threadIdFromUrl) {
+      setCurrentThreadId(threadIdFromUrl);
+    }
+  }, []);
   
   // 在组件初始化时创建线程（如果没有URL中的thread_id）
   useEffect(() => {
@@ -113,6 +115,9 @@ export default function ChatEngine({
           const url = new URL(window.location.href);
           url.searchParams.set('thread_id', newThread.thread_id);
           window.history.replaceState({}, '', url.toString());
+          
+          // 更新线程ID状态，这将触发useStream重新初始化
+          setCurrentThreadId(newThread.thread_id);
           
           console.log('✅ 初始化时创建新线程成功:', newThread.thread_id);
         } catch (error) {
@@ -132,7 +137,7 @@ export default function ChatEngine({
     apiUrl: apiUrl,
     assistantId: getAgentId(),
     messagesKey: "messages",
-    ...getThreadIdConfig(),
+    threadId: currentThreadId,  // 使用状态中的线程ID
     onError: (error: any) => {
       // 检查是否是智能体密钥错误
       if (error.code === 461 || error.status === 461) {
@@ -186,21 +191,11 @@ export default function ChatEngine({
     }
   }, [agent]); // 移除 currentModel 依赖，避免循环更新
 
-  // 当新线程创建时，将线程ID同步到URL
-  useEffect(() => {
-    const threadId = (thread as any).threadId;
-    if (threadId && !getThreadIdFromUrl()) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('thread_id', threadId);
-      window.history.replaceState({}, '', url.toString());
-    }
-  }, [(thread as any).threadId]);
 
   // 当有线程ID时，获取关联的文件ID
   useEffect(() => {
-    const threadIdFromUrl = getThreadIdFromUrl();
-    if (threadIdFromUrl) {
-      threadApi.getThreadFiles(threadIdFromUrl)
+    if (currentThreadId) {
+      threadApi.getThreadFiles(currentThreadId)
         .then(result => {
           setThreadFileIds(result.file_ids || []);
           console.log('✅ 获取会话文件成功:', result.file_ids);
@@ -210,7 +205,7 @@ export default function ChatEngine({
           setThreadFileIds([]);
         });
     }
-  }, []);
+  }, [currentThreadId]);
 
 
   const handleSubmit = useCallback(
