@@ -44,10 +44,9 @@ def prepare_graph_config(request_body, thread_id):
     if checkpoint and "thread_id" in checkpoint:
         del checkpoint["thread_id"]
     
-    # Combine stream modes
-    stream_modes = list(set([
-        "values", "messages", "updates", "custom", "checkpoints", "tasks"
-    ] + (request_body.stream_mode or [])))
+    # Use stream modes from request, or default if not provided
+    default_modes = ["values", "messages", "updates", "custom", "checkpoints", "tasks"]
+    stream_modes = request_body.stream_mode if request_body.stream_mode else default_modes
     
     return config, graph_input, stream_modes, checkpoint
 
