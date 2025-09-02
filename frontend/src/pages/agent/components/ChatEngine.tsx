@@ -295,7 +295,9 @@ export default function ChatEngine({
       
       // 构建提交选项，user_name 放在顶层
       const submitOptions = {
-        config: submitConfig      };
+        config: submitConfig,
+        streamMode: ["updates", "messages"]
+      };
       
       // 最终提交
       thread.submit(submitData as any, submitOptions as any);
