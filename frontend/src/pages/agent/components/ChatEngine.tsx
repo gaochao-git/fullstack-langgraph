@@ -137,9 +137,6 @@ export default function ChatEngine({
       // 检查是否是智能体密钥错误
       if (error.code === 461 || error.status === 461) {
         message.error(error.message || '智能体调用密钥错误');
-      } else if (error.code === 401 || error.status === 401) {
-        // 401 是用户认证错误，不处理，让全局拦截器处理
-        // 不显示消息，避免重复
       } else {
         // 其他错误显示错误消息
         message.error(error.message || '请求失败');
@@ -221,15 +218,10 @@ export default function ChatEngine({
       if (!submittedInputValue.trim() && !fileIds?.length) return;
 
       // 只发送当前消息，不需要历史消息（后端有checkpoint）
-      const currentMessage: Message = {
-        type: "human",
-        content: submittedInputValue,
-      } as Message;
+      const currentMessage: Message = {type: "human",content: submittedInputValue,} as Message;
       
       // 构建提交数据，只包含当前消息
-      const submitData = {
-        messages: [currentMessage],
-      };
+      const submitData = {messages: [currentMessage]};
       
       const submitConfig = {
         configurable: {
@@ -240,7 +232,7 @@ export default function ChatEngine({
         }
       };
       
-      // 构建提交选项，user_name 放在顶层
+      // 构建提交选项
       const submitOptions = {
         config: submitConfig,
         streamMode: ["updates", "messages"]
