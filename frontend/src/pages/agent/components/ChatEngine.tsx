@@ -52,7 +52,6 @@ export default function ChatEngine({
   const [error, setError] = useState<string | null>(null);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [historyThreads, setHistoryThreads] = useState<HistoryThread[]>([]);
-  const [createdThreadId, setCreatedThreadId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [threadFileIds, setThreadFileIds] = useState<string[]>([]);
   // 分页相关状态
@@ -93,9 +92,6 @@ export default function ChatEngine({
     if (threadIdFromUrl) {
       return { threadId: threadIdFromUrl };
     }
-    if (createdThreadId) {
-      return { threadId: createdThreadId };
-    }
     return {};
   };
 
@@ -107,14 +103,12 @@ export default function ChatEngine({
   useEffect(() => {
     const initThread = async () => {
       const threadIdFromUrl = getThreadIdFromUrl();
-      if (!threadIdFromUrl && !createdThreadId) {
+      if (!threadIdFromUrl) {
         try {
           const newThread = await threadApi.create({
             assistant_id: getAgentId(),  // 使用 assistant_id，与 LangGraph SDK 保持一致
             user_name: getCurrentUsername(),
           });
-          setCreatedThreadId(newThread.thread_id);
-          
           // 更新URL
           const url = new URL(window.location.href);
           url.searchParams.set('thread_id', newThread.thread_id);
