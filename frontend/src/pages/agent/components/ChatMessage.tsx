@@ -1486,74 +1486,84 @@ function ChatMessages({
                         
                         return renderItems;
                       })()}
-                      {/* 合并区域只显示最后一条 AI 消息的操作按钮 */}
-                    </div>
-                  </div>
-                  {/* 操作按钮 - 放在左下角 */}
-                  {(() => {
-                    // 找到最后一条有内容的 AI 消息
-                    const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
-                    if (!lastAiMsg) return null;
-                    const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
-                    return (
-                      <div className="flex gap-1 mt-2 ml-12">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
-                          onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
-                          title={copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
-                        >
-                          {copiedMessageId === lastAiMsg.id ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
-                          onClick={async () => {
-                            try {
-                              setDownloadingMessageId(lastAiMsg.id!);
-                              // 使用新的导出函数，传入isDark参数以匹配主题
-                              await exportToWordWithImages(aiContent, `对话导出_${new Date().toLocaleDateString()}`, isDark);
-                            } catch (error) {
-                              // 错误已在 exportToWordWithImages 中处理
-                            } finally {
-                              setDownloadingMessageId(null);
-                            }
-                          }}
-                          disabled={downloadingMessageId === lastAiMsg.id}
-                          title="下载Word"
-                        >
-                          {downloadingMessageId === lastAiMsg.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Download className="h-3.5 w-3.5" />
-                          )}
-                        </Button>
-                        {idx === dialogRounds.length - 1 && (
+                      {/* 操作按钮区域 - 放在消息气泡内部底部 */}
+                      {(() => {
+                        // 找到最后一条有内容的 AI 消息
+                        const lastAiMsg = [...round.assistant].reverse().find(m => m.type === 'ai' && m.content && String(m.content).trim().length > 0);
+                        if (!lastAiMsg) return null;
+                        const aiContent = typeof lastAiMsg.content === 'string' ? lastAiMsg.content : JSON.stringify(lastAiMsg.content);
+                        return (
+                          <div className="flex items-center justify-between mt-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
-                            onClick={() => {
-                              // 重新生成回复 - 使用当前轮次的用户消息
-                              if (round.user && round.user.content) {
-                                const content = typeof round.user.content === 'string' 
-                                  ? round.user.content 
-                                  : JSON.stringify(round.user.content);
-                                // 直接调用 onSubmit 重新生成
-                                onSubmit(content);
+                            onClick={() => handleCopy(aiContent, lastAiMsg.id!)}
+                            title={copiedMessageId === lastAiMsg.id ? "已复制" : "复制"}
+                          >
+                            {copiedMessageId === lastAiMsg.id ? <CopyCheck className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                            onClick={async () => {
+                              try {
+                                setDownloadingMessageId(lastAiMsg.id!);
+                                // 使用新的导出函数，传入isDark参数以匹配主题
+                                await exportToWordWithImages(aiContent, `对话导出_${new Date().toLocaleDateString()}`, isDark);
+                              } catch (error) {
+                                // 错误已在 exportToWordWithImages 中处理
+                              } finally {
+                                setDownloadingMessageId(null);
                               }
                             }}
-                            disabled={isLoading}
-                            title="重新生成"
+                            disabled={downloadingMessageId === lastAiMsg.id}
+                            title="下载Word"
                           >
-                            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                            {downloadingMessageId === lastAiMsg.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
                           </Button>
-                        )}
-                      </div>
-                    );
-                  })()}
+                          {idx === dialogRounds.length - 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                              onClick={() => {
+                                // 重新生成回复 - 使用当前轮次的用户消息
+                                if (round.user && round.user.content) {
+                                  const content = typeof round.user.content === 'string' 
+                                    ? round.user.content 
+                                    : JSON.stringify(round.user.content);
+                                  // 直接调用 onSubmit 重新生成
+                                  onSubmit(content);
+                                }
+                              }}
+                              disabled={isLoading}
+                              title="重新生成"
+                            >
+                              <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                            </Button>
+                          )}
+                        </div>
+                        {/* AI生成标识 - GB45438合规要求 */}
+                        <div className={cn(
+                          "text-xs font-medium px-2 py-0.5 rounded",
+                          isDark 
+                            ? "text-orange-400 bg-orange-900/30 border border-orange-800" 
+                            : "text-orange-600 bg-orange-50 border border-orange-200"
+                        )}>
+                          AI生成
+                        </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
               )}
               </div>
