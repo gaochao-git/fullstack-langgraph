@@ -1,11 +1,6 @@
 """
-诊断智能体配置类
+诊断智能体配置
 """
-from ast import In
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from langchain_core.runnables import RunnableConfig
-from ..agent_utils import get_llm_config_for_agent
 
 # Agent 装饰器配置,首次注册使用，如果后续需要更新，需要手动更新数据库
 INIT_AGENT_CONFIG = {
@@ -17,34 +12,3 @@ INIT_AGENT_CONFIG = {
     "icon": "MedicineBoxOutlined",
     "owner": "gaochao"
 }
-
-
-class Configuration(BaseModel):
-    """诊断智能体的配置容器"""
-    
-    # 运行时选择的模型（可选）
-    selected_model: Optional[str] = None
-    
-    # 诊断智能体特有配置
-    enable_debug: bool = Field(default=False, description="是否启用调试模式")
-    max_analysis_depth: int = Field(default=5, description="最大分析深度")
-    enable_auto_fix: bool = Field(default=False, description="是否启用自动修复建议")
-    
-    @classmethod
-    def from_runnable_config(cls, config: Optional[RunnableConfig] = None) -> "Configuration":
-        """从运行配置创建实例"""
-        configurable = config.get("configurable", {}) if config else {}
-        
-        return cls(
-            selected_model=configurable.get("selected_model"),
-            enable_debug=configurable.get("enable_debug", False),
-            max_analysis_depth=configurable.get("max_analysis_depth", 5),
-            enable_auto_fix=configurable.get("enable_auto_fix", False)
-        )
-    
-    def get_llm_config(self) -> Dict[str, Any]:
-        """获取LLM配置 - 直接使用 agent_utils 的方法"""
-        return get_llm_config_for_agent(
-            agent_id=INIT_AGENT_CONFIG["agent_id"],  # 内置智能体使用文件中定义的常量
-            selected_model=self.selected_model
-        )

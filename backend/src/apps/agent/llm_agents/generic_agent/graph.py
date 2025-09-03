@@ -7,7 +7,7 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from .prompts import get_system_prompt_async
-from .configuration import Configuration
+from .llm import get_llm_config
 from .tools import get_generic_agent_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
 from src.shared.core.logging import get_logger
@@ -25,9 +25,9 @@ async def create_generic_agent(config: RunnableConfig, checkpointer=None):
     if not agent_id:
         raise ValueError("配置中缺少必需的agent_id参数")
     
-    # 获取配置
-    configuration = Configuration.from_runnable_config(config)
-    llm_config = configuration.get_llm_config()
+    # 获取大模型配置
+    selected_model = configurable.get("selected_model")
+    llm_config = get_llm_config(agent_id, selected_model)
     
     # 创建LLM实例
     llm = ChatOpenAI(**llm_config)

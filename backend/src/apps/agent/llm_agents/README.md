@@ -15,21 +15,19 @@
 ```python
 from src.apps.agent.llm_agents.decorators import agent
 
-# 在 configuration.py 中定义常量
-AGENT_ID = "diagnostic_agent"
-AGENT_DESCRIPTION = "智能运维诊断助手"
-# ... 其他常量
+# 在 configuration.py 中定义
+INIT_AGENT_CONFIG = {
+    "agent_id": "diagnostic_agent",
+    "description": "智能运维诊断助手",
+    "agent_type": "内置",
+    "capabilities": ["故障诊断", "性能分析"],
+    "version": "1.0.0",
+    "icon": "MedicineBoxOutlined",
+    "owner": "system"
+}
 
 # 在 graph.py 中使用
-@agent(
-    agent_id=AGENT_ID,
-    description=AGENT_DESCRIPTION,
-    agent_type=AGENT_TYPE,
-    capabilities=AGENT_CAPABILITIES,
-    version=AGENT_VERSION,
-    icon=AGENT_ICON,
-    owner=AGENT_OWNER
-)
+@agent(**INIT_AGENT_CONFIG)
 async def create_diagnostic_agent(config, checkpointer=None):
     # Agent 实现
     pass

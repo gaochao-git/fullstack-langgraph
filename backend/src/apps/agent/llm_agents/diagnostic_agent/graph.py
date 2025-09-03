@@ -4,7 +4,8 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
-from .configuration import Configuration, INIT_AGENT_CONFIG
+from .configuration import INIT_AGENT_CONFIG
+from .llm import get_llm_config
 from .prompts import get_system_prompt_async
 from .tools import get_diagnostic_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
@@ -20,9 +21,9 @@ async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
     # 内置智能体使用文件中定义的常量
     agent_id = INIT_AGENT_CONFIG["agent_id"]
     
-    # 获取配置
-    configuration = Configuration.from_runnable_config(config)
-    llm_config = configuration.get_llm_config()
+    # 获取大模型配置
+    selected_model = config.get("configurable", {}).get("selected_model") if config else None
+    llm_config = get_llm_config(agent_id, selected_model)
     
     # 创建LLM实例
     llm = ChatOpenAI(**llm_config)

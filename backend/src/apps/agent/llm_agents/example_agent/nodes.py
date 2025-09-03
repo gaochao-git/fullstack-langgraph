@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 from .state import ExampleAgentState
 from .tools import word_counter, text_analyzer
 from .configuration import INIT_AGENT_CONFIG  # 从 configuration.py 导入
-from src.apps.agent.llm_agents.agent_utils import get_llm_config_for_agent
+from .llm import get_llm_config
 from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -192,7 +192,7 @@ async def llm_process_node(state: ExampleAgentState) -> Dict[str, Any]:
     workflow_steps = state.get("workflow_steps", [])
     
     # 获取 LLM 配置（使用 agent_utils 的公共方法）
-    llm_config = get_llm_config_for_agent(INIT_AGENT_CONFIG["agent_id"])
+    llm_config = get_llm_config(INIT_AGENT_CONFIG["agent_id"])
     llm = ChatOpenAI(**llm_config)
     
     # 构建 LLM 提示

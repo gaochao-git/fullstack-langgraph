@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
-from .configuration import Configuration, INIT_AGENT_CONFIG
+from .configuration import INIT_AGENT_CONFIG
 from .state import ExampleAgentState
 from .nodes import (
     analyze_task_node,
@@ -24,12 +24,12 @@ async def create_example_agent(config: RunnableConfig, checkpointer=None):
     这是前端创建的 Agent 无法做到的高级功能
     """
     # 获取配置
-    configuration = Configuration.from_runnable_config(config)
-    return await create_workflow(configuration, checkpointer)
+    enable_debug = config.get("configurable", {}).get("enable_debug", False) if config else False
+    return await create_workflow(enable_debug, checkpointer)
 
 
 async def create_workflow(
-    configuration: Configuration,
+    enable_debug: bool,
     checkpointer=None
 ):
     """创建自定义工作流
@@ -93,7 +93,7 @@ async def create_workflow(
     logger.info(f"[Agent创建] 编译自定义工作流图")
     compiled_graph = workflow.compile(
         checkpointer=checkpointer,
-        debug=configuration.enable_debug,
+        debug=enable_debug,
     )
     # 设置图的名称（用于追踪和监控）
     compiled_graph.name = f"{INIT_AGENT_CONFIG['agent_id']}-workflow"
