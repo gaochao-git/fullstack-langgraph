@@ -58,12 +58,23 @@ async def process_task_node(state: ExampleAgentState) -> Dict[str, Any]:
     processing_results = state.get("processing_results", {})
     workflow_steps = state.get("workflow_steps", [])
     
-    # 获取要处理的文本
+    # 获取要处理的文本（包括系统消息中的文件内容）
     text_to_process = ""
+    # 先收集系统消息（如文件内容）
+    system_context = ""
+    for msg in messages:
+        if hasattr(msg, 'type') and msg.type == "system":
+            system_context += msg.content + "\n"
+    
+    # 再获取最后一条用户消息
     for msg in reversed(messages):
         if hasattr(msg, 'type') and msg.type == "human":
             text_to_process = msg.content
             break
+    
+    # 如果有系统上下文，将其添加到处理文本前
+    if system_context:
+        text_to_process = f"{system_context}\n用户消息：{text_to_process}"
     
     # 执行处理（这里演示使用工具）
     try:
@@ -195,15 +206,9 @@ async def llm_process_node(state: ExampleAgentState) -> Dict[str, Any]:
     llm_config = get_llm_config(INIT_AGENT_CONFIG["agent_id"])
     llm = ChatOpenAI(**llm_config)
     
-    # 构建 LLM 提示
-    prompt = "请处理以下复杂任务："
-    for msg in messages:
-        if hasattr(msg, 'content'):
-            prompt += f"\n{msg.content}"
-    
     try:
-        # 调用 LLM
-        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        # 直接传递所有消息给 LLM，这样系统消息（包括文件内容）也会被处理
+        response = await llm.ainvoke(messages)
         
         workflow_steps.append("LLM 处理复杂任务")
         
