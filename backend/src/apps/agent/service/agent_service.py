@@ -309,7 +309,7 @@ class AgentService:
             
             # 检查权限：只有所有者可以修改
             if current_username:
-                if existing.agent_owner != current_username and existing.create_by != current_username:
+                if existing.agent_owner != current_username:
                     raise BusinessException("只有智能体所有者可以修改", ResponseCode.FORBIDDEN)
             
             # 移除不可更新的字段
@@ -367,16 +367,16 @@ class AgentService:
             if not existing: 
                 raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
             
-            # 检查是否为内置智能体
-            if existing.is_builtin == 'yes': 
-                raise BusinessException("不能删除内置智能体", ResponseCode.FORBIDDEN)
+            # 内置智能体也可以删除，因为有自动注册功能
+            # if existing.is_builtin == 'yes': 
+            #     raise BusinessException("不能删除内置智能体", ResponseCode.FORBIDDEN)
             
             # 检查权限：只有所有者可以删除
             if current_username:
-                if existing.agent_owner != current_username and existing.create_by != current_username:
+                if existing.agent_owner != current_username:
                     raise BusinessException("只有智能体所有者可以删除", ResponseCode.FORBIDDEN)
             
-            logger.info(f"Deleting agent: {agent_id} by user: {current_username}")
+            logger.info(f"Deleting agent: {agent_id} by user: {current_username}, is_builtin: {existing.is_builtin}")
             result = await db.execute(delete(AgentConfig).where(AgentConfig.agent_id == agent_id))
             return result.rowcount > 0
     

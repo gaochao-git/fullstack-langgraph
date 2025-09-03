@@ -25,7 +25,8 @@ import {
   TeamOutlined,
   GlobalOutlined,
   UserOutlined,
-  SwapOutlined
+  SwapOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import AgentDetailModal from './components/AgentDetailModal';
 import AgentEditModal from './components/AgentEditModal';
@@ -366,10 +367,7 @@ const AgentManagement: React.FC = () => {
 
   // 删除智能体
   const handleDeleteAgent = (agent: LocalAgent) => {
-    if (agent.is_builtin === 'yes') {
-      message.warning('不能删除内置智能体');
-      return;
-    }
+    // 内置智能体也可以删除，会在服务重启时自动注册
     setAgentToDelete(agent);
     setDeleteModalVisible(true);
   };
@@ -651,15 +649,17 @@ const AgentManagement: React.FC = () => {
                   >
                     详情
                   </Button>,
-                  <Button 
-                    key="edit"
-                    type="text" 
-                    icon={<SettingOutlined />}
-                    onClick={() => handleEditAgent(agent)}
-                  >
-                    编辑
-                  </Button>,
-                  ...(agent.is_builtin !== 'yes' && user && agent.agent_owner === user.username ? [
+                  ...(user && agent.agent_owner === user.username ? [
+                    // 编辑按钮：只有所有者可以编辑
+                    <Button 
+                      key="edit"
+                      type="text" 
+                      icon={<SettingOutlined />}
+                      onClick={() => handleEditAgent(agent)}
+                    >
+                      编辑
+                    </Button>,
+                    // 转移按钮：只有所有者可以转移
                     <Button 
                       key="transfer"
                       type="text" 
@@ -672,6 +672,7 @@ const AgentManagement: React.FC = () => {
                     >
                       转移
                     </Button>,
+                    // 删除按钮：只有所有者可以删除
                     <Button 
                       key="delete"
                       type="text" 
@@ -834,7 +835,14 @@ const AgentManagement: React.FC = () => {
         cancelText="取消"
       >
         {agentToDelete && (
-          <div>确定要删除智能体 "{agentToDelete.displayName}" 吗？此操作不可撤销。</div>
+          <div>
+            <p>确定要删除智能体 "{agentToDelete.displayName}" 吗？此操作不可撤销。</p>
+            {agentToDelete.is_builtin === 'yes' && (
+              <p style={{ marginTop: 8, color: '#faad14' }}>
+                <InfoCircleOutlined /> 提示：这是内置智能体，删除后将在服务重启时自动重新注册。
+              </p>
+            )}
+          </div>
         )}
       </Modal>
 
