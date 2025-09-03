@@ -6,9 +6,9 @@
 INIT_AGENT_CONFIG = {
     "agent_id": "example_agent",
     "description": "示例助手",
-    "agent_type": "内置",
-    "capabilities": ["文本分析", "字数统计", "工作流演示", "条件路由"],
+    "agent_type": "其他",
+    "capabilities": ["文本分析", "字数统计"],
     "version": "1.0.0",
     "icon": "WorkflowOutlined",
-    "owner": "system"
+    "owner": "gaochao"
 }
