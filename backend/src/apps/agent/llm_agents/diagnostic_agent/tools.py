@@ -14,7 +14,7 @@ from src.shared.db.config import get_sync_db
 
 logger = get_logger(__name__)
 
-async def get_diagnostic_tools(agent_id: str = "diagnostic_agent"):
+async def get_diagnostic_tools(agent_id: str):
     """获取诊断工具列表"""
     try:
         # 从数据库获取工具配置

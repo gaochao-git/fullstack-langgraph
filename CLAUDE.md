@@ -31,7 +31,7 @@ cd mcp_gateway && ./manage.sh {init|start|stop|restart|status|cleanup}
 
 ```bash
 # 创建Python虚拟环境（初次配置）
-/Users/gaochao/miniconda3/envs/py312/bin/python -m venv venv
+/Users/gaochao/miniconda3/envs/py312/bin/python -m venv /Users/gaochao/gaochao-git/gaochao_repo/fullstack-langgraph/venv
 
 # 安装依赖
 make install              # 安装所有依赖（前后端）

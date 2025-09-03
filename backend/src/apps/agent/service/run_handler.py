@@ -17,8 +17,7 @@ from .document_service import document_service
 from src.shared.db.config import get_sync_db
 from ..utils import (prepare_graph_config, serialize_value)
 from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping)
-from ..llm_agents.diagnostic_agent.graph import create_diagnostic_agent
-from ..llm_agents.generic_agent.graph import create_generic_agent
+from ..llm_agents.agent_registry import AgentRegistry
 from .agent_config_service import AgentConfigService
 from .agent_service import agent_service
 from ..models import AgentDocumentSession
@@ -292,16 +291,9 @@ async def handle_chat_streaming(request_body, thread_id):
             request_body.config["configurable"] = {}
         request_body.config["configurable"]["agent_id"] = agent_id
         
-        if is_builtin:
-            # 内置智能体使用专用图
-            if agent_id == 'diagnostic_agent':
-                # 导入新的创建函数
-                graph = await create_diagnostic_agent(request_body.config, checkpointer)
-            else:
-                raise Exception(f"不支持的内置智能体: {agent_id}")
-        else:
-            # 自定义智能体使用generic_agent图
-            graph = await create_generic_agent(request_body.config, checkpointer)
+        # 使用注册中心动态创建 Agent
+        graph = await AgentRegistry.create_agent(agent_id, request_body.config, checkpointer)
+        logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
         
         # 在同一个async with内执行完整的流式处理
         async for item in stream_with_graph_postgres(graph, request_body, thread_id):
@@ -360,16 +352,8 @@ async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: 
         # 在配置中添加 agent_id
         config["configurable"]["agent_id"] = agent_id
         
-        # 动态创建图
-        if is_builtin:
-            if agent_id == 'diagnostic_agent':
-                from ..llm_agents.diagnostic_agent.graph import create_diagnostic_agent
-                graph = await create_diagnostic_agent(config, checkpointer)
-            else:
-                raise Exception(f"不支持的内置智能体: {agent_id}")
-        else:
-            from ..llm_agents.generic_agent.graph import create_generic_agent
-            graph = await create_generic_agent(config, checkpointer)
+        # 使用注册中心动态创建 Agent
+        graph = await AgentRegistry.create_agent(agent_id, config, checkpointer)
         
         # 保存文档关联（如果有）
         file_ids = None

@@ -1,34 +1,32 @@
 """
-诊断智能体配置类
+示例智能体配置类 - 纯配置容器
 """
-from ast import In
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from langchain_core.runnables import RunnableConfig
 from ..agent_utils import get_llm_config_for_agent
 
-# Agent 装饰器配置,首次注册使用，如果后续需要更新，需要手动更新数据库
+# Agent 装饰器配置，首次注册使用，如果后续需要更新，需要手动更新数据库
 INIT_AGENT_CONFIG = {
-    "agent_id": "diagnostic_agent",
-    "description": "智能运维诊断助手",
+    "agent_id": "example_agent",
+    "description": "示例助手 - 展示自定义工作流",
     "agent_type": "内置",
-    "capabilities": ["故障诊断","性能分析", "日志分析","系统监控","根因分析","解决方案推荐"],
+    "capabilities": ["文本分析", "字数统计", "工作流演示", "条件路由"],
     "version": "1.0.0",
-    "icon": "MedicineBoxOutlined",
-    "owner": "gaochao"
+    "icon": "WorkflowOutlined",
+    "owner": "system"
 }
 
 
 class Configuration(BaseModel):
-    """诊断智能体的配置容器"""
+    """示例智能体的配置容器"""
     
     # 运行时选择的模型（可选）
     selected_model: Optional[str] = None
     
-    # 诊断智能体特有配置
+    # 示例智能体特有配置（如果需要）
     enable_debug: bool = Field(default=False, description="是否启用调试模式")
-    max_analysis_depth: int = Field(default=5, description="最大分析深度")
-    enable_auto_fix: bool = Field(default=False, description="是否启用自动修复建议")
+    max_text_length: int = Field(default=10000, description="最大处理文本长度")
     
     @classmethod
     def from_runnable_config(cls, config: Optional[RunnableConfig] = None) -> "Configuration":
@@ -38,8 +36,7 @@ class Configuration(BaseModel):
         return cls(
             selected_model=configurable.get("selected_model"),
             enable_debug=configurable.get("enable_debug", False),
-            max_analysis_depth=configurable.get("max_analysis_depth", 5),
-            enable_auto_fix=configurable.get("enable_auto_fix", False)
+            max_text_length=configurable.get("max_text_length", 10000)
         )
     
     def get_llm_config(self) -> Dict[str, Any]:

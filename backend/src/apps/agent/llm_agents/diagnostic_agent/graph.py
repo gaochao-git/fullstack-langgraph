@@ -4,21 +4,21 @@ from langgraph.prebuilt import create_react_agent
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
-from .configuration import Configuration
+from .configuration import Configuration, INIT_AGENT_CONFIG
 from .prompts import get_system_prompt_async
 from .tools import get_diagnostic_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
+from src.apps.agent.llm_agents.decorators import agent
 from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 
+@agent(**INIT_AGENT_CONFIG)
 async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
     """创建诊断智能体"""
-    # 参数验证
-    configurable = config.get("configurable", {}) if config else {}
-    agent_id = configurable.get("agent_id")
-    if not agent_id: raise ValueError("配置中缺少必需的agent_id参数")
+    # 内置智能体使用文件中定义的常量
+    agent_id = INIT_AGENT_CONFIG["agent_id"]
     
     # 获取配置
     configuration = Configuration.from_runnable_config(config)

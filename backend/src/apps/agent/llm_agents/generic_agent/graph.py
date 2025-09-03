@@ -15,6 +15,8 @@ from src.shared.core.logging import get_logger
 logger = get_logger(__name__)
 
 
+# 注意：generic_agent 是模板，不要使用 @agent 装饰器注册
+# 前端会基于此模板创建自定义 Agent
 async def create_generic_agent(config: RunnableConfig, checkpointer=None):
     """创建通用智能体"""
     # 参数验证
