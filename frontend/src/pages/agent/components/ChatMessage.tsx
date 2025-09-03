@@ -29,34 +29,173 @@ const HIDDEN_TOOLS = [
 const { isFilePreviewable, isImageFile, isExcelFile } = fileUploadUtils;
 
 
-// 文档引用信息
-interface DocumentReference {
-  fileName: string;
-  content: string;
-  fileId?: string;
+// 文件附件组件 props
+interface FileAttachmentsProps {
+  message: Message;
+  isDark: boolean;
+  onPreview: (file: {fileId: string; fileName: string; fileType: string}) => void;
 }
 
-// 解析系统消息中的文档引用
-function parseDocumentReferences(content: string): { 
-  documents: DocumentReference[]; 
-  hasDocuments: boolean;
-} {
-  const docPattern = /【文档：([^】]+)】\n([^【]*)/g;
-  const documents: DocumentReference[] = [];
-  let match;
+// 全局文件信息缓存（避免重复请求）
+const globalFileInfoCache: {[key: string]: {fileName: string; fileType: string}} = {};
+
+// 文件附件组件
+const FileAttachments: React.FC<FileAttachmentsProps> = ({ message, isDark, onPreview }) => {
+  const { token } = theme.useToken();
+  const { message: antMessage } = App.useApp();
+  const [fileInfos, setFileInfos] = useState<{[key: string]: {fileName: string; fileType: string}}>({});
   
-  while ((match = docPattern.exec(content)) !== null) {
-    documents.push({
-      fileName: match[1],
-      content: match[2].trim()
-    });
-  }
+  // 从消息的 additional_kwargs 获取 file_ids 和 file_names
+  const fileIds = (message as any).additional_kwargs?.file_ids || [];
+  const fileNames = (message as any).additional_kwargs?.file_names || {};
   
-  return {
-    documents,
-    hasDocuments: documents.length > 0
+  // 获取文件扩展名
+  const getFileExtension = (fileName: string): string => {
+    const lastDot = fileName.lastIndexOf('.');
+    return lastDot > -1 ? fileName.substring(lastDot) : '';
   };
-}
+  
+  // 获取文件信息
+  useEffect(() => {
+    const fetchFileInfos = async () => {
+      const infos: {[key: string]: {fileName: string; fileType: string}} = {};
+      
+      for (const fileId of fileIds) {
+        // 优先使用消息中的文件名
+        if (fileNames[fileId]) {
+          infos[fileId] = {
+            fileName: fileNames[fileId],
+            fileType: getFileExtension(fileNames[fileId])
+          };
+          // 更新缓存
+          globalFileInfoCache[fileId] = infos[fileId];
+        } 
+        // 其次使用缓存
+        else if (globalFileInfoCache[fileId]) {
+          infos[fileId] = globalFileInfoCache[fileId];
+        }
+        // 最后才去请求API（仅对历史消息必要）
+        else {
+          try {
+            // 先尝试获取文档内容（为了兼容历史消息）
+            const content = await fileApi.getDocumentContent(fileId);
+            if (content && content.file_name) {
+              infos[fileId] = {
+                fileName: content.file_name,
+                fileType: getFileExtension(content.file_name)
+              };
+              // 更新缓存
+              globalFileInfoCache[fileId] = infos[fileId];
+            }
+          } catch (error) {
+            // 如果获取文档内容失败，尝试获取文件状态
+            try {
+              const status = await fileApi.getFileStatus(fileId);
+              if (status && status.file_name) {
+                infos[fileId] = {
+                  fileName: status.file_name,
+                  fileType: getFileExtension(status.file_name)
+                };
+                // 更新缓存
+                globalFileInfoCache[fileId] = infos[fileId];
+              }
+            } catch (statusError) {
+              // 如果都失败了，使用文件ID作为显示名称
+              console.warn(`获取文件信息失败: ${fileId}`, statusError);
+              infos[fileId] = {
+                fileName: fileId,
+                fileType: ''
+              };
+            }
+          }
+        }
+      }
+      
+      setFileInfos(infos);
+    };
+    
+    if (fileIds.length > 0) {
+      fetchFileInfos();
+    }
+  }, [fileIds, fileNames]);
+  
+  if (fileIds.length === 0) return null;
+  
+  return (
+    <div className="flex flex-wrap gap-2 justify-end">
+      {fileIds.map((fileId: string) => {
+        const fileInfo = fileInfos[fileId];
+        const fileName = fileInfo?.fileName || fileId;
+        const fileType = fileInfo?.fileType || '';
+        
+        return (
+          <div 
+            key={fileId}
+            className={cn(
+              "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
+              isDark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"
+            )}
+          >
+            {isImageFile(fileName) ? (
+              <Image className="h-4 w-4" />
+            ) : isExcelFile(fileName) ? (
+              <FileSpreadsheet className="h-4 w-4" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
+            <span>{fileName}</span>
+            <div className="flex items-center gap-1 ml-2">
+              {isFilePreviewable(fileName) && (
+                <button
+                  type="button"
+                  onClick={() => onPreview({
+                    fileId: fileId,
+                    fileName: fileName,
+                    fileType: fileType
+                  })}
+                  className={cn(
+                    "p-0.5 rounded hover:opacity-70 transition-opacity",
+                    isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                  )}
+                  title="预览"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const blob = await fileApi.downloadDocument(fileId);
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    antMessage.success('文件下载成功');
+                  } catch (error) {
+                    antMessage.error('文件下载失败');
+                    console.error('下载失败:', error);
+                  }
+                }}
+                className={cn(
+                  "p-0.5 rounded hover:opacity-70 transition-opacity",
+                  isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                )}
+                title="下载"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 // 工具调用组件 props
 interface ToolCallProps {
@@ -658,120 +797,6 @@ interface ChatMessagesProps {
   threadFileIds?: string[]; // 新增：会话关联的文件ID列表
 }
 
-// 系统消息组件 - 用于显示文档引用
-interface SystemMessageProps {
-  message: Message;
-  fileIds?: string[];
-}
-
-const SystemMessage: React.FC<SystemMessageProps> = ({ message, fileIds }) => {
-  const { isDark } = useTheme();
-  const { token } = theme.useToken();
-  const { message: antMessage } = App.useApp();
-  const [previewFile, setPreviewFile] = useState<{fileId: string; fileName: string; fileType: string} | null>(null);
-  
-  if (message.type !== 'system' || !message.content) return null;
-  
-  const content = typeof message.content === 'string' ? message.content : JSON.stringify(message.content);
-  const { documents, hasDocuments } = parseDocumentReferences(content);
-  
-  // 如果不是文档引用的系统消息，不显示
-  if (!hasDocuments || !content.includes('请参考以下文档内容回答用户问题')) {
-    return null;
-  }
-  
-  // 获取文件扩展名
-  const getFileExtension = (fileName: string): string => {
-    const lastDot = fileName.lastIndexOf('.');
-    return lastDot > -1 ? fileName.substring(lastDot) : '';
-  };
-  
-  
-  return (
-    <>
-      <div className="mb-4">
-        <div className="flex flex-wrap gap-2">
-          {documents.map((doc, index) => (
-            <div 
-              key={index}
-              className={cn(
-                "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
-                isDark ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"
-              )}
-            >
-              {isImageFile(doc.fileName) ? (
-                <Image className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
-              ) : isExcelFile(doc.fileName) ? (
-                <FileSpreadsheet className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
-              ) : (
-                <FileText className="h-4 w-4" style={{ color: token.colorTextSecondary }} />
-              )}
-              <span>{doc.fileName}</span>
-              {fileIds && fileIds[index] && (
-                <div className="flex items-center gap-1 ml-2">
-                  {isFilePreviewable(doc.fileName) && (
-                    <button
-                      type="button"
-                      onClick={() => setPreviewFile({
-                        fileId: fileIds[index],
-                        fileName: doc.fileName,
-                        fileType: getFileExtension(doc.fileName)
-                      })}
-                      className={cn(
-                        "p-0.5 rounded hover:opacity-70 transition-opacity",
-                        isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
-                      )}
-                      title="预览"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        const blob = await fileApi.downloadDocument(fileIds[index]);
-                        const url = window.URL.createObjectURL(blob);
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = doc.fileName;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(url);
-                        antMessage.success('文件下载成功');
-                      } catch (error) {
-                        antMessage.error('文件下载失败');
-                        console.error('下载失败:', error);
-                      }
-                    }}
-                    className={cn(
-                      "p-0.5 rounded hover:opacity-70 transition-opacity",
-                      isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
-                    )}
-                    title="下载"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      {previewFile && (
-        <FilePreviewModal
-          visible={!!previewFile}
-          fileId={previewFile.fileId}
-          fileName={previewFile.fileName}
-          fileType={previewFile.fileType}
-          onClose={() => setPreviewFile(null)}
-        />
-      )}
-    </>
-  );
-};
 
 // 诊断聊天视图组件
 function ChatMessages({
@@ -821,14 +846,19 @@ function ChatMessages({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // 获取成功上传的文件ID
-    const successFileIds = uploadedFiles
-      .filter(f => f.status === 'success' && f.fileId)
-      .map(f => f.fileId);
+    // 获取成功上传的文件信息
+    const successFiles = uploadedFiles.filter(f => f.status === 'success' && f.fileId);
+    const successFileIds = successFiles.map(f => f.fileId);
     
     if (inputValue.trim() || successFileIds.length > 0) {
-      // 存储当前文件IDs以便在系统消息中使用
-      if (successFileIds.length > 0) {
+      // 将文件信息存储到缓存中，供实时显示使用
+      if (successFiles.length > 0) {
+        successFiles.forEach(f => {
+          globalFileInfoCache[f.fileId] = {
+            fileName: f.file.name,
+            fileType: f.file.name.substring(f.file.name.lastIndexOf('.'))
+          };
+        });
         setCurrentFileIds(successFileIds);
       }
       
@@ -1253,111 +1283,18 @@ function ChatMessages({
             </div>
           )}
           {dialogRounds.map((round, idx) => {
-            // 查找这一轮之前的系统消息（文档引用）
-            const roundIndex = messages.findIndex(m => m.id === round.user.id);
-            let systemMessage = null;
-            let systemFileIds = null;
-            
-            if (roundIndex > 0) {
-              // 检查前一条消息是否是系统消息
-              const prevMessage = messages[roundIndex - 1];
-              if (prevMessage.type === 'system' && prevMessage.content) {
-                const content = typeof prevMessage.content === 'string' ? prevMessage.content : JSON.stringify(prevMessage.content);
-                if (content.includes('请参考以下文档内容回答用户问题')) {
-                  systemMessage = prevMessage;
-                  // 使用会话关联的文件IDs（优先使用线程文件ID，如果没有则使用当前文件ID）
-                  systemFileIds = threadFileIds.length > 0 ? threadFileIds : currentFileIds;
-                }
-              }
-            }
-            
             return (
               <div key={round.user.id || idx}>
                 {/* 用户消息 */}
                 <div className="flex flex-col items-end mb-6 pl-4">
                   <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
                     <div className="flex flex-col items-end gap-2">
-                      {/* 文档附件 - 显示在消息上方 */}
-                      {systemMessage && (() => {
-                        const content = typeof systemMessage.content === 'string' ? systemMessage.content : JSON.stringify(systemMessage.content);
-                        const { documents, hasDocuments } = parseDocumentReferences(content);
-                        if (hasDocuments) {
-                          return (
-                            <div className="flex flex-wrap gap-2 justify-end">
-                              {documents.map((doc, index) => (
-                                <div 
-                                  key={index}
-                                  className={cn(
-                                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
-                                    isDark ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-700"
-                                  )}
-                                >
-                                  {isImageFile(doc.fileName) ? (
-                                    <Image className="h-4 w-4" />
-                                  ) : isExcelFile(doc.fileName) ? (
-                                    <FileSpreadsheet className="h-4 w-4" />
-                                  ) : (
-                                    <FileText className="h-4 w-4" />
-                                  )}
-                                  <span>{doc.fileName}</span>
-                                  {(() => {
-                                    const ext = doc.fileName.substring(doc.fileName.lastIndexOf('.')).toLowerCase();
-                                    return systemFileIds && systemFileIds[index] && (
-                                      <div className="flex items-center gap-1 ml-2">
-                                        {isFilePreviewable(doc.fileName) && (
-                                          <button
-                                            type="button"
-                                            onClick={() => setPreviewFile({
-                                              fileId: systemFileIds[index],
-                                              fileName: doc.fileName,
-                                              fileType: ext
-                                            })}
-                                            className={cn(
-                                              "p-0.5 rounded hover:opacity-70 transition-opacity",
-                                              isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
-                                            )}
-                                            title="预览"
-                                          >
-                                            <Eye className="h-3.5 w-3.5" />
-                                          </button>
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={async () => {
-                                            try {
-                                              const blob = await fileApi.downloadDocument(systemFileIds[index]);
-                                              const url = window.URL.createObjectURL(blob);
-                                              const link = document.createElement('a');
-                                              link.href = url;
-                                              link.download = doc.fileName;
-                                              document.body.appendChild(link);
-                                              link.click();
-                                              document.body.removeChild(link);
-                                              window.URL.revokeObjectURL(url);
-                                              message.success('文件下载成功');
-                                            } catch (error) {
-                                              message.error('文件下载失败');
-                                              console.error('下载失败:', error);
-                                            }
-                                          }}
-                                          className={cn(
-                                            "p-0.5 rounded hover:opacity-70 transition-opacity",
-                                            isDark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
-                                          )}
-                                          title="下载"
-                                        >
-                                          <Download className="h-3.5 w-3.5" />
-                                        </button>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
+                      {/* 文档附件 - 从用户消息的 additional_kwargs 获取 */}
+                      <FileAttachments 
+                        message={round.user} 
+                        isDark={isDark}
+                        onPreview={setPreviewFile}
+                      />
                       
                       {/* 用户消息内容 */}
                       <div 

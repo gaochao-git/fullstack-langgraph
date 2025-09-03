@@ -427,12 +427,27 @@ class DocumentService:
                     else:
                         break
                 
-                context_parts.append(f"【文档：{file_name}】\n{content}")
+                # 为每个文档添加明确的开始和结束标记
+                doc_with_markers = f"""
+==================== 文档开始 ====================
+文档名称：{file_name}
+文档ID：{file_id}
+--------------------------------------------------
+{content}
+==================== 文档结束 ===================="""
+                context_parts.append(doc_with_markers.strip())
                 current_length += len(content)
         finally:
             db.close()
         
-        return "\n\n".join(context_parts)
+        # 如果有多个文档，在整体内容前添加文档摘要
+        if len(context_parts) > 1:
+            header = f"共有 {len(context_parts)} 个文档供参考。每个文档都用明确的分隔符标记了开始和结束。\n"
+            return header + "\n\n".join(context_parts)
+        elif len(context_parts) == 1:
+            return context_parts[0]
+        else:
+            return ""
 
 
     async def _process_text_file(self, file_path: Path, file_name: str) -> str:

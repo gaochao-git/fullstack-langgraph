@@ -212,8 +212,17 @@ export default function ChatEngine({
     (submittedInputValue: string, fileIds?: string[]) => {
       if (!submittedInputValue.trim() && !fileIds?.length) return;
 
-      // 只发送当前消息，不需要历史消息（后端有checkpoint）
-      const currentMessage: Message = {type: "human",content: submittedInputValue,} as Message;
+      // 构建消息对象，将 file_ids 作为消息的一部分
+      const currentMessage: Message = {
+        type: "human",
+        content: submittedInputValue,
+        ...(fileIds && fileIds.length > 0 && { file_ids: fileIds })
+      } as Message;
+      
+      // 调试日志
+      if (fileIds && fileIds.length > 0) {
+        console.log('📎 提交文件数量:', fileIds.length, '文件IDs:', fileIds);
+      }
       
       // 构建提交数据，只包含当前消息
       const submitData = {messages: [currentMessage]};
@@ -221,9 +230,7 @@ export default function ChatEngine({
       const submitConfig = {
         configurable: {
           ...(currentModel && { selected_model: currentModel }),
-          ...(fileIds && fileIds.length > 0 && { file_ids: fileIds }),
           ...(getCurrentUsername() && { user_name: getCurrentUsername() }),
-
         }
       };
       
