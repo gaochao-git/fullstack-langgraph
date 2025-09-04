@@ -202,7 +202,6 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 
 async def handle_chat_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""    
-    # 从 assistant_id 获取内部使用的 agent_id
     agent_id = request_body.assistant_id    
     # 按照官方模式：在async with内完成整个请求周期
     async with create_checkpointer() as checkpointer:
