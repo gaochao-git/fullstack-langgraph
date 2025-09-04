@@ -25,100 +25,35 @@ logger = get_logger(__name__)
 
 # 定义运行请求体
 class RunCreate(BaseModel):
-    assistant_id: Optional[str] = None  # 前端调用时传递，API调用时可从认证信息获取
-    input: Optional[Dict[str, Any]] = None
-    config: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
-    stream_mode: Optional[List[str]] = ["values"]
-    interrupt_before: Optional[List[str]] = None
-    interrupt_after: Optional[List[str]] = None
-    on_disconnect: Optional[str] = None
+    assistant_id: str  # 智能体ID（必需）
+    input: Dict[str, Any]  # 输入消息（必需）
+    config: Dict[str, Any]  # 配置信息（必需）
+    stream_mode: List[str] = ["values"]  # 流式模式（必需，有默认值）
     command: Optional[Dict[str, Any]] = None
-    checkpoint: Optional[Dict[str, Any]] = None
-    user_name: Optional[str] = None  # 用户名，用于线程关联
-    file_ids: Optional[List[str]] = None  # 关联的文件ID列表
     
 
-async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
+async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
     """验证和准备运行参数 - 公共方法，提取stream_run_standard和invoke_run_standard的重复逻辑"""
-    
-    # 获取认证信息
-    current_user = None
-    auth_type = None
-    if request and hasattr(request.state, 'current_user'):
-        current_user = request.state.current_user
-        auth_type = request.state.auth_type
-    
-    # 获取 agent_id，优先从请求体获取，其次从认证信息获取
-    agent_id = request_body.assistant_id
-    
-    # 如果是 agent_key 认证且没有提供 assistant_id，从认证信息中获取
-    if not agent_id and current_user and auth_type == 'agent_key':
-        agent_id = current_user.get('agent_id')
-        logger.info(f"从agent_key认证信息中获取到agent_id: {agent_id}")
-    
-    if not agent_id: raise BusinessException("必须提供智能体ID", ResponseCode.BAD_REQUEST)
-    
-    # 检查数据库中是否存在该智能体
-    db_gen = get_sync_db()
-    db = next(db_gen)
-    try:
-        agent_config = AgentConfigService.get_agent_config(agent_id, db)
-        if not agent_config: raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
-        
-        # 如果是agent_key认证，验证agent_id是否匹配（只在请求体中提供了agent_id时验证）
-        if auth_type == "agent_key" and request_body.assistant_id:
-            agent_id_from_auth = current_user.get('agent_id')
-            if agent_id_from_auth and agent_id_from_auth != agent_id:
-                logger.warning(f"Agent ID mismatch: {agent_id_from_auth} != {agent_id}")
-                raise BusinessException("智能体ID不匹配", ResponseCode.FORBIDDEN)
-            logger.info(f"智能体 {agent_id} agent_key认证验证成功")
-        elif auth_type == "jwt":
-            logger.info(f"智能体 {agent_id} JWT认证验证成功")
-        elif auth_type:
-            logger.info(f"智能体 {agent_id} 使用 {auth_type} 认证")
-        else:
-            logger.warning(f"智能体 {agent_id} 未通过认证中间件")
-            
-    finally:
-        db.close()
-    
     # 更新智能体使用统计
+    agent_id = request_body.assistant_id
     try:
         async with get_async_db_context() as async_db:
             await agent_service.increment_run_count(async_db, agent_id)
             logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
     except Exception as e:
-        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
         # 统计更新失败不影响主流程
-    
-    # 获取用户名，优先从认证信息中获取
-    user_name = None
-    
-    # 1. 首先尝试从认证信息中获取（agent_key认证会自动带用户名）
-    if current_user:
-        user_name = current_user.get('username')
-        logger.info(f"从认证信息中获取到用户名: {user_name}")
-    
-    # 2. 如果认证信息中没有，再从请求参数中获取
-    if not user_name and request_body.config and request_body.config.get("configurable"):
-        user_name = request_body.config["configurable"].get("user_name")
-        logger.info(f"从请求参数中获取到用户名: {user_name}")
-    
-    # 用户名是必须的
-    if not user_name:
-        raise BusinessException("无法获取用户名", ResponseCode.BAD_REQUEST)
-    
-    if user_name:
-        logger.info(f"🔍 开始处理用户线程关联: {user_name} -> {thread_id}")
-        try:
-            await ensure_user_thread_mapping(user_name, thread_id, request_body)
-        except Exception as e:
-            logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
-            # 不影响主流程，继续执行
-    else:
-        logger.warning(f"⚠️ 请求中没有提供用户名，跳过用户线程关联创建")
-    
+        logger.error(f"更新智能体统计失败: {e}", exc_info=True)
+    # 用户线程映射
+    current_user = None
+    if request and hasattr(request.state, 'current_user'): current_user = request.state.current_user
+    if not current_user: raise BusinessException("无法获取用户信息", ResponseCode.BAD_REQUEST)
+    # 获取用户名
+    user_name = current_user.get('username')
+    try:
+        await ensure_user_thread_mapping(user_name, thread_id, request_body)
+    except Exception as e:
+         # 不影响主流程，继续执行 
+        logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
     return agent_id, agent_config, user_name
 
 
@@ -290,7 +225,7 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     
     # 使用公共方法验证和准备运行参数
-    await validate_and_prepare_run(thread_id, request_body, request)
+    await prepare_run(thread_id, request_body, request)
 
     async def generate():
         try:
@@ -317,21 +252,15 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
 
 
 async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=None):
-    """Standard LangGraph non-streaming endpoint - 非流式调用"""
-    
-    # 使用公共方法验证和准备运行参数
-    agent_id, agent_config, user_name = await validate_and_prepare_run(thread_id, request_body, request)
-    
-    # PostgreSQL 模式下的非流式处理
-    is_builtin = agent_config.get('is_builtin') == 'yes'
-    return await handle_chat_invoke(thread_id, request_body, agent_id, is_builtin)
+    """Standard LangGraph non-streaming endpoint - 非流式调用"""    
+    await prepare_run(thread_id, request_body, request)    
+    agent_id = request_body.assistant_id
+    return await handle_chat_invoke(thread_id, request_body, agent_id)
 
 
-async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: str, is_builtin: bool):
+async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: str):
     """PostgreSQL 模式下的非流式处理"""
     async with create_checkpointer() as checkpointer:
-        # 不再调用 setup()，表结构已在应用启动时创建
-        
         # 准备配置和输入
         config, graph_input, _, checkpoint = prepare_graph_config(request_body, thread_id)
         
