@@ -134,7 +134,7 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
         return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n", False
 
-async def stream_with_graph_postgres(graph, request_body, thread_id):
+async def stream_with_graph(graph, request_body, thread_id):
     """PostgreSQL模式专用的图流媒体处理函数"""
     config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
     
@@ -195,31 +195,27 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
     else:
         logger.info("Skipping end event due to interrupt - waiting for user approval")
 
-async def handle_chat_streaming(request_body, thread_id):
-    """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""    
-    agent_id = request_body.assistant_id    
-    # 按照官方模式：在async with内完成整个请求周期
-    async with create_checkpointer() as checkpointer:
-        # 将agent_id添加到config中
-        if not request_body.config: request_body.config = {}
-        if not request_body.config.get("configurable"): request_body.config["configurable"] = {}
-        request_body.config["configurable"]["agent_id"] = agent_id
-        
-        # 使用注册中心动态创建 Agent
-        graph = await AgentRegistry.create_agent(agent_id, request_body.config, checkpointer)
-        logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
-        
-        # 在同一个async with内执行完整的流式处理
-        async for item in stream_with_graph_postgres(graph, request_body, thread_id):
-            yield item
-
 async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     await prepare_run(thread_id, request_body, request)
+    
     async def generate():
         try:
-            async for item in handle_chat_streaming(request_body, thread_id):
-                yield item
+            agent_id = request_body.assistant_id
+            # 按照官方模式：在async with内完成整个请求周期
+            async with create_checkpointer() as checkpointer:
+                # 将agent_id添加到config中
+                if not request_body.config: request_body.config = {}
+                if not request_body.config.get("configurable"): request_body.config["configurable"] = {}
+                request_body.config["configurable"]["agent_id"] = agent_id
+                
+                # 使用注册中心动态创建 Agent
+                graph = await AgentRegistry.create_agent(agent_id, request_body.config, checkpointer)
+                logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
+                
+                # 在同一个async with内执行完整的流式处理
+                async for item in stream_with_graph(graph, request_body, thread_id):
+                    yield item
         except Exception as e:
             logger.error(f"流式处理异常: {e}", exc_info=True)
             yield f"event: error\n"
@@ -241,11 +237,8 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     """Standard LangGraph non-streaming endpoint - 非流式调用"""    
     await prepare_run(thread_id, request_body, request)    
     agent_id = request_body.assistant_id
-    return await handle_chat_invoke(thread_id, request_body, agent_id)
-
-
-async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: str):
-    """PostgreSQL 模式下的非流式处理"""
+    
+    # PostgreSQL 模式下的非流式处理
     async with create_checkpointer() as checkpointer:
         # 准备配置和输入
         config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
