@@ -16,18 +16,22 @@ logger = get_logger(__name__)
 
 # 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
 
+# 使用Pydantic定义线程创建请求体
 class ThreadCreate(BaseModel):
-    assistant_id: Optional[str] = None  # 前端调用时传递，API调用时可从认证信息获取
-    user_name: Optional[str] = None  # 可从认证信息获取
-    metadata: Optional[Dict[str, Any]] = None  # 保留用于其他扩展信息
+    assistant_id: Optional[str] = None 
+    user_name: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
+# 定义线程响应体
 class ThreadResponse(BaseModel):
     thread_id: str
     created_at: str
     metadata: Dict[str, Any]
 
 async def create_thread(thread_create: ThreadCreate):
-    """Create a new thread"""
+    """
+    创建线程，后续基于线程来管理线程状态和消息
+    """
     thread_id = str(uuid.uuid4())
     
     # 构建metadata，包含assistant_id和user_name
@@ -44,9 +48,6 @@ async def create_thread(thread_create: ThreadCreate):
         "metadata": metadata,
         "state": {}
     }
-    # 持久化到PostgreSQL
-    # 这里需要一个PostgreSQL客户端来执行插入操作
-    # 例如：await postgres_client.insert_thread(thread_id, thread_data)
     logger.info(f"Created thread: {thread_id} for agent: {thread_create.assistant_id}, user: {thread_create.user_name}")
     return ThreadResponse(**thread_data)
 

@@ -23,6 +23,7 @@ from .agent_service import agent_service
 from ..models import AgentDocumentSession
 logger = get_logger(__name__)
 
+# 定义运行请求体
 class RunCreate(BaseModel):
     assistant_id: Optional[str] = None  # 前端调用时传递，API调用时可从认证信息获取
     input: Optional[Dict[str, Any]] = None
@@ -56,17 +57,14 @@ async def validate_and_prepare_run(thread_id: str, request_body: RunCreate, requ
         agent_id = current_user.get('agent_id')
         logger.info(f"从agent_key认证信息中获取到agent_id: {agent_id}")
     
-    if not agent_id:
-        raise BusinessException("必须提供智能体ID", ResponseCode.BAD_REQUEST)
+    if not agent_id: raise BusinessException("必须提供智能体ID", ResponseCode.BAD_REQUEST)
     
     # 检查数据库中是否存在该智能体
     db_gen = get_sync_db()
     db = next(db_gen)
     try:
         agent_config = AgentConfigService.get_agent_config(agent_id, db)
-        
-        if not agent_config:
-            raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
+        if not agent_config: raise BusinessException(f"智能体不存在: {agent_id}", ResponseCode.NOT_FOUND)
         
         # 如果是agent_key认证，验证agent_id是否匹配（只在请求体中提供了agent_id时验证）
         if auth_type == "agent_key" and request_body.assistant_id:
@@ -272,29 +270,12 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
 async def handle_chat_streaming(request_body, thread_id):
     """处理PostgreSQL模式的流式响应 - 完全基于数据库配置"""    
     # 从 assistant_id 获取内部使用的 agent_id
-    agent_id = request_body.assistant_id
-    # 从数据库获取智能体配置
-    db_gen = get_sync_db()
-    db = next(db_gen)
-    try:
-        agent_config = AgentConfigService.get_agent_config(agent_id, db)
-    finally:
-        db.close()
-    
-    if not agent_config:
-        raise Exception(f"数据库中未找到智能体配置: {agent_id}")
-    
-    # 根据数据库中的is_builtin字段判断使用哪个图
-    is_builtin = agent_config.get('is_builtin') == 'yes'
+    agent_id = request_body.assistant_id    
     # 按照官方模式：在async with内完成整个请求周期
     async with create_checkpointer() as checkpointer:
-        # 不再调用 setup()，表结构已在应用启动时创建
-        
         # 将agent_id添加到config中
-        if not request_body.config:
-            request_body.config = {}
-        if not request_body.config.get("configurable"):
-            request_body.config["configurable"] = {}
+        if not request_body.config: request_body.config = {}
+        if not request_body.config.get("configurable"): request_body.config["configurable"] = {}
         request_body.config["configurable"]["agent_id"] = agent_id
         
         # 使用注册中心动态创建 Agent
@@ -309,11 +290,10 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
     
     # 使用公共方法验证和准备运行参数
-    agent_id, agent_config, user_name = await validate_and_prepare_run(thread_id, request_body, request)
+    await validate_and_prepare_run(thread_id, request_body, request)
 
     async def generate():
         try:
-            # 只保留PostgreSQL处理逻辑
             async for item in handle_chat_streaming(request_body, thread_id):
                 yield item
         except Exception as e:
