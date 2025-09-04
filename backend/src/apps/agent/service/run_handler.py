@@ -75,6 +75,67 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
         logger.info(f"创建用户线程映射: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
         await create_user_thread_mapping(user_name, thread_id, thread_title, agent_id)
 
+def prepare_config(request_body, thread_id):
+    """准备配置 - 公共方法"""
+    config = request_body.config or {}
+    
+    # 确保 thread_id 在 configurable 中
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["thread_id"] = thread_id
+    
+    # 设置默认递归限制
+    if "recursion_limit" not in config:
+        config["recursion_limit"] = 100
+        
+    return config
+
+
+async def prepare_graph_input(request_body, config, thread_id):
+    """准备图输入 - 处理resume命令或普通输入，并处理文档上下文"""
+    # 处理 resume 命令或普通输入
+    if request_body.command and "resume" in request_body.command:
+        graph_input = Command(resume=request_body.command["resume"])
+        logger.info(f"Resuming execution with command: {request_body.command}")
+    elif request_body.input is not None:
+        graph_input = request_body.input
+    else:
+        raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
+    
+    # 处理文档上下文
+    file_ids = None
+    
+    # 从消息中获取 file_ids
+    if graph_input and "messages" in graph_input:
+        messages = graph_input["messages"]
+        if messages and len(messages) > 0:
+            last_msg = messages[-1]
+            if isinstance(last_msg, dict):
+                file_ids = last_msg.get("file_ids")
+    
+    # 如果有关联的文档，将文档内容添加到消息上下文中
+    if file_ids:
+        logger.info(f"检测到关联文档: {file_ids}, 文档数量: {len(file_ids) if isinstance(file_ids, list) else 'N/A'}")
+        
+        # 获取文档上下文
+        doc_context = document_service.get_document_context(file_ids)
+        if doc_context:
+            # 在用户消息前插入文档上下文作为系统消息
+            doc_message = {
+                "type": "system",
+                "content": f"请参考以下文档内容回答用户问题：\n\n{doc_context}"
+            }
+            graph_input["messages"].insert(0, doc_message)
+            logger.info(f"已添加文档上下文，长度: {len(doc_context)} 字符")
+            
+            # 保存会话和文档的关联
+            agent_id = config.get("configurable", {}).get("agent_id", "diagnostic_agent")
+            user_name = config.get("configurable", {}).get("user_name", "system")
+            await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
+    
+    return graph_input
+
+
 async def process_stream_chunk(chunk, event_id, thread_id):
     """处理单个流式数据块"""    
     # Handle tuple format from LangGraph streaming
@@ -135,200 +196,60 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
         return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n", False
 
-async def stream_with_graph(graph, request_body, thread_id):
-    """流式处理图"""
-    # 简化配置构造 - 直接使用请求中的配置
-    config = request_body.config or {}
-    
-    # 确保 thread_id 在 configurable 中
-    if "configurable" not in config:
-        config["configurable"] = {}
-    config["configurable"]["thread_id"] = thread_id
-    
-    # 设置默认递归限制
-    if "recursion_limit" not in config:
-        config["recursion_limit"] = 100
-    
-    # 处理 resume 命令或普通输入
-    if request_body.command and "resume" in request_body.command:
-        graph_input = Command(resume=request_body.command["resume"])
-        logger.info(f"Resuming execution with command: {request_body.command}")
-    elif request_body.input is not None:
-        graph_input = request_body.input
-    else:
-        raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
-    
-    # 直接使用流式模式（已经有默认值）
-    stream_modes = request_body.stream_mode
-    
-    # 从消息中获取 file_ids
-    file_ids = None
-    
-    if graph_input and "messages" in graph_input:
-        messages = graph_input["messages"]
-        if messages and len(messages) > 0:
-            last_msg = messages[-1]
-            if isinstance(last_msg, dict):
-                # 从消息本身获取 file_ids
-                file_ids = last_msg.get("file_ids")
-    
-    # 如果有关联的文档，将文档内容添加到消息上下文中
-    if file_ids:
-        logger.info(f"检测到关联文档: {file_ids}, 文档数量: {len(file_ids) if isinstance(file_ids, list) else 'N/A'}")
-        
-        
-        # 获取文档上下文
-        doc_context = document_service.get_document_context(file_ids)
-        if doc_context:
-            # 在用户消息前插入文档上下文作为系统消息
-            doc_message = {
-                "type": "system",
-                "content": f"请参考以下文档内容回答用户问题：\n\n{doc_context}"
-            }
-            graph_input["messages"].insert(0, doc_message)
-            logger.info(f"已添加文档上下文，长度: {len(doc_context)} 字符")
-            
-            # 保存会话和文档的关联
-            agent_id = config.get("configurable", {}).get("agent_id", "diagnostic_agent")
-            user_name = config.get("configurable", {}).get("user_name", "system")
-            await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
-    
-    
-    logger.info(f"Starting stream with modes: {stream_modes}")
-    
-    event_id = 0
-    has_interrupt = False
-    
-    async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
-        try:
-            event_id += 1
-            sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
-            yield sse_data
-            if chunk_has_interrupt:
-                has_interrupt = True
-        except Exception as e:
-            logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
-            event_id += 1
-            yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
-    
-    # End event - only send if no interrupt occurred
-    if not has_interrupt:
-        event_id += 1
-        yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-    else:
-        logger.info("Skipping end event due to interrupt - waiting for user approval")
 
-async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
-    """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
+async def execute_graph_request(request_body: RunCreate, thread_id: str, request=None, is_streaming: bool = True):
+    """执行图请求的通用函数 - 支持流式和非流式"""
+    # 准备运行（更新统计、确保线程映射）
     await prepare_run(thread_id, request_body, request)
     
-    async def generate():
-        try:
-            agent_id = request_body.assistant_id
-            # 按照官方模式：在async with内完成整个请求周期
-            async with create_checkpointer() as checkpointer:
-                # 将agent_id添加到config中
-                if not request_body.config: request_body.config = {}
-                if not request_body.config.get("configurable"): request_body.config["configurable"] = {}
-                request_body.config["configurable"]["agent_id"] = agent_id
-                
-                # 使用注册中心动态创建 Agent
-                graph = await AgentRegistry.create_agent(agent_id, request_body.config, checkpointer)
-                logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
-                
-                # 在同一个async with内执行完整的流式处理
-                async for item in stream_with_graph(graph, request_body, thread_id):
-                    yield item
-        except Exception as e:
-            logger.error(f"流式处理异常: {e}", exc_info=True)
-            yield f"event: error\n"
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+    # 准备配置
+    config = prepare_config(request_body, thread_id)
     
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "text/event-stream"
-        }
-    )
-
-
-async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=None):
-    """Standard LangGraph non-streaming endpoint - 非流式调用"""    
-    await prepare_run(thread_id, request_body, request)    
+    # 添加 agent_id 到配置
     agent_id = request_body.assistant_id
+    config["configurable"]["agent_id"] = agent_id
     
-    # PostgreSQL 模式下的非流式处理
+    # 准备输入（包括处理文档上下文）
+    graph_input = await prepare_graph_input(request_body, config, thread_id)
+    
+    # 获取流式模式
+    stream_modes = request_body.stream_mode
+    
+    # 在 async with 内执行所有操作
     async with create_checkpointer() as checkpointer:
-        # 简化配置构造 - 直接使用请求中的配置
-        config = request_body.config or {}
-        
-        # 确保 thread_id 在 configurable 中
-        if "configurable" not in config:
-            config["configurable"] = {}
-        config["configurable"]["thread_id"] = thread_id
-        
-        # 设置默认递归限制
-        if "recursion_limit" not in config:
-            config["recursion_limit"] = 100
-        
-        # 处理 resume 命令或普通输入
-        if request_body.command and "resume" in request_body.command:
-            from langgraph.types import Command
-            graph_input = Command(resume=request_body.command["resume"])
-            logger.info(f"Resuming execution with command: {request_body.command}")
-        elif request_body.input is not None:
-            graph_input = request_body.input
-        else:
-            raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
-        
-        # 直接使用流式模式（已经有默认值）
-        stream_modes = request_body.stream_mode
-        
-        # 在配置中添加 agent_id
-        config["configurable"]["agent_id"] = agent_id
-        
-        # 使用注册中心动态创建 Agent
+        # 创建图
         graph = await AgentRegistry.create_agent(agent_id, config, checkpointer)
+        logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
         
-        # 从消息中获取 file_ids（如果有）
-        file_ids = None
-        if graph_input and "messages" in graph_input:
-            messages = graph_input["messages"]
-            if messages and len(messages) > 0:
-                last_msg = messages[-1]
-                if isinstance(last_msg, dict):
-                    # 从消息本身获取 file_ids
-                    file_ids = last_msg.get("file_ids")
-        
-        # 如果有文档，添加文档上下文
-        if file_ids:
-            logger.info(f"非流式调用检测到关联文档: {file_ids}, 文档数量: {len(file_ids) if isinstance(file_ids, list) else 'N/A'}")
-            # 获取文档上下文
-            doc_context = document_service.get_document_context(file_ids)
-            if doc_context:
-                # 在用户消息前插入文档上下文作为系统消息
-                doc_message = {
-                    "type": "system",
-                    "content": f"请参考以下文档内容回答用户问题：\n\n{doc_context}"
-                }
-                graph_input["messages"].insert(0, doc_message)
-                logger.info(f"已添加文档上下文，长度: {len(doc_context)} 字符")
-        
-        # user_name 从 config.configurable 获取
-        user_name = None
-        if request_body.config and request_body.config.get("configurable"):
-            user_name = request_body.config["configurable"].get("user_name")
-        
-        if file_ids and user_name:
-            await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
-        
-        # 非流式调用
-        try:
+        if is_streaming:
+            # 流式处理
+            logger.info(f"Starting stream with modes: {stream_modes}")
+            
+            event_id = 0
+            has_interrupt = False
+            
+            async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
+                try:
+                    event_id += 1
+                    sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
+                    yield sse_data
+                    if chunk_has_interrupt:
+                        has_interrupt = True
+                except Exception as e:
+                    logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
+                    event_id += 1
+                    yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
+            
+            # End event - only send if no interrupt occurred
+            if not has_interrupt:
+                event_id += 1
+                yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
+            else:
+                logger.info("Skipping end event due to interrupt - waiting for user approval")
+        else:
+            # 非流式处理
             result = await graph.ainvoke(graph_input, config=config, stream_mode=stream_modes)
+            
             # 处理结果
             final_response = {
                 "thread_id": thread_id,
@@ -355,20 +276,43 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
                         }
                         break
             
-            # 检查是否有中断
-            state = await checkpointer.aget(config)
-            if state:
-                # state 可能是一个字典或对象
-                next_nodes = state.get("next") if isinstance(state, dict) else getattr(state, "next", None)
-                if next_nodes:
-                    final_response["status"] = "interrupted"
-                    final_response["interrupted_at"] = list(next_nodes)
-            
-            return success_response(final_response)
-            
+            yield final_response
+
+
+async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
+    """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
+    async def generate():
+        try:
+            # 使用通用执行函数，流式模式
+            async for item in execute_graph_request(request_body, thread_id, request, is_streaming=True):
+                yield item
         except Exception as e:
-            logger.error(f"非流式调用失败: {e}", exc_info=True)
-            raise BusinessException(f"处理请求时出错: {str(e)}", ResponseCode.INTERNAL_ERROR)
+            logger.error(f"流式处理异常: {e}", exc_info=True)
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "text/event-stream"
+        }
+    )
+
+
+async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=None):
+    """Standard LangGraph non-streaming endpoint - 非流式调用"""    
+    try:
+        # 使用通用执行函数，非流式模式
+        async for final_response in execute_graph_request(request_body, thread_id, request, is_streaming=False):
+            # 非流式模式只会yield一次结果
+            return success_response(final_response)
+    except Exception as e:
+        logger.error(f"非流式调用失败: {e}", exc_info=True)
+        raise BusinessException(f"处理请求时出错: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
 async def save_thread_file_associations(thread_id: str, file_ids: List[str], agent_id: str, user_name: str) -> None:
