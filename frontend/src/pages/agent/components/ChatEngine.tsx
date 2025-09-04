@@ -65,6 +65,9 @@ export default function ChatEngine({
   
   // 用于跟踪当前线程ID的状态 - 先不初始化，稍后在定义getThreadIdFromUrl后再设置
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  
+  // 新增：正在发送的用户消息
+  const [sendingUserMessage, setSendingUserMessage] = useState<{content: string; fileIds?: string[]} | null>(null);
 
   // 获取agentId，用于LangGraph SDK的assistantId字段
   const getAgentId = (): string => {
@@ -149,6 +152,18 @@ export default function ChatEngine({
       setError(error.message);
     },
   });
+  
+  // 监听消息变化，当用户消息出现在流中时，清除发送中状态
+  useEffect(() => {
+    if (sendingUserMessage && thread.messages.length > 0) {
+      // 查找是否有匹配的用户消息
+      const lastUserMessage = [...thread.messages].reverse().find(msg => msg.type === 'human');
+      if (lastUserMessage && lastUserMessage.content === sendingUserMessage.content) {
+        // 用户消息已经在流中了，清除发送中状态
+        setSendingUserMessage(null);
+      }
+    }
+  }, [thread.messages, sendingUserMessage]);
 
   // 使用传入的agent数据获取配置信息，避免重复API请求
   useEffect(() => {
@@ -211,6 +226,12 @@ export default function ChatEngine({
   const handleSubmit = useCallback(
     (submittedInputValue: string, fileIds?: string[]) => {
       if (!submittedInputValue.trim() && !fileIds?.length) return;
+
+      // 立即设置发送中的消息，用于显示loading
+      setSendingUserMessage({
+        content: submittedInputValue,
+        fileIds: fileIds
+      });
 
       // 构建消息对象，将 file_ids 作为消息的一部分
       const currentMessage: Message = {
@@ -379,6 +400,7 @@ export default function ChatEngine({
             WelcomeComponent={WelcomeComponent}
             agent={agent}
             threadFileIds={threadFileIds}
+            sendingUserMessage={sendingUserMessage}
           />
         )}
       

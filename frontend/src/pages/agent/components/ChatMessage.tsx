@@ -795,6 +795,7 @@ interface ChatMessagesProps {
   WelcomeComponent?: React.ComponentType<WelcomeComponentProps>; // 新增：自定义欢迎组件
   agent?: Agent | null; // 新增：智能体信息
   threadFileIds?: string[]; // 新增：会话关联的文件ID列表
+  sendingUserMessage?: {content: string; fileIds?: string[]} | null; // 新增：正在发送的用户消息
 }
 
 
@@ -814,6 +815,7 @@ function ChatMessages({
   WelcomeComponent,
   agent,
   threadFileIds = [],
+  sendingUserMessage,
 }: ChatMessagesProps) {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
@@ -1268,7 +1270,7 @@ function ChatMessages({
         onScroll={handleScroll}
       >
         <div className="flex flex-col overflow-x-hidden">
-          {messages.length === 0 && (
+          {messages.length === 0 && !sendingUserMessage && (
             <div className="w-full">
               {WelcomeComponent ? (
                 <WelcomeComponent 
@@ -1507,6 +1509,29 @@ function ChatMessages({
             );
           })}
           
+          {/* 正在发送的用户消息 loading 状态 */}
+          {sendingUserMessage && (
+            <div className="flex flex-col items-end mb-6 pl-4">
+              <div className="flex items-center justify-end max-w-[90%] w-full" style={{ gap: '5px' }}>
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: token.colorPrimary }} />
+                  <span 
+                    className="text-sm" 
+                    style={{ color: token.colorTextDescription }}
+                  >
+                    发送中...
+                  </span>
+                </div>
+                <div 
+                  className="rounded-full p-2 flex-shrink-0 flex items-center justify-center"
+                  style={{ backgroundColor: token.colorFillSecondary }}
+                >
+                  <User className="h-5 w-5" style={{ color: token.colorPrimary }} />
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* 加载状态 - 当正在加载且最后一轮没有助手气泡时显示 */}
           {isLoading && (() => {
             const lastRound = dialogRounds[dialogRounds.length - 1];
@@ -1534,7 +1559,7 @@ function ChatMessages({
             });
             
             return !hasRenderableContent;
-          })() && (
+          })() && !sendingUserMessage && (
             <div className="flex flex-col items-start mb-6 mr-2">
               <div className="flex items-start gap-2 w-full">
                 <div 
