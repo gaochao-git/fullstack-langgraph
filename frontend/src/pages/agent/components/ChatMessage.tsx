@@ -117,7 +117,7 @@ const FileAttachments: React.FC<FileAttachmentsProps> = ({ message, isDark, onPr
     if (fileIds.length > 0) {
       fetchFileInfos();
     }
-  }, [fileIds, fileNames]);
+  }, [fileIds.join(',')]); // 使用 fileIds 的字符串形式作为依赖，避免数组引用变化
   
   if (fileIds.length === 0) return null;
   
