@@ -47,14 +47,12 @@ async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> 
     current_user = None
     if request and hasattr(request.state, 'current_user'): current_user = request.state.current_user
     if not current_user: raise BusinessException("无法获取用户信息", ResponseCode.BAD_REQUEST)
-    # 获取用户名
     user_name = current_user.get('username')
     try:
         await ensure_user_thread_mapping(user_name, thread_id, request_body)
     except Exception as e:
          # 不影响主流程，继续执行 
         logger.error(f"处理用户线程关联时出错: {e}", exc_info=True)
-    return agent_id, agent_config, user_name
 
 
 async def ensure_user_thread_mapping(user_name, thread_id, request_body):
@@ -143,7 +141,7 @@ async def process_stream_chunk(chunk, event_id, thread_id):
 
 async def stream_with_graph_postgres(graph, request_body, thread_id):
     """PostgreSQL模式专用的图流媒体处理函数"""
-    config, graph_input, stream_modes, checkpoint = prepare_graph_config(request_body, thread_id)
+    config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
     
     # 从消息中获取 file_ids
     file_ids = None
@@ -178,7 +176,7 @@ async def stream_with_graph_postgres(graph, request_body, thread_id):
             await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
     
     
-    logger.info(f"Starting stream with modes: {stream_modes}, checkpoint: {checkpoint}")
+    logger.info(f"Starting stream with modes: {stream_modes}")
     
     event_id = 0
     has_interrupt = False
@@ -262,7 +260,7 @@ async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: 
     """PostgreSQL 模式下的非流式处理"""
     async with create_checkpointer() as checkpointer:
         # 准备配置和输入
-        config, graph_input, _, checkpoint = prepare_graph_config(request_body, thread_id)
+        config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
         
         # 在配置中添加 agent_id
         config["configurable"]["agent_id"] = agent_id
@@ -304,8 +302,7 @@ async def handle_chat_invoke(thread_id: str, request_body: RunCreate, agent_id: 
         
         # 非流式调用
         try:
-            result = await graph.ainvoke(graph_input, config=config)
-            
+            result = await graph.ainvoke(graph_input, config=config, stream_mode=stream_modes)
             # 处理结果
             final_response = {
                 "thread_id": thread_id,

@@ -38,17 +38,11 @@ def prepare_graph_config(request_body, thread_id):
         graph_input = request_body.input
     else:
         raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
-    
-    # Use checkpoint from request if provided  
-    checkpoint = request_body.checkpoint
-    if checkpoint and "thread_id" in checkpoint:
-        del checkpoint["thread_id"]
-    
     # Use stream modes from request, or default if not provided
-    default_modes = ["values", "messages", "updates", "custom", "checkpoints", "tasks"]
+    default_modes = ["values", "messages", "updates", "custom", "tasks"]
     stream_modes = request_body.stream_mode if request_body.stream_mode else default_modes
     
-    return config, graph_input, stream_modes, checkpoint
+    return config, graph_input, stream_modes
 
 def serialize_value(val):
     """通用序列化函数"""
