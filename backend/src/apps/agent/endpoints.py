@@ -439,26 +439,20 @@ async def get_thread_history_endpoint(
 @router.post("/chat/threads/{thread_id}/runs/stream")
 async def stream_run_standard_endpoint(
     thread_id: str, 
-    request_body: Optional[RunCreate] = None, 
+    request_body: RunCreate = None, 
     request: Request = None
 ):
     """智能体流式对话处理"""
-    # 如果没有传递 body，创建一个空的 RunCreate 对象
-    if request_body is None:
-        request_body = RunCreate()
     return await stream_run_standard(thread_id, request_body, request)
 
 
 @router.post("/chat/threads/{thread_id}/runs/invoke")
 async def invoke_run_standard_endpoint(
     thread_id: str, 
-    request_body: Optional[RunCreate] = None, 
+    request_body: RunCreate = None, 
     request: Request = None
 ):
     """智能体非流式对话处理"""
-    # 如果没有传递 body，创建一个空的 RunCreate 对象
-    if request_body is None:
-        request_body = RunCreate()
     return await invoke_run_standard(thread_id, request_body, request)
 
 
