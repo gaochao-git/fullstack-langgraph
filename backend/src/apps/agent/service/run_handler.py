@@ -60,9 +60,7 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     确保用户和线程的归属已写入user_threads表，如不存在则自动写入。
     自动提取thread_title（取消息内容前20字）。
     """
-    logger.info(f"[ensure_user_thread_mapping] called with user_name={user_name}, thread_id={thread_id}")
     exists = await check_user_thread_exists(user_name, thread_id)
-    logger.info(f"[ensure_user_thread_mapping] exists={exists}")
     if not exists:
         thread_title = None
         if hasattr(request_body, 'input') and request_body.input and "messages" in request_body.input:
