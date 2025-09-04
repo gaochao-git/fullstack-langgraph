@@ -26,22 +26,21 @@ class RunCreate(BaseModel):
     assistant_id: str  # 智能体ID（必需）
     input: Dict[str, Any]  # 输入消息（必需）
     config: Dict[str, Any]  # 配置信息（必需）
-    stream_mode: List[str] = ["values"]  # 流式模式（必需，有默认值）
+    stream_mode: List[str]  # 流式模式
     command: Optional[Dict[str, Any]] = None
     
 
 async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
-    """验证和准备运行参数 - 公共方法，提取stream_run_standard和invoke_run_standard的重复逻辑"""
+    """更新智能体使用统计，确保用户线程映射"""
     # 更新智能体使用统计
     agent_id = request_body.assistant_id
     try:
         async with get_async_db_context() as async_db:
             await agent_service.increment_run_count(async_db, agent_id)
-            logger.info(f"✅ 已更新智能体 {agent_id} 的使用统计")
     except Exception as e:
         # 统计更新失败不影响主流程
         logger.error(f"更新智能体统计失败: {e}", exc_info=True)
-    # 用户线程映射
+    # 用户线程映射写入数据库
     current_user = None
     if request and hasattr(request.state, 'current_user'): current_user = request.state.current_user
     if not current_user: raise BusinessException("无法获取用户信息", ResponseCode.BAD_REQUEST)
@@ -70,9 +69,9 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
                     thread_title = content[:20] + "..." if len(content) > 20 else content
         
         # 从request_body中获取assistant_id，内部作为agent_id使用
-        agent_id = getattr(request_body, 'assistant_id', None)
+        agent_id = request_body.assistant_id
         
-        logger.info(f"[ensure_user_thread_mapping] creating mapping: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
+        logger.info(f"创建用户线程映射: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
         await create_user_thread_mapping(user_name, thread_id, thread_title, agent_id)
 
 async def process_stream_chunk(chunk, event_id, thread_id):
