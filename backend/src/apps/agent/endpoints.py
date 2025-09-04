@@ -1,29 +1,25 @@
 """Agent API routes - 使用全局统一响应格式"""
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
-    AgentCreate, AgentUpdate, AgentQueryParams, MCPConfigUpdate,
-    AgentStatusUpdate, AgentStatisticsUpdate, AgentResponse, AgentStatistics,
+    AgentCreate, AgentUpdate, MCPConfigUpdate,AgentStatusUpdate, AgentStatisticsUpdate,
     AgentOwnerTransfer, FileUploadResponse, DocumentContent, FileProcessStatus
 )
 from src.apps.agent.service.agent_service import agent_service
 from src.apps.agent.service.agent_permission_service import agent_permission_service
 from src.shared.core.logging import get_logger
-from src.shared.schemas.response import (
-    UnifiedResponse, success_response, paginated_response, ResponseCode
-)
+from src.shared.schemas.response import (UnifiedResponse, success_response, paginated_response, ResponseCode)
 from src.shared.core.exceptions import BusinessException
 from src.apps.auth.dependencies import get_current_user_optional
-from .dependencies import verify_agent_key
 
 # 导入LLM路由功能
 from .service.run_handler import stream_run_standard, invoke_run_standard, RunCreate, get_thread_file_ids
-from .service.threads import create_thread, get_thread_history_post, ThreadCreate, ThreadResponse
+from .service.threads import create_thread, ThreadCreate, ThreadResponse
 from .service.document_service import document_service
 from .service.document_export_service import document_export_service
 
