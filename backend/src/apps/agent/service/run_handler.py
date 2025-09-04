@@ -11,10 +11,11 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy import select
+from langgraph.types import Command
 from src.shared.db.config import get_async_db_context
 from ..checkpoint_factory import create_checkpointer
 from .document_service import document_service
-from ..utils import (prepare_graph_config, serialize_value)
+from ..utils import serialize_value
 from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping)
 from ..llm_agents.agent_registry import AgentRegistry
 from .agent_service import agent_service
@@ -26,7 +27,7 @@ class RunCreate(BaseModel):
     assistant_id: str  # 智能体ID（必需）
     input: Dict[str, Any]  # 输入消息（必需）
     config: Dict[str, Any]  # 配置信息（必需）
-    stream_mode: List[str]  # 流式模式
+    stream_mode: List[str] = ["values", "messages", "updates", "custom", "tasks"]  # 流式模式（带默认值）
     command: Optional[Dict[str, Any]] = None
     
 
@@ -136,7 +137,29 @@ async def process_stream_chunk(chunk, event_id, thread_id):
 
 async def stream_with_graph(graph, request_body, thread_id):
     """流式处理图"""
-    config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
+    # 简化配置构造 - 直接使用请求中的配置
+    config = request_body.config or {}
+    
+    # 确保 thread_id 在 configurable 中
+    if "configurable" not in config:
+        config["configurable"] = {}
+    config["configurable"]["thread_id"] = thread_id
+    
+    # 设置默认递归限制
+    if "recursion_limit" not in config:
+        config["recursion_limit"] = 100
+    
+    # 处理 resume 命令或普通输入
+    if request_body.command and "resume" in request_body.command:
+        graph_input = Command(resume=request_body.command["resume"])
+        logger.info(f"Resuming execution with command: {request_body.command}")
+    elif request_body.input is not None:
+        graph_input = request_body.input
+    else:
+        raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
+    
+    # 直接使用流式模式（已经有默认值）
+    stream_modes = request_body.stream_mode
     
     # 从消息中获取 file_ids
     file_ids = None
@@ -240,8 +263,30 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     
     # PostgreSQL 模式下的非流式处理
     async with create_checkpointer() as checkpointer:
-        # 准备配置和输入
-        config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
+        # 简化配置构造 - 直接使用请求中的配置
+        config = request_body.config or {}
+        
+        # 确保 thread_id 在 configurable 中
+        if "configurable" not in config:
+            config["configurable"] = {}
+        config["configurable"]["thread_id"] = thread_id
+        
+        # 设置默认递归限制
+        if "recursion_limit" not in config:
+            config["recursion_limit"] = 100
+        
+        # 处理 resume 命令或普通输入
+        if request_body.command and "resume" in request_body.command:
+            from langgraph.types import Command
+            graph_input = Command(resume=request_body.command["resume"])
+            logger.info(f"Resuming execution with command: {request_body.command}")
+        elif request_body.input is not None:
+            graph_input = request_body.input
+        else:
+            raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
+        
+        # 直接使用流式模式（已经有默认值）
+        stream_modes = request_body.stream_mode
         
         # 在配置中添加 agent_id
         config["configurable"]["agent_id"] = agent_id
