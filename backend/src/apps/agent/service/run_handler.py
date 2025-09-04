@@ -135,7 +135,7 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n", False
 
 async def stream_with_graph(graph, request_body, thread_id):
-    """PostgreSQL模式专用的图流媒体处理函数"""
+    """流式处理图"""
     config, graph_input, stream_modes = prepare_graph_config(request_body, thread_id)
     
     # 从消息中获取 file_ids
