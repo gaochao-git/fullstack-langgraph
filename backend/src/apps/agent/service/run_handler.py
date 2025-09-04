@@ -221,21 +221,15 @@ async def handle_chat_streaming(request_body, thread_id):
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
-    
-    # 使用公共方法验证和准备运行参数
     await prepare_run(thread_id, request_body, request)
-
     async def generate():
         try:
             async for item in handle_chat_streaming(request_body, thread_id):
                 yield item
         except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            logger.error(f"Error in streaming: {e}")
-            logger.error(f"Full traceback: {error_details}")
+            logger.error(f"流式处理异常: {e}", exc_info=True)
             yield f"event: error\n"
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e), 'traceback': error_details}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
         generate(),
