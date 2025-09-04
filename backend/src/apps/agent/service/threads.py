@@ -48,6 +48,7 @@ async def create_thread(thread_create: ThreadCreate):
         "metadata": metadata,
         "state": {}
     }
+    # 这里用户与线程的映射关系不需要写入数据库，在第一轮对话的时候需要拿到对话主题的时候写入映射表
     logger.info(f"Created thread: {thread_id} for agent: {thread_create.assistant_id}, user: {thread_create.user_name}")
     return ThreadResponse(**thread_data)
 
