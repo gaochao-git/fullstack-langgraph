@@ -8,7 +8,6 @@ from sqlalchemy import select, update, delete, func, or_, and_
 from sqlalchemy.exc import IntegrityError
 import json
 import uuid
-import traceback
 
 from src.apps.mcp.models import MCPConfig
 from src.apps.mcp.schema import (
@@ -50,12 +49,6 @@ class MCPGatewayConfigService:
             # 创建新配置
             tools_json = json.dumps(config_data.tools or [], ensure_ascii=False)
             
-            # 打印日志调试
-            logger.info(f"创建配置 - tools原始数据长度: {len(tools_json)}")
-            logger.info(f"创建配置 - tools前300字符: {tools_json[:300]}")
-            if len(tools_json) > 300:
-                logger.info(f"创建配置 - tools 300-400字符: {tools_json[290:400]}")
-            
             new_config = MCPConfig(
                 config_id=str(uuid.uuid4()),
                 name=config_data.name,
@@ -72,12 +65,6 @@ class MCPGatewayConfigService:
             await db.flush()
             await db.refresh(new_config)
             
-            # 验证保存后的数据
-            logger.info(f"保存后 - tools长度: {len(new_config.tools)}")
-            if len(new_config.tools) != len(tools_json):
-                logger.error(f"❌ 数据被截断！原始: {len(tools_json)}, 保存后: {len(new_config.tools)}")
-                logger.error(f"截断位置附近: ...{new_config.tools[290:310]}...")
-
             logger.info(f"创建MCP Gateway配置成功: {config_data.name}")
             return new_config
 
@@ -198,10 +185,6 @@ class MCPGatewayConfigService:
                 update_data['servers'] = json.dumps(config_data.servers, ensure_ascii=False)
             if config_data.tools is not None:
                 tools_json = json.dumps(config_data.tools, ensure_ascii=False)
-                logger.info(f"更新配置 {config_id} - tools原始数据长度: {len(tools_json)}")
-                logger.info(f"更新配置 {config_id} - tools前300字符: {tools_json[:300]}")
-                if len(tools_json) > 300:
-                    logger.info(f"更新配置 {config_id} - tools 290-400字符: {tools_json[290:400]}")
                 update_data['tools'] = tools_json
             if config_data.prompts is not None:
                 update_data['prompts'] = json.dumps(config_data.prompts, ensure_ascii=False)
@@ -220,13 +203,6 @@ class MCPGatewayConfigService:
                 
                 # 重新获取更新后的配置
                 config = await self.get_config_by_id(db, config_id)
-                
-                # 如果更新了tools，验证数据
-                if 'tools' in update_data and config:
-                    logger.info(f"更新后 - tools长度: {len(config.tools)}")
-                    if len(config.tools) != len(update_data['tools']):
-                        logger.error(f"❌ 更新时数据被截断！原始: {len(update_data['tools'])}, 保存后: {len(config.tools)}")
-                        logger.error(f"截断位置附近: ...{config.tools[290:310]}...")
 
             logger.info(f"更新MCP Gateway配置成功: {config_id}")
             return config
