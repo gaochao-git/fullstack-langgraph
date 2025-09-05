@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getBaseUrl } from '@/utils/base_api';
+import { getBaseUrl, omind_post } from '@/utils/base_api';
 
 // 消息类型定义
 export interface Message {
@@ -47,35 +47,40 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
   useEffect(() => {
     if (options.threadId) {
       // 从后端获取线程历史消息
-      fetch(`${options.apiUrl.replace('/api/chat', '')}/api/chat/threads/${options.threadId}/history`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({})
-      })
-        .then(res => res.json())
-        .then(data => {
-          // 后端返回的是数组格式 [{values: {messages: [...]}}, ...]
-          if (Array.isArray(data) && data.length > 0) {
-            // 获取最新的checkpoint中的消息
-            const latestCheckpoint = data[data.length - 1];
-            if (latestCheckpoint?.values?.messages) {
-              setMessages(latestCheckpoint.values.messages);
-              accumulatedMessagesRef.current = latestCheckpoint.values.messages;
+      const loadHistory = async () => {
+        try {
+          const response = await omind_post(`/api/chat/threads/${options.threadId}/history`, {});
+          
+          // 检查响应状态
+          if (response.status === 'ok' && response.data) {
+            const data = response.data;
+            // 后端返回的是数组格式 [{values: {messages: [...]}}, ...]
+            if (Array.isArray(data) && data.length > 0) {
+              // 获取最新的checkpoint中的消息
+              const latestCheckpoint = data[data.length - 1];
+              if (latestCheckpoint?.values?.messages) {
+                setMessages(latestCheckpoint.values.messages);
+                accumulatedMessagesRef.current = latestCheckpoint.values.messages;
+              }
+            } else if (data.messages) {
+              // 兼容旧格式
+              setMessages(data.messages);
+              accumulatedMessagesRef.current = data.messages;
             }
-          } else if (data.messages) {
-            // 兼容旧格式
-            setMessages(data.messages);
-            accumulatedMessagesRef.current = data.messages;
+          } else if (response.status === 'error') {
+            // 处理错误响应
+            console.error('Failed to load thread history:', response.msg);
+            options.onError?.({ message: response.msg || '加载历史消息失败' });
           }
-        })
-        .catch(err => {
+        } catch (err) {
           console.error('Failed to load thread history:', err);
-        });
+          options.onError?.({ message: '加载历史消息失败' });
+        }
+      };
+      
+      loadHistory();
     }
-  }, [options.threadId, options.apiUrl]);
+  }, [options.threadId]);
 
   // 处理SSE事件
   const handleStreamEvent = useCallback((eventType: string, eventData: any) => {

@@ -410,7 +410,7 @@ async def create_thread_endpoint(
     )
 
 
-@router.post("/chat/threads/{thread_id}/history")
+@router.post("/chat/threads/{thread_id}/history", response_model=UnifiedResponse)
 async def get_thread_history_endpoint(
     thread_id: str,
     limit: int = Query(50, ge=1, le=100, description="返回的消息数量"),
@@ -422,7 +422,11 @@ async def get_thread_history_endpoint(
     # 调用原有的服务方法
     history = await get_thread_history_post(thread_id, None)
     
-    return history[:limit] if history else []
+    # 返回标准格式
+    return success_response(
+        data=history[:limit] if history else [],
+        msg="获取历史记录成功"
+    )
 
 
 
