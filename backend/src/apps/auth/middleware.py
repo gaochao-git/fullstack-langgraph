@@ -96,64 +96,87 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 from src.apps.agent.models import AgentConfig, AgentPermission
                 from src.apps.user.models import RbacUser
                 
-                # 1. 首先通过agent_key在permission表中查找
-                perm_stmt = select(AgentPermission).where(
-                    AgentPermission.agent_key == token,
-                    AgentPermission.is_active == True
-                )
-                perm_result = await db.execute(perm_stmt)
-                permission = perm_result.scalar_one_or_none()
+                # 1. 首先从请求中获取agent_id（必须）
+                agent_id = None
+                user_name = None
+                
+                # 从查询参数获取
+                agent_id = request.query_params.get("assistant_id") or request.query_params.get("agent_id")
+                
+                # 如果是POST请求且查询参数中没有，尝试从请求体获取
+                if request.method == "POST" and not agent_id:
+                    content_type = request.headers.get("content-type", "")
+                    
+                    # 处理JSON请求
+                    if "application/json" in content_type:
+                        body = await request.body()
+                        request._body = body  # 保存以供后续使用
+                        
+                        if body:
+                            import json
+                            try:
+                                data = json.loads(body)
+                                if not agent_id:
+                                    agent_id = data.get("assistant_id") or data.get("agent_id")
+                            except json.JSONDecodeError:
+                                pass
+                    
+                    # 处理multipart/form-data请求（文件上传）
+                    elif "multipart/form-data" in content_type:
+                        try:
+                            from starlette.datastructures import FormData
+                            async def receive():
+                                body = await request.body()
+                                return {"type": "http.request", "body": body}
+                            
+                            # 创建新的请求对象来解析form data
+                            scope = request.scope.copy()
+                            form_request = Request(scope, receive)
+                            form = await form_request.form()
+                            
+                            if not agent_id:
+                                agent_id = form.get("assistant_id") or form.get("agent_id")
+                            
+                            # 保存form数据以供后续使用
+                            request._form = form
+                        except Exception as e:
+                            logger.debug(f"解析FormData失败: {e}")
+                
+                # 对于某些接口，agent_id 是可选的
+                path = request.url.path
+                agent_id_optional_paths = [
+                    "/api/v1/chat/threads",  # 获取线程列表
+                    "/api/chat/threads",  # 兼容旧路径
+                ]
+                
+                # 验证是否有agent_id
+                if not agent_id and not any(path.startswith(p) for p in agent_id_optional_paths):
+                    raise BusinessException("使用agent_key认证时必须提供agent_id", ResponseCode.BAD_REQUEST)
+                
+                # 2. 通过agent_key和agent_id在permission表中查找（如果有agent_id）
+                permission = None
+                if agent_id:
+                    perm_stmt = select(AgentPermission).where(
+                        AgentPermission.agent_key == token,
+                        AgentPermission.agent_id == agent_id,
+                        AgentPermission.is_active == True
+                    )
+                    perm_result = await db.execute(perm_stmt)
+                    permission = perm_result.scalar_one_or_none()
                 
                 if permission:
-                    # 使用permission表中的agent_id和user_name
-                    agent_id = permission.agent_id
+                    # 使用permission表中的user_name
                     user_name = permission.user_name
-                    logger.info(f"通过agent_permission表找到权限配置: agent_id={agent_id}, user_name={user_name}")
+                    logger.info(f"通过agent_permission表找到权限配置: agent_id={agent_id}, user_name={user_name}, key={token[:10]}...")
                 else:
-                    # 2. 如果permission表中没找到，降级到原有逻辑（向后兼容）
-                    # 获取assistant_id和user_name - 从查询参数获取
-                    agent_id = request.query_params.get("assistant_id")
-                    user_name = request.query_params.get("user_name")
-                    
-                    # 如果是POST请求且查询参数中没有，尝试从请求体获取（仅限JSON请求）
-                    if request.method == "POST" and (not agent_id or not user_name):
-                        content_type = request.headers.get("content-type", "")
-                        
-                        # 只处理JSON请求，form-data请求必须通过URL传参
-                        if "application/json" in content_type:
-                            body = await request.body()
-                            request._body = body  # 保存以供后续使用
-                            
-                            if body:
-                                import json
-                                try:
-                                    data = json.loads(body)
-                                    if not agent_id:
-                                        agent_id = data.get("assistant_id")
-                                    
-                                    if not user_name:
-                                        # 尝试从不同位置获取user_name
-                                        if data.get("metadata") and data["metadata"].get("user_name"):
-                                            user_name = data["metadata"]["user_name"]
-                                        elif data.get("config") and data["config"].get("configurable") and data["config"]["configurable"].get("user_name"):
-                                            user_name = data["config"]["configurable"]["user_name"]
-                                        elif data.get("user_name"):
-                                            user_name = data["user_name"]
-                                except json.JSONDecodeError:
-                                    pass
-                    
-                    # 对于某些接口，agent_id 是可选的
-                    path = request.url.path
-                    agent_id_optional_paths = [
-                        "/api/chat/threads",  # 获取线程列表
-                    ]
-                    
-                    # 验证必要参数
-                    if not agent_id and not any(path.startswith(p) for p in agent_id_optional_paths):
-                        raise BusinessException("使用agent_key认证时必须提供assistant_id", ResponseCode.BAD_REQUEST)
-                    
-                    if not user_name:
-                        raise BusinessException("未获取到用户信息", ResponseCode.BAD_REQUEST)
+                    # 如果没有找到匹配的权限记录
+                    if agent_id:
+                        logger.warning(f"agent_key和agent_id不匹配: key={token[:10]}..., agent_id={agent_id}")
+                        raise BusinessException("agent_key无效或未授权访问该智能体", ResponseCode.FORBIDDEN)
+                    else:
+                        # 对于不需要agent_id的接口，无法验证权限
+                        logger.warning(f"agent_key无法验证（缺少agent_id）: key={token[:10]}...")
+                        raise BusinessException("agent_key无效或未授权", ResponseCode.FORBIDDEN)
                 
                 # 3. 验证agent是否存在（如果提供了agent_id）
                 agent = None
@@ -164,11 +187,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     
                     if not agent:
                         raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-                    
-                    # 4. 如果没有通过permission表找到，说明这个key无效
-                    if not permission:
-                        logger.warning(f"agent_key无效或未授权: {token[:10]}...")
-                        raise BusinessException("agent_key无效或未授权", ResponseCode.FORBIDDEN)
                 
                 # 5. 验证用户是否存在
                 user_stmt = select(RbacUser).where(RbacUser.user_name == user_name)

@@ -49,7 +49,15 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
       // 从后端获取线程历史消息
       const loadHistory = async () => {
         try {
-          const response = await omind_get(`/api/v1/chat/threads/${options.threadId}`);
+          // 构建查询参数
+          const params = new URLSearchParams();
+          if (options.assistantId) {
+            params.append('agent_id', options.assistantId);
+          }
+          const url = params.toString() 
+            ? `/api/v1/chat/threads/${options.threadId}?${params.toString()}`
+            : `/api/v1/chat/threads/${options.threadId}`;
+          const response = await omind_get(url);
           
           // 检查响应状态
           if (response.status === 'ok' && response.data) {

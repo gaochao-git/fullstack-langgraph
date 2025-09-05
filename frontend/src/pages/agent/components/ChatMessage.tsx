@@ -78,7 +78,7 @@ const FileAttachments: React.FC<FileAttachmentsProps> = ({ message, isDark, onPr
         else {
           try {
             // 先尝试获取文档内容（为了兼容历史消息）
-            const content = await fileApi.getDocumentContent(fileId);
+            const content = await fileApi.getDocumentContent(fileId, agent?.agent_id || agent?.id?.toString());
             if (content && content.file_name) {
               infos[fileId] = {
                 fileName: content.file_name,
@@ -1029,7 +1029,7 @@ function ChatMessages({
         });
         
         // 等待文件处理完成，并更新处理状态
-        await fileApi.waitForFileReady(result.file_id, (status) => {
+        await fileApi.waitForFileReady(result.file_id, assistantId, (status) => {
           // 更新处理中的消息，让用户知道系统仍在工作
           setUploadedFiles(prev => {
             const updated = [...prev];
@@ -1751,6 +1751,7 @@ function ChatMessages({
           fileId={previewFile.fileId}
           fileName={previewFile.fileName}
           fileType={previewFile.fileType}
+          agentId={agent?.agent_id || agent?.id?.toString()}
           onClose={() => setPreviewFile(null)}
         />
       )}

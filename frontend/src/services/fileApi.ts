@@ -67,8 +67,15 @@ export const fileApi = {
   },
 
   // 获取文档内容
-  async getDocumentContent(fileId: string): Promise<DocumentContent> {
-    const response = await omind_get(`/api/v1/chat/files/${fileId}/content`);
+  async getDocumentContent(fileId: string, agentId?: string): Promise<DocumentContent> {
+    const params = new URLSearchParams();
+    if (agentId) {
+      params.append('agent_id', agentId);
+    }
+    const url = params.toString() 
+      ? `/api/v1/chat/files/${fileId}/content?${params.toString()}`
+      : `/api/v1/chat/files/${fileId}/content`;
+    const response = await omind_get(url);
     if (response.status === 'ok' && response.data) {
       return response.data;
     } else {
@@ -77,8 +84,15 @@ export const fileApi = {
   },
 
   // 获取文件处理状态
-  async getFileStatus(fileId: string): Promise<FileProcessStatus> {
-    const response = await omind_get(`/api/v1/chat/files/${fileId}/status`, { showLoading: false });
+  async getFileStatus(fileId: string, agentId?: string): Promise<FileProcessStatus> {
+    const params = new URLSearchParams();
+    if (agentId) {
+      params.append('agent_id', agentId);
+    }
+    const url = params.toString() 
+      ? `/api/v1/chat/files/${fileId}/status?${params.toString()}`
+      : `/api/v1/chat/files/${fileId}/status`;
+    const response = await omind_get(url, { showLoading: false });
     if (response.status === 'ok' && response.data) {
       return response.data;
     } else {
@@ -89,13 +103,14 @@ export const fileApi = {
   // 等待文件处理完成（支持进度回调）
   async waitForFileReady(
     fileId: string, 
+    agentId?: string,
     onStatusUpdate?: (status: FileProcessStatus) => void
   ): Promise<void> {
     const interval = 2000; // 固定2秒轮询间隔
     
     while (true) {
       try {
-        const status = await this.getFileStatus(fileId);
+        const status = await this.getFileStatus(fileId, agentId);
         
         // 回调状态更新
         if (onStatusUpdate) {
@@ -119,14 +134,22 @@ export const fileApi = {
   },
 
   // 下载文档
-  async downloadDocument(fileId: string): Promise<Blob> {
+  async downloadDocument(fileId: string, agentId?: string): Promise<Blob> {
     const token = localStorage.getItem('access_token');
     const headers: any = {};
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`/api/v1/chat/files/${fileId}`, {
+    const params = new URLSearchParams();
+    if (agentId) {
+      params.append('agent_id', agentId);
+    }
+    const url = params.toString() 
+      ? `/api/v1/chat/files/${fileId}?${params.toString()}`
+      : `/api/v1/chat/files/${fileId}`;
+
+    const response = await fetch(url, {
       method: 'GET',
       headers: headers
     });

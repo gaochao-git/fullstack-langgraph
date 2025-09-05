@@ -10,6 +10,7 @@ interface FilePreviewModalProps {
   fileId: string;
   fileName: string;
   fileType: string;
+  agentId?: string;
   onClose: () => void;
 }
 
@@ -18,6 +19,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   fileId,
   fileName,
   fileType,
+  agentId,
   onClose
 }) => {
   const { isDark } = useTheme();
@@ -86,17 +88,17 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     try {
       if (isImagePreviewable) {
         // 获取图片文件
-        const blob = await fileApi.downloadDocument(fileId);
+        const blob = await fileApi.downloadDocument(fileId, agentId);
         const url = URL.createObjectURL(blob);
         setImageUrl(url);
       } else if (isPdfPreviewable) {
         // 获取PDF文件
-        const blob = await fileApi.downloadDocument(fileId);
+        const blob = await fileApi.downloadDocument(fileId, agentId);
         const url = URL.createObjectURL(blob);
         setPdfUrl(url);
       } else if (isTextPreviewable || isTablePreviewable) {
         // 获取文本或表格内容
-        const docContent = await fileApi.getDocumentContent(fileId);
+        const docContent = await fileApi.getDocumentContent(fileId, agentId);
         setContent(docContent.content || '文件内容为空');
       }
     } catch (err) {

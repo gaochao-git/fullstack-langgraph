@@ -414,6 +414,7 @@ async def create_thread_endpoint(
 async def get_thread_detail(
     thread_id: str,
     limit: int = Query(50, ge=1, le=100, description="返回的消息数量"),
+    agent_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """获取线程详情（历史记录）"""
@@ -553,6 +554,7 @@ async def create_file(
 @router.get("/v1/chat/files/{file_id}/content", response_model=UnifiedResponse)
 async def get_document_content(
     file_id: str,
+    agent_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -573,6 +575,7 @@ async def get_document_content(
 @router.get("/v1/chat/files/{file_id}/status", response_model=UnifiedResponse)
 async def get_file_status(
     file_id: str,
+    agent_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -590,6 +593,7 @@ async def get_file_status(
 @router.get("/v1/chat/files/{file_id}")
 async def get_file(
     file_id: str,
+    agent_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
