@@ -46,7 +46,7 @@ export const fileApi = {
       params.append('user_name', userName);
     }
     
-    const url = params.toString() ? `/api/chat/files?${params.toString()}` : '/api/chat/files';
+    const url = params.toString() ? `/api/v1/chat/files?${params.toString()}` : '/api/v1/chat/files';
     
     const response = await omind_post(url, formData, {
       headers: {
@@ -71,7 +71,7 @@ export const fileApi = {
 
   // 获取文档内容
   async getDocumentContent(fileId: string): Promise<DocumentContent> {
-    const response = await omind_get(`/api/chat/files/${fileId}/content`);
+    const response = await omind_get(`/api/v1/chat/files/${fileId}/content`);
     if (response.status === 'ok' && response.data) {
       return response.data;
     } else {
@@ -81,7 +81,7 @@ export const fileApi = {
 
   // 获取文件处理状态
   async getFileStatus(fileId: string): Promise<FileProcessStatus> {
-    const response = await omind_get(`/api/chat/files/${fileId}/status`, { showLoading: false });
+    const response = await omind_get(`/api/v1/chat/files/${fileId}/status`, { showLoading: false });
     if (response.status === 'ok' && response.data) {
       return response.data;
     } else {
@@ -129,7 +129,7 @@ export const fileApi = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`/api/chat/files/${fileId}`, {
+    const response = await fetch(`/api/v1/chat/files/${fileId}`, {
       method: 'GET',
       headers: headers
     });

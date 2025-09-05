@@ -49,7 +49,7 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
       // 从后端获取线程历史消息
       const loadHistory = async () => {
         try {
-          const response = await omind_get(`/api/chat/threads/${options.threadId}`);
+          const response = await omind_get(`/api/v1/chat/threads/${options.threadId}`);
           
           // 检查响应状态
           if (response.status === 'ok' && response.data) {
@@ -290,7 +290,7 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
       requestBody.chat_mode = "streaming";
 
       // 使用统一的聊天流式请求方法
-      await omind_chat_stream(`/api/chat/threads/${options.threadId}/completion`, {
+      await omind_chat_stream(`/api/v1/chat/threads/${options.threadId}/completion`, {
         body: requestBody,
         signal: abortControllerRef.current.signal,
         onEvent: handleStreamEvent,

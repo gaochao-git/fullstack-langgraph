@@ -93,7 +93,7 @@ export default function ChatEngine({
 
   // 构造完整的 API URL
   const baseUrl = getBaseUrl() || window.location.origin;
-  const apiUrl = `${baseUrl}/api/chat`;
+  const apiUrl = `${baseUrl}/api/v1/chat`;
   
   // 初始化currentThreadId
   useEffect(() => {
@@ -300,7 +300,7 @@ export default function ChatEngine({
         assistant_id: agentId,
         user_name: username
       });
-      const url = `/api/chat/threads?${params.toString()}`;
+      const url = `/api/v1/chat/threads?${params.toString()}`;
       const response = await omind_get(url);
       
       // 检查响应状态

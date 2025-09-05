@@ -461,7 +461,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
           ]}
           tooltip="智能体服务的API调用地址"
         >
-          <Input placeholder="http://localhost:8000/api/chat/stream" />
+          <Input placeholder="http://localhost:8000/api/v1/chat/completion" />
         </Form.Item>
 
         <Form.Item

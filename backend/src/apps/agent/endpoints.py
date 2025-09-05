@@ -390,7 +390,7 @@ async def toggle_permission_status(
 class ThreadRequest(BaseModel):
     assistant_id: str
 
-@router.post("/chat/threads", response_model=UnifiedResponse)
+@router.post("/v1/chat/threads", response_model=UnifiedResponse)
 async def create_thread_endpoint(
     request: ThreadRequest
 ):
@@ -410,7 +410,7 @@ async def create_thread_endpoint(
     )
 
 
-@router.get("/chat/threads/{thread_id}", response_model=UnifiedResponse)
+@router.get("/v1/chat/threads/{thread_id}", response_model=UnifiedResponse)
 async def get_thread_detail(
     thread_id: str,
     limit: int = Query(50, ge=1, le=100, description="返回的消息数量"),
@@ -429,7 +429,7 @@ async def get_thread_detail(
     )
 
 
-@router.post("/chat/threads/{thread_id}/completion")
+@router.post("/v1/chat/threads/{thread_id}/completion")
 async def completion_endpoint(
     thread_id: str,
     request_body: RunCreate,
@@ -440,7 +440,7 @@ async def completion_endpoint(
     return await completion_handler(thread_id, request_body, request)
 
 
-@router.post("/chat/threads/{thread_id}/runs/stream")
+@router.post("/v1/chat/threads/{thread_id}/runs/stream")
 async def stream_run_standard_endpoint(
     thread_id: str, 
     request_body: RunCreate = None, 
@@ -450,7 +450,7 @@ async def stream_run_standard_endpoint(
     return await stream_run_standard(thread_id, request_body, request)
 
 
-@router.post("/chat/threads/{thread_id}/runs/invoke")
+@router.post("/v1/chat/threads/{thread_id}/runs/invoke")
 async def invoke_run_standard_endpoint(
     thread_id: str, 
     request_body: RunCreate = None, 
@@ -460,7 +460,7 @@ async def invoke_run_standard_endpoint(
     return await invoke_run_standard(thread_id, request_body, request)
 
 
-@router.get("/chat/threads")
+@router.get("/v1/chat/threads")
 async def get_threads(
     agent_id: Optional[str] = Query(None, description="智能体ID"),
     user_name: Optional[str] = Query(None, description="用户名"), 
@@ -502,7 +502,7 @@ async def get_threads(
 
 # ==================== 文档上传和处理路由 ====================
 
-@router.post("/chat/files", response_model=UnifiedResponse)
+@router.post("/v1/chat/files", response_model=UnifiedResponse)
 async def create_file(
     file: UploadFile = File(...),
     assistant_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
@@ -550,7 +550,7 @@ async def create_file(
 
 
 
-@router.get("/chat/files/{file_id}/content", response_model=UnifiedResponse)
+@router.get("/v1/chat/files/{file_id}/content", response_model=UnifiedResponse)
 async def get_document_content(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
@@ -570,7 +570,7 @@ async def get_document_content(
     )
 
 
-@router.get("/chat/files/{file_id}/status", response_model=UnifiedResponse)
+@router.get("/v1/chat/files/{file_id}/status", response_model=UnifiedResponse)
 async def get_file_status(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
@@ -587,7 +587,7 @@ async def get_file_status(
     )
 
 
-@router.get("/chat/files/{file_id}")
+@router.get("/v1/chat/files/{file_id}")
 async def get_file(
     file_id: str,
     db: AsyncSession = Depends(get_async_db),
