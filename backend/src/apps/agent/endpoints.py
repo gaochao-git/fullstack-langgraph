@@ -1,7 +1,7 @@
 """Agent API routes - 使用全局统一响应格式"""
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, Body
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, Body, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from src.shared.db.models import now_shanghai
@@ -505,8 +505,8 @@ async def get_threads(
 @router.post("/v1/chat/files", response_model=UnifiedResponse)
 async def create_file(
     file: UploadFile = File(...),
-    assistant_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
-    user_name: Optional[str] = Query(None, description="上传文件的用户名（agent_key认证时必须）"),
+    assistant_id: Optional[str] = Form(None, description="智能体ID（agent_key认证时必须）"),
+    user_name: Optional[str] = Form(None, description="上传文件的用户名（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     request: Request = None,
     current_user: Optional[dict] = Depends(get_current_user_optional)

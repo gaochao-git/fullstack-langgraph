@@ -37,18 +37,15 @@ export const fileApi = {
     const formData = new FormData();
     formData.append('file', file);
     
-    // 构建URL，如果有assistantId和userName，添加到查询参数中
-    const params = new URLSearchParams();
+    // 将 assistant_id 和 user_name 也放入 FormData
     if (assistantId) {
-      params.append('assistant_id', assistantId);
+      formData.append('assistant_id', assistantId);
     }
     if (userName) {
-      params.append('user_name', userName);
+      formData.append('user_name', userName);
     }
     
-    const url = params.toString() ? `/api/v1/chat/files?${params.toString()}` : '/api/v1/chat/files';
-    
-    const response = await omind_post(url, formData, {
+    const response = await omind_post('/api/v1/chat/files', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
