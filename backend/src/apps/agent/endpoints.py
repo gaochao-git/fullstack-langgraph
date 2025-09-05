@@ -429,6 +429,15 @@ async def get_thread_history_endpoint(
     )
 
 
+@router.post("/chat/threads/{thread_id}/completion")
+async def completion_endpoint(
+    thread_id: str,
+    request_body: RunCreate,
+    request: Request = None
+):
+    """统一的补全接口 - 支持流式和非流式"""
+    from .service.run_handler import completion_handler
+    return await completion_handler(thread_id, request_body, request)
 
 
 @router.post("/chat/threads/{thread_id}/runs/stream")

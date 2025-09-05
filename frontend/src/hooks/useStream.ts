@@ -286,9 +286,11 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
       config.stream_mode = submitOptions?.streamMode || ["updates", "messages", "values"];
       
       requestBody.config = config;
+      // 添加 chat_mode
+      requestBody.chat_mode = "streaming";
 
       // 使用统一的聊天流式请求方法
-      await omind_chat_stream(`/api/chat/threads/${options.threadId}/runs/stream`, {
+      await omind_chat_stream(`/api/chat/threads/${options.threadId}/completion`, {
         body: requestBody,
         signal: abortControllerRef.current.signal,
         onEvent: handleStreamEvent,

@@ -27,6 +27,7 @@ class RunCreate(BaseModel):
     assistant_id: str  # 智能体ID（必需）
     user_name: str  # 用户名（必需）
     query: str  # 查询内容（必需）
+    chat_mode: str = "streaming"  # 聊天模式：streaming 或 blocking
     file_ids: Optional[List[str]] = None  # 文件ID列表（可选）
     config: Optional[Dict[str, Any]] = None  # 配置信息（可选）
     
@@ -303,6 +304,21 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
     except Exception as e:
         logger.error(f"非流式调用失败: {e}", exc_info=True)
         raise BusinessException(f"处理请求时出错: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
+async def completion_handler(thread_id: str, request_body: RunCreate, request=None):
+    """统一的补全处理函数 - 支持流式和非流式"""
+    if request_body.chat_mode == "streaming":
+        # 流式处理
+        return await stream_run_standard(thread_id, request_body, request)
+    elif request_body.chat_mode == "blocking":
+        # 非流式处理
+        return await invoke_run_standard(thread_id, request_body, request)
+    else:
+        raise BusinessException(
+            f"不支持的chat_mode: {request_body.chat_mode}，必须是 'streaming' 或 'blocking'",
+            ResponseCode.BAD_REQUEST
+        )
 
 
 async def save_thread_file_associations(thread_id: str, file_ids: List[str], agent_id: str, user_name: str) -> None:
