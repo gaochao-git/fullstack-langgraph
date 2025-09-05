@@ -240,12 +240,14 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   const handleEditConfig = (config: MCPGatewayConfig) => {
     setEditingConfig(config);
     
-    // 处理工具配置中的headers字段，确保它们是字符串格式
+    // 处理工具配置中的headers字段和args字段
     const processedTools = (config.tools || []).map(tool => ({
       ...tool,
       headers: typeof tool.headers === 'object' && tool.headers !== null 
         ? JSON.stringify(tool.headers, null, 2) 
-        : tool.headers
+        : tool.headers,
+      // 确保args是数组格式
+      args: tool.args || []
     }));
     
     form.setFieldsValue({
@@ -263,7 +265,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   // 保存配置（新增或编辑）
   const handleSaveConfig = async (values: any) => {
     try {
-      // 处理工具配置中的headers字段，将字符串转换为对象
+      // 处理工具配置中的headers字段和args字段
       const processedTools = (values.tools || []).map((tool: any) => ({
         ...tool,
         headers: tool.headers && typeof tool.headers === 'string' 
@@ -274,7 +276,20 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                 return {};
               }
             })()
-          : tool.headers
+          : tool.headers,
+        // 处理参数配置
+        args: (tool.args || []).map((arg: any) => {
+          const processedArg = { ...arg };
+          // 如果是object类型且有properties字段，尝试解析JSON
+          if (arg.type === 'object' && arg.properties && typeof arg.properties === 'string') {
+            try {
+              processedArg.properties = JSON.parse(arg.properties);
+            } catch {
+              // 如果解析失败，保持原样
+            }
+          }
+          return processedArg;
+        })
       }));
       
       const configData = {
@@ -500,7 +515,11 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                 tenant: selectedConfig.tenant,
                 routers: selectedConfig.routers || [],
                 servers: selectedConfig.servers || [], 
-                tools: selectedConfig.tools || [],
+                tools: (selectedConfig.tools || []).map(tool => ({
+                  ...tool,
+                  // 确保args字段显示
+                  args: tool.args || []
+                })),
                 prompts: selectedConfig.prompts || [],
                 mcpServers: selectedConfig.mcp_servers || [],
                 createdAt: selectedConfig.create_time,
@@ -696,64 +715,251 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                   </Col>
                                 </Row>
                                 {isExpanded && (
-                                  <Row gutter={16}>
-                                    <Col span={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'description']}
-                                        label="描述"
-                                      >
-                                        <Input placeholder="工具功能描述" />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'requestBody']}
-                                        label="请求体"
-                                      >
-                                        <TextArea 
-                                          rows={1} 
-                                          placeholder='{"key": "value"}' 
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'headers']}
-                                        label="请求头"
-                                        initialValue='{"Content-Type": "application/json"}'
-                                        normalize={(value) => {
-                                          // 如果是对象，转换为字符串
-                                          if (typeof value === 'object' && value !== null) {
-                                            return JSON.stringify(value, null, 2);
-                                          }
-                                          return value;
-                                        }}
-                                        getValueFromEvent={(e) => {
-                                          // 确保始终返回字符串
-                                          const value = e.target.value;
-                                          return value;
-                                        }}
-                                      >
-                                        <TextArea 
-                                          rows={1} 
-                                          placeholder='{"Content-Type": "application/json"}' 
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col span={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[name, 'responseBody']}
-                                        label="响应体模板"
-                                        initialValue="{{.Response.Body}}"
-                                      >
-                                        <Input placeholder="{{.Response.Body}}" />
-                                      </Form.Item>
-                                    </Col>
-                                  </Row>
+                                  <>
+                                    <Row gutter={16} style={{ marginTop: 16 }}>
+                                      <Col span={24}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, 'description']}
+                                          label="工具描述"
+                                        >
+                                          <TextArea 
+                                            rows={2} 
+                                            placeholder="描述这个工具的功能和用途" 
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                    </Row>
+                                    
+                                    {/* 参数配置区域 */}
+                                    <div style={{ 
+                                      background: isDark ? '#1f2937' : '#f9fafb', 
+                                      padding: 16, 
+                                      borderRadius: 8, 
+                                      marginTop: 16,
+                                      border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
+                                    }}>
+                                      <div style={{ marginBottom: 12, fontWeight: 500, fontSize: 14 }}>
+                                        参数配置
+                                      </div>
+                                      
+                                      <Form.List name={[name, 'args']}>
+                                        {(argFields, { add: addArg, remove: removeArg }) => (
+                                          <>
+                                            {argFields.map((argField, argIndex) => (
+                                              <Card 
+                                                key={argField.key} 
+                                                size="small" 
+                                                style={{ 
+                                                  marginBottom: 12,
+                                                  background: isDark ? '#374151' : '#ffffff',
+                                                  border: `1px solid ${isDark ? '#4b5563' : '#e5e7eb'}`
+                                                }}
+                                              >
+                                                <Row gutter={[16, 16]}>
+                                                  <Col span={6}>
+                                                    <Form.Item
+                                                      {...argField}
+                                                      name={[argField.name, 'name']}
+                                                      label="参数名称"
+                                                      rules={[{ required: true, message: '请输入参数名称' }]}
+                                                    >
+                                                      <Input placeholder="参数名称" />
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={5}>
+                                                    <Form.Item
+                                                      {...argField}
+                                                      name={[argField.name, 'position']}
+                                                      label="参数位置"
+                                                      initialValue="body"
+                                                    >
+                                                      <Select>
+                                                        <Select.Option value="body">Body</Select.Option>
+                                                        <Select.Option value="query">Query</Select.Option>
+                                                        <Select.Option value="path">Path</Select.Option>
+                                                        <Select.Option value="header">Header</Select.Option>
+                                                      </Select>
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={5}>
+                                                    <Form.Item
+                                                      {...argField}
+                                                      name={[argField.name, 'type']}
+                                                      label="参数类型"
+                                                      initialValue="string"
+                                                    >
+                                                      <Select>
+                                                        <Select.Option value="string">String</Select.Option>
+                                                        <Select.Option value="number">Number</Select.Option>
+                                                        <Select.Option value="boolean">Boolean</Select.Option>
+                                                        <Select.Option value="array">Array</Select.Option>
+                                                        <Select.Option value="object">Object</Select.Option>
+                                                      </Select>
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={4}>
+                                                    <Form.Item
+                                                      {...argField}
+                                                      name={[argField.name, 'required']}
+                                                      label="是否必填"
+                                                      valuePropName="checked"
+                                                    >
+                                                      <Switch />
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={3}>
+                                                    <Form.Item
+                                                      {...argField}
+                                                      name={[argField.name, 'default']}
+                                                      label="默认值"
+                                                    >
+                                                      <Input placeholder="默认值" />
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={1}>
+                                                    <Button
+                                                      type="text"
+                                                      danger
+                                                      icon={<MinusCircleOutlined />}
+                                                      onClick={() => removeArg(argField.name)}
+                                                      style={{ marginTop: 30 }}
+                                                    />
+                                                  </Col>
+                                                </Row>
+                                                <Row gutter={16}>
+                                                  <Col span={24}>
+                                                    <Form.Item
+                                                      {...argField}
+                                                      name={[argField.name, 'description']}
+                                                      label="参数描述"
+                                                    >
+                                                      <Input placeholder="描述参数的用途和格式要求" />
+                                                    </Form.Item>
+                                                  </Col>
+                                                </Row>
+                                                
+                                                {/* 当参数类型为array或object时，显示嵌套配置 */}
+                                                <Form.Item
+                                                  noStyle
+                                                  shouldUpdate={(prevValues, currentValues) => {
+                                                    const prevType = prevValues?.tools?.[name]?.args?.[argIndex]?.type;
+                                                    const currType = currentValues?.tools?.[name]?.args?.[argIndex]?.type;
+                                                    return prevType !== currType;
+                                                  }}
+                                                >
+                                                  {({ getFieldValue }) => {
+                                                    const argType = getFieldValue(['tools', name, 'args', argIndex, 'type']);
+                                                    if (argType === 'array' || argType === 'object') {
+                                                      return (
+                                                        <div style={{ 
+                                                          marginTop: 12, 
+                                                          padding: 12, 
+                                                          background: isDark ? '#1f2937' : '#f3f4f6',
+                                                          borderRadius: 6
+                                                        }}>
+                                                          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+                                                            {argType === 'array' ? '数组元素配置' : '对象属性配置'}
+                                                          </div>
+                                                          
+                                                          {argType === 'array' && (
+                                                            <Form.Item
+                                                              {...argField}
+                                                              name={[argField.name, 'items', 'type']}
+                                                              label="元素类型"
+                                                              initialValue="string"
+                                                            >
+                                                              <Select size="small">
+                                                                <Select.Option value="string">String</Select.Option>
+                                                                <Select.Option value="number">Number</Select.Option>
+                                                                <Select.Option value="boolean">Boolean</Select.Option>
+                                                                <Select.Option value="object">Object</Select.Option>
+                                                              </Select>
+                                                            </Form.Item>
+                                                          )}
+                                                          
+                                                          {argType === 'object' && (
+                                                            <Form.Item
+                                                              {...argField}
+                                                              name={[argField.name, 'properties']}
+                                                              label="属性定义 (JSON格式)"
+                                                            >
+                                                              <TextArea 
+                                                                rows={3}
+                                                                placeholder={'{\n  "key1": { "type": "string", "description": "属性1" },\n  "key2": { "type": "number", "description": "属性2" }\n}'}
+                                                              />
+                                                            </Form.Item>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    }
+                                                    return null;
+                                                  }}
+                                                </Form.Item>
+                                              </Card>
+                                            ))}
+                                            
+                                            <Button 
+                                              type="dashed" 
+                                              onClick={() => addArg()} 
+                                              icon={<PlusOutlined />}
+                                              style={{ width: '100%' }}
+                                            >
+                                              添加参数
+                                            </Button>
+                                          </>
+                                        )}
+                                      </Form.List>
+                                    </div>
+                                    
+                                    {/* 请求头和响应配置 */}
+                                    <Row gutter={16} style={{ marginTop: 16 }}>
+                                      <Col span={12}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, 'headers']}
+                                          label="请求头"
+                                          initialValue='{"Content-Type": "application/json"}'
+                                          normalize={(value) => {
+                                            if (typeof value === 'object' && value !== null) {
+                                              return JSON.stringify(value, null, 2);
+                                            }
+                                            return value;
+                                          }}
+                                        >
+                                          <TextArea 
+                                            rows={3} 
+                                            placeholder='{"Content-Type": "application/json"}' 
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                      <Col span={12}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, 'requestBody']}
+                                          label="请求体模板"
+                                        >
+                                          <TextArea 
+                                            rows={3} 
+                                            placeholder='{"key": "{{.Args.paramName}}"}' 
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                    </Row>
+                                    
+                                    <Row gutter={16}>
+                                      <Col span={24}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, 'responseBody']}
+                                          label="响应体模板"
+                                          initialValue="{{.Response.Body}}"
+                                        >
+                                          <Input placeholder="{{.Response.Body}}" />
+                                        </Form.Item>
+                                      </Col>
+                                    </Row>
+                                  </>
                                 )}
                               </Card>
                             );
