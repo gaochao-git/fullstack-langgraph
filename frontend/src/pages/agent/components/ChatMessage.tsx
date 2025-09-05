@@ -1,5 +1,5 @@
 import type React from "react";
-import type { Message } from "@langchain/langgraph-sdk";
+import type { Message } from "@/hooks/useStream";
 import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

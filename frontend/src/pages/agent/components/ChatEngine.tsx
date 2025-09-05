@@ -1,5 +1,4 @@
-import { useStream } from "@langchain/langgraph-sdk/react";
-import type { Message } from "@langchain/langgraph-sdk";
+import { useStream, type Message } from "@/hooks/useStream";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import ChatMessages from "./ChatMessage";
@@ -257,7 +256,7 @@ export default function ChatEngine({
       // 构建提交选项
       const submitOptions = {
         config: submitConfig,
-        streamMode: ["updates", "messages"]
+        streamMode: ["updates", "messages", "values"]
       };
       
       // 最终提交
