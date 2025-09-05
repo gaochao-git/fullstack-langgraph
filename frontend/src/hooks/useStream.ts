@@ -244,9 +244,16 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
     setIsLoading(true);
     setInterrupt(null);
 
-    // 立即添加用户消息到消息列表
-    // 后端只返回AI消息，不返回用户消息，所以我们需要自己添加
+    // 从 data 中提取用户消息和文件信息
+    let userQuery = '';
+    let fileIds: string[] = [];
+    
     if (data.messages && Array.isArray(data.messages)) {
+      const userMessage = data.messages[0]; // 假设只有一条用户消息
+      userQuery = userMessage.content || '';
+      fileIds = userMessage.file_ids || [];
+      
+      // 立即添加用户消息到消息列表
       const userMessages = data.messages.map((msg: any) => ({
         id: msg.id || `user-${Date.now()}`,
         type: msg.type || 'human',
@@ -259,13 +266,26 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
     }
 
     try {
-      const requestBody = {
+      // 构建新的请求格式
+      const requestBody: any = {
         assistant_id: options.assistantId,
-        input: data,
-        config: submitOptions?.config || {},
-        stream_mode: submitOptions?.streamMode || ["updates", "messages", "values"],
-        command: submitOptions?.command
+        user_name: submitOptions?.config?.configurable?.user_name || 'anonymous',
+        query: userQuery,
       };
+
+      // 添加可选参数
+      if (fileIds.length > 0) {
+        requestBody.file_ids = fileIds;
+      }
+
+      // 构建 config 对象
+      const config: any = {};
+      if (submitOptions?.config?.configurable?.selected_model) {
+        config.selected_model = submitOptions.config.configurable.selected_model;
+      }
+      config.stream_mode = submitOptions?.streamMode || ["updates", "messages", "values"];
+      
+      requestBody.config = config;
 
       // 使用统一的聊天流式请求方法
       await omind_chat_stream(`/api/chat/threads/${options.threadId}/runs/stream`, {

@@ -25,10 +25,10 @@ logger = get_logger(__name__)
 # 定义运行请求体
 class RunCreate(BaseModel):
     assistant_id: str  # 智能体ID（必需）
-    input: Dict[str, Any]  # 输入消息（必需）
-    config: Dict[str, Any]  # 配置信息（必需）
-    stream_mode: List[str] = ["values", "messages", "updates", "custom", "tasks"]  # 流式模式（带默认值）
-    command: Optional[Dict[str, Any]] = None
+    user_name: str  # 用户名（必需）
+    query: str  # 查询内容（必需）
+    file_ids: Optional[List[str]] = None  # 文件ID列表（可选）
+    config: Optional[Dict[str, Any]] = None  # 配置信息（可选）
     
 
 async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
@@ -41,11 +41,9 @@ async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> 
     except Exception as e:
         # 统计更新失败不影响主流程
         logger.error(f"更新智能体统计失败: {e}", exc_info=True)
-    # 用户线程映射写入数据库
-    current_user = None
-    if request and hasattr(request.state, 'current_user'): current_user = request.state.current_user
-    if not current_user: raise BusinessException("无法获取用户信息", ResponseCode.BAD_REQUEST)
-    user_name = current_user.get('username')
+    
+    # 使用请求中的 user_name
+    user_name = request_body.user_name
     try:
         await ensure_user_thread_mapping(user_name, thread_id, request_body)
     except Exception as e:
@@ -56,18 +54,12 @@ async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> 
 async def ensure_user_thread_mapping(user_name, thread_id, request_body):
     """
     确保用户和线程的归属已写入user_threads表，如不存在则自动写入。
-    自动提取thread_title（取消息内容前20字）。
+    自动提取thread_title（取query内容前20字）。
     """
     exists = await check_user_thread_exists(user_name, thread_id)
     if not exists:
-        thread_title = None
-        if hasattr(request_body, 'input') and request_body.input and "messages" in request_body.input:
-            messages = request_body.input["messages"]
-            if messages and len(messages) > 0:
-                last_msg = messages[-1]
-                if isinstance(last_msg, dict) and "content" in last_msg:
-                    content = str(last_msg["content"])
-                    thread_title = content[:20] + "..." if len(content) > 20 else content
+        # 使用 query 作为标题
+        thread_title = request_body.query[:20] + "..." if len(request_body.query) > 20 else request_body.query
         
         # 从request_body中获取assistant_id，内部作为agent_id使用
         agent_id = request_body.assistant_id
@@ -79,46 +71,47 @@ def prepare_config(request_body, thread_id):
     """准备配置 - 公共方法"""
     config = request_body.config or {}
     
-    # 确保 thread_id 在 configurable 中
-    if "configurable" not in config:
-        config["configurable"] = {}
-    config["configurable"]["thread_id"] = thread_id
+    # 提取 stream_mode 和其他配置
+    stream_mode = config.get("stream_mode", ["updates", "messages", "values"])
+    selected_model = config.get("selected_model")
     
-    # 设置默认递归限制
-    if "recursion_limit" not in config:
-        config["recursion_limit"] = 100
+    # 构建新的配置结构
+    new_config = {
+        "configurable": {
+            "thread_id": thread_id,
+            "user_name": request_body.user_name,
+            "agent_id": request_body.assistant_id
+        },
+        "recursion_limit": config.get("recursion_limit", 100)
+    }
+    
+    # 添加模型选择
+    if selected_model:
+        new_config["configurable"]["selected_model"] = selected_model
         
-    return config
+    return new_config, stream_mode
 
 
 async def prepare_graph_input(request_body, config, thread_id):
-    """准备图输入 - 处理resume命令或普通输入，并处理文档上下文"""
-    # 处理 resume 命令或普通输入
-    if request_body.command and "resume" in request_body.command:
-        graph_input = Command(resume=request_body.command["resume"])
-        logger.info(f"Resuming execution with command: {request_body.command}")
-    elif request_body.input is not None:
-        graph_input = request_body.input
-    else:
-        raise BusinessException("Either 'input' or 'command' must be provided", ResponseCode.BAD_REQUEST)
+    """准备图输入 - 构建消息格式并处理文档上下文"""
+    # 构建消息格式的输入
+    messages = [{
+        "type": "human",
+        "content": request_body.query
+    }]
     
-    # 处理文档上下文
-    file_ids = None
+    # 如果有文档，添加到消息中
+    if request_body.file_ids:
+        messages[0]["file_ids"] = request_body.file_ids
     
-    # 从消息中获取 file_ids
-    if graph_input and "messages" in graph_input:
-        messages = graph_input["messages"]
-        if messages and len(messages) > 0:
-            last_msg = messages[-1]
-            if isinstance(last_msg, dict):
-                file_ids = last_msg.get("file_ids")
+    graph_input = {"messages": messages}
     
     # 如果有关联的文档，将文档内容添加到消息上下文中
-    if file_ids:
-        logger.info(f"检测到关联文档: {file_ids}, 文档数量: {len(file_ids) if isinstance(file_ids, list) else 'N/A'}")
+    if request_body.file_ids:
+        logger.info(f"检测到关联文档: {request_body.file_ids}, 文档数量: {len(request_body.file_ids)}")
         
         # 获取文档上下文
-        doc_context = document_service.get_document_context(file_ids)
+        doc_context = document_service.get_document_context(request_body.file_ids)
         if doc_context:
             # 在用户消息前插入文档上下文作为系统消息
             doc_message = {
@@ -131,7 +124,7 @@ async def prepare_graph_input(request_body, config, thread_id):
             # 保存会话和文档的关联
             agent_id = config.get("configurable", {}).get("agent_id", "diagnostic_agent")
             user_name = config.get("configurable", {}).get("user_name", "system")
-            await save_thread_file_associations(thread_id, file_ids, agent_id, user_name)
+            await save_thread_file_associations(thread_id, request_body.file_ids, agent_id, user_name)
     
     return graph_input
 
@@ -202,8 +195,8 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     # 准备运行（更新统计、确保线程映射）
     await prepare_run(thread_id, request_body, request)
     
-    # 准备配置
-    config = prepare_config(request_body, thread_id)
+    # 准备配置（返回 config, stream_mode）
+    config, stream_modes = prepare_config(request_body, thread_id)
     
     # 添加 agent_id 到配置
     agent_id = request_body.assistant_id
@@ -211,9 +204,6 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     
     # 准备输入（包括处理文档上下文）
     graph_input = await prepare_graph_input(request_body, config, thread_id)
-    
-    # 获取流式模式
-    stream_modes = request_body.stream_mode
     
     # 在 async with 内执行所有操作
     async with create_checkpointer() as checkpointer:
