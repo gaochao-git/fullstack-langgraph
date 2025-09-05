@@ -410,6 +410,99 @@ export const omind_patch = (url: string, body?: any, config: Omit<RequestConfig,
   return omind_axios(url, { ...config, method: 'PATCH', body });
 };
 
+/**
+ * 聊天专用流式请求
+ * 处理 LangGraph 的 SSE 事件格式
+ */
+export interface ChatStreamConfig {
+  method?: 'POST';
+  body?: any;
+  signal?: AbortSignal;
+  onEvent?: (eventType: string, eventData: any) => void;
+  onError?: (error: Error) => void;
+  onComplete?: () => void;
+}
+
+export async function omind_chat_stream(url: string, config: ChatStreamConfig = {}): Promise<void> {
+  const {
+    method = 'POST',
+    body,
+    signal,
+    onEvent,
+    onError,
+    onComplete
+  } = config;
+
+  // 添加认证token
+  const token = localStorage.getItem('token');
+  if (token) {
+    await tokenManager.checkAndRefreshIfNeeded();
+  }
+
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream',
+    ...(token && { 'Authorization': `Bearer ${localStorage.getItem('token')}` })
+  };
+
+  try {
+    const response = await fetch(url.startsWith('http') ? url : `${getBaseUrl()}${url}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw { 
+        code: response.status, 
+        message: error.message || `请求失败: ${response.status}`,
+        status: response.status 
+      };
+    }
+
+    // 处理 SSE 流
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+
+    while (reader) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === '') continue;
+        
+        if (line.startsWith('event: ')) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          try {
+            const eventData = JSON.parse(line.slice(6));
+            onEvent?.(currentEvent || 'data', eventData);
+          } catch (e) {
+            console.error('Failed to parse SSE data:', e, line);
+          }
+        }
+      }
+    }
+
+    onComplete?.();
+  } catch (error: any) {
+    if (error.name !== 'AbortError') {
+      onError?.(error);
+    }
+    throw error;
+  }
+}
+
 // 导出 axios 实例，供需要自定义配置的场景使用
 export { axiosInstance };
 
@@ -417,6 +510,7 @@ export { axiosInstance };
 export default {
   omind_axios,
   omind_fetch_stream,
+  omind_chat_stream,
   omind_get,
   omind_post,
   omind_put,

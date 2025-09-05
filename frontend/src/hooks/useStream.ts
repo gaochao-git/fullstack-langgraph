@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getBaseUrl, omind_post } from '@/utils/base_api';
+import { getBaseUrl, omind_post, omind_chat_stream } from '@/utils/base_api';
 
 // 消息类型定义
 export interface Message {
@@ -267,59 +267,19 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
         command: submitOptions?.command
       };
 
-      const response = await fetch(`${options.apiUrl.replace('/api/chat', '')}/api/chat/threads/${options.threadId}/runs/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Accept': 'text/event-stream',
-        },
-        body: JSON.stringify(requestBody),
+      // 使用统一的聊天流式请求方法
+      await omind_chat_stream(`/api/chat/threads/${options.threadId}/runs/stream`, {
+        body: requestBody,
         signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: response.statusText }));
-        throw { 
-          code: response.status, 
-          message: error.message || `请求失败: ${response.status}`,
-          status: response.status 
-        };
-      }
-
-      // 处理 SSE 流
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let currentEvent = '';
-
-      while (true) {
-        const { done, value } = await reader!.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line === '') continue;
-          
-          if (line.startsWith('event: ')) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith('data: ')) {
-            try {
-              const eventData = JSON.parse(line.slice(6));
-              handleStreamEvent(currentEvent || 'data', eventData);
-            } catch (e) {
-              console.error('Failed to parse SSE data:', e, line);
-            }
-          } else if (line.startsWith('id: ')) {
-            // 忽略 id 行
-            continue;
-          }
+        onEvent: handleStreamEvent,
+        onError: (error) => {
+          options.onError?.(error);
+        },
+        onComplete: () => {
+          // 流结束
+          streamingMessageRef.current = null;
         }
-      }
+      });
     } catch (error: any) {
       if (error.name !== 'AbortError') {
         options.onError?.(error);
