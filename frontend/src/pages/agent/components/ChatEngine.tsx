@@ -111,8 +111,7 @@ export default function ChatEngine({
       if (!threadIdFromUrl) {
         try {
           const newThread = await threadApi.create({
-            assistant_id: getAgentId(),  // 使用 assistant_id，与 LangGraph SDK 保持一致
-            user_name: getCurrentUsername(),
+            assistant_id: getAgentId()
           });
           // 更新URL
           const url = new URL(window.location.href);

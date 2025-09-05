@@ -27,6 +27,10 @@ export const threadApi = {
    */
   async create(data: ThreadCreateRequest): Promise<ThreadResponse> {
     const response = await omind_post('/api/chat/threads', data);
+    // 处理统一响应格式，实际数据在 response.data 中
+    if (response && response.status === 'ok' && response.data) {
+      return response.data;
+    }
     return response;
   },
 

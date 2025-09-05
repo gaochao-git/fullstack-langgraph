@@ -14,43 +14,11 @@ from ..utils import recover_thread_from_postgres
 
 logger = get_logger(__name__)
 
-# 删除所有threads_store、thread_messages、thread_interrupts相关全局变量和init_storage_refs相关内容
-
-# 使用Pydantic定义线程创建请求体
-class ThreadCreate(BaseModel):
-    assistant_id: Optional[str] = None 
-    user_name: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-
 # 定义线程响应体
 class ThreadResponse(BaseModel):
     thread_id: str
     created_at: str
-    metadata: Dict[str, Any]
-
-async def create_thread(thread_create: ThreadCreate):
-    """
-    创建线程，后续基于线程来管理线程状态和消息
-    """
-    thread_id = str(uuid.uuid4())
     
-    # 构建metadata，包含assistant_id和user_name
-    metadata = thread_create.metadata or {}
-    metadata.update({
-        "assistant_id": thread_create.assistant_id,  # 保持与请求参数一致
-        "user_name": thread_create.user_name,
-        "created_at": now_shanghai().isoformat()
-    })
-    
-    thread_data = {
-        "thread_id": thread_id,
-        "created_at": now_shanghai().isoformat(),
-        "metadata": metadata,
-        "state": {}
-    }
-    # 这里用户与线程的映射关系不需要写入数据库，在第一轮对话的时候需要拿到对话主题的时候写入映射表
-    logger.info(f"Created thread: {thread_id} for agent: {thread_create.assistant_id}, user: {thread_create.user_name}")
-    return ThreadResponse(**thread_data)
 
 async def get_thread(thread_id: str):
     """Get thread details"""

@@ -1,9 +1,11 @@
 """Agent API routes - 使用全局统一响应格式"""
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Request
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Request, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from src.shared.db.models import now_shanghai
+import uuid
 
 from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
@@ -19,7 +21,6 @@ from src.apps.auth.dependencies import get_current_user_optional
 
 # 导入LLM路由功能
 from .service.run_handler import stream_run_standard, invoke_run_standard, RunCreate, get_thread_file_ids
-from .service.threads import create_thread, ThreadCreate, ThreadResponse
 from .service.document_service import document_service
 from .service.document_export_service import document_export_service
 
@@ -386,33 +387,27 @@ async def toggle_permission_status(
 
 # ==================== LLM智能体流式处理路由 ====================
 
-@router.post("/chat/threads", response_model=ThreadResponse)
+class ThreadRequest(BaseModel):
+    assistant_id: str
+
+@router.post("/chat/threads", response_model=UnifiedResponse)
 async def create_thread_endpoint(
-    thread_create: Optional[ThreadCreate] = None,
-    request: Request = None,
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    request: ThreadRequest
 ):
     """创建新的对话线程"""
-    # 如果没有传递 body，创建一个空的 ThreadCreate 对象
-    if thread_create is None:
-        thread_create = ThreadCreate()
+    # 直接生成线程ID和时间戳
+    thread_id = str(uuid.uuid4())
+    created_at = now_shanghai().isoformat()
     
-    # 如果没有提供 user_name，从认证信息中获取
-    if not thread_create.user_name and current_user:
-        thread_create.user_name = current_user.get('username')
-    
-    # 如果是 agent_key 认证且没有提供 assistant_id，从认证信息中获取
-    if not thread_create.assistant_id and current_user and current_user.get('auth_type') == 'agent_key':
-        thread_create.assistant_id = current_user.get('agent_id')
-    
-    # 验证必需参数
-    if not thread_create.assistant_id:
-        raise BusinessException("必须提供智能体ID", ResponseCode.BAD_REQUEST)
-    
-    if not thread_create.user_name:
-        raise BusinessException("无法获取用户名", ResponseCode.BAD_REQUEST)
-    
-    return await create_thread(thread_create)
+    # 返回统一响应格式
+    return success_response(
+        data={
+            "thread_id": thread_id,
+            "created_at": created_at,
+            "assistant_id": request.assistant_id
+        },
+        msg="线程创建成功"
+    )
 
 
 @router.post("/chat/threads/{thread_id}/history")
