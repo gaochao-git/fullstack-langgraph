@@ -11,7 +11,7 @@ from src.apps.agent.service.streaming import invoke_run_standard, RunCreate
 async def test_invoke():
     """直接测试invoke_run_standard函数"""
     request_body = RunCreate(
-        assistant_id="diagnostic_agent",
+        agent_id="diagnostic_agent",
         input={
             "messages": [{"role": "human", "content": "你好"}],
             "user_name": "test_user"

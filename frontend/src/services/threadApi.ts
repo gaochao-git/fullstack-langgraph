@@ -8,7 +8,7 @@ export interface ThreadFiles {
 }
 
 export interface ThreadCreateRequest {
-  assistant_id: string;  // 使用 assistant_id，与 LangGraph SDK 保持一致
+  agent_id: string;  // 使用 agent_id，与系统命名保持一致
   user_name: string;
   metadata?: Record<string, any>;  // 保留用于其他扩展信息
 }

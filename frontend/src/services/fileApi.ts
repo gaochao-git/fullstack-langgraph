@@ -37,9 +37,9 @@ export const fileApi = {
     const formData = new FormData();
     formData.append('file', file);
     
-    // 将 assistant_id 和 user_name 也放入 FormData
+    // 将 agent_id 和 user_name 也放入 FormData
     if (assistantId) {
-      formData.append('assistant_id', assistantId);
+      formData.append('agent_id', assistantId);
     }
     if (userName) {
       formData.append('user_name', userName);

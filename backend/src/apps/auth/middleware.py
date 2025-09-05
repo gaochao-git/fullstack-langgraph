@@ -101,7 +101,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 user_name = None
                 
                 # 从查询参数获取
-                agent_id = request.query_params.get("assistant_id") or request.query_params.get("agent_id")
+                agent_id = request.query_params.get("agent_id")
                 
                 # 如果是POST请求且查询参数中没有，尝试从请求体获取
                 if request.method == "POST" and not agent_id:
@@ -117,7 +117,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                             try:
                                 data = json.loads(body)
                                 if not agent_id:
-                                    agent_id = data.get("assistant_id") or data.get("agent_id")
+                                    agent_id = data.get("agent_id")
                             except json.JSONDecodeError:
                                 pass
                     
@@ -135,7 +135,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                             form = await form_request.form()
                             
                             if not agent_id:
-                                agent_id = form.get("assistant_id") or form.get("agent_id")
+                                agent_id = form.get("agent_id")
                             
                             # 保存form数据以供后续使用
                             request._form = form

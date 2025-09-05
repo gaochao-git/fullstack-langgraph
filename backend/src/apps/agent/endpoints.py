@@ -388,7 +388,7 @@ async def toggle_permission_status(
 # ==================== LLM智能体流式处理路由 ====================
 
 class ThreadRequest(BaseModel):
-    assistant_id: str
+    agent_id: str
 
 @router.post("/v1/chat/threads", response_model=UnifiedResponse)
 async def create_thread_endpoint(
@@ -404,7 +404,7 @@ async def create_thread_endpoint(
         data={
             "thread_id": thread_id,
             "created_at": created_at,
-            "assistant_id": request.assistant_id
+            "agent_id": request.agent_id
         },
         msg="线程创建成功"
     )
@@ -506,14 +506,14 @@ async def get_threads(
 @router.post("/v1/chat/files", response_model=UnifiedResponse)
 async def create_file(
     file: UploadFile = File(...),
-    assistant_id: Optional[str] = Form(None, description="智能体ID（agent_key认证时必须）"),
+    agent_id: Optional[str] = Form(None, description="智能体ID（agent_key认证时必须）"),
     user_name: Optional[str] = Form(None, description="上传文件的用户名（agent_key认证时必须）"),
     db: AsyncSession = Depends(get_async_db),
     request: Request = None,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """上传文档文件"""
-    # 如果是 agent_key 认证，assistant_id 和 user_name 应该已经在中间件验证过了
+    # 如果是 agent_key 认证，agent_id 和 user_name 应该已经在中间件验证过了
     # 如果是 JWT 认证，从 current_user 获取用户名
     if not user_name and current_user:
         user_name = current_user.get('username')

@@ -276,7 +276,7 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
     try {
       // 构建新的请求格式
       const requestBody: any = {
-        assistant_id: options.assistantId,
+        agent_id: options.assistantId,
         user_name: submitOptions?.config?.configurable?.user_name || 'anonymous',
         query: userQuery,
       };

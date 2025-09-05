@@ -68,7 +68,7 @@ def call_agent_task(agent_id, message, user_name="system", conversation_id=None,
                 }
             },
             "stream_mode": ["messages", "values", "updates"],  # 包含消息历史模式
-            "assistant_id": agent_id  # 直接使用agent_id
+            "agent_id": agent_id  # 直接使用agent_id
         }
         
         api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{conversation_id}/runs/stream"

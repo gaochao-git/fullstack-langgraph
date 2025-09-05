@@ -188,7 +188,7 @@ payload = {
     },
     "config": {"configurable": {"selected_model": "deepseek-chat", "file_ids": ["9b521165-a223-4934-8f35-ae2021a831a9"]}},
     "stream_mode": ["messages-tuple", "values", "updates"],
-    "assistant_id": "{智能体id}",
+    "agent_id": "{智能体id}",
     "on_disconnect": "cancel",
 }
 api_url = f"{AGENT_API_BASE_URL}/api/chat/threads/{thread_id}/runs/stream"

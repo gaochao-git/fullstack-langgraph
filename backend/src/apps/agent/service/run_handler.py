@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 
 # 定义运行请求体
 class RunCreate(BaseModel):
-    assistant_id: str  # 智能体ID（必需）
+    agent_id: str  # 智能体ID（必需）
     user_name: str  # 用户名（必需）
     query: str  # 查询内容（必需）
     chat_mode: str = "streaming"  # 聊天模式：streaming 或 blocking
@@ -35,7 +35,7 @@ class RunCreate(BaseModel):
 async def prepare_run(thread_id: str, request_body: RunCreate, request=None) -> tuple[str, dict, str]:
     """更新智能体使用统计，确保用户线程映射"""
     # 更新智能体使用统计
-    agent_id = request_body.assistant_id
+    agent_id = request_body.agent_id
     try:
         async with get_async_db_context() as async_db:
             await agent_service.increment_run_count(async_db, agent_id)
@@ -62,8 +62,8 @@ async def ensure_user_thread_mapping(user_name, thread_id, request_body):
         # 使用 query 作为标题
         thread_title = request_body.query[:20] + "..." if len(request_body.query) > 20 else request_body.query
         
-        # 从request_body中获取assistant_id，内部作为agent_id使用
-        agent_id = request_body.assistant_id
+        # 从request_body中获取agent_id，内部作为agent_id使用
+        agent_id = request_body.agent_id
         
         logger.info(f"创建用户线程映射: user_name={user_name}, thread_id={thread_id}, thread_title={thread_title}, agent_id={agent_id}")
         await create_user_thread_mapping(user_name, thread_id, thread_title, agent_id)
@@ -81,7 +81,7 @@ def prepare_config(request_body, thread_id):
         "configurable": {
             "thread_id": thread_id,
             "user_name": request_body.user_name,
-            "agent_id": request_body.assistant_id
+            "agent_id": request_body.agent_id
         },
         "recursion_limit": config.get("recursion_limit", 100)
     }
@@ -200,7 +200,7 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     config, stream_modes = prepare_config(request_body, thread_id)
     
     # 添加 agent_id 到配置
-    agent_id = request_body.assistant_id
+    agent_id = request_body.agent_id
     config["configurable"]["agent_id"] = agent_id
     
     # 准备输入（包括处理文档上下文）

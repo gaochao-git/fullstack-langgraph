@@ -110,7 +110,7 @@ export default function ChatEngine({
       if (!threadIdFromUrl) {
         try {
           const newThread = await threadApi.create({
-            assistant_id: getAgentId()
+            agent_id: getAgentId()
           });
           // 更新URL
           const url = new URL(window.location.href);
@@ -297,7 +297,7 @@ export default function ChatEngine({
       const params = new URLSearchParams({
         limit: '20',
         offset: offset.toString(),
-        assistant_id: agentId,
+        agent_id: agentId,
         user_name: username
       });
       const url = `/api/v1/chat/threads?${params.toString()}`;
