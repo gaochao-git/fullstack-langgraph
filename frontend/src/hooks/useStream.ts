@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { getBaseUrl, omind_post, omind_chat_stream } from '@/utils/base_api';
+import { getBaseUrl, omind_get, omind_post, omind_chat_stream } from '@/utils/base_api';
 
 // 消息类型定义
 export interface Message {
@@ -49,7 +49,7 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
       // 从后端获取线程历史消息
       const loadHistory = async () => {
         try {
-          const response = await omind_post(`/api/chat/threads/${options.threadId}/history`, {});
+          const response = await omind_get(`/api/chat/threads/${options.threadId}`);
           
           // 检查响应状态
           if (response.status === 'ok' && response.data) {

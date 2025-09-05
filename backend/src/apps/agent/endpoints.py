@@ -410,13 +410,13 @@ async def create_thread_endpoint(
     )
 
 
-@router.post("/chat/threads/{thread_id}/history", response_model=UnifiedResponse)
-async def get_thread_history_endpoint(
+@router.get("/chat/threads/{thread_id}", response_model=UnifiedResponse)
+async def get_thread_detail(
     thread_id: str,
     limit: int = Query(50, ge=1, le=100, description="返回的消息数量"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """获取线程历史记录"""
+    """获取线程详情（历史记录）"""
     from .service.threads import get_thread_history_post
     
     # 调用原有的服务方法
@@ -425,7 +425,7 @@ async def get_thread_history_endpoint(
     # 返回标准格式
     return success_response(
         data=history[:limit] if history else [],
-        msg="获取历史记录成功"
+        msg="获取线程详情成功"
     )
 
 
@@ -462,9 +462,9 @@ async def invoke_run_standard_endpoint(
 
 @router.get("/chat/threads")
 async def get_threads(
+    agent_id: Optional[str] = Query(None, description="智能体ID"),
     user_name: Optional[str] = Query(None, description="用户名"), 
-    assistant_id: Optional[str] = Query(None, description="智能体ID"),
-    limit: int = Query(10, ge=1, le=100, description="每页数量"),
+    limit: int = Query(20, ge=1, le=100, description="每页数量"),
     offset: int = Query(0, ge=0, description="偏移量"),
     request: Request = None,
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -476,19 +476,19 @@ async def get_threads(
     if not user_name and current_user:
         user_name = current_user.get('username')
     
-    # 如果是agent_key认证且没有传assistant_id，从认证信息中获取
-    if not assistant_id and current_user and current_user.get('auth_type') == 'agent_key':
-        assistant_id = current_user.get('agent_id')
+    # 如果是agent_key认证且没有传agent_id，从认证信息中获取
+    if not agent_id and current_user and current_user.get('auth_type') == 'agent_key':
+        agent_id = current_user.get('agent_id')
     
     if not user_name:
         raise BusinessException("必须提供用户名", ResponseCode.BAD_REQUEST)
     
-    threads = await get_user_threads(user_name, limit, offset, agent_id=assistant_id)
+    threads = await get_user_threads(user_name, limit, offset, agent_id=agent_id)
     
     return success_response(
         data={
             "user_name": user_name,
-            "agent_id": assistant_id,
+            "agent_id": agent_id,
             "threads": threads,
             "total": len(threads),
             "limit": limit,
