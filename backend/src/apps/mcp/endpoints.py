@@ -16,6 +16,7 @@ from src.apps.mcp.schema import (
 )
 from src.apps.mcp.service.mcp_service import mcp_service
 from src.apps.mcp.service.mcp_gateway_service import mcp_gateway_service
+from src.apps.mcp.service.mcp_reload_service import reload_mcp_gateway
 from src.shared.schemas.response import (
     UnifiedResponse, success_response, paginated_response, ResponseCode
 )
@@ -597,3 +598,26 @@ async def delete_gateway_config(
     except Exception as e:
         logger.error(f"删除MCP Gateway配置失败: {str(e)}", exc_info=True)
         raise BusinessException("删除配置失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.post("/v1/mcp/gateway/reload", response_model=UnifiedResponse)
+async def reload_gateway():
+    """手动触发MCP Gateway热加载配置"""
+    try:
+        success = await reload_mcp_gateway()
+        if success:
+            return success_response(
+                data={"reloaded": True},
+                msg="MCP Gateway配置重新加载成功"
+            )
+        else:
+            raise BusinessException(
+                "MCP Gateway配置重新加载失败，请检查Gateway服务是否正常运行",
+                ResponseCode.BAD_REQUEST
+            )
+    except Exception as e:
+        logger.error(f"触发MCP Gateway热加载失败: {str(e)}", exc_info=True)
+        raise BusinessException(
+            f"触发热加载失败: {str(e)}", 
+            ResponseCode.INTERNAL_ERROR
+        )

@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     MULTIMODAL_SERVICE_URL: Optional[str] = None
     MULTIMODAL_SERVICE_TIMEOUT: int = 30
     
+    # MCP配置
+    MCP_RELOAD_URL: Optional[str] = None
+    
     # 消息监控配置
     MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8  # 当总消息量超过模型上下文长度的多少比例时触发警告（默认 0.8 = 80%）
     MULTIMODAL_SERVICE_API_KEY: Optional[str] = None

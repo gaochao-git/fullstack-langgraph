@@ -16,6 +16,7 @@ from src.apps.mcp.schema import (
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.logging import get_logger
+from src.apps.mcp.service.mcp_reload_service import reload_mcp_gateway
 
 logger = get_logger(__name__)
 
@@ -66,6 +67,10 @@ class MCPGatewayConfigService:
             await db.refresh(new_config)
             
             logger.info(f"创建MCP Gateway配置成功: {config_data.name}")
+            
+            # 触发热更新
+            await reload_mcp_gateway()
+            
             return new_config
 
     async def get_config_by_id(self, db: AsyncSession, config_id: int) -> Optional[MCPConfig]:
@@ -205,6 +210,10 @@ class MCPGatewayConfigService:
                 config = await self.get_config_by_id(db, config_id)
 
             logger.info(f"更新MCP Gateway配置成功: {config_id}")
+            
+            # 触发热更新
+            await reload_mcp_gateway()
+            
             return config
 
     async def delete_config(self, db: AsyncSession, config_id: int) -> bool:
@@ -222,6 +231,10 @@ class MCPGatewayConfigService:
             await db.flush()
 
             logger.info(f"删除MCP Gateway配置成功: {config_id}")
+            
+            # 触发热更新
+            await reload_mcp_gateway()
+            
             return True
 
     async def get_all_active_configs(self, db: AsyncSession) -> List[MCPConfig]:

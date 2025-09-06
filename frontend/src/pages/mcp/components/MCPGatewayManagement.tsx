@@ -33,7 +33,8 @@ import {
   CloudServerOutlined,
   BulbOutlined,
   DownOutlined,
-  UpOutlined
+  UpOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTheme } from '@/hooks/ThemeContext';
@@ -189,6 +190,28 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
     }
   };
 
+  const handleHotReload = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/gateway/reload`, {
+        method: 'POST'
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === 'ok') {
+          message.success('MCP Gateway配置热加载成功');
+        } else {
+          message.error(result.msg || 'MCP Gateway配置热加载失败');
+        }
+      } else {
+        const errorData = await response.json();
+        message.error(`热加载失败: ${errorData.msg || errorData.detail || '未知错误'}`);
+      }
+    } catch (error) {
+      console.error('热加载错误:', error);
+      message.error('MCP Gateway配置热加载失败');
+    }
+  };
 
   // 初始化数据
   useEffect(() => {
@@ -463,6 +486,21 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
               >
                 添加配置
               </Button>
+              <Popconfirm
+                title="热加载确认"
+                description="是否立即重新加载MCP Gateway配置？这将使所有配置变更立即生效。"
+                onConfirm={handleHotReload}
+                okText="确认热加载"
+                cancelText="取消"
+                okButtonProps={{ danger: true }}
+              >
+                <Button 
+                  danger
+                  icon={<ThunderboltOutlined />}
+                >
+                  热加载
+                </Button>
+              </Popconfirm>
             </Space>
           </Col>
         </Row>
