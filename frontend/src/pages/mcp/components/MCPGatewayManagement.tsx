@@ -824,9 +824,20 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                             
                             return (
                               <Card key={key} size="small" style={{ marginBottom: 8, background: isDark ? '#374151' : '#fafafa' }}>
-                                {/* 工具名称和描述在同一行 */}
+                                {/* 工具描述和名称在同一行 */}
                                 <Row gutter={16} align="middle" style={{ marginBottom: 12 }}>
-                                  <Col span={8}>
+                                  <Col span={5}>
+                                    <Form.Item
+                                      {...restField}
+                                      name={[name, 'description']}
+                                      label="工具描述"
+                                      rules={[{ required: true, message: '请输入工具描述' }]}
+                                      style={{ marginBottom: 0 }}
+                                    >
+                                      <Input placeholder="描述这个工具的功能和用途" />
+                                    </Form.Item>
+                                  </Col>
+                                  <Col span={15}>
                                     <Form.Item
                                       {...restField}
                                       name={[name, 'name']}
@@ -835,16 +846,6 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                       style={{ marginBottom: 0 }}
                                     >
                                       <Input placeholder="systeminfo" />
-                                    </Form.Item>
-                                  </Col>
-                                  <Col span={12}>
-                                    <Form.Item
-                                      {...restField}
-                                      name={[name, 'description']}
-                                      label="工具描述"
-                                      style={{ marginBottom: 0 }}
-                                    >
-                                      <Input placeholder="描述这个工具的功能和用途" />
                                     </Form.Item>
                                   </Col>
                                   <Col span={2}>
@@ -870,7 +871,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                   <>
                                     {/* HTTP方法和端点地址在同一行 */}
                                     <Row gutter={16} align="middle" style={{ marginBottom: 12 }}>
-                                      <Col span={4}>
+                                      <Col span={5}>
                                         <Form.Item
                                           {...restField}
                                           name={[name, 'method']}
@@ -886,7 +887,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                           </Select>
                                         </Form.Item>
                                       </Col>
-                                      <Col span={20}>
+                                      <Col span={19}>
                                         <Form.Item
                                           {...restField}
                                           name={[name, 'endpoint']}
