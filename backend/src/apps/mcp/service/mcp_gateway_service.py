@@ -68,8 +68,11 @@ class MCPGatewayConfigService:
             
             logger.info(f"创建MCP Gateway配置成功: {config_data.name}")
             
-            # 触发热更新
-            await reload_mcp_gateway()
+            # 触发热更新（失败不影响主流程）
+            try:
+                await reload_mcp_gateway()
+            except Exception as e:
+                logger.warning(f"热更新MCP Gateway失败，但配置已保存: {str(e)}")
             
             return new_config
 
@@ -211,8 +214,11 @@ class MCPGatewayConfigService:
 
             logger.info(f"更新MCP Gateway配置成功: {config_id}")
             
-            # 触发热更新
-            await reload_mcp_gateway()
+            # 触发热更新（失败不影响主流程）
+            try:
+                await reload_mcp_gateway()
+            except Exception as e:
+                logger.warning(f"热更新MCP Gateway失败，但配置已保存: {str(e)}")
             
             return config
 
@@ -232,8 +238,11 @@ class MCPGatewayConfigService:
 
             logger.info(f"删除MCP Gateway配置成功: {config_id}")
             
-            # 触发热更新
-            await reload_mcp_gateway()
+            # 触发热更新（失败不影响主流程）
+            try:
+                await reload_mcp_gateway()
+            except Exception as e:
+                logger.warning(f"热更新MCP Gateway失败，但配置已删除: {str(e)}")
             
             return True
 
