@@ -36,7 +36,8 @@ import {
   BulbOutlined,
   DownOutlined,
   UpOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useTheme } from '@/hooks/ThemeContext';
@@ -287,14 +288,33 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
     setEditingConfig(config);
     
     // 处理工具配置中的headers字段和args字段
-    const processedTools = (config.tools || []).map(tool => ({
-      ...tool,
-      headers: typeof tool.headers === 'object' && tool.headers !== null 
-        ? JSON.stringify(tool.headers, null, 2) 
-        : tool.headers,
-      // 确保args是数组格式
-      args: tool.args || []
-    }));
+    const processedTools = (config.tools || []).map(tool => {
+      // 将headers对象转换为headersList数组
+      const headersList = [];
+      const hasContentType = tool.headers && tool.headers['Content-Type'];
+      const hasAuthorization = tool.headers && tool.headers['Authorization'] !== undefined;
+      
+      if (tool.headers && typeof tool.headers === 'object') {
+        for (const [key, value] of Object.entries(tool.headers)) {
+          headersList.push({ key, value });
+        }
+      }
+      
+      // 确保至少有Content-Type和Authorization
+      if (!hasContentType) {
+        headersList.push({ key: 'Content-Type', value: 'application/json' });
+      }
+      if (!hasAuthorization) {
+        headersList.push({ key: 'Authorization', value: '' });
+      }
+      
+      return {
+        ...tool,
+        headersList,
+        // 确保args是数组格式
+        args: tool.args || []
+      };
+    });
     
     form.setFieldsValue({
       name: config.name,
@@ -312,31 +332,38 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   const handleSaveConfig = async (values: any) => {
     try {
       // 处理工具配置中的headers字段和args字段
-      const processedTools = (values.tools || []).map((tool: any) => ({
-        ...tool,
-        headers: tool.headers && typeof tool.headers === 'string' 
-          ? (() => {
-              try {
-                return JSON.parse(tool.headers);
-              } catch {
-                return {};
-              }
-            })()
-          : tool.headers,
-        // 处理参数配置
-        args: (tool.args || []).map((arg: any) => {
-          const processedArg = { ...arg };
-          // 如果是object类型且有properties字段，尝试解析JSON
-          if (arg.type === 'object' && arg.properties && typeof arg.properties === 'string') {
-            try {
-              processedArg.properties = JSON.parse(arg.properties);
-            } catch {
-              // 如果解析失败，保持原样
+      const processedTools = (values.tools || []).map((tool: any) => {
+        // 将headersList数组转换回headers对象
+        const headers: Record<string, string> = {};
+        if (tool.headersList && Array.isArray(tool.headersList)) {
+          tool.headersList.forEach((header: any) => {
+            if (header.key && header.value) {
+              headers[header.key] = header.value;
             }
-          }
-          return processedArg;
-        })
-      }));
+          });
+        }
+        
+        // 移除headersList，只保留headers
+        const { headersList, ...toolWithoutHeadersList } = tool;
+        
+        return {
+          ...toolWithoutHeadersList,
+          headers,
+          // 处理参数配置
+          args: (tool.args || []).map((arg: any) => {
+            const processedArg = { ...arg };
+            // 如果是object类型且有properties字段，尝试解析JSON
+            if (arg.type === 'object' && arg.properties && typeof arg.properties === 'string') {
+              try {
+                processedArg.properties = JSON.parse(arg.properties);
+              } catch {
+                // 如果解析失败，保持原样
+              }
+            }
+            return processedArg;
+          })
+        };
+      });
       
       const configData = {
         name: values.name,
@@ -797,43 +824,27 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                             
                             return (
                               <Card key={key} size="small" style={{ marginBottom: 8, background: isDark ? '#374151' : '#fafafa' }}>
-                                <Row gutter={16} align="middle">
-                                  <Col span={6}>
+                                {/* 工具名称和描述在同一行 */}
+                                <Row gutter={16} align="middle" style={{ marginBottom: 12 }}>
+                                  <Col span={8}>
                                     <Form.Item
                                       {...restField}
                                       name={[name, 'name']}
                                       label="工具名称"
                                       rules={[{ required: true, message: '请输入工具名称' }]}
-                                      style={{ marginBottom: isExpanded ? 24 : 0 }}
+                                      style={{ marginBottom: 0 }}
                                     >
                                       <Input placeholder="systeminfo" />
                                     </Form.Item>
                                   </Col>
-                                  <Col span={4}>
+                                  <Col span={12}>
                                     <Form.Item
                                       {...restField}
-                                      name={[name, 'method']}
-                                      label="HTTP方法"
-                                      rules={[{ required: true, message: '请选择HTTP方法' }]}
-                                      style={{ marginBottom: isExpanded ? 24 : 0 }}
+                                      name={[name, 'description']}
+                                      label="工具描述"
+                                      style={{ marginBottom: 0 }}
                                     >
-                                      <Select placeholder="POST">
-                                        <Select.Option value="GET">GET</Select.Option>
-                                        <Select.Option value="POST">POST</Select.Option>
-                                        <Select.Option value="PUT">PUT</Select.Option>
-                                        <Select.Option value="DELETE">DELETE</Select.Option>
-                                      </Select>
-                                    </Form.Item>
-                                  </Col>
-                                  <Col span={10}>
-                                    <Form.Item
-                                      {...restField}
-                                      name={[name, 'endpoint']}
-                                      label="端点地址"
-                                      rules={[{ required: true, message: '请输入端点地址' }]}
-                                      style={{ marginBottom: isExpanded ? 24 : 0 }}
-                                    >
-                                      <Input placeholder="http://localhost:8000/api/v1/mcp/tools/system_info" />
+                                      <Input placeholder="描述这个工具的功能和用途" />
                                     </Form.Item>
                                   </Col>
                                   <Col span={2}>
@@ -854,22 +865,110 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                     />
                                   </Col>
                                 </Row>
-                                {isExpanded && (
+                                
+                                {!isExpanded ? null : (
                                   <>
-                                    <Row gutter={16} style={{ marginTop: 16 }}>
-                                      <Col span={24}>
+                                    {/* HTTP方法和端点地址在同一行 */}
+                                    <Row gutter={16} align="middle" style={{ marginBottom: 12 }}>
+                                      <Col span={4}>
                                         <Form.Item
                                           {...restField}
-                                          name={[name, 'description']}
-                                          label="工具描述"
+                                          name={[name, 'method']}
+                                          label="请求方法"
+                                          rules={[{ required: true, message: '请选择HTTP方法' }]}
+                                          style={{ marginBottom: 0 }}
                                         >
-                                          <TextArea 
-                                            rows={2} 
-                                            placeholder="描述这个工具的功能和用途" 
-                                          />
+                                          <Select placeholder="POST">
+                                            <Select.Option value="GET">GET</Select.Option>
+                                            <Select.Option value="POST">POST</Select.Option>
+                                            <Select.Option value="PUT">PUT</Select.Option>
+                                            <Select.Option value="DELETE">DELETE</Select.Option>
+                                          </Select>
+                                        </Form.Item>
+                                      </Col>
+                                      <Col span={20}>
+                                        <Form.Item
+                                          {...restField}
+                                          name={[name, 'endpoint']}
+                                          label="接口地址"
+                                          rules={[{ required: true, message: '请输入端点地址' }]}
+                                          style={{ marginBottom: 0 }}
+                                        >
+                                          <Input placeholder="http://localhost:8000/api/v1/mcp/tools/system_info" />
                                         </Form.Item>
                                       </Col>
                                     </Row>
+                                    
+                                    {/* 请求头 Headers */}
+                                    <div style={{ marginBottom: 12 }}>
+                                      <div style={{ 
+                                        marginBottom: 8, 
+                                        display: 'flex', 
+                                        justifyContent: 'space-between', 
+                                        alignItems: 'center' 
+                                      }}>
+                                        <span style={{ fontWeight: 500 }}>Headers</span>
+                                      </div>
+                                      <div style={{
+                                        background: isDark ? '#1f2937' : '#f5f5f5',
+                                        padding: 12,
+                                        borderRadius: 6,
+                                        border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`
+                                      }}>
+                                        <Form.List name={[name, 'headersList']}>
+                                          {(headerFields, { add: addHeader, remove: removeHeader }) => (
+                                            <>
+                                              {headerFields.map((headerField, headerIndex) => (
+                                                <Row key={headerField.key} gutter={8} align="middle" style={{ marginBottom: 8 }}>
+                                                  <Col span={8}>
+                                                    <Form.Item
+                                                      {...headerField}
+                                                      name={[headerField.name, 'key']}
+                                                      style={{ marginBottom: 0 }}
+                                                    >
+                                                      <Input placeholder="Header Key" />
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={14}>
+                                                    <Form.Item
+                                                      {...headerField}
+                                                      name={[headerField.name, 'value']}
+                                                      style={{ marginBottom: 0 }}
+                                                    >
+                                                      <Input placeholder="Header Value" />
+                                                    </Form.Item>
+                                                  </Col>
+                                                  <Col span={2}>
+                                                    <Button
+                                                      type="text"
+                                                      danger
+                                                      icon={<CloseOutlined />}
+                                                      onClick={() => removeHeader(headerField.name)}
+                                                      size="small"
+                                                      style={{ fontSize: '16px' }}
+                                                    />
+                                                  </Col>
+                                                </Row>
+                                              ))}
+                                              <Button
+                                                type="dashed"
+                                                onClick={() => addHeader()}
+                                                icon={<PlusOutlined />}
+                                                size="small"
+                                                style={{ width: '100%' }}
+                                              >
+                                                添加请求头
+                                              </Button>
+                                            </>
+                                          )}
+                                        </Form.List>
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                                
+                                {isExpanded && (
+                                  <>
                                     
                                     {/* 参数配置区域 */}
                                     <div style={{ 
@@ -1052,27 +1151,8 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                       </Form.List>
                                     </div>
                                     
-                                    {/* 请求头和响应配置 */}
+                                    {/* 请求体和响应体配置 */}
                                     <Row gutter={16} style={{ marginTop: 16 }}>
-                                      <Col span={12}>
-                                        <Form.Item
-                                          {...restField}
-                                          name={[name, 'headers']}
-                                          label="请求头"
-                                          initialValue='{"Content-Type": "application/json"}'
-                                          normalize={(value) => {
-                                            if (typeof value === 'object' && value !== null) {
-                                              return JSON.stringify(value, null, 2);
-                                            }
-                                            return value;
-                                          }}
-                                        >
-                                          <TextArea 
-                                            rows={3} 
-                                            placeholder='{"Content-Type": "application/json"}' 
-                                          />
-                                        </Form.Item>
-                                      </Col>
                                       <Col span={12}>
                                         <Form.Item
                                           {...restField}
@@ -1085,17 +1165,17 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                                           />
                                         </Form.Item>
                                       </Col>
-                                    </Row>
-                                    
-                                    <Row gutter={16}>
-                                      <Col span={24}>
+                                      <Col span={12}>
                                         <Form.Item
                                           {...restField}
                                           name={[name, 'responseBody']}
                                           label="响应体模板"
                                           initialValue="{{.Response.Body}}"
                                         >
-                                          <Input placeholder="{{.Response.Body}}" />
+                                          <TextArea
+                                            rows={3}
+                                            placeholder="{{.Response.Body}}" 
+                                          />
                                         </Form.Item>
                                       </Col>
                                     </Row>
@@ -1104,7 +1184,12 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                               </Card>
                             );
                           })}
-                          <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} block>
+                          <Button type="dashed" onClick={() => add({
+                            headersList: [
+                              { key: 'Content-Type', value: 'application/json' },
+                              { key: 'Authorization', value: '' }
+                            ]
+                          })} icon={<PlusOutlined />} block>
                             添加工具
                           </Button>
                         </>
