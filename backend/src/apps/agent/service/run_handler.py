@@ -107,20 +107,34 @@ async def prepare_graph_input(request_body, config, thread_id):
     
     graph_input = {"messages": messages}
     
-    # 如果有关联的文档，将文档内容添加到消息上下文中
+    # 如果有关联的文档，将文档元信息添加到消息上下文中
     if request_body.file_ids:
         logger.info(f"检测到关联文档: {request_body.file_ids}, 文档数量: {len(request_body.file_ids)}")
         
-        # 获取文档上下文
-        doc_context = document_service.get_document_context(request_body.file_ids)
-        if doc_context:
-            # 在用户消息前插入文档上下文作为系统消息
+        # 获取文档元信息（不包含内容）
+        docs_info = document_service.get_documents_info(request_body.file_ids)
+        if docs_info:
+            # 构建文档信息的提示
+            files_summary = "\n".join([
+                f"- {doc['file_name']} (ID: {doc['file_id']}, 大小: {doc['file_size']} bytes)"
+                for doc in docs_info
+            ])
+            
+            # 在用户消息前插入文档元信息作为系统消息
             doc_message = {
                 "type": "system",
-                "content": f"请参考以下文档内容回答用户问题：\n\n{doc_context}"
+                "content": f"""用户上传了以下文档供参考：
+
+{files_summary}
+
+如果用户的问题需要参考这些文档的内容，请使用以下工具获取：
+- get_documents_content: 批量获取多个文档的内容
+- get_single_document_content: 获取单个文档的详细信息
+
+使用时传入对应的 file_id 即可获取文档内容。"""
             }
             graph_input["messages"].insert(0, doc_message)
-            logger.info(f"已添加文档上下文，长度: {len(doc_context)} 字符")
+            logger.info(f"已添加文档元信息，共 {len(docs_info)} 个文档")
             
             # 保存会话和文档的关联
             agent_id = config.get("configurable", {}).get("agent_id", "diagnostic_agent")
