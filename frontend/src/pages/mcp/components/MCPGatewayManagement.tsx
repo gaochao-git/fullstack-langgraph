@@ -337,8 +337,9 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
         const headers: Record<string, string> = {};
         if (tool.headersList && Array.isArray(tool.headersList)) {
           tool.headersList.forEach((header: any) => {
-            if (header.key && header.value) {
-              headers[header.key] = header.value;
+            // 保留所有有key的header，即使value为空
+            if (header.key) {
+              headers[header.key] = header.value || '';
             }
           });
         }
