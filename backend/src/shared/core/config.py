@@ -133,6 +133,7 @@ class Settings(BaseSettings):
     
     # MCP配置
     MCP_RELOAD_PID: Optional[str] = None  # MCP Gateway PID文件路径
+    MCP_GATEWAY_URL: Optional[str] = None  # MCP Gateway访问地址
     
     # 消息监控配置
     MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8  # 当总消息量超过模型上下文长度的多少比例时触发警告（默认 0.8 = 80%）

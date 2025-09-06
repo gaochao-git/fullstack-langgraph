@@ -151,6 +151,11 @@ export class MCPApi {
   static async getStatistics() {
     return await omind_get('/api/v1/mcp/servers/meta/statistics');
   }
+
+  // 获取MCP配置信息
+  static async getMCPConfig() {
+    return await omind_get('/api/v1/mcp/config');
+  }
 }
 
 export default MCPApi;

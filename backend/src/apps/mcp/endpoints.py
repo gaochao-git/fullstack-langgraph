@@ -22,6 +22,7 @@ from src.shared.schemas.response import (
 )
 from src.shared.core.exceptions import BusinessException
 from src.shared.core.logging import get_logger
+from src.shared.core.config import settings
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["MCP Server Management"])
@@ -619,5 +620,28 @@ async def reload_gateway():
         logger.error(f"触发MCP Gateway热加载失败: {str(e)}", exc_info=True)
         raise BusinessException(
             f"触发热加载失败: {str(e)}", 
+            ResponseCode.INTERNAL_ERROR
+        )
+
+
+@router.get("/v1/mcp/config", response_model=UnifiedResponse)
+async def get_mcp_config():
+    """获取MCP相关配置信息"""
+    try:
+        config_data = {
+            "gateway_url": settings.MCP_GATEWAY_URL,
+            "endpoints": {
+                "sse": "/sse",
+                "streamable_http": "/mcp"
+            }
+        }
+        return success_response(
+            data=config_data,
+            msg="获取MCP配置成功"
+        )
+    except Exception as e:
+        logger.error(f"获取MCP配置失败: {str(e)}", exc_info=True)
+        raise BusinessException(
+            "获取MCP配置失败", 
             ResponseCode.INTERNAL_ERROR
         )

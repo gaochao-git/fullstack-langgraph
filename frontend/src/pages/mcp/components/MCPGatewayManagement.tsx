@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getBaseUrl } from '@/utils/base_api';
+import MCPApi from '@/services/mcpApi';
 import { 
   Card, 
   Table, 
@@ -28,6 +29,7 @@ import {
   SettingOutlined,
   ApiOutlined,
   MinusCircleOutlined,
+  CopyOutlined,
   GlobalOutlined,
   ToolOutlined,
   CloudServerOutlined,
@@ -83,6 +85,9 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   
   // 工具展开状态
   const [expandedTools, setExpandedTools] = useState<Record<number, boolean>>({});
+  
+  // MCP配置信息
+  const [mcpConfig, setMcpConfig] = useState<{ gateway_url: string } | null>(null);
   
   const { message } = App.useApp();
   const [form] = Form.useForm();
@@ -213,9 +218,27 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
     }
   };
 
+  // 获取MCP配置信息
+  const fetchMCPConfig = async () => {
+    try {
+      const res = await MCPApi.getMCPConfig();
+      if (res.status === 'ok' && res.data) {
+        setMcpConfig(res.data);
+      } else {
+        setMcpConfig(null);
+        message.error('获取MCP Gateway地址失败');
+      }
+    } catch (error) {
+      console.error('获取MCP配置失败:', error);
+      setMcpConfig(null);
+      message.error('获取MCP Gateway地址失败，请检查后端配置');
+    }
+  };
+
   // 初始化数据
   useEffect(() => {
     fetchConfigs();
+    fetchMCPConfig();
   }, []);
 
   // 过滤配置
@@ -539,6 +562,85 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
                 <Tag>创建者: {selectedConfig.create_by}</Tag>
               </Space>
             </div>
+            
+            {/* 直接访问MCP Gateway端点 */}
+            {selectedConfig.routers && selectedConfig.routers.length > 0 && (
+              <div style={{ 
+                marginBottom: 16, 
+                padding: 16, 
+                background: isDark ? '#1f2937' : '#f9fafb',
+                borderRadius: 8,
+                border: isDark ? '1px solid #374151' : '1px solid #e5e7eb'
+              }}>
+                <div style={{ marginBottom: 12, fontWeight: 600, fontSize: 16 }}>
+                  直接访问MCP Gateway:
+                </div>
+                
+                {!mcpConfig ? (
+                  <div style={{ 
+                    padding: 20, 
+                    textAlign: 'center', 
+                    color: isDark ? '#f87171' : '#dc2626' 
+                  }}>
+                    <span>获取MCP Gateway地址失败，请检查后端配置</span>
+                  </div>
+                ) : (
+                  selectedConfig.routers.map((router, index) => {
+                    const baseUrl = mcpConfig.gateway_url;
+                    const routerPath = router.prefix.startsWith('/') ? router.prefix : `/${router.prefix}`;
+                  
+                  return (
+                    <div key={index} style={{ marginBottom: 12 }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <Tag color="orange">路由 {index + 1}</Tag>
+                        <span style={{ marginLeft: 8, color: isDark ? '#9ca3af' : '#6b7280' }}>
+                          {router.description || '无描述'}
+                        </span>
+                      </div>
+                      
+                      {/* SSE端点 */}
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                        <span style={{ width: 140, color: isDark ? '#9ca3af' : '#6b7280' }}>SSE:</span>
+                        <Input
+                          readOnly
+                          value={`${baseUrl}${routerPath}/sse`}
+                          style={{ flex: 1 }}
+                          addonAfter={
+                            <CopyOutlined
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${baseUrl}${routerPath}/sse`);
+                                message.success('已复制到剪贴板');
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          }
+                        />
+                      </div>
+                      
+                      {/* Streamable HTTP端点 */}
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{ width: 140, color: isDark ? '#9ca3af' : '#6b7280' }}>Streamable HTTP:</span>
+                        <Input
+                          readOnly
+                          value={`${baseUrl}${routerPath}/mcp`}
+                          style={{ flex: 1 }}
+                          addonAfter={
+                            <CopyOutlined
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${baseUrl}${routerPath}/mcp`);
+                                message.success('已复制到剪贴板');
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                          }
+                        />
+                      </div>
+                    </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
             <pre style={{ 
               background: isDark ? '#374151' : '#f5f5f5',
               padding: 16,
