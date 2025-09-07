@@ -102,12 +102,16 @@ async def prepare_graph_input(request_body, config, thread_id):
     }]
     
     # 如果有文档，获取文档信息并添加到消息中
+    docs_info = []
     if request_body.file_ids:
-        logger.info(f"检测到关联文档: {request_body.file_ids}, 文档数量: {len(request_body.file_ids)}")
+        logger.info(f"📎 检测到关联文档 {len(request_body.file_ids)} 个: {request_body.file_ids}")
         
-        # 获取文档元信息（不包含内容）
-        docs_info = document_service.get_documents_info(request_body.file_ids)
+        # 使用异步方法获取文档元信息（不包含内容）
+        async with get_async_db_context() as db:
+            docs_info = await document_service.get_documents_info_async(db, request_body.file_ids)
+        
         if docs_info:
+            logger.info(f"✅ 成功获取 {len(docs_info)} 个文档的元信息")
             # 构建files数组，包含文件的完整信息
             files = []
             for doc in docs_info:
@@ -119,11 +123,14 @@ async def prepare_graph_input(request_body, config, thread_id):
             
             # 将files信息添加到消息中，系统会自动转为additional_kwargs
             messages[0]["files"] = files
+            logger.debug(f"📋 已将文件信息添加到消息的 files 字段")
+        else:
+            logger.warning(f"⚠️ 未能获取到任何文档信息")
     
     graph_input = {"messages": messages}
     
     # 如果有关联的文档，将文档元信息添加到消息上下文中
-    if request_body.file_ids and docs_info:
+    if docs_info:
             # 构建文档信息的提示
             files_summary = "\n".join([
                 f"- {doc['file_name']} (ID: {doc['file_id']}, 大小: {doc['file_size']} bytes)"
@@ -138,10 +145,9 @@ async def prepare_graph_input(request_body, config, thread_id):
 {files_summary}
 
 如果用户的问题需要参考这些文档的内容，请使用以下工具获取：
-- get_documents_content: 批量获取多个文档的内容
-- get_single_document_content: 获取单个文档的详细信息
+- get_documents_content: 获取文档内容（支持单个或多个文档）
 
-使用时传入对应的 file_id 即可获取文档内容。"""
+使用时传入对应的 file_id 列表即可获取文档内容。"""
             }
             graph_input["messages"].insert(0, doc_message)
             logger.info(f"已添加文档元信息，共 {len(docs_info)} 个文档")

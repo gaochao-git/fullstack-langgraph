@@ -440,6 +440,51 @@ class DocumentService:
             except StopIteration:
                 pass
 
+    async def get_documents_info_async(self, db: AsyncSession, file_ids: List[str]) -> List[Dict[str, Any]]:
+        """
+        异步获取文档的元信息（不包含内容）
+        
+        Args:
+            db: 异步数据库会话
+            file_ids: 文件ID列表
+            
+        Returns:
+            文档信息列表，每个元素包含 file_id, file_name, file_size 等
+        """
+        from ..models import AgentDocumentUpload
+        
+        docs_info = []
+        
+        for file_id in file_ids:
+            try:
+                # 异步查询文档
+                result = await db.execute(
+                    select(AgentDocumentUpload).where(
+                        AgentDocumentUpload.file_id == file_id
+                    )
+                )
+                document = result.scalar_one_or_none()
+                
+                if document and document.process_status == 2:  # READY
+                    doc_info = {
+                        "file_id": document.file_id,
+                        "file_name": document.file_name,
+                        "file_size": document.file_size,
+                        "file_type": document.file_type,
+                        "upload_time": str(document.upload_time)
+                    }
+                    docs_info.append(doc_info)
+                    logger.debug(f"✅ 获取文档元信息成功: {doc_info['file_name']} (ID: {file_id})")
+                elif document and document.process_status != 2:
+                    logger.warning(f"⚠️ 文档 {file_id} 尚未就绪，状态: {document.process_status}")
+                else:
+                    logger.warning(f"❌ 文档 {file_id} 不存在")
+                    
+            except Exception as e:
+                logger.error(f"获取文档 {file_id} 元信息失败: {e}")
+                
+        return docs_info
+
     def get_document_context(self, file_ids: List[str], max_length: int = 10000000) -> str:
         """
         获取文档上下文（用于对话）
