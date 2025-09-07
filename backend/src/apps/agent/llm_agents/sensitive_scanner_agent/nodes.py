@@ -307,12 +307,29 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
             
         except Exception as e:
             logger.error(f"扫描 {source['source_name']} 时出错: {e}")
+            
+            # 处理不同类型的错误
+            error_message = str(e)
+            if "maximum context length" in error_message:
+                # 上下文长度超限错误
+                scan_result = "文件内容过长|||文件超出模型处理能力范围|||未发现敏感信息"
+                is_error = True
+            elif "Error code: 400" in error_message:
+                # 其他400错误
+                scan_result = "文件处理失败|||模型处理请求失败|||未发现敏感信息"
+                is_error = True
+            else:
+                # 其他错误
+                scan_result = f"扫描失败|||{error_message[:50]}...|||未发现敏感信息"
+                is_error = False
+            
             all_scan_results.append({
                 "source": source['source_name'],
                 "source_type": source.get('source_type', 'file'),
-                "scan_result": f"扫描失败: {str(e)}",
+                "scan_result": scan_result,
                 "has_sensitive": False,
                 "error": True,
+                "is_content_error": is_error,
                 "file_size": source['file_size'],
                 "word_count": source['word_count'],
                 "image_count": source['image_count'],
