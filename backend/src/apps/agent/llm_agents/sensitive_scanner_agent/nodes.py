@@ -222,6 +222,7 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     
     # 扫描概览
     report_parts.append("【扫描概览】")
+    report_parts.append("")  # 添加空行
     report_parts.append(f"📊 扫描范围：{len(scan_sources)} 个内容源")
     report_parts.append("")
     
@@ -299,6 +300,7 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     
     # 扫描总结
     report_parts.append("\n【扫描总结】")
+    report_parts.append("")  # 添加一个空行
     
     # 计算处理异常数（包括解析异常和扫描失败）
     total_errors = error_count + content_error_count
