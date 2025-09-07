@@ -49,6 +49,7 @@ export const fileApi = {
       headers: {
         'Content-Type': 'multipart/form-data'
       },
+      timeout: 300000,  // 文件上传超时时间设置为300秒
       onUploadProgress: (progressEvent: any) => {
         if (progressEvent.total && onProgress) {
           const percentComplete = Math.round((progressEvent.loaded * 100) / progressEvent.total);
