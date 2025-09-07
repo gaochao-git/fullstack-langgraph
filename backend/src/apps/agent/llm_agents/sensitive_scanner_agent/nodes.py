@@ -66,13 +66,23 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                         file_name = doc_info.get("file_name") or f"未知文件_{file_id[:8]}"
                         file_size = doc_info.get("file_size") or 0
                         
+                        # 计算文字数量
+                        word_count = len(content)
+                        
+                        # 统计图片数量
+                        image_pattern = r'\[图片[^\]]*\]'
+                        image_matches = re.findall(image_pattern, content)
+                        image_count = len(image_matches)
+                        
                         file_contents[file_id] = {
                             "content": content,
                             "file_name": file_name,
-                            "file_size": file_size
+                            "file_size": file_size,
+                            "word_count": word_count,
+                            "image_count": image_count
                         }
                         # 调试：记录获取到的文件信息（不记录内容，避免敏感信息泄露）
-                        logger.info(f"文件 {file_id} 信息: file_name={file_name}, file_size={file_size}")
+                        logger.info(f"文件 {file_id} 信息: file_name={file_name}, file_size={file_size}, words={word_count}, images={image_count}")
                     else:
                         errors.append(f"文件 {file_id} 不存在")
                 except Exception as e:
@@ -116,10 +126,13 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
         if file_info.get("content"):
             scan_sources.append({
                 "source_name": f"文件：{file_info.get('file_name', file_id)}",
-                "content": file_info["content"],  # 不再截断
+                "content": file_info["content"],
                 "source_type": "file",
                 "file_id": file_id,
-                "file_size": file_info.get("file_size", len(file_info["content"]))
+                "file_size": file_info.get("file_size", 0),
+                "word_count": file_info.get("word_count", 0),
+                "image_count": file_info.get("image_count", 0),
+                "file_name": file_info.get("file_name", "")
             })
     
     if not scan_sources:
@@ -198,17 +211,15 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                        "部分内容" in scan_content)
             has_sensitive = "未发现敏感信息" not in scan_content and not is_error
             
-            # 计算文字数量（包括全部内容）
-            word_count = len(source['content'])
-            
             all_scan_results.append({
                 "source": source['source_name'],
                 "scan_result": scan_content,
                 "has_sensitive": has_sensitive,
                 "is_content_error": is_error,
-                "file_size": source.get('file_size', 0),  # 保存文件大小
-                "word_count": word_count,  # 保存文字数量
-                "content": source['content']  # 保存内容用于后续图片检测
+                "file_size": source.get('file_size', 0),
+                "word_count": source.get('word_count', len(source['content'])),  # 优先使用预计算的值
+                "image_count": source.get('image_count', 0),  # 使用预计算的图片数量
+                "file_name": source.get('file_name', '')
             })
             
         except Exception as e:
@@ -218,9 +229,10 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                 "scan_result": f"扫描失败: {str(e)}",
                 "has_sensitive": False,
                 "error": True,
-                "file_size": source.get('file_size', 0),  # 保存文件大小
-                "word_count": 0,  # 错误时文字数量为0
-                "content": source.get('content', '')  # 保存内容用于后续图片检测
+                "file_size": source.get('file_size', 0),
+                "word_count": source.get('word_count', 0),
+                "image_count": source.get('image_count', 0),
+                "file_name": source.get('file_name', '')
             })
     
     # 构建最终的综合报告
@@ -228,14 +240,8 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     error_count = sum(1 for r in all_scan_results if r.get("error", False))
     content_error_count = sum(1 for r in all_scan_results if r.get("is_content_error", False))
     
-    # 统计总图片数量
-    total_image_count = 0
-    image_pattern = r'\[图片[^\]]*\]'
-    for result in all_scan_results:
-        content = result.get('content', '')
-        if content:
-            image_matches = re.findall(image_pattern, content)
-            total_image_count += len(image_matches)
+    # 统计总图片数量（直接使用预计算的值）
+    total_image_count = sum(result.get('image_count', 0) for result in all_scan_results)
     
     # 构建报告内容
     report_parts = []
@@ -299,15 +305,10 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
         # 添加文档信息行（第3行）
         file_size = result.get('file_size', 0)
         word_count = result.get('word_count', 0)
+        image_count = result.get('image_count', 0)
+        
         # 将字节转换为KB，保留1位小数
         file_size_kb = round(file_size / 1024, 1) if file_size > 0 else 0
-        
-        # 检查内容中是否包含图片标记
-        content = result.get('content', '')
-        # 匹配各种图片标记格式：[图片文件: xxx]、[图片 1]、[图片1]等
-        image_pattern = r'\[图片[^\]]*\]'
-        image_matches = re.findall(image_pattern, content)
-        image_count = len(image_matches)
         
         # 构建文档信息
         doc_info = f"3. 文档信息：文件大小: {file_size_kb}KB • 文字数量: {word_count}字"
@@ -328,14 +329,9 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     sensitive_files = []
     
     for result in all_scan_results:
-        # 提取文件名（安全地去掉"文件："前缀）
-        source_name = result['source']
-        file_prefix = "文件："
-        if source_name.startswith(file_prefix):
-            file_name = source_name[len(file_prefix):]
-        else:
-            file_name = source_name
-            
+        # 直接使用预存的文件名
+        file_name = result.get('file_name') or result['source']
+        
         # 收集异常文件
         if result.get("error") or result.get("is_content_error"):
             error_files.append(file_name)
