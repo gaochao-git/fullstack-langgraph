@@ -304,10 +304,7 @@ async def completion_handler(thread_id: str, request_body: RunCreate, request=No
         # 非流式处理
         return await invoke_run_standard(thread_id, request_body, request)
     else:
-        raise BusinessException(
-            f"不支持的chat_mode: {request_body.chat_mode}，必须是 'streaming' 或 'blocking'",
-            ResponseCode.BAD_REQUEST
-        )
+        raise BusinessException(f"chat_mode必须是 'streaming' 或 'blocking'", ResponseCode.BAD_REQUEST)
 
 
 async def save_thread_file_associations(thread_id: str, file_ids: List[str], agent_id: str, user_name: str) -> None:
