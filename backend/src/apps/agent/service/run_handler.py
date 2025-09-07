@@ -214,8 +214,7 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
                 event_id += 1
                 sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id)
                 yield sse_data
-                if chunk_has_interrupt:
-                    has_interrupt = True
+                if chunk_has_interrupt: has_interrupt = True
             except Exception as e:
                 logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
                 event_id += 1
