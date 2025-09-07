@@ -1,5 +1,6 @@
 """敏感数据扫描节点实现"""
 from typing import Dict, Any
+import re
 from langchain_core.messages import AIMessage
 from src.shared.db.config import get_async_db_context
 from src.apps.agent.service.document_service import document_service
@@ -60,13 +61,18 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                 try:
                     doc_info = await document_service.get_document_content(db, file_id)
                     if doc_info:
+                        # 安全地获取文件信息，避免None值
+                        content = doc_info.get("content") or ""
+                        file_name = doc_info.get("file_name") or f"未知文件_{file_id[:8]}"
+                        file_size = doc_info.get("file_size") or 0
+                        
                         file_contents[file_id] = {
-                            "content": doc_info.get("content", ""),
-                            "file_name": doc_info.get("file_name", ""),
-                            "file_size": doc_info.get("file_size", 0)
+                            "content": content,
+                            "file_name": file_name,
+                            "file_size": file_size
                         }
-                        # 调试：记录获取到的文件信息
-                        logger.info(f"文件 {file_id} 信息: file_name={doc_info.get('file_name')}, file_size={doc_info.get('file_size')}")
+                        # 调试：记录获取到的文件信息（不记录内容，避免敏感信息泄露）
+                        logger.info(f"文件 {file_id} 信息: file_name={file_name}, file_size={file_size}")
                     else:
                         errors.append(f"文件 {file_id} 不存在")
                 except Exception as e:
@@ -139,7 +145,7 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
 内容长度：{len(source['content'])} 字符
 
 待扫描内容：
-{source['content']}
+{source['content'][:500000]}
 
 你的任务：扫描上述内容中的所有敏感数据，并生成脱敏报告。
 
@@ -223,7 +229,6 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     content_error_count = sum(1 for r in all_scan_results if r.get("is_content_error", False))
     
     # 统计总图片数量
-    import re
     total_image_count = 0
     image_pattern = r'\[图片[^\]]*\]'
     for result in all_scan_results:
@@ -323,10 +328,11 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     sensitive_files = []
     
     for result in all_scan_results:
-        # 提取文件名（去掉"文件："前缀）
+        # 提取文件名（安全地去掉"文件："前缀）
         source_name = result['source']
-        if source_name.startswith("文件："):
-            file_name = source_name[3:]
+        file_prefix = "文件："
+        if source_name.startswith(file_prefix):
+            file_name = source_name[len(file_prefix):]
         else:
             file_name = source_name
             
