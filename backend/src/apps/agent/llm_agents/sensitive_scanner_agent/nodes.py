@@ -1,6 +1,7 @@
 """敏感数据扫描节点实现"""
 from typing import Dict, Any
 import re
+from datetime import datetime
 from langchain_core.messages import AIMessage
 from src.shared.db.config import get_async_db_context
 from src.apps.agent.service.document_service import document_service
@@ -461,6 +462,19 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
             "messages": state["messages"] + [AIMessage(content="未找到需要扫描的内容")]
         }
     
+    # 收集所有要添加的消息
+    messages_to_add = []
+    
+    # 添加开始扫描消息
+    messages_to_add.append(AIMessage(
+        content=f"开始扫描敏感数据，共 {len(scan_sources)} 个内容源...",
+        additional_kwargs={
+            "scan_phase": "start",
+            "total_sources": len(scan_sources),
+            "timestamp": datetime.now().isoformat()
+        }
+    ))
+    
     # 收集所有扫描结果
     all_scan_results = []
     
@@ -470,6 +484,18 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
         llm = get_llm()
         
         logger.info(f"扫描进度 [{i}/{len(scan_sources)}] - {source['source_name']}")
+        
+        # 添加扫描进度消息
+        messages_to_add.append(AIMessage(
+            content=f"[{i}/{len(scan_sources)}] 正在扫描: {source['source_name']}",
+            additional_kwargs={
+                "scan_phase": "progress",
+                "scan_step": i,
+                "total_steps": len(scan_sources),
+                "source_name": source['source_name'],
+                "timestamp": datetime.now().isoformat()
+            }
+        ))
         
         try:
             # 使用提示词模板
@@ -490,6 +516,20 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                        "解析失败" in scan_content or
                        "部分内容" in scan_content)
             has_sensitive = "未发现敏感信息" not in scan_content and not is_error
+            
+            # 保存扫描结果为消息
+            messages_to_add.append(AIMessage(
+                content=f"{source['source_name']} 扫描结果：\n{scan_content}",
+                additional_kwargs={
+                    "scan_phase": "result",
+                    "scan_step": i,
+                    "source_name": source['source_name'],
+                    "source_type": source.get('source_type', 'file'),
+                    "has_sensitive": has_sensitive,
+                    "is_error": is_error,
+                    "timestamp": datetime.now().isoformat()
+                }
+            ))
             
             all_scan_results.append({
                 "source": source['source_name'],
@@ -521,6 +561,19 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                 scan_result = f"扫描失败|||{error_message[:50]}...|||未发现敏感信息"
                 is_error = False
             
+            # 错误情况也保存为消息
+            messages_to_add.append(AIMessage(
+                content=f"{source['source_name']} 扫描出错：\n{scan_result}",
+                additional_kwargs={
+                    "scan_phase": "error",
+                    "scan_step": i,
+                    "source_name": source['source_name'],
+                    "error_message": error_message,
+                    "is_error": is_error,
+                    "timestamp": datetime.now().isoformat()
+                }
+            ))
+            
             all_scan_results.append({
                 "source": source['source_name'],
                 "source_type": source.get('source_type', 'file'),
@@ -537,7 +590,18 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     # 生成扫描报告
     final_report = generate_scan_report(scan_sources, all_scan_results)
     
-    # 只返回一个最终的综合报告消息
+    # 添加最终报告消息
+    messages_to_add.append(AIMessage(
+        content=final_report,
+        additional_kwargs={
+            "scan_phase": "complete",
+            "total_sources": len(scan_sources),
+            "total_results": len(all_scan_results),
+            "timestamp": datetime.now().isoformat()
+        }
+    ))
+    
+    # 返回所有消息（包括中间步骤）
     return {
-        "messages": state["messages"] + [AIMessage(content=final_report)]
+        "messages": state["messages"] + messages_to_add
     }
