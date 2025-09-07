@@ -138,13 +138,10 @@ async def prepare_graph_input(request_body, config, thread_id):
             # 在用户消息前插入文档元信息作为系统消息
             doc_message = {
                 "type": "system",
-                "content": f"""用户上传了以下文档供参考：
-
+                "content": f"""用户上传了以下文档供参考
 {files_summary}
-
 如果用户的问题需要参考这些文档的内容，请使用以下工具获取：
 - get_documents_content: 获取文档内容（支持单个或多个文档）
-
 使用时传入对应的 file_id 列表即可获取文档内容。"""
             }
             graph_input["messages"].insert(0, doc_message)
