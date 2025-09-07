@@ -205,20 +205,33 @@ export default function ChatEngine({
   }, [agent]); // 移除 currentModel 依赖，避免循环更新
 
 
-  // 当有线程ID时，获取关联的文件ID
+  // 从历史消息中提取文件信息
   useEffect(() => {
-    if (currentThreadId) {
-      threadApi.getThreadFiles(currentThreadId)
-        .then(result => {
-          setThreadFileIds(result.file_ids || []);
-          console.log('✅ 获取会话文件成功:', result.file_ids);
-        })
-        .catch(err => {
-          console.error('获取会话文件失败:', err);
-          setThreadFileIds([]);
-        });
+    if (thread.messages && thread.messages.length > 0) {
+      // 从所有消息中收集文件ID
+      const fileIds = new Set<string>();
+      
+      thread.messages.forEach(msg => {
+        // 检查 additional_kwargs 中的文件信息
+        const files = (msg as any).additional_kwargs?.files;
+        if (files && Array.isArray(files)) {
+          files.forEach((file: any) => {
+            if (file.file_id) {
+              fileIds.add(file.file_id);
+            }
+          });
+        }
+      });
+      
+      const uniqueFileIds = Array.from(fileIds);
+      setThreadFileIds(uniqueFileIds);
+      if (uniqueFileIds.length > 0) {
+        console.log('✅ 从历史消息中提取文件ID:', uniqueFileIds);
+      }
+    } else {
+      setThreadFileIds([]);
     }
-  }, [currentThreadId]);
+  }, [thread.messages]);
 
 
   const handleSubmit = useCallback(

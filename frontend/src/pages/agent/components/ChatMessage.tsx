@@ -45,9 +45,17 @@ const FileAttachments: React.FC<FileAttachmentsProps> = ({ message, isDark, onPr
   const { message: antMessage } = App.useApp();
   const [fileInfos, setFileInfos] = useState<{[key: string]: {fileName: string; fileType: string}}>({});
   
-  // 从消息的 additional_kwargs 获取 file_ids 和 file_names
-  const fileIds = (message as any).additional_kwargs?.file_ids || [];
-  const fileNames = (message as any).additional_kwargs?.file_names || {};
+  // 从消息的 additional_kwargs 获取文件信息
+  const files = (message as any).additional_kwargs?.files || [];
+  const fileIds = files.map((f: any) => f.file_id);
+  
+  // 构建文件名映射
+  const fileNames: {[key: string]: string} = {};
+  files.forEach((f: any) => {
+    if (f.file_id && f.file_name) {
+      fileNames[f.file_id] = f.file_name;
+    }
+  });
   
   // 获取文件扩展名
   const getFileExtension = (fileName: string): string => {

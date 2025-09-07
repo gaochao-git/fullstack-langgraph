@@ -1,11 +1,7 @@
 /**
  * 会话线程相关API
  */
-import { omind_get, omind_post } from '@/utils/base_api';
-
-export interface ThreadFiles {
-  file_ids: string[];
-}
+import { omind_post } from '@/utils/base_api';
 
 export interface ThreadCreateRequest {
   agent_id: string;  // 使用 agent_id，与系统命名保持一致
@@ -32,15 +28,5 @@ export const threadApi = {
       return response.data;
     }
     return response;
-  },
-
-  /**
-   * 获取会话关联的文件ID列表
-   * @param threadId 会话ID
-   * @returns 文件ID列表
-   */
-  async getThreadFiles(threadId: string): Promise<ThreadFiles> {
-    const response = await omind_get(`/api/v1/agents/threads/${threadId}/files`);
-    return response.data;
   }
 };

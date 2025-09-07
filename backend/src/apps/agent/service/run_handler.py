@@ -101,19 +101,29 @@ async def prepare_graph_input(request_body, config, thread_id):
         "content": request_body.query
     }]
     
-    # 如果有文档，添加到消息中
-    if request_body.file_ids:
-        messages[0]["file_ids"] = request_body.file_ids
-    
-    graph_input = {"messages": messages}
-    
-    # 如果有关联的文档，将文档元信息添加到消息上下文中
+    # 如果有文档，获取文档信息并添加到消息中
     if request_body.file_ids:
         logger.info(f"检测到关联文档: {request_body.file_ids}, 文档数量: {len(request_body.file_ids)}")
         
         # 获取文档元信息（不包含内容）
         docs_info = document_service.get_documents_info(request_body.file_ids)
         if docs_info:
+            # 构建files数组，包含文件的完整信息
+            files = []
+            for doc in docs_info:
+                files.append({
+                    "file_id": doc['file_id'],
+                    "file_name": doc['file_name'],
+                    "file_size": doc['file_size']
+                })
+            
+            # 将files信息添加到消息中，系统会自动转为additional_kwargs
+            messages[0]["files"] = files
+    
+    graph_input = {"messages": messages}
+    
+    # 如果有关联的文档，将文档元信息添加到消息上下文中
+    if request_body.file_ids and docs_info:
             # 构建文档信息的提示
             files_summary = "\n".join([
                 f"- {doc['file_name']} (ID: {doc['file_id']}, 大小: {doc['file_size']} bytes)"
