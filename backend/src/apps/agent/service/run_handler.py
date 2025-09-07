@@ -94,10 +94,7 @@ def prepare_config(request_body, thread_id):
 async def prepare_graph_input(request_body, config, thread_id):
     """准备图输入 - 构建消息格式并处理文档上下文"""
     # 构建消息格式的输入
-    messages = [{
-        "type": "human",
-        "content": request_body.query
-    }]
+    messages = [{"type": "human","content": request_body.query}]
     
     # 如果有文档，获取文档信息并添加到消息中
     docs_info = []
