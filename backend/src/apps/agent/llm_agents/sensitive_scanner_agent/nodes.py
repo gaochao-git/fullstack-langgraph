@@ -186,7 +186,10 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
             
             # 判断扫描结果类型
             scan_content = result.content
-            is_error = "文件内容异常" in scan_content
+            # 检查是否为解析失败或内容异常（通过LLM返回的文档解析状态判断）
+            is_error = ("文件内容异常" in scan_content or 
+                       "解析失败" in scan_content or
+                       "部分内容" in scan_content)
             has_sensitive = "未发现敏感信息" not in scan_content and not is_error
             
             # 计算文字数量（包括全部内容）
@@ -198,7 +201,8 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                 "has_sensitive": has_sensitive,
                 "is_content_error": is_error,
                 "file_size": source.get('file_size', 0),  # 保存文件大小
-                "word_count": word_count  # 保存文字数量
+                "word_count": word_count,  # 保存文字数量
+                "content": source['content']  # 保存内容用于后续图片检测
             })
             
         except Exception as e:
@@ -209,7 +213,8 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                 "has_sensitive": False,
                 "error": True,
                 "file_size": source.get('file_size', 0),  # 保存文件大小
-                "word_count": 0  # 错误时文字数量为0
+                "word_count": 0,  # 错误时文字数量为0
+                "content": source.get('content', '')  # 保存内容用于后续图片检测
             })
     
     # 构建最终的综合报告
@@ -217,13 +222,25 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     error_count = sum(1 for r in all_scan_results if r.get("error", False))
     content_error_count = sum(1 for r in all_scan_results if r.get("is_content_error", False))
     
+    # 统计总图片数量
+    import re
+    total_image_count = 0
+    image_pattern = r'\[图片[^\]]*\]'
+    for result in all_scan_results:
+        content = result.get('content', '')
+        if content:
+            image_matches = re.findall(image_pattern, content)
+            total_image_count += len(image_matches)
+    
     # 构建报告内容
     report_parts = []
     
     # 扫描概览
     report_parts.append("【扫描概览】")
     report_parts.append("")  # 添加空行
-    report_parts.append(f"📊 扫描范围：{len(scan_sources)} 个内容源")
+    report_parts.append(f"扫描范围：{len(scan_sources)} 个内容源")
+    if total_image_count > 0:
+        report_parts.append(f"包含图片：{total_image_count} 张（已解析为文字）")
     report_parts.append("")
     
     # 扫描详情
@@ -281,8 +298,7 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
         file_size_kb = round(file_size / 1024, 1) if file_size > 0 else 0
         
         # 检查内容中是否包含图片标记
-        content = source['content']
-        import re
+        content = result.get('content', '')
         # 匹配各种图片标记格式：[图片文件: xxx]、[图片 1]、[图片1]等
         image_pattern = r'\[图片[^\]]*\]'
         image_matches = re.findall(image_pattern, content)
@@ -302,12 +318,42 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     report_parts.append("\n【扫描总结】")
     report_parts.append("")  # 添加一个空行
     
-    # 计算处理异常数（包括解析异常和扫描失败）
-    total_errors = error_count + content_error_count
+    # 收集异常文件和敏感信息文件的名称
+    error_files = []
+    sensitive_files = []
     
-    report_parts.append(f"• 总计扫描：{len(scan_sources)} 个内容源")
-    report_parts.append(f"• 处理异常：{total_errors} 个内容源")
-    report_parts.append(f"• 发现敏感信息：{sensitive_count} 个内容源")
+    for result in all_scan_results:
+        # 提取文件名（去掉"文件："前缀）
+        source_name = result['source']
+        if source_name.startswith("文件："):
+            file_name = source_name[3:]
+        else:
+            file_name = source_name
+            
+        # 收集异常文件
+        if result.get("error") or result.get("is_content_error"):
+            error_files.append(file_name)
+            
+        # 收集包含敏感信息的文件
+        if result.get("has_sensitive"):
+            sensitive_files.append(file_name)
+    
+    # 构建总结内容
+    report_parts.append(f"1. 总计扫描：{len(scan_sources)} 个内容源")
+    
+    # 文档异常
+    if error_files:
+        error_names = "、".join(error_files)
+        report_parts.append(f"2. 文档异常：{len(error_files)} 个内容源（{error_names}）")
+    else:
+        report_parts.append(f"2. 文档异常：0 个内容源")
+    
+    # 敏感信息
+    if sensitive_files:
+        sensitive_names = "、".join(sensitive_files)
+        report_parts.append(f"3. 敏感信息：{len(sensitive_files)} 个内容源（{sensitive_names}）")
+    else:
+        report_parts.append(f"3. 敏感信息：0 个内容源")
     
     final_report = "\n".join(report_parts)
     
