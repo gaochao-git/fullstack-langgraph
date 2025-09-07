@@ -191,15 +191,11 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     # 准备配置（返回 config, stream_mode）
     config, stream_modes = prepare_config(request_body, thread_id)
     
-    # 添加 agent_id 到配置
-    agent_id = request_body.agent_id
-    config["configurable"]["agent_id"] = agent_id
-    
     # 准备输入（包括处理文档上下文）
     graph_input = await prepare_graph_input(request_body, config, thread_id)
     
     # 创建图
-    graph = await AgentRegistry.create_agent(agent_id, config)
+    graph = await AgentRegistry.create_agent(request_body.agent_id, config)
     logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
     
     if is_streaming:
@@ -208,7 +204,6 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
         
         event_id = 0
         has_interrupt = False
-        
         async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
             try:
                 event_id += 1
