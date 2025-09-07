@@ -157,8 +157,8 @@ async def process_stream_chunk(chunk, event_id):
             namespace, event_type, data = chunk
         else:
             # 未知格式，尝试获取最后两个元素
-            event_type, data = chunk[-2:]
-            logger.warning(f"⚠️ 未知的chunk格式，长度={len(chunk)}, 尝试使用后两个元素")
+            logger.error(f"未知的chunk格式，长度={len(chunk)}")
+            raise BadRequestException("未知的chunk格式")
         
         serialized_data = serialize_value(data)
         
@@ -170,7 +170,7 @@ async def process_stream_chunk(chunk, event_id):
             
             # 检查 interrupt_data 是否为空
             if not interrupt_data or len(interrupt_data) == 0:
-                logger.warning(f"⚠️ 检测到空的中断数据: {interrupt_data}")
+                logger.warning(f"检测到空的中断数据: {interrupt_data}")
             
             has_interrupt = True
         
