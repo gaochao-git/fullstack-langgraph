@@ -164,49 +164,36 @@ def generate_scan_report(scan_sources: list, all_scan_results: list) -> str:
         if result.get('source_type') == 'user_input':
             display_source = "用户输入文本"
         else:
-            display_source = f"用户上传文件{result['file_name']}"
+            file_name = result['file_name']
+            # 如果是异常文件或包含敏感信息，文件名加粗
+            if result.get("error") or result.get("is_content_error") or result.get("has_sensitive"):
+                display_source = f"用户上传文件**{file_name}**"
+            else:
+                display_source = f"用户上传文件{file_name}"
         report_parts.append(f"\n内容源{i}:{display_source}")
         
-        # 准备默认状态（仅在LLM没有返回状态时使用）
-        if result.get("error") or result.get("is_content_error"):
-            status = "内容解析异常"
-        else:
-            status = "内容已解析"
+        # 准备四个标签的内容
+        # 1. 文档解析状态（从LLM返回内容中提取）
+        # 2. 文档摘要（从LLM返回内容中提取）
+        # 3. 文档信息（系统直接生成）
+        # 4. 敏感信息扫描结果（从LLM返回内容中提取）
         
-        # 从LLM返回的内容中提取信息
-        scan_content = result['scan_result']
+        # 初始化默认值
+        doc_parse_status = "内容已解析"  # 默认状态
+        doc_summary = "无摘要"  # 默认摘要
+        scan_result = "未发现敏感信息"  # 默认扫描结果
         
-        # 解析LLM的输出（现在有3行）并按顺序组装报告
-        lines = scan_content.strip().split('\n')
+        # 从LLM返回的内容中提取信息（使用|||分隔的格式）
+        scan_content = result['scan_result'].strip()
         
-        # 临时存储各部分内容
-        doc_parse_status = ""
-        doc_summary = ""
-        scan_result = ""
+        # 解析|||分隔的格式（现在有3部分）
+        parts = scan_content.split('|||')
+        if len(parts) >= 3:
+            doc_parse_status = parts[0].strip()
+            doc_summary = parts[1].strip()
+            scan_result = parts[2].strip()
         
-        for line in lines:
-            if line.startswith('1. '):
-                # 文档解析状态
-                doc_parse_status = '1. ' + line[3:]
-            elif line.startswith('2. '):
-                # 文档摘要
-                doc_summary = '2. ' + line[3:]
-            elif line.startswith('3. '):
-                # 敏感信息扫描结果
-                scan_result = '4. ' + line[3:]
-        
-        # 按正确的顺序添加到报告中
-        # 1. 文件状态（使用LLM返回的解析状态，而不是系统判断的状态）
-        if doc_parse_status:
-            report_parts.append(doc_parse_status)
-        else:
-            # 如果LLM没有返回状态，使用默认状态
-            report_parts.append(f"1. 文件状态：{status}")
-            
-        if doc_summary:
-            report_parts.append(doc_summary)
-        
-        # 添加文档信息行（第3行）
+        # 生成文档信息（系统计算）
         file_size = result.get('file_size', 0)
         word_count = result.get('word_count', 0)
         image_count = result.get('image_count', 0)
@@ -215,14 +202,15 @@ def generate_scan_report(scan_sources: list, all_scan_results: list) -> str:
         file_size_kb = round(file_size / 1024, 1) if file_size > 0 else 0
         
         # 构建文档信息
-        doc_info = f"3. 文档信息：文件大小: {file_size_kb}KB • 文字数量: {word_count}字"
+        doc_info = f"文件大小: {file_size_kb}KB • 文字数量: {word_count}字"
         if image_count > 0:
             doc_info += f"（含{image_count}张图片解析内容）"
-        report_parts.append(doc_info)
         
-        # 添加敏感信息扫描结果（第4行）
-        if scan_result:
-            report_parts.append(scan_result)
+        # 按固定格式输出四个标签
+        report_parts.append(f"1. 文档解析状态：{doc_parse_status}")
+        report_parts.append(f"2. 文档摘要：{doc_summary}")
+        report_parts.append(f"3. 文档信息：{doc_info}")
+        report_parts.append(f"4. 敏感信息扫描结果：{scan_result}")
     
     # 扫描总结
     report_parts.append("\n【扫描总结】")
@@ -290,7 +278,8 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
             prompt = SCAN_PROMPT_TEMPLATE.format(
                 source_name=source['source_name'],
                 content_length=len(source['content']),
-                content=source['content'][:500000]  # 限制内容长度
+                file_name=source['file_name'],
+                content=source['content']  # 不限制内容长度
             )
             
             # 调用LLM扫描
