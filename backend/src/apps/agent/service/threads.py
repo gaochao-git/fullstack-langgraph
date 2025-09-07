@@ -10,7 +10,7 @@ from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from pydantic import BaseModel
 
-from ..utils import recover_thread_from_postgres
+from ..checkpoint_factory import recover_thread_from_checkpoint as recover_thread_from_postgres
 
 logger = get_logger(__name__)
 

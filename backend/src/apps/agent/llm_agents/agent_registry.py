@@ -64,13 +64,12 @@ class AgentRegistry:
             logger.error("装饰器模块不存在")
     
     @classmethod
-    async def create_agent(cls, agent_id: str, config: Any, checkpointer: Any = None):
+    async def create_agent(cls, agent_id: str, config: Any):
         """动态创建 Agent 实例
         
         Args:
             agent_id: Agent 标识
             config: 运行配置
-            checkpointer: 检查点管理器
             
         Returns:
             Agent 图实例
@@ -80,14 +79,14 @@ class AgentRegistry:
         logger.info(f"[Agent创建] 从注册表获取Agent信息: {agent_info}")
         if not agent_info:
             logger.warning(f"未注册的 Agent: {agent_id}，使用 generic_agent 模板")
-            return await create_generic_agent(config, checkpointer)
+            return await create_generic_agent(config)
         try:
             # 直接使用保存的函数引用
             creator_func = agent_info['func']
             logger.info(f"创建 Agent: {agent_id}")
             
             # 创建 Agent
-            return await creator_func(config, checkpointer)
+            return await creator_func(config)
             
         except Exception as e:
             logger.error(f"创建 Agent {agent_id} 失败: {e}", exc_info=True)

@@ -17,8 +17,10 @@ logger = get_logger(__name__)
 
 # 注意：generic_agent 是模板，不要使用 @agent 装饰器注册
 # 前端会基于此模板创建自定义 Agent
-async def create_generic_agent(config: RunnableConfig, checkpointer=None):
+async def create_generic_agent(config: RunnableConfig):
     """创建通用智能体"""
+    from src.apps.agent.checkpoint_factory import get_checkpointer
+    
     # 参数验证
     configurable = config.get("configurable", {}) if config else {}
     agent_id = configurable.get("agent_id")
@@ -51,6 +53,6 @@ async def create_generic_agent(config: RunnableConfig, checkpointer=None):
         tools=tools,
         prompt=system_prompt,
         pre_model_hook=monitor_hook,
-        checkpointer=checkpointer,
+        checkpointer=get_checkpointer(),
         name=f"{agent_id}-agent"
     )

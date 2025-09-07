@@ -9,13 +9,7 @@ from datetime import datetime
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from langgraph.types import Command
-from .checkpoint_factory import create_checkpointer, test_checkpoint_connection, recover_thread_from_checkpoint as recover_thread_impl
-
 logger = get_logger(__name__)
-
-# 重新导出函数，保持接口兼容性
-test_postgres_connection = test_checkpoint_connection
-recover_thread_from_postgres = recover_thread_impl
 
 def serialize_value(val):
     """通用序列化函数"""

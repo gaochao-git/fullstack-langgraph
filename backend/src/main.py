@@ -23,8 +23,6 @@ from .shared.core.middleware import setup_middlewares
 from .shared.core.exceptions import EXCEPTION_HANDLERS
 from .router import api_router
 
-# 导入LLM相关模块
-from .apps.agent.utils import test_postgres_connection
 
 
 
@@ -75,17 +73,12 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_event():
         """应用启动事件"""
-        logger.info("🚀 测试PostgreSQL连接")
-        await test_postgres_connection()
-        
-        # 初始化 checkpoint（只在启动时执行一次）
+        # 初始化 checkpoint
         try:
-            from .apps.agent.checkpoint_factory import setup_checkpoint_once
-            await setup_checkpoint_once()
-            logger.info("✅ Checkpoint 初始化完成")
+            from .apps.agent import checkpoint_factory
+            await checkpoint_factory.init()
         except Exception as e:
-            logger.error(f"❌ Checkpoint 初始化失败: {e}", exc_info=True)
-            # 不阻止应用启动
+            logger.error(f"Checkpoint 初始化失败: {e}", exc_info=True)
         
         # 自动扫描并同步API权限
         try:
@@ -96,7 +89,15 @@ def create_app() -> FastAPI:
                 logger.warning(f"⚠️ 发现 {stats['orphaned']} 个孤立权限")
         except Exception as e:
             logger.error(f"❌ API权限同步失败: {e}", exc_info=True)
-            # 不阻止应用启动
+
+    @app.on_event("shutdown")
+    async def shutdown_event():
+        """应用关闭事件"""
+        try:
+            from .apps.agent import checkpoint_factory
+            await checkpoint_factory.cleanup()
+        except Exception as e:
+            logger.error(f"清理失败: {e}", exc_info=True)
 
     # 注册API路由
     app.include_router(api_router, prefix="/api")

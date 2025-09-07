@@ -13,7 +13,7 @@ from typing import Optional
 from sqlalchemy import select
 from langgraph.types import Command
 from src.shared.db.config import get_async_db_context
-from ..checkpoint_factory import create_checkpointer
+from ..checkpoint_factory import get_checkpointer
 from .document_service import document_service
 from ..utils import serialize_value
 from .user_threads_db import (check_user_thread_exists,create_user_thread_mapping)
@@ -220,68 +220,66 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     # 准备输入（包括处理文档上下文）
     graph_input = await prepare_graph_input(request_body, config, thread_id)
     
-    # 在 async with 内执行所有操作
-    async with create_checkpointer() as checkpointer:
-        # 创建图
-        graph = await AgentRegistry.create_agent(agent_id, config, checkpointer)
-        logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
+    # 创建图
+    graph = await AgentRegistry.create_agent(agent_id, config)
+    logger.info(f"[Agent创建] 动态创建智能体graph: {graph}")
+    
+    if is_streaming:
+        # 流式处理
+        logger.info(f"Starting stream with modes: {stream_modes}")
         
-        if is_streaming:
-            # 流式处理
-            logger.info(f"Starting stream with modes: {stream_modes}")
-            
-            event_id = 0
-            has_interrupt = False
-            
-            async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
-                try:
-                    event_id += 1
-                    sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
-                    yield sse_data
-                    if chunk_has_interrupt:
-                        has_interrupt = True
-                except Exception as e:
-                    logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
-                    event_id += 1
-                    yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
-            
-            # End event - only send if no interrupt occurred
-            if not has_interrupt:
+        event_id = 0
+        has_interrupt = False
+        
+        async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
+            try:
                 event_id += 1
-                yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
-            else:
-                logger.info("Skipping end event due to interrupt - waiting for user approval")
+                sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
+                yield sse_data
+                if chunk_has_interrupt:
+                    has_interrupt = True
+            except Exception as e:
+                logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
+                event_id += 1
+                yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
+        
+        # End event - only send if no interrupt occurred
+        if not has_interrupt:
+            event_id += 1
+            yield f"id: {event_id}\nevent: end\ndata: {json.dumps({'status': 'completed'}, ensure_ascii=False)}\n\n"
         else:
-            # 非流式处理
-            result = await graph.ainvoke(graph_input, config=config, stream_mode=stream_modes)
-            
-            # 处理结果
-            final_response = {
-                "thread_id": thread_id,
-                "status": "completed",
-                "result": result
-            }
-            
-            # 如果结果中有messages，提取最后一条AI消息
-            if isinstance(result, dict) and "messages" in result:
-                messages = result["messages"]
-                # 找到最后一条AI消息
-                for message in reversed(messages):
-                    # 检查 role 或 type 字段
-                    is_ai_message = False
-                    if hasattr(message, "role") and message.role == "assistant":
-                        is_ai_message = True
-                    elif hasattr(message, "type") and message.type == "ai":
-                        is_ai_message = True
-                    
-                    if is_ai_message:
-                        final_response["last_message"] = {
-                            "content": getattr(message, "content", str(message)),
-                            "type": "ai"  # 统一使用 type，与 LangGraph 消息格式保持一致
-                        }
-                        break
-            
-            yield final_response
+            logger.info("Skipping end event due to interrupt - waiting for user approval")
+    else:
+        # 非流式处理
+        result = await graph.ainvoke(graph_input, config=config, stream_mode=stream_modes)
+        
+        # 处理结果
+        final_response = {
+            "thread_id": thread_id,
+            "status": "completed",
+            "result": result
+        }
+        
+        # 如果结果中有messages，提取最后一条AI消息
+        if isinstance(result, dict) and "messages" in result:
+            messages = result["messages"]
+            # 找到最后一条AI消息
+            for message in reversed(messages):
+                # 检查 role 或 type 字段
+                is_ai_message = False
+                if hasattr(message, "role") and message.role == "assistant":
+                    is_ai_message = True
+                elif hasattr(message, "type") and message.type == "ai":
+                    is_ai_message = True
+                
+                if is_ai_message:
+                    final_response["last_message"] = {
+                        "content": getattr(message, "content", str(message)),
+                        "type": "ai"  # 统一使用 type，与 LangGraph 消息格式保持一致
+                    }
+                    break
+        
+        yield final_response
 
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):

@@ -18,6 +18,8 @@ logger = get_logger(__name__)
 @agent(**INIT_AGENT_CONFIG)
 async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
     """创建诊断智能体"""
+    from src.apps.agent.checkpoint_factory import get_checkpointer
+    
     # 内置智能体使用文件中定义的常量
     agent_id = INIT_AGENT_CONFIG["agent_id"]
     
@@ -47,7 +49,7 @@ async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
         tools=tools,
         prompt=system_prompt,
         pre_model_hook=monitor_hook,
-        checkpointer=checkpointer,
+        checkpointer=get_checkpointer(),
         name=f"{agent_id}-agent"
     )
 

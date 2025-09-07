@@ -10,8 +10,10 @@ from src.shared.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-def compile_graph(checkpointer=None):
+def compile_graph():
     """编译敏感数据扫描图"""
+    from src.apps.agent.checkpoint_factory import get_checkpointer
+    
     # 创建状态图（使用项目中的标准方式）
     workflow = StateGraph(OverallState)
     
@@ -26,10 +28,10 @@ def compile_graph(checkpointer=None):
     
     # 编译图
     logger.info(f"[Agent创建] 编译敏感数据扫描图")
-    return workflow.compile(checkpointer=checkpointer)
+    return workflow.compile(checkpointer=get_checkpointer())
 
 
 @agent(**INIT_AGENT_CONFIG)
 async def create_sensitive_scanner_agent(config: RunnableConfig, checkpointer=None):
     """创建敏感数据扫描智能体"""
-    return compile_graph(checkpointer)
+    return compile_graph()
