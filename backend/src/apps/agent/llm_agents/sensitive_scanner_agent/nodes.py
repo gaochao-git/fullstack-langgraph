@@ -235,11 +235,6 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
                 "file_name": source.get('file_name', '')
             })
     
-    # 构建最终的综合报告
-    sensitive_count = sum(1 for r in all_scan_results if r.get("has_sensitive", False))
-    error_count = sum(1 for r in all_scan_results if r.get("error", False))
-    content_error_count = sum(1 for r in all_scan_results if r.get("is_content_error", False))
-    
     # 统计总图片数量（直接使用预计算的值）
     total_image_count = sum(result.get('image_count', 0) for result in all_scan_results)
     
