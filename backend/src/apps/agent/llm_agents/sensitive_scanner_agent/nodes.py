@@ -65,6 +65,8 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                             "file_name": doc_info.get("file_name", ""),
                             "file_size": doc_info.get("file_size", 0)
                         }
+                        # 调试：记录获取到的文件信息
+                        logger.info(f"文件 {file_id} 信息: file_name={doc_info.get('file_name')}, file_size={doc_info.get('file_size')}")
                     else:
                         errors.append(f"文件 {file_id} 不存在")
                 except Exception as e:
@@ -165,13 +167,19 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
 输出要求：
 请严格按以下格式输出（每行紧凑，不要空行）：
 
-1. 文档摘要：[简要描述文档内容，不超过50字]
-2. 敏感信息扫描结果：• 发现[类型]：[脱敏后的值] (关联信息) 或 • 未发现敏感信息
+1. 文档解析状态：[内容完整/部分内容/解析失败]
+2. 文档摘要：[简要描述文档内容，不超过50字]
+3. 敏感信息扫描结果：• 发现[类型]：[脱敏后的值] (关联信息) 或 • 未发现敏感信息
+
+文档解析状态说明：
+- 内容完整：文档成功解析，内容完整
+- 部分内容：文档包含"内容过长，只获取部分信息"等提示
+- 解析失败：文档包含"解析失败"、"无法读取"、"需要安装"等错误信息
 
 重要：
-- 只需要输出这2行
+- 只需要输出这3行
 - 每行内容紧凑，不要换行
-- 多个敏感信息用 • 分隔，都在第2行内"""
+- 多个敏感信息用 • 分隔，都在第3行内"""
             
             # 调用LLM扫描
             result = await llm.ainvoke(prompt)
@@ -224,42 +232,66 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
         source_type = "用户输入文本" if i == 1 and "用户输入" in result['source'] else f"用户上传文件{result['source'].replace('文件：', '')}"
         report_parts.append(f"\n内容源{i}:{source_type}")
         
-        # 1. 文件状态
+        # 准备默认状态（仅在LLM没有返回状态时使用）
         if result.get("error"):
             status = "内容解析异常"
         elif result.get("is_content_error"):
             status = "内容解析异常"
-        # 可以根据内容长度判断是否截断（如果需要的话）
         else:
             status = "内容已解析"
-        report_parts.append(f"1. 文件状态：{status}")
         
         # 从LLM返回的内容中提取信息
         scan_content = result['scan_result']
         
-        # 解析LLM的输出（现在只有2行）并按顺序组装报告
+        # 解析LLM的输出（现在有3行）并按顺序组装报告
         lines = scan_content.strip().split('\n')
         
         # 临时存储各部分内容
+        doc_parse_status = ""
         doc_summary = ""
         scan_result = ""
         
         for line in lines:
             if line.startswith('1. '):
+                # 文档解析状态
+                doc_parse_status = '1. ' + line[3:]
+            elif line.startswith('2. '):
                 # 文档摘要
                 doc_summary = '2. ' + line[3:]
-            elif line.startswith('2. '):
+            elif line.startswith('3. '):
                 # 敏感信息扫描结果
                 scan_result = '4. ' + line[3:]
         
         # 按正确的顺序添加到报告中
+        # 1. 文件状态（使用LLM返回的解析状态，而不是系统判断的状态）
+        if doc_parse_status:
+            report_parts.append(doc_parse_status)
+        else:
+            # 如果LLM没有返回状态，使用默认状态
+            report_parts.append(f"1. 文件状态：{status}")
+            
         if doc_summary:
             report_parts.append(doc_summary)
         
         # 添加文档信息行（第3行）
         file_size = result.get('file_size', 0)
         word_count = result.get('word_count', 0)
-        report_parts.append(f"3. 文档信息：文件大小: {file_size} 字节 • 文字数量: {word_count}字")
+        # 将字节转换为KB，保留1位小数
+        file_size_kb = round(file_size / 1024, 1) if file_size > 0 else 0
+        
+        # 检查内容中是否包含图片标记
+        content = source['content']
+        import re
+        # 匹配各种图片标记格式：[图片文件: xxx]、[图片 1]、[图片1]等
+        image_pattern = r'\[图片[^\]]*\]'
+        image_matches = re.findall(image_pattern, content)
+        image_count = len(image_matches)
+        
+        # 构建文档信息
+        doc_info = f"3. 文档信息：文件大小: {file_size_kb}KB • 文字数量: {word_count}字"
+        if image_count > 0:
+            doc_info += f"（含{image_count}张图片解析内容）"
+        report_parts.append(doc_info)
         
         # 添加敏感信息扫描结果（第4行）
         if scan_result:

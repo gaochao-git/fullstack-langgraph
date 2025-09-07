@@ -348,6 +348,7 @@ class DocumentService:
         return {
             "file_id": file_id,
             "file_name": doc_upload.file_name,
+            "file_size": doc_upload.file_size,
             "content": doc_upload.doc_content or "",
             "metadata": metadata,
             "chunks": chunks
