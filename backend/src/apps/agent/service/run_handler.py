@@ -178,9 +178,7 @@ async def process_stream_chunk(chunk, event_id):
     else:
         # Handle dict format (fallback)
         serializable_chunk = {}
-        for key, value in chunk.items():
-            serializable_chunk[key] = serialize_value(value)
-        
+        for key, value in chunk.items(): serializable_chunk[key] = serialize_value(value)
         event_type = list(serializable_chunk.keys())[0] if serializable_chunk else "data"
         return f"id: {event_id}\nevent: {event_type}\ndata: {json.dumps(serializable_chunk[event_type], ensure_ascii=False)}\n\n", False
 
