@@ -26,12 +26,15 @@ def compile_graph():
     workflow.add_edge("fetch_files", "scan_files")
     workflow.add_edge("scan_files", END)
     
+    # 获取 checkpointer
+    checkpointer = get_checkpointer()
+    
     # 编译图
     logger.info(f"[Agent创建] 编译敏感数据扫描图")
-    return workflow.compile(checkpointer=get_checkpointer())
+    return workflow.compile(checkpointer=checkpointer)
 
 
 @agent(**INIT_AGENT_CONFIG)
-async def create_sensitive_scanner_agent(config: RunnableConfig, checkpointer=None):
+async def create_sensitive_scanner_agent(config: RunnableConfig):
     """创建敏感数据扫描智能体"""
     return compile_graph()

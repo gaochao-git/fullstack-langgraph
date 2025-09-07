@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 
 @agent(**INIT_AGENT_CONFIG)
-async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
+async def create_diagnostic_agent(config: RunnableConfig):
     """创建诊断智能体"""
     from src.apps.agent.checkpoint_factory import get_checkpointer
     
@@ -43,13 +43,16 @@ async def create_diagnostic_agent(config: RunnableConfig, checkpointer=None):
     # 创建消息监控 hook
     monitor_hook = create_monitor_hook(llm_config)
     
+    # 获取 checkpointer
+    checkpointer = get_checkpointer()
+    
     # 直接使用 create_react_agent 创建并返回图
     return create_react_agent(
         model=llm,
         tools=tools,
         prompt=system_prompt,
         pre_model_hook=monitor_hook,
-        checkpointer=get_checkpointer(),
+        checkpointer=checkpointer,
         name=f"{agent_id}-agent"
     )
 

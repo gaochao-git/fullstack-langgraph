@@ -18,19 +18,18 @@ logger = get_logger(__name__)
 
 
 @agent(**INIT_AGENT_CONFIG)
-async def create_example_agent(config: RunnableConfig, checkpointer=None):
+async def create_example_agent(config: RunnableConfig):
     """创建示例智能体
     展示如何自己编译图，实现复杂工作流
     这是前端创建的 Agent 无法做到的高级功能
     """
     # 获取配置
     enable_debug = config.get("configurable", {}).get("enable_debug", False) if config else False
-    return await create_workflow(enable_debug, checkpointer)
+    return await create_workflow(enable_debug)
 
 
 async def create_workflow(
-    enable_debug: bool,
-    checkpointer=None
+    enable_debug: bool
 ):
     """创建自定义工作流
     
@@ -90,6 +89,11 @@ async def create_workflow(
     # 错误处理和格式化响应后结束
     workflow.add_edge("error_handler", END)
     workflow.add_edge("format_response", END)
+    from src.apps.agent.checkpoint_factory import get_checkpointer
+    
+    # 获取 checkpointer
+    checkpointer = get_checkpointer()
+    
     logger.info(f"[Agent创建] 编译自定义工作流图")
     compiled_graph = workflow.compile(
         checkpointer=checkpointer,

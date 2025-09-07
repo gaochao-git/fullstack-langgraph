@@ -28,7 +28,7 @@ INIT_AGENT_CONFIG = {
 
 # 在 graph.py 中使用
 @agent(**INIT_AGENT_CONFIG)
-async def create_diagnostic_agent(config, checkpointer=None):
+async def create_diagnostic_agent(config):
     # Agent 实现
     pass
 ```
