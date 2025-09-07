@@ -151,7 +151,7 @@ async def prepare_graph_input(request_body, config, thread_id):
     return graph_input
 
 
-async def process_stream_chunk(chunk, event_id, thread_id):
+async def process_stream_chunk(chunk, event_id):
     """处理单个流式数据块"""    
     # Handle tuple format from LangGraph streaming
     if isinstance(chunk, tuple) and len(chunk) >= 2:
@@ -168,19 +168,6 @@ async def process_stream_chunk(chunk, event_id, thread_id):
         
         serialized_data = serialize_value(data)
         
-        # Save messages to thread history from LangGraph state
-        if event_type == "values" and isinstance(data, dict) and "messages" in data:
-            # 不再操作thread_messages
-            pass
-        
-        # Also save messages from updates events (when nodes return message updates)
-        elif event_type == "updates" and isinstance(data, dict):
-            for node_name, node_data in data.items():
-                if isinstance(node_data, dict) and "messages" in node_data:
-                    # 不再操作thread_messages
-                    pass
-                break  # Only process the first node with messages
-        
         # Check for interrupts
         has_interrupt = False
         if event_type == "updates" and isinstance(data, dict) and "__interrupt__" in data:
@@ -188,16 +175,8 @@ async def process_stream_chunk(chunk, event_id, thread_id):
             interrupt_data = data["__interrupt__"]
             
             # 检查 interrupt_data 是否为空
-            if interrupt_data and len(interrupt_data) > 0:
-                # 不再操作thread_interrupts
-                pass
-            else:
+            if not interrupt_data or len(interrupt_data) == 0:
                 logger.warning(f"⚠️ 检测到空的中断数据: {interrupt_data}")
-                
-                # 处理空的中断数据：创建工具审批请求
-                # 这通常发生在 create_react_agent 使用 interrupt_before=["tools"] 时
-                # 不再操作thread_interrupts
-                pass
             
             has_interrupt = True
         
@@ -241,7 +220,7 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
         async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
             try:
                 event_id += 1
-                sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id, thread_id)
+                sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id)
                 yield sse_data
                 if chunk_has_interrupt:
                     has_interrupt = True
