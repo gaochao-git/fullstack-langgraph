@@ -89,35 +89,63 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
 
 
 async def scan_files(state: OverallState) -> Dict[str, Any]:
-    """扫描用户输入和文件中的敏感数据"""
-    llm = get_llm()
+    """串行扫描用户输入和文件中的敏感数据，每个文件独立调用LLM"""
     
-    # 构建所有需要扫描的内容
-    all_content = []
+    # 准备所有需要扫描的内容源
+    scan_sources = []
     
-    # 添加用户输入
+    # 1. 用户输入文本
     user_text = state.get("user_input_text", "")
     if user_text and user_text.strip():
-        all_content.append(f"===== 用户输入文本 =====\n{user_text}")
+        scan_sources.append({
+            "source_name": "用户输入文本",
+            "content": user_text,
+            "source_type": "user_input"
+        })
     
-    # 添加文件内容
+    # 2. 文件内容（每个文件作为独立的扫描源）
     for file_id, file_info in state.get("file_contents", {}).items():
         if file_info.get("content"):
-            file_name = file_info.get("file_name", file_id)
-            all_content.append(f"\n===== 文件：{file_name} =====\n{file_info['content'][:2000]}")
+            scan_sources.append({
+                "source_name": f"文件：{file_info.get('file_name', file_id)}",
+                "content": file_info["content"],  # 不再截断
+                "source_type": "file",
+                "file_id": file_id,
+                "file_size": file_info.get("file_size", len(file_info["content"]))
+            })
     
-    if not all_content:
+    if not scan_sources:
         return {
             "messages": state["messages"] + [AIMessage(content="未找到需要扫描的内容")]
         }
     
-    # 让LLM一次性扫描所有内容
-    prompt = f"""你是一个敏感数据扫描工具。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
+    # 收集所有扫描结果
+    all_scan_results = []
+    
+    # 串行扫描每个内容源
+    for i, source in enumerate(scan_sources, 1):
+        # 为每个源创建新的LLM实例
+        llm = get_llm()
+        
+        logger.info(f"扫描进度 [{i}/{len(scan_sources)}] - {source['source_name']}")
+        
+        try:
+            # 为每个源构建专门的提示词
+            prompt = f"""你是一个敏感数据扫描工具。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
+
+待扫描内容来源：{source['source_name']}
+内容长度：{len(source['content'])} 字符
 
 待扫描内容：
-{'\n'.join(all_content)}
+{source['content']}
 
 你的任务：扫描上述内容中的所有敏感数据，并生成脱敏报告。
+
+特别注意：
+- 如果内容看起来像是文件解析失败的错误信息（如"解析失败"、"无法读取"、"文件损坏"等），请输出：
+  • 文件内容异常：[简要说明异常情况]
+- 如果内容是乱码或无法理解的格式，请输出：
+  • 文件内容异常：文件可能已损坏或格式不支持
 
 重要提示：
 - 单独的用户名（如：gaochao、admin等）不属于敏感信息，不需要脱敏
@@ -127,43 +155,129 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
 重要要求：
 - 绝对不要在报告中显示敏感信息的原始值
 - 对所有敏感信息进行脱敏处理，规则如下：
-  * 默认：将敏感信息的后半部分用*替换（如：gaochao → gao****，13812345678 → 138****5678）
+  * 默认：将敏感信息的后半部分用*替换（如：13812345678 → 138****5678）
   * 身份证号：只显示前6位和后4位（如：110101****1234）
   * 银行卡号：只显示前4位和后4位（如：6222****4321）
   * 邮箱：@前面部分隐藏一半（如：test@163.com → te**@163.com）
-  * 密码：显示前2-3位字符，其余用*替换（如：12345678 → 123*****，password123 → pas*****）
+  * 密码：显示前2-3位字符，其余用*替换（如：12345678 → 123*****）
   * 短密码（少于6位）：显示第一位（如：12345 → 1****）
-- 说明在哪个内容源发现了什么类型的敏感信息
-- 如果没有发现敏感数据，请明确说明
 
-注意：这是一个安全扫描任务，不是文档内容总结。你只需要：
-1. 找出敏感信息
-2. 对其脱敏
-3. 生成扫描报告
+输出要求：
+请严格按以下格式输出（每行紧凑，不要空行）：
 
-报告格式要求：
-1. 使用与输入相同的分隔符格式
-2. 文件名要完整显示，便于区分
+1. 文档摘要：[简要描述文档内容，不超过50字]
+2. 敏感信息扫描结果：• 发现[类型]：[脱敏后的值] (关联信息) 或 • 未发现敏感信息
 
-示例：
-===== 用户输入文本 =====
-- 发现手机号：138****5678
-- 发现邮箱：te**@163.com
-
-===== 文件：example.txt =====
-- 发现密码：555***** (关联用户名：gaochao)
-
-===== 文件：data.docx =====
-- 未发现敏感信息
-
-总结：
-- 扫描了X个内容源，Y个包含敏感信息
-- 主要敏感类型：[列出发现的类型]
-
-记住：这不是文档分析或内容总结，而是敏感数据安全扫描！"""
+重要：
+- 只需要输出这2行
+- 每行内容紧凑，不要换行
+- 多个敏感信息用 • 分隔，都在第2行内"""
+            
+            # 调用LLM扫描
+            result = await llm.ainvoke(prompt)
+            
+            # 判断扫描结果类型
+            scan_content = result.content
+            is_error = "文件内容异常" in scan_content
+            has_sensitive = "未发现敏感信息" not in scan_content and not is_error
+            
+            # 计算文字数量（包括全部内容）
+            word_count = len(source['content'])
+            
+            all_scan_results.append({
+                "source": source['source_name'],
+                "scan_result": scan_content,
+                "has_sensitive": has_sensitive,
+                "is_content_error": is_error,
+                "file_size": source.get('file_size', 0),  # 保存文件大小
+                "word_count": word_count  # 保存文字数量
+            })
+            
+        except Exception as e:
+            logger.error(f"扫描 {source['source_name']} 时出错: {e}")
+            all_scan_results.append({
+                "source": source['source_name'],
+                "scan_result": f"扫描失败: {str(e)}",
+                "has_sensitive": False,
+                "error": True,
+                "file_size": source.get('file_size', 0),  # 保存文件大小
+                "word_count": 0  # 错误时文字数量为0
+            })
     
-    result = await llm.ainvoke(prompt)
+    # 构建最终的综合报告
+    sensitive_count = sum(1 for r in all_scan_results if r.get("has_sensitive", False))
+    error_count = sum(1 for r in all_scan_results if r.get("error", False))
+    content_error_count = sum(1 for r in all_scan_results if r.get("is_content_error", False))
     
+    # 构建报告内容
+    report_parts = []
+    
+    # 扫描概览
+    report_parts.append("【扫描概览】")
+    report_parts.append(f"📊 扫描范围：{len(scan_sources)} 个内容源")
+    report_parts.append("")
+    
+    # 扫描详情
+    report_parts.append("【扫描详情】")
+    for i, result in enumerate(all_scan_results, 1):
+        # 构建内容源标题
+        source_type = "用户输入文本" if i == 1 and "用户输入" in result['source'] else f"用户上传文件{result['source'].replace('文件：', '')}"
+        report_parts.append(f"\n内容源{i}:{source_type}")
+        
+        # 1. 文件状态
+        if result.get("error"):
+            status = "内容解析异常"
+        elif result.get("is_content_error"):
+            status = "内容解析异常"
+        # 可以根据内容长度判断是否截断（如果需要的话）
+        else:
+            status = "内容已解析"
+        report_parts.append(f"1. 文件状态：{status}")
+        
+        # 从LLM返回的内容中提取信息
+        scan_content = result['scan_result']
+        
+        # 解析LLM的输出（现在只有2行）并按顺序组装报告
+        lines = scan_content.strip().split('\n')
+        
+        # 临时存储各部分内容
+        doc_summary = ""
+        scan_result = ""
+        
+        for line in lines:
+            if line.startswith('1. '):
+                # 文档摘要
+                doc_summary = '2. ' + line[3:]
+            elif line.startswith('2. '):
+                # 敏感信息扫描结果
+                scan_result = '4. ' + line[3:]
+        
+        # 按正确的顺序添加到报告中
+        if doc_summary:
+            report_parts.append(doc_summary)
+        
+        # 添加文档信息行（第3行）
+        file_size = result.get('file_size', 0)
+        word_count = result.get('word_count', 0)
+        report_parts.append(f"3. 文档信息：文件大小: {file_size} 字节 • 文字数量: {word_count}字")
+        
+        # 添加敏感信息扫描结果（第4行）
+        if scan_result:
+            report_parts.append(scan_result)
+    
+    # 扫描总结
+    report_parts.append("\n【扫描总结】")
+    
+    # 计算处理异常数（包括解析异常和扫描失败）
+    total_errors = error_count + content_error_count
+    
+    report_parts.append(f"• 总计扫描：{len(scan_sources)} 个内容源")
+    report_parts.append(f"• 处理异常：{total_errors} 个内容源")
+    report_parts.append(f"• 发现敏感信息：{sensitive_count} 个内容源")
+    
+    final_report = "\n".join(report_parts)
+    
+    # 只返回一个最终的综合报告消息
     return {
-        "messages": state["messages"] + [AIMessage(content=result.content)]
+        "messages": state["messages"] + [AIMessage(content=final_report)]
     }
