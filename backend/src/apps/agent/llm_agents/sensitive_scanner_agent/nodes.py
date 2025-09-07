@@ -26,13 +26,24 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
             logger.info(f"提取到用户输入文本: {user_input_text[:100]}...")
             break
     
-    # 2. 从消息中提取 file_ids
+    # 2. 从消息中提取文件信息
     file_ids = []
+    file_info_map = {}  # 存储 file_id -> file_info 的映射
+    
     for msg in state["messages"]:
-        # 检查是否是 human message 且包含 file_ids
+        # 检查是否是 human message 且包含文件信息
         if hasattr(msg, "additional_kwargs") and msg.additional_kwargs:
-            if "file_ids" in msg.additional_kwargs:
-                file_ids.extend(msg.additional_kwargs["file_ids"])
+            # 新格式：files 数组
+            if "files" in msg.additional_kwargs and isinstance(msg.additional_kwargs["files"], list):
+                for file_info in msg.additional_kwargs["files"]:
+                    if isinstance(file_info, dict) and "file_id" in file_info:
+                        file_id = file_info["file_id"]
+                        file_ids.append(file_id)
+                        # 保存文件信息映射
+                        file_info_map[file_id] = {
+                            "file_name": file_info.get("file_name", f"未知文件_{file_id[:8]}"),
+                            "file_size": file_info.get("file_size", 0)
+                        }
     
     # 如果state中也有file_ids，合并
     if state.get("file_ids"):
@@ -64,8 +75,14 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                     if doc_info:
                         # 安全地获取文件信息，避免None值
                         content = doc_info.get("content") or ""
-                        file_name = doc_info.get("file_name") or f"未知文件_{file_id[:8]}"
-                        file_size = doc_info.get("file_size") or 0
+                        
+                        # 优先使用消息中的文件信息，否则使用文档服务返回的信息
+                        if file_id in file_info_map:
+                            file_name = file_info_map[file_id]["file_name"]
+                            file_size = file_info_map[file_id]["file_size"]
+                        else:
+                            file_name = doc_info.get("file_name") or f"未知文件_{file_id[:8]}"
+                            file_size = doc_info.get("file_size") or 0
                         
                         # 计算文字数量
                         word_count = len(content)
