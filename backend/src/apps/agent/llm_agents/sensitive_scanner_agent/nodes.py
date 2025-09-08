@@ -225,7 +225,7 @@ async def perform_scan(state: OverallState) -> Dict[str, Any]:
         # 获取提示词模板（优先使用数据库配置）
         agent_id = INIT_AGENT_CONFIG["agent_id"]
         prompt_template = await get_system_prompt_async(agent_id)
-        
+        logger.info(f"使用提示词模板：{prompt_template}")
         # 使用提示词模板
         prompt = prompt_template.format(
             source_name=source['source_name'],
