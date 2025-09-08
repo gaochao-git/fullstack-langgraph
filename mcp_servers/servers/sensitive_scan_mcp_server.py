@@ -349,62 +349,13 @@ async def scan_document(file_ids: List[str]) -> str:
     if not file_ids:
         return "错误: 未提供文件ID"
     
-    # 如果只有一个文件，直接扫描
-    if len(file_ids) == 1:
-        file_id = file_ids[0]
-        file_data = await get_file_content_from_db(file_id)
-        
-        if not file_data['success']:
-            return f"扫描失败: {file_data['error']}"
-        
-        scan_result = await scan_content_with_llm(
-            file_data['content'], 
-            file_data['file_name']
-        )
-        
-        if not scan_result['success']:
-            return f"扫描失败: {scan_result.get('error', '未知错误')}"
-        
-        result = scan_result['result']
-        
-        # 单文件报告
-        # 格式化文件大小
-        file_size_kb = file_data['file_size'] / 1024
-        
-        # 统计图片数量
-        image_count = file_data.get('image_count', 0)
-        char_count = file_data.get('char_count', len(file_data['content']))
-        
-        # 判断解析状态
-        parse_status = "内容完整"
-        if "解析失败" in file_data['content'] or "无法读取" in file_data['content']:
-            parse_status = "内容解析异常"
-        
-        output = f"内容源1: {file_data['file_name']}\n"
-        output += f"1.文档信息：{file_size_kb:.1f}KB、文字{char_count}"
-        if image_count > 0:
-            output += f"(包含图片{image_count}张的解析内容)"
-        output += "\n"
-        output += f"2.文档解析状态：{parse_status}\n"
-        output += f"3.文档摘要：{result['summary'][:100]}\n"
-        output += f"4.敏感信息扫描结果："
-        
-        if result['has_sensitive']:
-            output += f"发现{result['sensitive_count']}个敏感信息\n"
-            # 最多展示3个
-            for idx, item in enumerate(result['sensitive_items'][:3], 1):
-                output += f"  {idx}) {item['type']}: {item['masked_value']}\n"
-            if len(result['sensitive_items']) > 3:
-                output += f"  ...还有{len(result['sensitive_items'])-3}个敏感信息未展示\n"
-        else:
-            output += "未发现敏感信息\n"
-        return output
+    # 统一使用批量处理逻辑（无论是1个还是多个文件）
+    output = ""
     
-    # 批量扫描多个文件
-    output = f"批量扫描报告\n"
+    # 显示扫描报告头部
+    output = f"扫描报告\n"
     output += f"{'='*50}\n"
     output += f"扫描文件数: {len(file_ids)}\n"
-    output += f"并发度: {FILE_CONCURRENCY}\n"
     output += f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
     output += f"{'='*50}\n\n"
     
@@ -464,14 +415,14 @@ async def scan_document(file_ids: List[str]) -> str:
         
         output += "="*50 + "\n"
     
-    # 汇总统计
+    # 显示汇总统计
     output += f"\n{'='*50}\n"
     output += f"扫描汇总:\n"
     output += f"   - 扫描文件总数: {len(file_ids)}\n"
     output += f"   - 包含敏感信息的文件: {files_with_sensitive}\n"
     output += f"   - 敏感信息总数: {total_sensitive_count}\n"
     
-    return output
+    return output.rstrip()  # 去掉末尾换行
 
 
 if __name__ == "__main__":
