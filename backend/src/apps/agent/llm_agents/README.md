@@ -57,6 +57,12 @@ async def create_diagnostic_agent(config):
 
 详细指南请参考 [CREATE_CUSTOM_AGENT.md](./CREATE_CUSTOM_AGENT.md)
 
+## LangGraph 消息管理
+
+- **节点返回消息**：只返回新增消息 `{"messages": [new_msg]}`，不要包含 `state["messages"]`
+- **自动合并**：`add_messages` reducer 会自动合并消息到状态中
+- **持久化**：通过 return 返回的消息会被 checkpoint 持久化
+
 ## 重要提示
 
 - ⚠️ **不要修改 generic_agent**：它是系统模板，用于支持前端创建的自定义 Agent
