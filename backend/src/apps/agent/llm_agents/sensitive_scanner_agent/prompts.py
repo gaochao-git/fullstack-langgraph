@@ -27,7 +27,7 @@ DEFAULT_SYSTEM_PROMPT = """你是一个敏感数据扫描助手，具有文本�
 
 
 # 敏感数据扫描提示词模板
-SCAN_PROMPT_TEMPLATE = """你是一个敏感数据扫描工具。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
+DEFAULT_SCAN_PROMPT = """你是一个敏感数据扫描工具。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
 
 待扫描内容来源：{source_name}
 内容长度：{content_length} 字符
@@ -80,4 +80,4 @@ async def get_system_prompt_async(agent_id: str) -> str:
         return prompt
     except Exception as e:
         logger.warning(f"从数据库获取提示词失败，使用默认提示词: {e}")
-        return DEFAULT_SYSTEM_PROMPT
+        return DEFAULT_SCAN_PROMPT

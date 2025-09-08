@@ -8,7 +8,8 @@ from src.apps.agent.service.document_service import document_service
 from src.shared.core.logging import get_logger
 from .state import OverallState
 from .llm import get_llm
-from .prompts import SCAN_PROMPT_TEMPLATE
+from .prompts import get_system_prompt_async
+from .configuration import INIT_AGENT_CONFIG
 
 logger = get_logger(__name__)
 
@@ -221,8 +222,12 @@ async def perform_scan(state: OverallState) -> Dict[str, Any]:
     llm = get_llm()
     
     try:
+        # 获取提示词模板（优先使用数据库配置）
+        agent_id = INIT_AGENT_CONFIG["agent_id"]
+        prompt_template = await get_system_prompt_async(agent_id)
+        
         # 使用提示词模板
-        prompt = SCAN_PROMPT_TEMPLATE.format(
+        prompt = prompt_template.format(
             source_name=source['source_name'],
             content_length=len(source['content']),
             file_name=source['file_name'],
