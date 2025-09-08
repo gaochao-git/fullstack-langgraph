@@ -78,3 +78,20 @@ servers:
       # OCR相关配置可以在这里添加
       default_language: "eng"  # 默认语言
       # 支持的语言: eng, chi_sim, chi_tra, jpn, kor 等
+      
+  sensitive_scan_server:
+    enabled: true
+    port: 3008
+    script: "servers/sensitive_scan_mcp_server.py"
+    display_name: "敏感数据扫描服务"
+    config:
+      db_host: "82.156.146.51"
+      db_port: 3306
+      db_user: "gaochao"
+      db_password: "fffjjj"
+      db_name: "omind"
+      llm_api_base: "https://api.deepseek.com/v1"  # DeepSeek API地址
+      llm_api_key: "sk-490738f8ce8f4a36bcc0bfb165270008"  # DeepSeek API密钥
+      llm_model: "deepseek-chat"  # 使用的模型
+      chunk_size: 10000  # 扫描分块大小（字符数），默认10000
+      file_concurrency: 3  # 文件并发度（同时扫描的文件数），默认3
