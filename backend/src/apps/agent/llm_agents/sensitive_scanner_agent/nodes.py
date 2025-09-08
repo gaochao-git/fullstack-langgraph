@@ -62,7 +62,7 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
             "user_input_text": "",
             "file_contents": {},
             "errors": ["未找到需要扫描的内容"],
-            "messages": state["messages"] + [AIMessage(content="未找到需要扫描的内容，请提供文本或上传文件")]
+            "messages": [AIMessage(content="未找到需要扫描的内容，请提供文本或上传文件")]  # 只返回新消息
         }
     
     # 4. 获取文件内容（如果有）
@@ -121,7 +121,7 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
         "user_input_text": user_input_text,
         "file_contents": file_contents,
         "errors": state.get("errors", []) + errors,
-        "messages": state["messages"] + [AIMessage(content=status_message)]
+        "messages": [AIMessage(content=status_message)]  # 只返回新消息
     }
 
 
@@ -459,7 +459,7 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     
     if not scan_sources:
         return {
-            "messages": state["messages"] + [AIMessage(content="未找到需要扫描的内容")]
+            "messages": [AIMessage(content="未找到需要扫描的内容")]  # 只返回新消息
         }
     
     # 收集所有要添加的消息
@@ -603,5 +603,5 @@ async def scan_files(state: OverallState) -> Dict[str, Any]:
     
     # 返回所有消息（包括中间步骤）
     return {
-        "messages": state["messages"] + messages_to_add
+        "messages": messages_to_add  # 只返回新增的消息，add_messages reducer会自动合并
     }
