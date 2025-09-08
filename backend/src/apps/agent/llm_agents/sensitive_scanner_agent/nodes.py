@@ -1,5 +1,5 @@
 """敏感数据扫描节点实现"""
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 import re
 from datetime import datetime
 from langchain_core.messages import AIMessage
@@ -13,15 +13,15 @@ from .prompts import SCAN_PROMPT_TEMPLATE
 logger = get_logger(__name__)
 
 
-async def fetch_files(state: OverallState) -> Dict[str, Any]:
-    """获取文件内容和用户输入文本"""
+async def prepare_scan(state: OverallState) -> Dict[str, Any]:
+    """准备扫描：获取文件内容并创建扫描队列"""
     file_contents = {}
     errors = []
     user_input_text = ""
+    scan_queue = []
     
     # 1. 提取用户输入的文本
     for msg in state["messages"]:
-        # 找到用户的消息（human message）
         if hasattr(msg, "type") and msg.type == "human":
             user_input_text = msg.content
             logger.info(f"提取到用户输入文本: {user_input_text[:100]}...")
@@ -29,28 +29,23 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
     
     # 2. 从消息中提取文件信息
     file_ids = []
-    file_info_map = {}  # 存储 file_id -> file_info 的映射
+    file_info_map = {}
     
     for msg in state["messages"]:
-        # 检查是否是 human message 且包含文件信息
         if hasattr(msg, "additional_kwargs") and msg.additional_kwargs:
-            # 新格式：files 数组
             if "files" in msg.additional_kwargs and isinstance(msg.additional_kwargs["files"], list):
                 for file_info in msg.additional_kwargs["files"]:
                     if isinstance(file_info, dict) and "file_id" in file_info:
                         file_id = file_info["file_id"]
                         file_ids.append(file_id)
-                        # 保存文件信息映射
                         file_info_map[file_id] = {
                             "file_name": file_info.get("file_name", f"未知文件_{file_id[:8]}"),
                             "file_size": file_info.get("file_size", 0)
                         }
     
-    # 如果state中也有file_ids，合并
+    # 合并state中的file_ids
     if state.get("file_ids"):
         file_ids.extend(state["file_ids"])
-    
-    # 去重
     file_ids = list(set(file_ids))
     
     # 3. 判断扫描内容
@@ -62,10 +57,12 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
             "user_input_text": "",
             "file_contents": {},
             "errors": ["未找到需要扫描的内容"],
-            "messages": [AIMessage(content="未找到需要扫描的内容，请提供文本或上传文件")]  # 只返回新消息
+            "messages": [AIMessage(content="未找到需要扫描的内容，请提供文本或上传文件")],
+            "scan_queue": [],
+            "current_scan_index": 0
         }
     
-    # 4. 获取文件内容（如果有）
+    # 4. 获取文件内容
     if has_files:
         logger.info(f"准备获取文件内容，file_ids: {file_ids}")
         
@@ -74,10 +71,8 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                 try:
                     doc_info = await document_service.get_document_content(db, file_id)
                     if doc_info:
-                        # 安全地获取文件信息，避免None值
                         content = doc_info.get("content") or ""
                         
-                        # 优先使用消息中的文件信息，否则使用文档服务返回的信息
                         if file_id in file_info_map:
                             file_name = file_info_map[file_id]["file_name"]
                             file_size = file_info_map[file_id]["file_size"]
@@ -85,10 +80,7 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                             file_name = doc_info.get("file_name") or f"未知文件_{file_id[:8]}"
                             file_size = doc_info.get("file_size") or 0
                         
-                        # 计算文字数量
                         word_count = len(content)
-                        
-                        # 统计图片数量
                         image_pattern = r'\[图片[^\]]*\]'
                         image_matches = re.findall(image_pattern, content)
                         image_count = len(image_matches)
@@ -100,19 +92,75 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
                             "word_count": word_count,
                             "image_count": image_count
                         }
-                        # 调试：记录获取到的文件信息（不记录内容，避免敏感信息泄露）
-                        logger.info(f"文件 {file_id} 信息: file_name={file_name}, file_size={file_size}, words={word_count}, images={image_count}")
+                        logger.info(f"成功获取文件 {file_name} 的内容，字数: {word_count}, 图片数: {image_count}")
                     else:
-                        errors.append(f"文件 {file_id} 不存在")
+                        error_msg = f"无法获取文件 {file_id} 的内容"
+                        logger.warning(error_msg)
+                        errors.append(error_msg)
                 except Exception as e:
-                    logger.error(f"获取文件内容失败 {file_id}: {e}")
-                    errors.append(f"获取文件 {file_id} 失败: {str(e)}")
+                    error_msg = f"获取文件 {file_id} 时出错: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
     
-    # 5. 生成状态消息
+    # 5. 构建扫描队列
+    # 添加用户输入文本到队列
+    if has_user_text:
+        scan_queue.append({
+            "source_type": "user_input",
+            "source_name": "用户输入文本",
+            "content": user_input_text,
+            "file_name": "user_input",
+            "file_size": len(user_input_text.encode('utf-8')),
+            "word_count": len(user_input_text),
+            "image_count": 0
+        })
+    
+    # 添加文件到队列
+    for file_id, file_info in file_contents.items():
+        # 检查是否需要分块处理
+        content = file_info["content"]
+        file_name = file_info["file_name"]
+        
+        # 简单的分块策略：如果内容超过50000字符，则分块
+        max_chunk_size = 50000
+        if len(content) > max_chunk_size:
+            # 分块处理
+            chunks = []
+            chunk_size = max_chunk_size
+            for i in range(0, len(content), chunk_size):
+                chunks.append(content[i:i + chunk_size])
+            
+            for idx, chunk in enumerate(chunks):
+                scan_queue.append({
+                    "source_type": "file_chunk",
+                    "source_name": f"文件：{file_name} (块 {idx + 1}/{len(chunks)})",
+                    "content": chunk,
+                    "file_name": file_name,
+                    "file_size": file_info["file_size"],
+                    "word_count": len(chunk),
+                    "image_count": len(re.findall(r'\[图片[^\]]*\]', chunk)),
+                    "chunk_index": idx,
+                    "total_chunks": len(chunks),
+                    "original_word_count": file_info["word_count"],
+                    "original_image_count": file_info["image_count"]
+                })
+        else:
+            # 不需要分块
+            scan_queue.append({
+                "source_type": "file",
+                "source_name": f"文件：{file_name}",
+                "content": content,
+                "file_name": file_name,
+                "file_size": file_info["file_size"],
+                "word_count": file_info["word_count"],
+                "image_count": file_info["image_count"]
+            })
+    
+    # 6. 生成状态消息
     status_parts = []
     if has_user_text:
         status_parts.append("用户输入文本")
-    if len(file_contents) > 0:
+    if file_contents:
         status_parts.append(f"{len(file_contents)} 个文件")
     
     status_message = f"准备扫描: {' 和 '.join(status_parts)}"
@@ -121,83 +169,195 @@ async def fetch_files(state: OverallState) -> Dict[str, Any]:
         "user_input_text": user_input_text,
         "file_contents": file_contents,
         "errors": state.get("errors", []) + errors,
-        "messages": [AIMessage(content=status_message)]  # 只返回新消息
+        "scan_queue": scan_queue,
+        "current_scan_index": 0,
+        "all_scan_results": [],
+        "messages": [AIMessage(content=status_message)]
     }
 
 
-def prepare_scan_sources(state: OverallState) -> list:
-    """准备所有需要扫描的内容源"""
-    scan_sources = []
-    CHUNK_SIZE = 50000  # 每个块的最大字符数
+async def emit_scan_progress(state: OverallState) -> Dict[str, Any]:
+    """发送扫描进度消息"""
+    scan_queue = state.get("scan_queue", [])
+    current_index = state.get("current_scan_index", 0)
     
-    # 1. 用户输入文本
-    user_text = state.get("user_input_text", "")
-    if user_text and user_text.strip():
-        scan_sources.append({
-            "source_name": "用户输入文本",
-            "content": user_text,
-            "source_type": "user_input",
-            "word_count": len(user_text),
-            "file_size": 0,
-            "image_count": 0,
-            "file_name": "用户输入文本",
-            "chunk_index": None,
-            "total_chunks": 1
-        })
+    if current_index >= len(scan_queue):
+        return {}
     
-    # 2. 文件内容（每个文件可能被拆分为多个块）
-    for file_id, file_info in state.get("file_contents", {}).items():
-        content = file_info.get("content", "")
-        if not content:
-            continue
-            
-        content_length = len(content)
-        file_name = file_info.get('file_name', file_id)
+    source = scan_queue[current_index]
+    total = len(scan_queue)
+    
+    logger.info(f"发送扫描进度 [{current_index + 1}/{total}] - {source['source_name']}")
+    
+    # 只发送进度消息
+    progress_message = AIMessage(
+        content=f"[{current_index + 1}/{total}] 正在扫描: {source['source_name']}",
+        additional_kwargs={
+            "scan_phase": "progress",
+            "scan_step": current_index + 1,
+            "total_steps": total,
+            "source_name": source['source_name'],
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+    
+    return {
+        "messages": [progress_message]
+    }
+
+
+async def perform_scan(state: OverallState) -> Dict[str, Any]:
+    """执行扫描并返回结果"""
+    scan_queue = state.get("scan_queue", [])
+    current_index = state.get("current_scan_index", 0)
+    all_scan_results = state.get("all_scan_results", [])
+    
+    if current_index >= len(scan_queue):
+        return {}
+    
+    source = scan_queue[current_index]
+    
+    # 创建LLM实例
+    llm = get_llm()
+    
+    try:
+        # 使用提示词模板
+        prompt = SCAN_PROMPT_TEMPLATE.format(
+            source_name=source['source_name'],
+            content_length=len(source['content']),
+            file_name=source['file_name'],
+            content=source['content']
+        )
         
-        # 如果内容长度小于等于块大小，作为单个源处理
-        if content_length <= CHUNK_SIZE:
-            scan_sources.append({
-                "source_name": f"文件：{file_name}",
-                "content": content,
-                "source_type": "file",
-                "file_id": file_id,
-                "file_size": file_info.get("file_size", 0),
-                "word_count": file_info.get("word_count", 0),
-                "image_count": file_info.get("image_count", 0),
-                "file_name": file_name,
-                "chunk_index": None,
-                "total_chunks": 1
-            })
+        # 调用LLM扫描
+        result = await llm.ainvoke(prompt)
+        
+        # 解析扫描结果
+        scan_content = result.content
+        is_error = ("文件内容异常" in scan_content or 
+                   "解析失败" in scan_content or
+                   "部分内容" in scan_content)
+        has_sensitive = "未发现敏感信息" not in scan_content and not is_error
+        
+        # 创建结果消息
+        result_message = AIMessage(
+            content=f"{source['source_name']} 扫描结果：\n{scan_content}",
+            additional_kwargs={
+                "scan_phase": "result",
+                "scan_step": current_index + 1,
+                "source_name": source['source_name'],
+                "source_type": source.get('source_type', 'file'),
+                "has_sensitive": has_sensitive,
+                "is_error": is_error,
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        # 添加到结果列表
+        scan_result = {
+            "source": source['source_name'],
+            "source_type": source.get('source_type', 'file'),
+            "scan_result": scan_content,
+            "has_sensitive": has_sensitive,
+            "error": False,
+            "is_content_error": is_error,
+            "file_size": source['file_size'],
+            "word_count": source['word_count'],
+            "image_count": source['image_count'],
+            "file_name": source['file_name']
+        }
+        
+        if source.get('chunk_index') is not None:
+            scan_result['chunk_index'] = source['chunk_index']
+            scan_result['total_chunks'] = source['total_chunks']
+        
+        all_scan_results.append(scan_result)
+        
+        # 更新状态，移动到下一个
+        return {
+            "messages": [result_message],
+            "current_scan_index": current_index + 1,
+            "all_scan_results": all_scan_results
+        }
+        
+    except Exception as e:
+        logger.error(f"扫描 {source['source_name']} 时出错: {e}")
+        
+        # 处理错误
+        error_message = str(e)
+        if "maximum context length" in error_message:
+            scan_result_text = "文件内容过长|||文件超出模型处理能力范围|||未发现敏感信息"
+            is_error = True
+        elif "Error code: 400" in error_message:
+            scan_result_text = "文件处理失败|||模型处理请求失败|||未发现敏感信息"
+            is_error = True
         else:
-            # 需要分块处理
-            total_chunks = (content_length + CHUNK_SIZE - 1) // CHUNK_SIZE
-            logger.info(f"文件 {file_name} 需要分成 {total_chunks} 个块进行扫描")
-            
-            for i in range(total_chunks):
-                start = i * CHUNK_SIZE
-                end = min((i + 1) * CHUNK_SIZE, content_length)
-                chunk_content = content[start:end]
-                
-                # 统计当前块的图片数量
-                image_pattern = r'\[图片[^\]]*\]'
-                chunk_image_count = len(re.findall(image_pattern, chunk_content))
-                
-                scan_sources.append({
-                    "source_name": f"文件：{file_name} (块 {i+1}/{total_chunks})",
-                    "content": chunk_content,
-                    "source_type": "file_chunk",
-                    "file_id": file_id,
-                    "file_size": file_info.get("file_size", 0),
-                    "word_count": len(chunk_content),
-                    "image_count": chunk_image_count,
-                    "file_name": file_name,
-                    "chunk_index": i + 1,
-                    "total_chunks": total_chunks,
-                    "original_word_count": file_info.get("word_count", 0),
-                    "original_image_count": file_info.get("image_count", 0)
-                })
+            scan_result_text = f"扫描失败|||{error_message[:50]}...|||未发现敏感信息"
+            is_error = False
+        
+        error_msg = AIMessage(
+            content=f"{source['source_name']} 扫描出错：\n{scan_result_text}",
+            additional_kwargs={
+                "scan_phase": "error",
+                "scan_step": current_index + 1,
+                "source_name": source['source_name'],
+                "error_message": error_message,
+                "is_error": is_error,
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+        
+        all_scan_results.append({
+            "source": source['source_name'],
+            "source_type": source.get('source_type', 'file'),
+            "scan_result": scan_result_text,
+            "has_sensitive": False,
+            "error": True,
+            "is_content_error": is_error,
+            "file_size": source['file_size'],
+            "word_count": source['word_count'],
+            "image_count": source['image_count'],
+            "file_name": source['file_name']
+        })
+        
+        return {
+            "messages": [error_msg],
+            "current_scan_index": current_index + 1,
+            "all_scan_results": all_scan_results
+        }
+
+
+async def generate_final_report(state: OverallState) -> Dict[str, Any]:
+    """生成最终扫描报告"""
+    scan_queue = state.get("scan_queue", [])
+    all_scan_results = state.get("all_scan_results", [])
     
-    return scan_sources
+    # 生成扫描报告
+    final_report = generate_scan_report(scan_queue, all_scan_results)
+    
+    # 添加最终报告消息
+    return {
+        "messages": [AIMessage(
+            content=final_report,
+            additional_kwargs={
+                "scan_phase": "complete",
+                "total_sources": len(scan_queue),
+                "total_results": len(all_scan_results),
+                "timestamp": datetime.now().isoformat()
+            }
+        )]
+    }
+
+
+def check_scan_progress(state: OverallState) -> Literal["progress", "scan", "report"]:
+    """检查扫描进度，决定下一步"""
+    scan_queue = state.get("scan_queue", [])
+    current_index = state.get("current_scan_index", 0)
+    
+    if current_index < len(scan_queue):
+        return "progress"  # 先显示进度
+    else:
+        return "report"   # 生成报告
 
 
 def generate_scan_report(scan_sources: list, all_scan_results: list) -> str:
@@ -449,159 +609,3 @@ def _add_aggregated_chunk_results_to_report(report_parts, file_data, chunks):
     report_parts.append(f"2. 文档摘要：{overall_summary}")
     report_parts.append(f"3. 文档信息：{doc_info}")
     report_parts.append(f"4. 敏感信息扫描结果：{overall_sensitive}")
-
-
-async def scan_files(state: OverallState) -> Dict[str, Any]:
-    """串行扫描用户输入和文件中的敏感数据，每个文件独立调用LLM"""
-    
-    # 准备所有需要扫描的内容源
-    scan_sources = prepare_scan_sources(state)
-    
-    if not scan_sources:
-        return {
-            "messages": [AIMessage(content="未找到需要扫描的内容")]  # 只返回新消息
-        }
-    
-    # 收集所有要添加的消息
-    messages_to_add = []
-    
-    # 添加开始扫描消息
-    messages_to_add.append(AIMessage(
-        content=f"开始扫描敏感数据，共 {len(scan_sources)} 个内容源...",
-        additional_kwargs={
-            "scan_phase": "start",
-            "total_sources": len(scan_sources),
-            "timestamp": datetime.now().isoformat()
-        }
-    ))
-    
-    # 收集所有扫描结果
-    all_scan_results = []
-    
-    # 串行扫描每个内容源
-    for i, source in enumerate(scan_sources, 1):
-        # 为每个源创建新的LLM实例
-        llm = get_llm()
-        
-        logger.info(f"扫描进度 [{i}/{len(scan_sources)}] - {source['source_name']}")
-        
-        # 添加扫描进度消息
-        messages_to_add.append(AIMessage(
-            content=f"[{i}/{len(scan_sources)}] 正在扫描: {source['source_name']}",
-            additional_kwargs={
-                "scan_phase": "progress",
-                "scan_step": i,
-                "total_steps": len(scan_sources),
-                "source_name": source['source_name'],
-                "timestamp": datetime.now().isoformat()
-            }
-        ))
-        
-        try:
-            # 使用提示词模板
-            prompt = SCAN_PROMPT_TEMPLATE.format(
-                source_name=source['source_name'],
-                content_length=len(source['content']),
-                file_name=source['file_name'],
-                content=source['content']  # 不限制内容长度
-            )
-            
-            # 调用LLM扫描
-            result = await llm.ainvoke(prompt)
-            
-            # 判断扫描结果类型
-            scan_content = result.content
-            # 检查是否为解析失败或内容异常（通过LLM返回的文档解析状态判断）
-            is_error = ("文件内容异常" in scan_content or 
-                       "解析失败" in scan_content or
-                       "部分内容" in scan_content)
-            has_sensitive = "未发现敏感信息" not in scan_content and not is_error
-            
-            # 保存扫描结果为消息
-            messages_to_add.append(AIMessage(
-                content=f"{source['source_name']} 扫描结果：\n{scan_content}",
-                additional_kwargs={
-                    "scan_phase": "result",
-                    "scan_step": i,
-                    "source_name": source['source_name'],
-                    "source_type": source.get('source_type', 'file'),
-                    "has_sensitive": has_sensitive,
-                    "is_error": is_error,
-                    "timestamp": datetime.now().isoformat()
-                }
-            ))
-            
-            all_scan_results.append({
-                "source": source['source_name'],
-                "source_type": source.get('source_type', 'file'),
-                "scan_result": scan_content,
-                "has_sensitive": has_sensitive,
-                "is_content_error": is_error,
-                "file_size": source['file_size'],
-                "word_count": source['word_count'],
-                "image_count": source['image_count'],
-                "file_name": source['file_name']
-            })
-            
-        except Exception as e:
-            logger.error(f"扫描 {source['source_name']} 时出错: {e}")
-            
-            # 处理不同类型的错误
-            error_message = str(e)
-            if "maximum context length" in error_message:
-                # 上下文长度超限错误
-                scan_result = "文件内容过长|||文件超出模型处理能力范围|||未发现敏感信息"
-                is_error = True
-            elif "Error code: 400" in error_message:
-                # 其他400错误
-                scan_result = "文件处理失败|||模型处理请求失败|||未发现敏感信息"
-                is_error = True
-            else:
-                # 其他错误
-                scan_result = f"扫描失败|||{error_message[:50]}...|||未发现敏感信息"
-                is_error = False
-            
-            # 错误情况也保存为消息
-            messages_to_add.append(AIMessage(
-                content=f"{source['source_name']} 扫描出错：\n{scan_result}",
-                additional_kwargs={
-                    "scan_phase": "error",
-                    "scan_step": i,
-                    "source_name": source['source_name'],
-                    "error_message": error_message,
-                    "is_error": is_error,
-                    "timestamp": datetime.now().isoformat()
-                }
-            ))
-            
-            all_scan_results.append({
-                "source": source['source_name'],
-                "source_type": source.get('source_type', 'file'),
-                "scan_result": scan_result,
-                "has_sensitive": False,
-                "error": True,
-                "is_content_error": is_error,
-                "file_size": source['file_size'],
-                "word_count": source['word_count'],
-                "image_count": source['image_count'],
-                "file_name": source['file_name']
-            })
-    
-    # 生成扫描报告
-    final_report = generate_scan_report(scan_sources, all_scan_results)
-    
-    # 添加最终报告消息
-    messages_to_add.append(AIMessage(
-        content=final_report,
-        additional_kwargs={
-            "scan_phase": "complete",
-            "total_sources": len(scan_sources),
-            "total_results": len(all_scan_results),
-            "timestamp": datetime.now().isoformat()
-        }
-    ))
-    
-    # 返回所有消息（包括中间步骤）
-    return {
-        "messages": messages_to_add  # 只返回新增的消息，add_messages reducer会自动合并
-    }
