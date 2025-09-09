@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 DEFAULT_LLM_CONFIG = {
     "model": "gpt-3.5-turbo",
     "temperature": 0.7,
-    "max_tokens": 2000,
+    "max_tokens": 1000,  # 敏感数据扫描1000 token足够
     "api_key": "sk-default",  # 需要在环境变量中设置
     "base_url": "https://api.openai.com/v1"
 }
@@ -35,4 +35,7 @@ def get_llm_config(agent_id: str, selected_model: Optional[str] = None) -> Dict[
 def get_llm(agent_id: str = "sensitive_scanner_agent", selected_model: Optional[str] = None) -> ChatOpenAI:
     """获取配置好的LLM实例"""
     config = get_llm_config(agent_id, selected_model)
+    # 确保设置 max_tokens（数据库配置可能没有这个字段）
+    if 'max_tokens' not in config:
+        config['max_tokens'] = 1000  # 敏感数据扫描默认限制
     return ChatOpenAI(**config)

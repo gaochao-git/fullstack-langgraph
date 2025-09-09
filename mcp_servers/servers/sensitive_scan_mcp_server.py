@@ -64,7 +64,8 @@ llm = ChatOpenAI(
     openai_api_base=LLM_API_BASE,
     openai_api_key=LLM_API_KEY,
     temperature=0.1,
-    timeout=60.0
+    timeout=60.0,
+    max_tokens=1000  # 敏感数据扫描输出限制
 )
 
 # JSON输出解析器
