@@ -227,6 +227,11 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
           options.onError?.(eventData);
           break;
 
+        case 'heartbeat':
+          // 心跳事件，仅用于保持连接，不做处理
+          console.debug('SSE heartbeat received:', eventData.timestamp);
+          break;
+
         case 'end':
           // 流结束
           streamingMessageRef.current = null;
