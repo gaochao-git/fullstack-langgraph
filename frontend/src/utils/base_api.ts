@@ -41,7 +41,7 @@ declare module 'axios' {
 // 创建 axios 实例
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: getBaseUrl(),
-  timeout: 30000,
+  timeout: 300000, // 5分钟超时
   headers: {
     'Content-Type': 'application/json',
   },
@@ -233,7 +233,7 @@ export async function omind_axios(url: string, config: RequestConfig = {}): Prom
     method = 'GET',
     headers = {},
     body,
-    timeout = 30000,
+    timeout = 300000, // 5分钟超时
     returnRaw = false,
     showLoading = true,
     onUploadProgress
