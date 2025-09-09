@@ -14,6 +14,7 @@ import { FileUploadManager, FileListDisplay, fileUploadUtils } from "./FileUploa
 import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
+import { LoadingOutlined } from "@ant-design/icons";
 import { exportToWordWithImages } from "@/services/documentExportApi";
 import type { Agent } from "@/services/agentApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
@@ -236,11 +237,14 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
     <div 
       className="border rounded-xl mb-1 shadow-sm transition-all duration-300 overflow-hidden"
       style={{
-        borderColor: isPending ? token.colorWarningBorder : token.colorPrimaryBorder,
-        backgroundColor: isPending ? token.colorWarningBg : token.colorPrimaryBg,
+        borderColor: isPending ? token.colorWarningBorder : (!toolResultContent ? token.colorInfoBorder : token.colorPrimaryBorder),
+        backgroundColor: isPending ? token.colorWarningBg : (!toolResultContent ? token.colorInfoBg : token.colorPrimaryBg),
         backgroundImage: isPending 
           ? `linear-gradient(135deg, ${token.colorWarningBg} 0%, ${token.colorWarningBgHover} 100%)`
-          : `linear-gradient(135deg, ${token.colorPrimaryBg} 0%, ${token.colorPrimaryBgHover} 100%)`
+          : (!toolResultContent 
+            ? `linear-gradient(135deg, ${token.colorInfoBg} 0%, ${token.colorInfoBgHover} 100%)`
+            : `linear-gradient(135deg, ${token.colorPrimaryBg} 0%, ${token.colorPrimaryBgHover} 100%)`
+          )
       }}
     >
       {/* 工具调用头部（合并描述和折叠按钮） */}
@@ -252,7 +256,9 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           }
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = isPending ? token.colorWarningBgHover : token.colorPrimaryBgHover;
+          e.currentTarget.style.backgroundColor = isPending 
+            ? token.colorWarningBgHover 
+            : (!toolResultContent ? token.colorInfoBgHover : token.colorPrimaryBgHover);
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.backgroundColor = 'transparent';
@@ -263,6 +269,13 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           <Wrench className="h-5 w-5" style={{ color: isPending ? token.colorWarning : token.colorPrimary }} />
           <span className="font-mono text-sm font-semibold truncate" style={{ color: token.colorText }}>{toolName}</span>
           <span className="ml-2 text-xs font-bold flex-shrink-0" style={{ color: token.colorTextSecondary }}>工具调用（{toolCount || 1}）</span>
+          {/* 显示执行状态 */}
+          {!isPending && !toolResultContent && (
+            <div className="flex items-center gap-1 ml-2">
+              <LoadingOutlined className="text-xs animate-spin" style={{ color: token.colorPrimary }} />
+              <span className="text-xs" style={{ color: token.colorTextSecondary }}>执行中</span>
+            </div>
+          )}
         </div>
         
         {/* 待确认状态的操作按钮 - 放在头部 */}
@@ -324,8 +337,8 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
           
           
           
-          {/* 输出结果 */}
-          {toolResultContent && (
+          {/* 输出结果或加载状态 */}
+          {toolResultContent ? (
             <div className="min-w-fit max-w-full">
               <h4 className="text-sm font-bold mb-2" style={{ color: token.colorTextHeading }}>输出:</h4>
               
@@ -342,6 +355,22 @@ const ToolCall: React.FC<ToolCallProps> = ({ toolCall, toolResult, isPending, on
                   ? toolResultContent 
                   : JSON.stringify(toolResultContent, null, 2)}
               </pre>
+            </div>
+          ) : !isPending && (
+            // 如果没有结果且不是待审批状态，显示正在执行
+            <div className="min-w-fit max-w-full">
+              <h4 className="text-sm font-bold mb-2" style={{ color: token.colorTextHeading }}>状态:</h4>
+              <div 
+                className="p-3 rounded-lg text-xs border flex items-center gap-2"
+                style={{ 
+                  backgroundColor: token.colorFillTertiary,
+                  color: token.colorTextSecondary,
+                  borderColor: token.colorBorder
+                }}
+              >
+                <LoadingOutlined className="animate-spin" />
+                <span>正在执行中...</span>
+              </div>
             </div>
           )}
         </div>
