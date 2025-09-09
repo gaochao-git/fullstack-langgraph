@@ -61,15 +61,20 @@ async def get_diagnostic_tools(agent_id: str):
                 for mcp_server_config in mcp_tools_config:
                     server_id = mcp_server_config.get('server_id')
                     if server_id:
-                        # 查询mcp_servers表获取server_uri（使用同步方法）
-                        server = mcp_service.get_server_by_id_sync(db, server_id)
-                        if server and server.is_enabled == 'on':
-                            server_config[server_id] = {
-                                "url": server.server_uri,
-                                "transport": server.transport_type.replace('-','_'),        # langgraph要求'streamable_http'
-                                "timeout": server.read_timeout_seconds,                     # HTTP超时时间
-                                "sse_read_timeout": server.read_timeout_seconds * 10       # SSE读取超时设置为10倍
-                            }
+                        try:
+                            # 查询mcp_servers表获取server_uri（使用同步方法）
+                            server = mcp_service.get_server_by_id_sync(db, server_id)
+                            if server and server.is_enabled == 'on':
+                                server_config[server_id] = {
+                                    "url": server.server_uri,
+                                    "transport": server.transport_type.replace('-','_'),        # langgraph要求'streamable_http'
+                                    "timeout": server.read_timeout_seconds,                     # HTTP超时时间
+                                    "sse_read_timeout": server.read_timeout_seconds * 10       # SSE读取超时设置为10倍
+                                }
+                        except Exception as e:
+                            logger.error(f"获取MCP服务器配置失败 server_id={server_id}: {e}")
+                            # 继续处理其他服务器，不中断整个流程
+                            continue
             finally:
                 db.close()
             
