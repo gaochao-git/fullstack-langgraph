@@ -66,7 +66,9 @@ async def get_diagnostic_tools(agent_id: str):
                         if server and server.is_enabled == 'on':
                             server_config[server_id] = {
                                 "url": server.server_uri,
-                                "transport": server.transport_type.replace('-','_')         # langgraph要求'streamable_http'
+                                "transport": server.transport_type.replace('-','_'),        # langgraph要求'streamable_http'
+                                "timeout": server.read_timeout_seconds,                     # HTTP超时时间
+                                "sse_read_timeout": server.read_timeout_seconds * 10       # SSE读取超时设置为10倍
                             }
             finally:
                 db.close()

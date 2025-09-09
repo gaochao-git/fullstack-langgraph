@@ -6,6 +6,7 @@ import {
   Table, 
   Button, 
   Input, 
+  InputNumber,
   Select, 
   Space, 
   Tag, 
@@ -1088,17 +1089,19 @@ const MCPManagement: React.FC = () => {
 
           {/* 超时时间配置 */}
           <Form.Item
-            label="连接超时时间"
+            label="读取超时时间"
             name="readTimeoutSeconds"
             rules={[
               { required: true, message: '请设置超时时间' },
               { type: 'number', min: 1, max: 300, message: '超时时间必须在1-300秒之间' }
             ]}
           >
-            <Input 
-              type="number"
-              suffix="秒"
-              placeholder="5"
+            <InputNumber 
+              min={1}
+              max={300}
+              addonAfter="秒"
+              placeholder="1-300秒之间"
+              style={{ width: '100%' }}
             />
           </Form.Item>
 

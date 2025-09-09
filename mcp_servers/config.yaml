@@ -80,8 +80,8 @@ servers:
       db_user: "gaochao"
       db_password: "fffjjj"
       db_name: "omind"
-      llm_api_base: "https://api.deepseek.com/v1"  # DeepSeek API地址
-      llm_api_key: "sk-490738f8ce8f4a36bcc0bfb165270008"  # DeepSeek API密钥
-      llm_model: "deepseek-chat"  # 使用的模型
+      llm_api_base: "https://api.siliconflow.cn/v1"
+      llm_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm" 
+      llm_model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
       chunk_size: 10000  # 扫描分块大小（字符数），默认10000
       file_concurrency: 3  # 文件并发度（同时扫描的文件数），默认3

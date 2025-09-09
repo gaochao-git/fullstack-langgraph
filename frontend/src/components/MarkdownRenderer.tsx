@@ -7,7 +7,7 @@ import { MermaidDiagram } from './MermaidDiagram';
 
 const md: MarkdownIt = new MarkdownIt({ 
   html: true, 
-  breaks: false,
+  breaks: true,
   // 配置代码高亮
   highlight: function (str: string, lang: string): string {
     // 如果是 mermaid 代码块，返回特殊标记
