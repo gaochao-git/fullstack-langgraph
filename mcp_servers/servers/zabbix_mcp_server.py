@@ -212,6 +212,9 @@ async def get_zabbix_metric_data(
         else:
             avg_value = max_value = min_value = 0
         
+        # 格式化时间范围字符串
+        time_range_str = f"{start_dt.strftime('%Y-%m-%d %H:%M:%S')} to {end_dt.strftime('%Y-%m-%d %H:%M:%S')}"
+        
         metrics_data = {
             item["key_"]: {
                 "name": item["name"],
@@ -221,16 +224,28 @@ async def get_zabbix_metric_data(
                 "max_value": round(max_value, 2),
                 "min_value": round(min_value, 2),
                 "data_points": len(values),
-                "history": formatted_history
+                "history": formatted_history[:50] if len(formatted_history) > 50 else formatted_history  # 限制返回的数据点数量
             }
         }
+        
+        # 根据指标类型确定推荐的图表类型（只返回一个）
+        chart_type = "line"  # 默认折线图
+        if "util" in metric_key or "percent" in item["units"].lower() or "%" in item["units"]:
+            chart_type = "gauge"  # 利用率类指标使用仪表盘
+        elif "bytes" in item["units"].lower() or "bps" in item["units"].lower():
+            chart_type = "area"  # 流量类指标使用面积图
+        elif "count" in metric_key.lower() or "number" in metric_key.lower():
+            chart_type = "bar"  # 计数类指标使用柱状图
         
         return json.dumps({
             "hostname": actual_ip,
             "host_id": host_id,
             "metric_key": metric_key,
-            "time_range": f"{start_time} to {end_time}",
-            "metrics": metrics_data
+            "time_range": time_range_str,
+            "metrics": metrics_data,
+            "extra_config": {
+                "show_charts": chart_type
+            }
         }, indent=2)
         
     except Exception as e:
@@ -355,8 +370,8 @@ if __name__ == "__main__":
     
     # 测试Zabbix连接
     try:
-        session, token, url = _create_zabbix_session()
-        session.close()
+        zabbix_config = _create_zabbix_session()
+        zabbix_config["session"].close()
         logger.info("Zabbix连接测试成功")
     except Exception as e:
         logger.warning(f"Zabbix连接测试失败: {e}")

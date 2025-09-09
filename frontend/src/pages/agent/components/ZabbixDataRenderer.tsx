@@ -142,6 +142,7 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
                 data={chartData}
                 showHeader={true}
                 style={{ height: '167px' }}
+                chartType={data.extra_config?.show_charts || 'line'}
               />
             </div>
           );

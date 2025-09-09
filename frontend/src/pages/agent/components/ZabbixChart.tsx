@@ -3,7 +3,7 @@ import ReactEcharts from 'echarts-for-react';
 import { theme } from 'antd';
 
 // 使用React.memo包装组件，避免不必要的重渲染
-const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
+const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType = 'line' }) => {
     const { token } = theme.useToken();
     // 确保数据存在且有效
     if (!Array.isArray(data) || data.length === 0) {
@@ -37,6 +37,130 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
         // 确定是否从0开始
         const shouldStartFromZero = minValue <= maxValue * 0.1;  // 如果最小值小于最大值的10%，则从0开始
         const yAxisMin = shouldStartFromZero ? 0 : minValue * 0.95;
+
+        // 对于仪表盘类型，返回不同的配置
+        if (chartType === 'gauge') {
+            // 获取最新值和单位
+            const currentValue = values[values.length - 1];
+            const units = firstItem.units || '';
+            
+            return {
+                tooltip: {
+                    formatter: '{a} <br/>{b} : {c}' + units
+                },
+                series: [
+                    {
+                        name: firstItem.key_ || '指标',
+                        type: 'gauge',
+                        detail: {
+                            formatter: function(value) {
+                                return value + units;
+                            },
+                            fontSize: 16
+                        },
+                        data: [{ value: currentValue, name: '当前值' }],
+                        min: 0,
+                        max: Math.ceil(maxValue * 1.2), // 最大值增加20%空间
+                        axisLine: {
+                            lineStyle: {
+                                color: [
+                                    [0.3, token.colorSuccess],
+                                    [0.7, token.colorWarning],
+                                    [1, token.colorError]
+                                ]
+                            }
+                        },
+                        pointer: {
+                            itemStyle: {
+                                color: 'auto'
+                            }
+                        },
+                        axisTick: {
+                            distance: -30,
+                            length: 8,
+                            lineStyle: {
+                                color: '#fff',
+                                width: 2
+                            }
+                        },
+                        splitLine: {
+                            distance: -30,
+                            length: 30,
+                            lineStyle: {
+                                color: '#fff',
+                                width: 4
+                            }
+                        },
+                        axisLabel: {
+                            color: 'auto',
+                            distance: 40,
+                            fontSize: 12
+                        },
+                        title: {
+                            offsetCenter: [0, '-30%'],
+                            fontSize: 14,
+                            color: token.colorText
+                        }
+                    }
+                ]
+            };
+        }
+
+        // 对于折线图、面积图、柱状图的通用配置
+        const seriesConfig = {
+            line: {
+                type: 'line',
+                smooth: false,
+                symbol: 'circle',
+                symbolSize: data.length > 100 ? 0 : 4,
+                sampling: 'lttb',
+                lineStyle: {
+                    width: 2,
+                    color: token.colorSuccess
+                },
+                itemStyle: {
+                    color: token.colorSuccess
+                },
+                areaStyle: null
+            },
+            area: {
+                type: 'line',
+                smooth: false,
+                symbol: 'circle',
+                symbolSize: data.length > 100 ? 0 : 4,
+                sampling: 'lttb',
+                lineStyle: {
+                    width: 2,
+                    color: token.colorSuccess
+                },
+                itemStyle: {
+                    color: token.colorSuccess
+                },
+                areaStyle: {
+                    color: {
+                        type: 'linear',
+                        x: 0,
+                        y: 0,
+                        x2: 0,
+                        y2: 1,
+                        colorStops: [{
+                            offset: 0,
+                            color: `${token.colorSuccess}33`
+                        }, {
+                            offset: 1,
+                            color: `${token.colorSuccess}0D`
+                        }]
+                    }
+                }
+            },
+            bar: {
+                type: 'bar',
+                barWidth: '60%',
+                itemStyle: {
+                    color: token.colorSuccess
+                }
+            }
+        };
 
         return {
             tooltip: {
@@ -148,40 +272,11 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 }
             ],
             series: [{
-                type: 'line',
-                data: values,
-                smooth: false,
-                symbol: 'circle',
-                // 大数据量时不显示所有点的标记
-                symbolSize: data.length > 100 ? 0 : 4,
-                // 保留LTTB采样算法，但仅在ECharts内部渲染优化时使用
-                sampling: 'lttb',
-                lineStyle: {
-                    width: 2,
-                    color: token.colorSuccess
-                },
-                itemStyle: {
-                    color: token.colorSuccess
-                },
-                areaStyle: {
-                    color: {
-                        type: 'linear',
-                        x: 0,
-                        y: 0,
-                        x2: 0,
-                        y2: 1,
-                        colorStops: [{
-                            offset: 0,
-                            color: `${token.colorSuccess}33`
-                        }, {
-                            offset: 1,
-                            color: `${token.colorSuccess}0D`
-                        }]
-                    }
-                }
+                ...seriesConfig[chartType] || seriesConfig.line,
+                data: values
             }]
         };
-    }, [data, showHeader, token]); // 只有当data、showHeader或主题变化时才重新计算
+    }, [data, showHeader, token, chartType]); // 只有当data、showHeader、主题或图表类型变化时才重新计算
 
     // 计算统计信息用于底部显示
     const statsInfo = useMemo(() => {
@@ -247,8 +342,8 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true }) => {
                 notMerge={true}    // 完全替换配置，避免合并开销
             />
             
-            {/* 统计信息显示在图表下方 */}
-            {statsInfo && (
+            {/* 统计信息显示在图表下方（仪表盘不显示） */}
+            {statsInfo && chartType !== 'gauge' && (
                 <div style={{ 
                     color: token.colorWarning, 
                     fontSize: '11px', 
