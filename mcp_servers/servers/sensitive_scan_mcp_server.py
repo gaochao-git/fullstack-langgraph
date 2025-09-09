@@ -38,10 +38,10 @@ config = MCPServerConfig('sensitive_scan_server')
 
 # 获取数据库配置
 DB_CONFIG = {
-    'host': config.get('db_host', '82.156.146.51'),
+    'host': config.get('db_host', '82.156.xx.xx'),
     'port': config.get('db_port', 3306),
-    'user': config.get('db_user', 'gaochao'),
-    'password': config.get('db_password', 'fffjjj'),
+    'user': config.get('db_user', 'xxxx'),
+    'password': config.get('db_password', 'xxxx'),
     'db': config.get('db_name', 'omind'),
     'charset': 'utf8mb4'
 }

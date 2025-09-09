@@ -5,6 +5,7 @@
 
 import asyncio
 from typing import List, Any
+from datetime import timedelta
 from src.shared.core.logging import get_logger
 from src.apps.agent.tools import general_tool
 from ..agent_utils import get_tools_config_from_db
@@ -65,12 +66,23 @@ async def get_generic_agent_tools(agent_id: str = "generic_agent") -> List[Any]:
                             # 查询mcp_servers表获取server_uri（使用同步方法）
                             server = mcp_service.get_server_by_id_sync(db, server_id)
                             if server and server.is_enabled == 'on':
-                                server_config[server_id] = {
-                                    "url": server.server_uri,
-                                    "transport": server.transport_type.replace('-','_'),        # langgraph要求'streamable_http'
-                                    "timeout": server.read_timeout_seconds,                     # HTTP超时时间
-                                    "sse_read_timeout": server.read_timeout_seconds * 10       # SSE读取超时设置为10倍
-                                }
+                                # 根据传输类型使用正确的超时参数类型
+                                if server.transport_type == 'streamable-http':
+                                    # Streamable HTTP 需要 timedelta 对象
+                                    server_config[server_id] = {
+                                        "url": server.server_uri,
+                                        "transport": "streamable_http",
+                                        "timeout": timedelta(seconds=server.read_timeout_seconds),
+                                        "sse_read_timeout": timedelta(seconds=server.read_timeout_seconds * 10)
+                                    }
+                                else:
+                                    # SSE 和其他传输类型使用 float
+                                    server_config[server_id] = {
+                                        "url": server.server_uri,
+                                        "transport": server.transport_type.replace('-','_'),
+                                        "timeout": float(server.read_timeout_seconds),
+                                        "sse_read_timeout": float(server.read_timeout_seconds * 10)
+                                    }
                         except Exception as e:
                             logger.error(f"获取MCP服务器配置失败 server_id={server_id}: {e}")
                             # 继续处理其他服务器，不中断整个流程
