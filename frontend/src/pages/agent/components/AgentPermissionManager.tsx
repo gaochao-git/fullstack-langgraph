@@ -19,9 +19,10 @@ import {
   PlusOutlined, 
   DeleteOutlined, 
   ReloadOutlined,
-  CopyOutlined,
   KeyOutlined,
-  UserOutlined
+  UserOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined
 } from '@ant-design/icons';
 import { agentApi } from '@/services/agentApi';
 import type { ColumnsType } from 'antd/es/table';
@@ -33,7 +34,6 @@ interface Permission {
   agent_id: string;
   user_name: string;
   agent_key: string;
-  agent_key_preview?: string;
   mark_comment: string;
   is_active: boolean;
   create_by: string;
@@ -54,6 +54,7 @@ const AgentPermissionManager: React.FC<AgentPermissionManagerProps> = ({
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [regeneratingKeys, setRegeneratingKeys] = useState<Set<number>>(new Set());
   const [togglingStatus, setTogglingStatus] = useState<Set<number>>(new Set());
+  const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
   const [form] = Form.useForm();
 
   // 加载权限列表
@@ -187,38 +188,44 @@ const AgentPermissionManager: React.FC<AgentPermissionManagerProps> = ({
       title: '密钥',
       dataIndex: 'agent_key',
       key: 'agent_key',
-      width: 200,
+      width: 250,
       render: (text: string, record: Permission) => {
-        // 使用预览版本显示，如果没有则自行截取
-        const displayKey = record.agent_key_preview || text.substring(0, 10) + '...';
-        const fullKey = text;  // 完整密钥
+        if (!text) {
+          return <Text type="secondary">无密钥</Text>;
+        }
         
-        const handleCopy = () => {
-          // 确保复制的是完整密钥
-          navigator.clipboard.writeText(fullKey).then(() => {
-            message.success('密钥已复制到剪贴板');
-          }).catch(() => {
-            // 降级方案：创建临时输入框
-            const input = document.createElement('input');
-            input.value = fullKey;
-            document.body.appendChild(input);
-            input.select();
-            document.execCommand('copy');
-            document.body.removeChild(input);
-            message.success('密钥已复制到剪贴板');
+        const isVisible = visibleKeys.has(record.id);
+        
+        const toggleVisibility = () => {
+          setVisibleKeys(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(record.id)) {
+              newSet.delete(record.id);
+            } else {
+              newSet.add(record.id);
+            }
+            return newSet;
           });
         };
         
         return (
           <Space>
-            <Text code>{displayKey}</Text>
-            <Tooltip title="复制完整密钥">
-              <Button 
-                size="small" 
-                icon={<CopyOutlined />} 
-                onClick={handleCopy}
-              />
-            </Tooltip>
+            <Input.Password
+              value={text}
+              readOnly
+              bordered={false}
+              visibilityToggle={{
+                visible: isVisible,
+                onVisibleChange: toggleVisibility
+              }}
+              style={{ 
+                width: 200,
+                padding: '0 11px',
+                backgroundColor: '#f5f5f5',
+                fontSize: '12px',
+                fontFamily: 'monospace'
+              }}
+            />
           </Space>
         );
       }

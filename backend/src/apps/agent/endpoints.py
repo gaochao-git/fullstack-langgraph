@@ -296,7 +296,6 @@ async def list_agent_permissions(
             "agent_id": p.agent_id,
             "user_name": p.user_name,
             "agent_key": p.agent_key,  # 返回完整密钥，前端负责显示处理
-            "agent_key_preview": p.agent_key[:10] + "...",  # 提供预览版本
             "mark_comment": p.mark_comment,
             "is_active": p.is_active,
             "create_by": p.create_by,
