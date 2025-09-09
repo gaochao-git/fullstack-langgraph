@@ -69,19 +69,9 @@ servers:
     config:
       document_dir: "/tmp/mcp_documents"
       
-  ocr_server:
-    enabled: true
-    port: 3007
-    script: "servers/ocr_mcp_server.py"
-    display_name: "OCR文字识别服务"
-    config:
-      # OCR相关配置可以在这里添加
-      default_language: "eng"  # 默认语言
-      # 支持的语言: eng, chi_sim, chi_tra, jpn, kor 等
-      
   sensitive_scan_server:
     enabled: true
-    port: 3008
+    port: 3007
     script: "servers/sensitive_scan_mcp_server.py"
     display_name: "敏感数据扫描服务"
     config:

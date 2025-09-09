@@ -427,6 +427,6 @@ async def scan_document(file_ids: List[str]) -> str:
 
 if __name__ == "__main__":
     # 启动服务器
-    port = int(os.environ.get('MCP_PORT', config.get('port', 3008)))
+    port = config.get('port', 3008)
     logger.info(f"Starting Sensitive Data Scanner MCP Server on port {port}")
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
