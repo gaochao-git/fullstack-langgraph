@@ -1436,23 +1436,22 @@ function ChatMessages({
                             // 为每个工具调用添加对应的图表
                             const toolCalls = (msg as any).tool_calls || [];
                             toolCalls.forEach((toolCall: any) => {
-                              if (toolCall.name === 'get_zabbix_metric_data') {
-                                // 查找工具调用的结果
-                                const messageIndex = messages.findIndex(m => m.id === msg.id);
-                                if (messageIndex !== -1) {
-                                  for (let j = messageIndex + 1; j < messages.length; j++) {
-                                    const nextMessage = messages[j];
-                                    if (nextMessage.type === 'tool' && (nextMessage as any).tool_call_id === toolCall.id) {
-                                      const toolResult = nextMessage.content;
-                                      if (canRenderChart(toolResult, toolCall.name)) {
-                                        renderItems.push(
-                                          <div key={`chart-${toolCall.id}`} className="min-w-0 w-full mb-3">
-                                            <ZabbixDataRenderer data={toolResult} toolName={toolCall.name} />
-                                          </div>
-                                        );
-                                      }
-                                      break;
+                              // 查找工具调用的结果
+                              const messageIndex = messages.findIndex(m => m.id === msg.id);
+                              if (messageIndex !== -1) {
+                                for (let j = messageIndex + 1; j < messages.length; j++) {
+                                  const nextMessage = messages[j];
+                                  if (nextMessage.type === 'tool' && (nextMessage as any).tool_call_id === toolCall.id) {
+                                    const toolResult = nextMessage.content;
+                                    // 不再检查工具名，直接检查数据格式
+                                    if (canRenderChart(toolResult)) {
+                                      renderItems.push(
+                                        <div key={`chart-${toolCall.id}`} className="min-w-0 w-full mb-3">
+                                          <ZabbixDataRenderer data={toolResult} />
+                                        </div>
+                                      );
                                     }
+                                    break;
                                   }
                                 }
                               }

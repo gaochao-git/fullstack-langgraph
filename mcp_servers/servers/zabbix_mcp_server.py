@@ -218,33 +218,31 @@ async def get_zabbix_metric_data(
         metrics_data = {
             item["key_"]: {
                 "name": item["name"],
-                "current_value": item["lastvalue"],
+                "current_value": float(item["lastvalue"]) if item["lastvalue"] else 0,
                 "units": item["units"],
-                "avg_value": round(avg_value, 2),
-                "max_value": round(max_value, 2),
-                "min_value": round(min_value, 2),
+                "avg_value": round(avg_value, 5),
+                "max_value": round(max_value, 5),
+                "min_value": round(min_value, 5),
                 "data_points": len(values),
                 "history": formatted_history[:50] if len(formatted_history) > 50 else formatted_history  # 限制返回的数据点数量
             }
         }
         
-        # 根据指标类型确定推荐的图表类型（只返回一个）
-        chart_type = "line"  # 默认折线图
-        if "util" in metric_key or "percent" in item["units"].lower() or "%" in item["units"]:
-            chart_type = "gauge"  # 利用率类指标使用仪表盘
-        elif "bytes" in item["units"].lower() or "bps" in item["units"].lower():
-            chart_type = "area"  # 流量类指标使用面积图
-        elif "count" in metric_key.lower() or "number" in metric_key.lower():
-            chart_type = "bar"  # 计数类指标使用柱状图
+        # 图表类型固定为line，后续可由用户手动指定
+        chart_type = "line"  # 折线图
         
         return json.dumps({
-            "hostname": actual_ip,
-            "host_id": host_id,
-            "metric_key": metric_key,
-            "time_range": time_range_str,
-            "metrics": metrics_data,
-            "extra_config": {
-                "show_charts": chart_type
+            "success": True,
+            "message": f"成功获取主机 {actual_ip} 的 {metric_key} 监控数据",
+            "data": {
+                "hostname": actual_ip,
+                "host_id": host_id,
+                "metrics": metrics_data,
+                "time_range": time_range_str,
+                "extra_config": {
+                    "show_charts": chart_type,
+                    "data_source": "zabbix"
+                }
             }
         }, indent=2)
         

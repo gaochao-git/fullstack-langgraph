@@ -27,8 +27,13 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
         const maxValue = Math.max(...values);
         const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
         
-        // 格式化统计值（保留2位小数）
-        const formatValue = (val) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        // 格式化统计值（小于1的保留5位小数）
+        const formatValue = (val) => {
+            if (Math.abs(val) < 1 && Math.abs(val) > 0) {
+                return val.toFixed(5);
+            }
+            return Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        };
         const statsText = `当前值: ${formatValue(values[values.length - 1])} ${firstItem.units} | 最大值: ${formatValue(maxValue)} ${firstItem.units} | 数据点: ${values.length}`;
         
         // 简化头部信息：只显示IP和指标名称
@@ -169,12 +174,14 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
                     const value = parseFloat(params[0].value);
                     // 使用与Y轴标签相同的格式化逻辑
                     let formattedValue;
-                    if (value >= 1000000) {
+                    if (Math.abs(value) < 1 && Math.abs(value) > 0) {
+                        formattedValue = value.toFixed(5);
+                    } else if (value >= 1000000) {
                         formattedValue = (value / 1000000).toFixed(1) + 'M';
                     } else if (value >= 1000) {
                         formattedValue = (value / 1000).toFixed(1) + 'K';
                     } else {
-                        formattedValue = Number.isInteger(value) ? value.toString() : value.toFixed(1);
+                        formattedValue = Number.isInteger(value) ? value.toString() : value.toFixed(2);
                     }
                     const time = params[0].axisValue;
                     return `${time}<br/>${formattedValue}${firstItem.units}`;
@@ -230,12 +237,14 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
                         const numValue = parseFloat(value);
                         // 对于大数字，使用K/M/G等单位简化显示
                         let formattedValue;
-                        if (numValue >= 1000000) {
+                        if (Math.abs(numValue) < 1 && Math.abs(numValue) > 0) {
+                            formattedValue = numValue.toFixed(5);
+                        } else if (numValue >= 1000000) {
                             formattedValue = (numValue / 1000000).toFixed(1) + 'M';
                         } else if (numValue >= 1000) {
                             formattedValue = (numValue / 1000).toFixed(1) + 'K';
                         } else {
-                            formattedValue = Number.isInteger(numValue) ? numValue.toString() : numValue.toFixed(1);
+                            formattedValue = Number.isInteger(numValue) ? numValue.toString() : numValue.toFixed(2);
                         }
                         return formattedValue + firstItem.units;
                     }
@@ -289,7 +298,12 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
         const maxValue = Math.max(...values);
         const currentValue = values[values.length - 1];
         
-        const formatValue = (val) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        const formatValue = (val) => {
+            if (Math.abs(val) < 1 && Math.abs(val) > 0) {
+                return val.toFixed(5);
+            }
+            return Number.isInteger(val) ? val.toString() : val.toFixed(2);
+        };
         
         return {
             max: formatValue(maxValue),

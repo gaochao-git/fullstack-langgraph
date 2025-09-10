@@ -2,6 +2,14 @@ import React from 'react';
 import ZabbixChart from './ZabbixChart';
 import { theme } from 'antd';
 
+// 格式化数值（小于1的保留5位小数）
+const formatMetricValue = (value: number): string => {
+  if (Math.abs(value) < 1 && Math.abs(value) > 0) {
+    return value.toFixed(5);
+  }
+  return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+};
+
 // 检测是否为Zabbix监控数据
 const isZabbixMetricsData = (data: any): boolean => {
   if (!data || typeof data !== 'object') return false;
@@ -126,7 +134,7 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
               }}>
                 <h5 className="font-medium mb-2" style={{ color: token.colorText }}>{metricData.name}</h5>
                 <div className="text-center py-4" style={{ color: token.colorTextSecondary }}>
-                  <p>当前值: {metricData.current_value} {metricData.units}</p>
+                  <p>当前值: {formatMetricValue(metricData.current_value)} {metricData.units}</p>
                   <p className="text-sm">暂无历史数据</p>
                 </div>
               </div>
@@ -153,11 +161,6 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
 
 // 主要的Zabbix数据渲染组件
 const ZabbixDataRenderer: React.FC<{ data: any; toolName?: string }> = ({ data, toolName }) => {
-  // 只对 get_zabbix_metric_data 工具显示图表
-  if (toolName !== 'get_zabbix_metric_data') {
-    return null; // 其他工具不处理，显示普通输出
-  }
-  
   // 尝试解析JSON字符串
   let parsedData = data;
   if (typeof data === 'string') {
@@ -168,9 +171,17 @@ const ZabbixDataRenderer: React.FC<{ data: any; toolName?: string }> = ({ data, 
     }
   }
   
+  // 支持嵌套在 data 字段中的数据
+  const actualData = parsedData.data || parsedData;
+  
+  // 检查是否有 extra_config.data_source = "zabbix"
+  if (actualData?.extra_config?.data_source !== 'zabbix') {
+    return null; // 不是zabbix数据源，不处理
+  }
+  
   // 检查是否为监控数据（带图表）
-  if (isZabbixMetricsData(parsedData)) {
-    return <ZabbixMetricsCharts data={parsedData} />;
+  if (isZabbixMetricsData(actualData)) {
+    return <ZabbixMetricsCharts data={actualData} />;
   }
   
   return null; // 不是有效的图表数据，不处理
@@ -178,10 +189,6 @@ const ZabbixDataRenderer: React.FC<{ data: any; toolName?: string }> = ({ data, 
 
 // 检查是否可以渲染图表
 export const canRenderChart = (data: any, toolName?: string): boolean => {
-  if (toolName !== 'get_zabbix_metric_data') {
-    return false;
-  }
-  
   let parsedData = data;
   if (typeof data === 'string') {
     try {
@@ -191,7 +198,12 @@ export const canRenderChart = (data: any, toolName?: string): boolean => {
     }
   }
   
-  return isZabbixMetricsData(parsedData);
+  // 支持嵌套在 data 字段中的数据
+  const actualData = parsedData.data || parsedData;
+  
+  // 检查 data_source 和数据格式
+  return actualData?.extra_config?.data_source === 'zabbix' && 
+         isZabbixMetricsData(actualData);
 };
 
 export default ZabbixDataRenderer;
