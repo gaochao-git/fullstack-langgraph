@@ -256,54 +256,21 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
 
 async def stream_run_standard(thread_id: str, request_body: RunCreate, request=None):
     """Standard LangGraph streaming endpoint - 支持动态智能体检查"""
-    import asyncio
-    import time
-    
-    async def generate_with_heartbeat():
-        """优化的生成器函数，包含心跳机制"""
-        heartbeat_interval = 10  # 10秒心跳间隔
-        last_activity = time.time()
-        
+    # 暂时禁用心跳以避免MCP CloseResourceError
+    # TODO: 需要更好的解决方案来处理心跳与MCP工具的兼容性
+    async def generate():
+        """恢复原始的流式处理（暂时禁用心跳）"""
         try:
-            data_iterator = execute_graph_request(request_body, thread_id, request, is_streaming=True)
-            
-            while True:
-                # 计算到下次心跳的剩余时间
-                elapsed = time.time() - last_activity
-                remaining = heartbeat_interval - elapsed
-                
-                # 如果已经超过心跳间隔，立即发送心跳
-                if remaining <= 0:
-                    heartbeat_msg = f"event: heartbeat\ndata: {json.dumps({'type': 'heartbeat', 'timestamp': time.time()}, ensure_ascii=False)}\n\n"
-                    yield heartbeat_msg
-                    last_activity = time.time()
-                    logger.debug("发送心跳，保持SSE连接活跃")
-                    continue
-                
-                try:
-                    # 在剩余时间内等待数据
-                    item = await asyncio.wait_for(
-                        data_iterator.__anext__(),
-                        timeout=remaining
-                    )
-                    yield item
-                    last_activity = time.time()
-                    
-                except asyncio.TimeoutError:
-                    # 达到心跳时间，下次循环会发送心跳
-                    continue
-                    
-                except StopAsyncIteration:
-                    # 数据流正常结束
-                    break
-                    
+            # 使用通用执行函数，流式模式
+            async for item in execute_graph_request(request_body, thread_id, request, is_streaming=True):
+                yield item
         except Exception as e:
-            # 处理所有其他异常
             logger.error(f"流式处理异常: {e}", exc_info=True)
-            yield f"event: error\ndata: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
     return StreamingResponse(
-        generate_with_heartbeat(),
+        generate(),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
