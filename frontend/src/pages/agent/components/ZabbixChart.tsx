@@ -296,6 +296,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
         
         const minValue = Math.min(...values);
         const maxValue = Math.max(...values);
+        const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
         const currentValue = values[values.length - 1];
         
         const formatValue = (val) => {
@@ -308,6 +309,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
         return {
             max: formatValue(maxValue),
             min: formatValue(minValue),
+            avg: formatValue(avgValue),
             units: firstItem.units
         };
     }, [data, showHeader]);
@@ -318,7 +320,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
         const firstItem = data[0];
         return {
             hostname: firstItem.hostname || '',
-            key: firstItem.key_ || ''
+            name: firstItem.name || firstItem.key_ || ''  // 优先使用name，如果没有则用key_
         };
     }, [data, showHeader]);
 
@@ -339,9 +341,9 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap'
                 }}
-                title={`${headerInfo.hostname} | ${headerInfo.key}`} // 悬浮显示完整内容
+                title={`${headerInfo.hostname} | ${headerInfo.name}`} // 悬浮显示完整内容
                 >
-                    {headerInfo.hostname} | {headerInfo.key}
+                    {headerInfo.hostname} | {headerInfo.name}
                 </div>
             )}
             
@@ -369,6 +371,7 @@ const ZabbixChart = React.memo(({ data, style = {}, showHeader = true, chartType
                     borderRadius: '4px'
                 }}>
                     最大值: {statsInfo.max} {statsInfo.units} | 
+                    平均值: {statsInfo.avg} {statsInfo.units} | 
                     最小值: {statsInfo.min} {statsInfo.units}
                 </div>
             )}

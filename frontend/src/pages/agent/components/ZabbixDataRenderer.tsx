@@ -121,6 +121,7 @@ const ZabbixMetricsCharts: React.FC<{ data: any }> = ({ data }) => {
             metric_time: item[0], // 时间戳
             value: item[1],       // 数值
             key_: metricKey,
+            name: metricData.name,  // 添加指标名称
             units: metricData.units || '',
             hostname: data.hostname,
             timeRange: data.time_range
