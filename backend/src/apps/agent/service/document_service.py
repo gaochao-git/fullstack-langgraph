@@ -8,6 +8,7 @@ import csv
 import io
 import subprocess
 import tempfile
+import aiofiles
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -334,24 +335,40 @@ class DocumentService:
         if doc_upload.process_status != ProcessStatus.READY:
             return None
         
-        # 解析JSON字段
-        chunks = []
+        # 读取内容
+        content = ""
+        if doc_upload.doc_content:
+            if self._is_file_path(doc_upload.doc_content):
+                # 新方式：从文件读取
+                parse_file_path = Path(doc_upload.doc_content)
+                if parse_file_path.exists():
+                    try:
+                        async with aiofiles.open(parse_file_path, 'r', encoding='utf-8') as f:
+                            content = await f.read()
+                    except Exception as e:
+                        logger.error(f"读取解析文件失败: {e}")
+                        content = ""
+                else:
+                    logger.warning(f"解析文件不存在: {parse_file_path}")
+            else:
+                # 兼容旧方式：直接从数据库读取
+                content = doc_upload.doc_content
+        
+        # 解析元数据
         metadata = {}
         try:
-            if doc_upload.doc_chunks:
-                chunks = json.loads(doc_upload.doc_chunks)
             if doc_upload.doc_metadata:
                 metadata = json.loads(doc_upload.doc_metadata)
         except Exception as e:
-            logger.error(f"解析JSON字段失败: {e}")
+            logger.error(f"解析metadata字段失败: {e}")
         
         return {
             "file_id": file_id,
             "file_name": doc_upload.file_name,
             "file_size": doc_upload.file_size,
-            "content": doc_upload.doc_content or "",
+            "content": content,
             "metadata": metadata,
-            "chunks": chunks
+            "chunks": []  # 不再返回分块内容
         }
     
     async def get_file_status(self, db: AsyncSession, file_id: str) -> Optional[Dict[str, Any]]:
@@ -514,7 +531,27 @@ class DocumentService:
                 if not result:
                     continue
                 
-                content = result.doc_content or ""
+                # 读取内容
+                content = ""
+                if result.doc_content:
+                    if self._is_file_path(result.doc_content):
+                        # 新方式：从文件读取
+                        parse_file_path = Path(result.doc_content)
+                        if parse_file_path.exists():
+                            try:
+                                # 同步读取文件
+                                with open(parse_file_path, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                            except Exception as e:
+                                logger.error(f"读取解析文件失败: {e}")
+                                content = f"读取文件失败: {str(e)}"
+                        else:
+                            logger.warning(f"解析文件不存在: {parse_file_path}")
+                            content = "解析文件不存在"
+                    else:
+                        # 兼容旧方式：直接使用数据库中的内容
+                        content = result.doc_content
+                
                 file_name = result.file_name
                 
                 # 如果内容太长，只取前面部分
@@ -1184,6 +1221,18 @@ class DocumentService:
         # 普通文件处理
         return await processor(file_path, file_name)
     
+    def _is_file_path(self, content: str) -> bool:
+        """判断doc_content字段是否为文件路径"""
+        if not content:
+            return False
+        # 检查是否符合文件路径格式
+        try:
+            path = Path(content)
+            # 如果是绝对路径且以.parse.txt结尾，认为是文件路径
+            return path.is_absolute() and content.endswith('.parse.txt')
+        except:
+            return False
+    
     def _create_document_chunks(self, text: str) -> List[str]:
         """将文档文本分块"""
         # 分块处理 - 优化分块策略
@@ -1211,7 +1260,7 @@ class DocumentService:
         return chunks
     
     async def _finalize_document_processing(self, db: AsyncSession, file_id: str, full_text: str, file_ext: str) -> int:
-        """完成文档处理，分块并更新数据库"""
+        """完成文档处理，保存到文件并更新数据库"""
         # 创建分块
         chunks = self._create_document_chunks(full_text)
         
@@ -1222,6 +1271,16 @@ class DocumentService:
             "file_type": file_ext
         }
         
+        # 保存解析后的内容到文件
+        parse_file_path = UPLOAD_DIR / f"{file_id}.parse.txt"
+        try:
+            async with aiofiles.open(parse_file_path, 'w', encoding='utf-8') as f:
+                await f.write(full_text)
+            logger.info(f"解析内容已保存到文件: {parse_file_path}")
+        except Exception as e:
+            logger.error(f"保存解析内容到文件失败: {e}")
+            raise
+        
         # 更新数据库
         async with db.begin():
             # 重新查询文档记录
@@ -1231,14 +1290,11 @@ class DocumentService:
             doc_upload = result.scalar_one_or_none()
             if doc_upload:
                 doc_upload.process_status = ProcessStatus.READY
-                # MEDIUMTEXT 支持 16MB，约 1600万字符，这里限制为 500万字符以保留余量
-                doc_upload.doc_content = full_text[:5000000] if len(full_text) > 5000000 else full_text
+                # 存储解析文件的路径而不是内容
+                doc_upload.doc_content = str(parse_file_path)
                 
-                # 限制分块数量，避免 JSON 过大
-                # 每个分块 1000 字符，存储前 1000 个分块（约 100万字符的内容）
-                max_chunks = 1000
-                chunks_to_store = chunks[:max_chunks]
-                doc_upload.doc_chunks = json.dumps([{"id": i, "content": chunk} for i, chunk in enumerate(chunks_to_store)])
+                # 不再存储分块内容，设为空字符串
+                doc_upload.doc_chunks = ""
                 
                 doc_upload.doc_metadata = json.dumps(metadata)
                 doc_upload.process_end_time = now_shanghai()
