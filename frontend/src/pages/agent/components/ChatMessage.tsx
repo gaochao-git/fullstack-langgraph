@@ -914,8 +914,6 @@ function ChatMessages({
     if (!items) return;
 
     const files: File[] = [];
-    const oversizedFiles: string[] = [];
-    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -947,29 +945,12 @@ function ChatMessages({
 
         // 创建File对象
         const file = new File([blob], fileName, { type: blob.type });
-        
-        // 检查文件大小
-        if (file.size > MAX_SIZE) {
-          const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-          oversizedFiles.push(`${file.name} (${fileSizeMB}MB)`);
-          continue;
-        }
-        
         files.push(file);
       }
     }
     
-    // 显示文件大小超限的错误消息
-    if (oversizedFiles.length > 0) {
-      const errorMsg = `文件大小超出限制（最大 100MB）：${oversizedFiles.join('、')}`;
-      message.error(errorMsg);
-    }
-    
-    if (files.length > 0) {
-      // 使用现有的文件处理逻辑
-      await handleFilesSelect(files);
-      message.success(`已粘贴 ${files.length} 个文件`);
-    }
+    // 使用统一的文件处理函数
+    await processFiles(files, 'paste');
   };
 
   // 拖放状态
@@ -1012,45 +993,8 @@ function ChatMessages({
     dragCounter.current = 0;
 
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      // 先进行文件大小检查
-      const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-      const oversizedFiles: string[] = [];
-      const invalidTypeFiles: string[] = [];
-      
-      const validFiles = files.filter(file => {
-        // 检查文件大小
-        if (file.size > MAX_SIZE) {
-          const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
-          oversizedFiles.push(`${file.name} (${fileSizeMB}MB)`);
-          return false;
-        }
-        
-        // 检查文件类型
-        if (!fileUploadUtils.isValidFileType(file)) {
-          invalidTypeFiles.push(file.name);
-          return false;
-        }
-        
-        return true;
-      });
-
-      // 处理有效文件
-      if (validFiles.length > 0) {
-        await handleFilesSelect(validFiles);
-        message.success(`已拖入 ${validFiles.length} 个文件`);
-      }
-
-      // 显示错误信息
-      if (oversizedFiles.length > 0) {
-        const errorMsg = `文件大小超出限制（最大 100MB）：${oversizedFiles.join('、')}`;
-        message.error(errorMsg);
-      }
-      
-      if (invalidTypeFiles.length > 0) {
-        message.warning(`${invalidTypeFiles.length} 个文件类型不支持`);
-      }
-    }
+    // 使用统一的文件处理函数
+    await processFiles(files, 'drop');
   };
 
   // 处理文件选择 - 选择后立即上传
@@ -1173,6 +1117,68 @@ function ChatMessages({
   // 移除选中的文件
   const handleRemoveFile = (index: number) => {
     setUploadedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
+  };
+
+  // 统一的文件验证函数
+  const validateFiles = (files: File[]): { validFiles: File[], oversizedFiles: string[], invalidTypeFiles: string[] } => {
+    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+    const oversizedFiles: string[] = [];
+    const invalidTypeFiles: string[] = [];
+    
+    const validFiles = files.filter(file => {
+      // 检查文件大小
+      if (file.size > MAX_SIZE) {
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        oversizedFiles.push(`${file.name} (${fileSizeMB}MB)`);
+        return false;
+      }
+      
+      // 检查文件类型
+      if (!fileUploadUtils.isValidFileType(file)) {
+        invalidTypeFiles.push(file.name);
+        return false;
+      }
+      
+      return true;
+    });
+
+    return { validFiles, oversizedFiles, invalidTypeFiles };
+  };
+
+  // 统一的文件处理函数：验证并上传
+  const processFiles = async (files: File[], source: 'paste' | 'drop' | 'select') => {
+    if (files.length === 0) return;
+
+    // 验证文件
+    const { validFiles, oversizedFiles, invalidTypeFiles } = validateFiles(files);
+    
+    // 如果有错误，显示错误信息并返回
+    let hasError = false;
+    
+    if (oversizedFiles.length > 0) {
+      const errorMsg = `文件大小超出限制（最大 100MB）：${oversizedFiles.join('、')}`;
+      message.error(errorMsg);
+      hasError = true;
+    }
+    
+    if (invalidTypeFiles.length > 0) {
+      message.warning(`${invalidTypeFiles.length} 个文件类型不支持`);
+      hasError = true;
+    }
+    
+    // 如果有错误且没有有效文件，直接返回
+    if (hasError && validFiles.length === 0) {
+      return;
+    }
+    
+    // 处理有效文件
+    if (validFiles.length > 0) {
+      await handleFilesSelect(validFiles);
+      const successMsg = source === 'paste' ? `已粘贴 ${validFiles.length} 个文件` :
+                        source === 'drop' ? `已拖入 ${validFiles.length} 个文件` :
+                        `已选择 ${validFiles.length} 个文件`;
+      message.success(successMsg);
+    }
   };
 
   // 滚动到底部
