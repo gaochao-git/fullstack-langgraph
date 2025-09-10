@@ -10,6 +10,8 @@ import logging
 import os
 import asyncio
 import re
+import aiofiles
+from pathlib import Path
 from asyncio import Semaphore
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -57,6 +59,9 @@ CHUNK_SIZE = config.get('chunk_size', 10000)
 
 # 获取文件并发度配置（默认3个文件同时扫描）
 FILE_CONCURRENCY = config.get('file_concurrency', 3)
+
+# 获取文档存储路径配置
+DOCUMENT_STORAGE_PATH = config.get('document_storage_path', '/tmp/documents/uploads')
 
 # 初始化LangChain LLM
 llm = ChatOpenAI(
@@ -116,6 +121,21 @@ SYSTEM_PROMPT = """你是一个专业的敏感数据扫描助手。你的任务�
 注意：绝对不要在输出中包含敏感信息的原始值！"""
 
 
+async def read_content_from_file(file_path: str) -> str:
+    """从文件读取内容"""
+    try:
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            content = await f.read()
+            logger.info(f"成功从文件读取内容: {file_path}")
+            return content
+    except FileNotFoundError:
+        logger.error(f"解析文件不存在: {file_path}")
+        return ""
+    except Exception as e:
+        logger.error(f"读取解析文件失败: {file_path}, 错误: {e}")
+        return ""
+
+
 async def get_file_content_from_db(file_id: str) -> Dict[str, Any]:
     """从MySQL数据库获取文件内容"""
     conn = None
@@ -160,12 +180,21 @@ async def get_file_content_from_db(file_id: str) -> Dict[str, Any]:
             }
         
         # 获取文档内容
-        content = row['doc_content']
-        if not content:
+        doc_content_field = row['doc_content']
+        if not doc_content_field:
             return {
                 'success': False,
                 'content': '',
                 'error': '文档内容为空'
+            }
+        
+        # 从文件路径读取内容
+        content = await read_content_from_file(doc_content_field)
+        if not content:
+            return {
+                'success': False,
+                'content': '',
+                'error': f'无法读取解析文件: {doc_content_field}'
             }
         
         # 解析文档元数据

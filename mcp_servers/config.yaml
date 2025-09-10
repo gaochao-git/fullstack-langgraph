@@ -75,11 +75,7 @@ servers:
     script: "servers/sensitive_scan_mcp_server.py"
     display_name: "敏感数据扫描服务"
     config:
-      db_host: "82.156.146.51"
-      db_port: 3306
-      db_user: "gaochao"
-      db_password: "fffjjj"
-      db_name: "omind"
+      document_storage_path: "/tmp/documents/uploads"  # 文档存储路径
       llm_api_base: "https://api.siliconflow.cn/v1"
       llm_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm" 
       llm_model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
