@@ -39,28 +39,37 @@ export const FileUploadManager: React.FC<FileUploadManagerProps> = ({
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length > 0 && uploadConfig) {
-      // 前端预检查文件大小
-      const MAX_SIZE = uploadConfig.max_upload_size_mb * 1024 * 1024;
-      const oversizedFiles: string[] = [];
-      const validFiles = files.filter(file => {
-        if (file.size > MAX_SIZE) {
-          oversizedFiles.push(`${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
-          return false;
+    try {
+      const files = Array.from(e.target.files || []);
+      if (files.length > 0 && uploadConfig) {
+        // 前端预检查文件大小
+        const MAX_SIZE = uploadConfig.max_upload_size_mb * 1024 * 1024;
+        const oversizedFiles: string[] = [];
+        const validFiles = files.filter(file => {
+          // 对于超大文件，立即给出反馈
+          if (file.size > MAX_SIZE) {
+            const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+            oversizedFiles.push(`${file.name} (${fileSizeMB}MB)`);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validFiles.length > 0) {
+          onFilesSelect(validFiles);
         }
-        return true;
-      });
-      
-      if (validFiles.length > 0) {
-        onFilesSelect(validFiles);
+        
+        if (oversizedFiles.length > 0) {
+          // 对超大文件给出更明显的错误提示
+          const errorMsg = `文件大小超出限制（最大 ${uploadConfig.max_upload_size_mb}MB）：${oversizedFiles.join('、')}`;
+          onError?.(errorMsg);
+        }
       }
-      
-      if (oversizedFiles.length > 0) {
-        const errorMsg = `以下文件超过 ${uploadConfig.max_upload_size_mb}MB 限制：${oversizedFiles.join(', ')}`;
-        onError?.(errorMsg);
-      }
-      
+    } catch (error) {
+      // 捕获任何文件选择过程中的错误
+      console.error('文件选择出错:', error);
+      onError?.('文件选择失败，请重试');
+    } finally {
       // 清空 input 的值，以便可以再次选择相同的文件
       e.target.value = '';
     }

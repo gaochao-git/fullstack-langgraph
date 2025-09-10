@@ -914,6 +914,8 @@ function ChatMessages({
     if (!items) return;
 
     const files: File[] = [];
+    const oversizedFiles: string[] = [];
+    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
     
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -945,8 +947,22 @@ function ChatMessages({
 
         // 创建File对象
         const file = new File([blob], fileName, { type: blob.type });
+        
+        // 检查文件大小
+        if (file.size > MAX_SIZE) {
+          const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+          oversizedFiles.push(`${file.name} (${fileSizeMB}MB)`);
+          continue;
+        }
+        
         files.push(file);
       }
+    }
+    
+    // 显示文件大小超限的错误消息
+    if (oversizedFiles.length > 0) {
+      const errorMsg = `文件大小超出限制（最大 100MB）：${oversizedFiles.join('、')}`;
+      message.error(errorMsg);
     }
     
     if (files.length > 0) {
@@ -997,20 +1013,42 @@ function ChatMessages({
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      // 验证文件类型
+      // 先进行文件大小检查
+      const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+      const oversizedFiles: string[] = [];
+      const invalidTypeFiles: string[] = [];
+      
       const validFiles = files.filter(file => {
-        // 使用 fileUploadUtils 中的验证函数
-        const ext = file.name.split('.').pop()?.toLowerCase() || '';
-        return fileUploadUtils.isValidFileType(file);
+        // 检查文件大小
+        if (file.size > MAX_SIZE) {
+          const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+          oversizedFiles.push(`${file.name} (${fileSizeMB}MB)`);
+          return false;
+        }
+        
+        // 检查文件类型
+        if (!fileUploadUtils.isValidFileType(file)) {
+          invalidTypeFiles.push(file.name);
+          return false;
+        }
+        
+        return true;
       });
 
+      // 处理有效文件
       if (validFiles.length > 0) {
         await handleFilesSelect(validFiles);
         message.success(`已拖入 ${validFiles.length} 个文件`);
       }
 
-      if (validFiles.length < files.length) {
-        message.warning(`${files.length - validFiles.length} 个文件类型不支持`);
+      // 显示错误信息
+      if (oversizedFiles.length > 0) {
+        const errorMsg = `文件大小超出限制（最大 100MB）：${oversizedFiles.join('、')}`;
+        message.error(errorMsg);
+      }
+      
+      if (invalidTypeFiles.length > 0) {
+        message.warning(`${invalidTypeFiles.length} 个文件类型不支持`);
       }
     }
   };
@@ -1711,6 +1749,10 @@ function ChatMessages({
                   selectedFiles={[]} // FileUploadManager只需要处理新选择的文件
                   onFilesSelect={handleFilesSelect}
                   onFileRemove={handleRemoveFile}
+                  onError={(errorMsg) => {
+                    // 显示错误消息
+                    message.error(errorMsg);
+                  }}
                   isDark={isDark}
                   disabled={isLoading || !!interrupt}
                 />

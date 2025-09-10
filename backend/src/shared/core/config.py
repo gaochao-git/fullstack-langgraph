@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     ALARM_API_URL: Optional[str] = None  # 报警数据获取接口URL，从.env文件读取
     
     # 文件上传配置
-    MAX_UPLOAD_SIZE_MB: int = 50  # 最大上传文件大小（MB）- 增加到50MB以支持大文档
+    MAX_UPLOAD_SIZE_MB: int = 100  # 最大上传文件大小（MB）- 增加到100MB以支持大文档
     UPLOAD_ALLOWED_EXTENSIONS: List[str] = [
         # 文档类
         ".pdf", ".doc", ".docx", ".txt", ".md", ".pptx", ".ppt",
