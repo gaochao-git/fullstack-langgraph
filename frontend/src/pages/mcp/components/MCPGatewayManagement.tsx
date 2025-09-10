@@ -440,23 +440,30 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       )
     },
     {
-      title: '创建者',
+      title: '创建人',
       dataIndex: 'create_by',
       key: 'create_by',
-      width: 120
+      width: 100
     },
     {
       title: '创建时间',
       dataIndex: 'create_time',
       key: 'create_time',
-      width: 150,
+      width: 140,
       render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
     },
     {
-      title: '更新时间',
+      title: '修改人',
+      dataIndex: 'update_by',
+      key: 'update_by',
+      width: 100,
+      render: (updateBy: string) => updateBy || '-'
+    },
+    {
+      title: '修改时间',
       dataIndex: 'update_time',
       key: 'update_time',
-      width: 150,
+      width: 140,
       render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
     },
     {
@@ -583,11 +590,20 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
         {selectedConfig && (
           <div>
             <div style={{ marginBottom: 12 }}>
-              <Space>
+              <Space wrap>
                 <Tag color="blue">配置名称: {selectedConfig.name}</Tag>
                 <Tag color="green">租户: {selectedConfig.tenant}</Tag>
                 <Tag color="purple">配置ID: {selectedConfig.config_id}</Tag>
-                <Tag>创建者: {selectedConfig.create_by}</Tag>
+              </Space>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <Space wrap>
+                <Tag>创建人: {selectedConfig.create_by}</Tag>
+                <Tag>创建时间: {selectedConfig.create_time?.replace('T', ' ').slice(0, 16) || '-'}</Tag>
+                {selectedConfig.update_by && (
+                  <Tag>修改人: {selectedConfig.update_by}</Tag>
+                )}
+                <Tag>修改时间: {selectedConfig.update_time?.replace('T', ' ').slice(0, 16) || '-'}</Tag>
               </Space>
             </div>
             

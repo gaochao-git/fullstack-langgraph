@@ -67,6 +67,10 @@ interface MCPServer {
   authToken?: string;
   apiKeyHeader?: string;
   readTimeoutSeconds?: number;
+  createBy?: string;
+  updateBy?: string;
+  createTime?: string;
+  updateTime?: string;
 }
 
 
@@ -90,6 +94,10 @@ const transformServerFromAPI = (apiServer: any): MCPServer => {
     authToken: apiServer.auth_token,
     apiKeyHeader: apiServer.api_key_header,
     readTimeoutSeconds: apiServer.read_timeout_seconds || 5,
+    createBy: apiServer.create_by,
+    updateBy: apiServer.update_by,
+    createTime: apiServer.create_time,
+    updateTime: apiServer.update_time,
     tools: tools.map((tool: any) => ({
       name: tool.name,
       description: tool.description,
@@ -654,9 +662,27 @@ const MCPManagement: React.FC = () => {
       )
     },
     {
-      title: '最后连接时间',
-      dataIndex: 'lastConnected',
-      key: 'lastConnected',
+      title: '创建人',
+      dataIndex: 'createBy',
+      key: 'createBy',
+      render: (createBy: string) => createBy || '-'
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createTime',
+      key: 'createTime',
+      render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
+    },
+    {
+      title: '修改人',
+      dataIndex: 'updateBy',
+      key: 'updateBy',
+      render: (updateBy: string) => updateBy || '-'
+    },
+    {
+      title: '更新时间',
+      dataIndex: 'updateTime',
+      key: 'updateTime',
       render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
     },
     {
@@ -825,6 +851,18 @@ const MCPManagement: React.FC = () => {
               </Descriptions.Item>
               <Descriptions.Item label="描述" span={2}>
                 {selectedServer.description}
+              </Descriptions.Item>
+              <Descriptions.Item label="创建人">
+                {selectedServer.createBy || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="创建时间">
+                {selectedServer.createTime?.replace('T', ' ').slice(0, 16) || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="修改人">
+                {selectedServer.updateBy || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="更新时间">
+                {selectedServer.updateTime?.replace('T', ' ').slice(0, 16) || '-'}
               </Descriptions.Item>
             </Descriptions>
             
