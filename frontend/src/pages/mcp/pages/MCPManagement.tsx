@@ -109,7 +109,7 @@ const transformServerFromAPI = (apiServer: any): MCPServer => {
 };
 
 // 将前端数据转换为后端格式
-const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'frontend_user') => {
+const transformServerToAPI = (server: Partial<MCPServer>) => {
   return {
     server_id: server.id,
     server_name: server.name,
@@ -124,8 +124,7 @@ const transformServerToAPI = (server: Partial<MCPServer>, createBy: string = 'fr
     read_timeout_seconds: server.readTimeoutSeconds || 5,
     server_tools: server.tools || [],
     server_config: {},
-    team_name: 'default_team',
-    create_by: createBy
+    team_name: 'default_team'
   };
 };
 
@@ -195,7 +194,7 @@ const MCPManagement: React.FC = () => {
 
   const updateServer = async (serverId: string, serverData: Partial<MCPServer>) => {
     try {
-      const apiData = { ...transformServerToAPI(serverData), update_by: 'frontend_user' };
+      const apiData = transformServerToAPI(serverData);
       const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -671,7 +670,7 @@ const MCPManagement: React.FC = () => {
       title: '创建时间',
       dataIndex: 'createTime',
       key: 'createTime',
-      render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
+      render: (time: string) => time?.replace('T', ' ').slice(0, 19) || '-'
     },
     {
       title: '修改人',
@@ -683,7 +682,7 @@ const MCPManagement: React.FC = () => {
       title: '更新时间',
       dataIndex: 'updateTime',
       key: 'updateTime',
-      render: (time: string) => time?.replace('T', ' ').slice(0, 16) || '-'
+      render: (time: string) => time?.replace('T', ' ').slice(0, 19) || '-'
     },
     {
       title: '启用状态',
@@ -856,13 +855,13 @@ const MCPManagement: React.FC = () => {
                 {selectedServer.createBy || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="创建时间">
-                {selectedServer.createTime?.replace('T', ' ').slice(0, 16) || '-'}
+                {selectedServer.createTime?.replace('T', ' ').slice(0, 19) || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="修改人">
                 {selectedServer.updateBy || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="更新时间">
-                {selectedServer.updateTime?.replace('T', ' ').slice(0, 16) || '-'}
+                {selectedServer.updateTime?.replace('T', ' ').slice(0, 19) || '-'}
               </Descriptions.Item>
             </Descriptions>
             

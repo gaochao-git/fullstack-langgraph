@@ -17,6 +17,7 @@ from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.logging import get_logger
 from src.apps.mcp.service.mcp_reload_service import reload_mcp_gateway
+from src.shared.db.models import now_shanghai
 
 logger = get_logger(__name__)
 
@@ -27,7 +28,8 @@ class MCPGatewayConfigService:
     async def create_config(
         self, 
         db: AsyncSession, 
-        config_data: MCPGatewayConfigCreate
+        config_data: MCPGatewayConfigCreate,
+        current_user: dict
     ) -> MCPConfig:
         """创建MCP Gateway配置"""
         async with db.begin():
@@ -50,6 +52,9 @@ class MCPGatewayConfigService:
             # 创建新配置
             tools_json = json.dumps(config_data.tools or [], ensure_ascii=False)
             
+            # 从当前用户获取username
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            
             new_config = MCPConfig(
                 config_id=str(uuid.uuid4()),
                 name=config_data.name,
@@ -59,7 +64,8 @@ class MCPGatewayConfigService:
                 tools=tools_json,
                 prompts=json.dumps(config_data.prompts or [], ensure_ascii=False),
                 mcp_servers=json.dumps(config_data.mcp_servers or [], ensure_ascii=False),
-                create_by=config_data.create_by
+                create_by=username,
+                update_by=username
             )
 
             db.add(new_config)
@@ -149,7 +155,8 @@ class MCPGatewayConfigService:
         self, 
         db: AsyncSession, 
         config_id: int, 
-        config_data: MCPGatewayConfigUpdate
+        config_data: MCPGatewayConfigUpdate,
+        current_user: dict
     ) -> Optional[MCPConfig]:
         """更新配置"""
         async with db.begin():
@@ -198,8 +205,11 @@ class MCPGatewayConfigService:
                 update_data['prompts'] = json.dumps(config_data.prompts, ensure_ascii=False)
             if config_data.mcp_servers is not None:
                 update_data['mcp_servers'] = json.dumps(config_data.mcp_servers, ensure_ascii=False)
-            if config_data.update_by is not None:
-                update_data['update_by'] = config_data.update_by
+            
+            # 从当前用户获取username并设置update_by
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            update_data['update_by'] = username
+            update_data['update_time'] = now_shanghai()
 
             if update_data:
                 await db.execute(
@@ -222,7 +232,7 @@ class MCPGatewayConfigService:
             
             return config
 
-    async def delete_config(self, db: AsyncSession, config_id: int) -> bool:
+    async def delete_config(self, db: AsyncSession, config_id: int, current_user: dict) -> bool:
         """软删除配置"""
         async with db.begin():
             config = await self.get_config_by_id(db, config_id)

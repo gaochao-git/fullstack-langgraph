@@ -189,7 +189,6 @@ class MCPGatewayConfigCreate(BaseModel):
     tools: Optional[List[Dict[str, Any]]] = Field([], description="工具配置")
     prompts: Optional[List[Dict[str, Any]]] = Field([], description="提示词配置")
     mcp_servers: Optional[List[Dict[str, Any]]] = Field([], description="MCP服务器配置")
-    create_by: str = Field(..., description="创建者", min_length=1, max_length=100)
 
     @field_validator('name')
     def validate_name(cls, v):
@@ -222,7 +221,6 @@ class MCPGatewayConfigUpdate(BaseModel):
     tools: Optional[List[Dict[str, Any]]] = Field(None, description="工具配置")
     prompts: Optional[List[Dict[str, Any]]] = Field(None, description="提示词配置")
     mcp_servers: Optional[List[Dict[str, Any]]] = Field(None, description="MCP服务器配置")
-    update_by: Optional[str] = Field(None, description="更新者", min_length=1, max_length=100)
 
     @field_validator('name')
     def validate_name(cls, v):

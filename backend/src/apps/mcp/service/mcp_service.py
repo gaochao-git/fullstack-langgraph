@@ -19,7 +19,8 @@ class MCPService:
     async def create_server(
         self, 
         db: AsyncSession, 
-        server_data: MCPServerCreate
+        server_data: MCPServerCreate,
+        current_user: dict
     ) -> MCPServer:
         """创建MCP服务器"""
         async with db.begin():
@@ -48,11 +49,15 @@ class MCPService:
             data.setdefault('is_enabled', 'on')
             data.setdefault('connection_status', 'disconnected')
             data.setdefault('team_name', 'default')
-            data.setdefault('create_by', 'system')
-            data.setdefault('create_time', now_shanghai())
-            data.setdefault('update_time', now_shanghai())
             
-            logger.info(f"Creating MCP server: {server_data.server_id}")
+            # 从当前用户获取username
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            data['create_by'] = username
+            data['update_by'] = username
+            data['create_time'] = now_shanghai()
+            data['update_time'] = now_shanghai()
+            
+            logger.info(f"Creating MCP server: {server_data.server_id} by user: {username}")
             instance = MCPServer(**data)
             db.add(instance)
             await db.flush()
@@ -147,7 +152,8 @@ class MCPService:
         self, 
         db: AsyncSession, 
         server_id: str, 
-        server_data: MCPServerUpdate
+        server_data: MCPServerUpdate,
+        current_user: dict
     ) -> Optional[MCPServer]:
         """更新MCP服务器"""
         async with db.begin():
@@ -174,14 +180,15 @@ class MCPService:
             
             # 移除不可更新字段
             data.pop('server_id', None)
+            data.pop('create_by', None)  # 不更新创建者
             data.pop('create_time', None)
-            data.pop('create_by', None)
-            # 如果没有指定update_by，则设置为system
-            if 'update_by' not in data:
-                data['update_by'] = 'system'
+            
+            # 从当前用户获取username并设置update_by
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            data['update_by'] = username
             data['update_time'] = now_shanghai()
             
-            logger.info(f"Updating MCP server: {server_id}")
+            logger.info(f"Updating MCP server: {server_id} by user: {username}")
             await db.execute(
                 update(MCPServer).where(MCPServer.server_id == server_id).values(**data)
             )
@@ -195,7 +202,8 @@ class MCPService:
     async def delete_server(
         self, 
         db: AsyncSession, 
-        server_id: str
+        server_id: str,
+        current_user: dict
     ) -> bool:
         """删除MCP服务器"""
         async with db.begin():

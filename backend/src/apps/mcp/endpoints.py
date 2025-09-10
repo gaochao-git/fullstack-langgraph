@@ -9,6 +9,7 @@ import logging
 import traceback
 
 from src.shared.db.config import get_async_db
+from src.apps.auth.dependencies import get_current_user
 from src.apps.mcp.schema import (
     MCPServerCreate, MCPServerUpdate, MCPQueryParams,
     MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate,
@@ -65,10 +66,11 @@ async def _test_mcp_connection(server_uri: str) -> List[dict]:
 @router.post("/v1/mcp/servers", response_model=UnifiedResponse)
 async def create_mcp_server(
     server_data: MCPServerCreate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """创建MCP服务器"""
-    server = await mcp_service.create_server(db, server_data)
+    server = await mcp_service.create_server(db, server_data, current_user)
     return success_response(
         data=server,
         msg="MCP服务器创建成功",
@@ -127,10 +129,11 @@ async def list_mcp_servers(
 async def update_mcp_server(
     server_id: str,
     server_data: MCPServerUpdate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """更新MCP服务器"""
-    updated_server = await mcp_service.update_server(db, server_id, server_data)
+    updated_server = await mcp_service.update_server(db, server_id, server_data, current_user)
     if not updated_server:
         raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
@@ -143,10 +146,11 @@ async def update_mcp_server(
 @router.delete("/v1/mcp/servers/{server_id}", response_model=UnifiedResponse)
 async def delete_mcp_server(
     server_id: str,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """删除MCP服务器"""
-    success = await mcp_service.delete_server(db, server_id)
+    success = await mcp_service.delete_server(db, server_id, current_user)
     if not success:
         raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
@@ -177,11 +181,12 @@ async def update_server_status(
 async def toggle_server_enable(
     server_id: str,
     enable_data: MCPEnableUpdate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """启用/禁用MCP服务器"""
     update_data = MCPServerUpdate(is_enabled=enable_data.enabled)
-    updated_server = await mcp_service.update_server(db, server_id, update_data)
+    updated_server = await mcp_service.update_server(db, server_id, update_data, current_user)
     if not updated_server:
         raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
     
@@ -483,11 +488,12 @@ async def get_all_gateway_configs(
 @router.post("/v1/mcp/gateway/configs", response_model=UnifiedResponse)
 async def create_gateway_config(
     config_data: MCPGatewayConfigCreate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """创建MCP Gateway配置"""
     try:
-        config = await mcp_gateway_service.create_config(db, config_data)
+        config = await mcp_gateway_service.create_config(db, config_data, current_user)
         return success_response(
             data=config.to_dict(),
             msg="MCP Gateway配置创建成功",
@@ -560,11 +566,12 @@ async def get_gateway_config(
 async def update_gateway_config(
     config_id: int,
     config_data: MCPGatewayConfigUpdate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """更新MCP Gateway配置"""
     try:
-        updated_config = await mcp_gateway_service.update_config(db, config_id, config_data)
+        updated_config = await mcp_gateway_service.update_config(db, config_id, config_data, current_user)
         if not updated_config:
             raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
         
@@ -582,11 +589,12 @@ async def update_gateway_config(
 @router.delete("/v1/mcp/gateway/configs/{config_id}", response_model=UnifiedResponse)
 async def delete_gateway_config(
     config_id: int,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """删除MCP Gateway配置（软删除）"""
     try:
-        success = await mcp_gateway_service.delete_config(db, config_id)
+        success = await mcp_gateway_service.delete_config(db, config_id, current_user)
         if not success:
             raise BusinessException(f"配置 {config_id} 不存在", ResponseCode.NOT_FOUND)
         

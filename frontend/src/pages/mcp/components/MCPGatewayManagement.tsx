@@ -121,10 +121,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       const response = await fetch(`${API_BASE_URL}/api/v1/mcp/gateway/configs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...configData,
-          create_by: 'frontend_user'
-        })
+        body: JSON.stringify(configData)
       });
       
       if (response.ok) {
@@ -150,10 +147,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       const response = await fetch(`${API_BASE_URL}/api/v1/mcp/gateway/configs/${configId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...configData,
-          update_by: 'frontend_user'
-        })
+        body: JSON.stringify(configData)
       });
       
       if (response.ok) {
