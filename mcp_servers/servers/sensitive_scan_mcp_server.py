@@ -51,6 +51,9 @@ FILE_CONCURRENCY = config.get('file_concurrency', 3)
 # 获取文档存储路径配置
 DOCUMENT_STORAGE_PATH = config.get('document_storage_path', '/tmp/documents/uploads')
 
+logger.info(f"文档存储路径配置: DOCUMENT_STORAGE_PATH = {DOCUMENT_STORAGE_PATH}")
+logger.info(f"路径是否存在: {os.path.exists(DOCUMENT_STORAGE_PATH)}")
+
 # 初始化LangChain LLM
 llm = ChatOpenAI(
     model=LLM_MODEL,
@@ -153,8 +156,8 @@ async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
         
         # 查找原始文件和解析后的文件
         original_file_pattern = f"{file_id}.*"
-        parsed_file_path = base_path / f"{file_id}_parsed.txt"
-        metadata_file_path = base_path / f"{file_id}_metadata.json"
+        # 使用与后端一致的命名规则：{file_id}.parse.txt
+        parsed_file_path = base_path / f"{file_id}.parse.txt"
         
         # 获取文件元数据
         file_metadata = {}
@@ -162,21 +165,11 @@ async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
         file_type = "unknown"
         file_size = 0
         
-        if metadata_file_path.exists():
-            try:
-                async with aiofiles.open(str(metadata_file_path), 'r', encoding='utf-8') as f:
-                    metadata_content = await f.read()
-                    file_metadata = json.loads(metadata_content)
-                    file_name = file_metadata.get('file_name', file_name)
-                    file_type = file_metadata.get('file_type', file_type)
-                    file_size = file_metadata.get('file_size', file_size)
-            except Exception as e:
-                logger.warning(f"读取元数据文件失败: {metadata_file_path}, 错误: {e}")
-        
         # 查找原始文件获取文件信息
         if not file_name.startswith("document_"):
             for file_path in base_path.glob(original_file_pattern):
-                if not str(file_path).endswith('_parsed.txt') and not str(file_path).endswith('_metadata.json'):
+                # 排除解析文件
+                if not str(file_path).endswith('.parse.txt'):
                     file_name = file_path.name
                     file_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
                     file_size = file_path.stat().st_size
