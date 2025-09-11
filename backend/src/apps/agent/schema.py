@@ -143,6 +143,8 @@ class MCPConfigUpdate(BaseModel):
         return v
 
 
+
+
 class AgentStatusUpdate(BaseModel):
     """Agent状态更新模型"""
     status: str = Field(..., pattern=r'^(running|stopped|error)$', description="新状态")

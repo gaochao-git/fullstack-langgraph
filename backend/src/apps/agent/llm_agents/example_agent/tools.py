@@ -6,7 +6,7 @@ Example Agent 工具模块
 from typing import List, Any
 from langchain_core.tools import tool
 from ..agent_utils import get_tools_config_from_db
-from src.apps.agent.tools import general_tool
+from src.apps.agent.tools import time_tool
 from src.shared.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -69,7 +69,7 @@ async def get_example_agent_tools(agent_id: str) -> List[Any]:
         # 处理系统工具配置
         system_tools_config = tools_config.get('system_tools', [])
         system_tools_map = {
-            'get_current_time': general_tool.get_current_time,
+            'get_current_time': time_tool.get_current_time,
             # 可以在这里添加更多系统工具
         }
         

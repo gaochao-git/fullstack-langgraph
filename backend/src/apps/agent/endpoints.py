@@ -70,6 +70,13 @@ async def list_agents(
     return paginated_response(items=agents,total=total,page=page,size=size,msg="查询智能体列表成功")
 
 
+@router.get("/v1/agents/system-tools", response_model=UnifiedResponse)
+async def get_available_system_tools():
+    """获取所有可用的系统工具列表"""
+    tools = agent_service.get_available_system_tools()
+    return success_response(data=tools, msg="获取系统工具列表成功")
+
+
 @router.get("/v1/agents/{agent_id}", response_model=UnifiedResponse)
 async def get_agent(
     agent_id: str, 
@@ -139,6 +146,8 @@ async def update_mcp_config(agent_id: str,mcp_config: MCPConfigUpdate,db: AsyncS
     )
     if not updated_agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data=updated_agent,msg="MCP配置更新成功")
+
+
 
 
 @router.put("/v1/agents/{agent_id}/status", response_model=UnifiedResponse)

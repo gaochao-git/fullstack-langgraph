@@ -388,6 +388,14 @@ class AgentService:
         selected_tools: List[str]
     ) -> Optional[AgentConfig]:
         """更新智能体MCP配置"""
+        # 先获取当前配置，保留系统工具
+        agent = await self.get_agent_by_id(db, agent_id)
+        if not agent:
+            return None
+            
+        current_tools_info = agent.tools_info or {}
+        system_tools = current_tools_info.get('system_tools', [])
+        
         # 构建MCP工具配置
         mcp_tools_config = []
         for server_id in enabled_servers:
@@ -399,10 +407,54 @@ class AgentService:
                     'tools': [tool.split(':', 1)[1] for tool in server_tools]  # 移除server_id前缀
                 })
         
-        # 构建完整工具配置
-        tools_info = {'system_tools': [], 'mcp_tools': mcp_tools_config}
+        # 构建完整工具配置，保留系统工具
+        tools_info = {'system_tools': system_tools, 'mcp_tools': mcp_tools_config}
         update_data = {'tools_info': tools_info}
         return await self.update_agent(db, agent_id, update_data)
+    
+    
+    @staticmethod
+    def get_available_system_tools() -> List[Dict[str, str]]:
+        """获取所有可用的系统工具列表 - 自动扫描工具目录"""
+        import os
+        import importlib
+        import inspect
+        from langchain_core.tools import BaseTool
+        
+        tools_list = []
+        tools_dir = os.path.join(os.path.dirname(__file__), '..', 'tools')
+        
+        # 扫描tools目录下的所有Python文件
+        for filename in os.listdir(tools_dir):
+            if filename.endswith('.py') and not filename.startswith('__'):
+                module_name = filename[:-3]  # 移除.py后缀
+                
+                try:
+                    # 动态导入模块
+                    module_path = f'src.apps.agent.tools.{module_name}'
+                    module = importlib.import_module(module_path)
+                    
+                    # 扫描模块中的所有工具
+                    for name, obj in inspect.getmembers(module):
+                        # 检查是否是LangChain工具对象
+                        if (hasattr(obj, 'name') and 
+                            hasattr(obj, 'description') and
+                            hasattr(obj, 'run')):  # LangChain工具都有run方法
+                            
+                            # 获取工具信息
+                            tool_info = {
+                                'name': obj.name,
+                                'display_name': obj.name.replace('_', ' ').title(),
+                                'description': obj.description or '无描述',
+                                'module': module_name
+                            }
+                            tools_list.append(tool_info)
+                            logger.debug(f"发现系统工具: {tool_info['name']} from {module_name}")
+                            
+                except Exception as e:
+                    logger.warning(f"加载工具模块 {module_name} 失败: {e}")
+                    
+        return tools_list
     
     async def update_agent_status(
         self,

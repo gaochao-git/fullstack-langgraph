@@ -319,6 +319,13 @@ class AgentApiService {
   }
 
   /**
+   * 获取系统工具列表
+   */
+  async getSystemTools() {
+    return await omind_get('/api/v1/agents/system-tools');
+  }
+
+  /**
    * 转移智能体所有权
    */
   async transferOwnership(agentId: string, data: {

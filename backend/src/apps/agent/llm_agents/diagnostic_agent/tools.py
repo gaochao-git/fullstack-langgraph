@@ -8,7 +8,6 @@ from typing import List
 from datetime import timedelta
 from src.shared.core.logging import get_logger
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from src.apps.agent.tools import general_tool
 from ..agent_utils import get_tools_config_from_db
 from src.apps.mcp.service.mcp_service import mcp_service
 from src.shared.db.config import get_sync_db
@@ -26,22 +25,15 @@ async def get_diagnostic_tools(agent_id: str):
         # 1. 处理系统工具
         system_tools_config = tools_config.get('system_tools', [])
         
-        # 导入文档工具
-        from ..tools.document_tools import get_documents_content
+        # 获取所有系统工具映射
+        from ..agent_utils import get_system_tools_map
+        system_tools_map = get_system_tools_map()
         
-        system_tools_map = {
-            'get_current_time': general_tool.get_current_time,
-            'get_documents_content': get_documents_content,
-        }
-        
-        # 按需加载
+        # 按需加载 - 只加载用户选择的工具
         for tool_name in system_tools_config:
             if tool_name in system_tools_map:
                 all_tools.append(system_tools_map[tool_name])
-                
-        # 默认添加文档工具（即使配置中没有）
-        if 'get_documents_content' not in system_tools_config:
-            all_tools.append(get_documents_content)
+                logger.debug(f"加载系统工具: {tool_name}")
         
         # 2. 处理MCP工具
         mcp_tools_config = tools_config.get('mcp_tools', [])

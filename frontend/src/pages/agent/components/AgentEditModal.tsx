@@ -169,14 +169,40 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     category: icon.category
   }));
 
-  // 系统工具定义
-  const systemTools = [
-    { 
-      name: 'get_current_time', 
-      category: 'general', 
-      description: '获取当前的系统时间。用于记录操作时间点或进行时间相关的判断。\n\nArgs:\n    format: 可选，时间格式，默认为ISO 8601格式\n    timezone: 可选，时区，默认为系统时区\n\nReturns:\n    格式化的当前时间字符串'
+  // 系统工具列表状态
+  const [systemTools, setSystemTools] = useState<Array<{
+    name: string;
+    display_name: string;
+    description: string;
+    module?: string;
+  }>>([]);
+
+  // 获取系统工具列表
+  const fetchSystemTools = async () => {
+    try {
+      const response = await agentApi.getSystemTools();
+      console.log('系统工具API响应:', response);
+      
+      // 处理响应数据 - 假设响应格式为 { status: 'ok', data: [...] }
+      if (response && response.status === 'ok' && Array.isArray(response.data)) {
+        setSystemTools(response.data);
+      } else if (Array.isArray(response)) {
+        // 如果直接返回数组
+        setSystemTools(response);
+      } else {
+        console.error('系统工具响应格式错误:', response);
+        setSystemTools([]);
+      }
+    } catch (error) {
+      console.error('获取系统工具失败:', error);
+      setSystemTools([]);
     }
-  ];
+  };
+
+  // 组件挂载时获取系统工具
+  useEffect(() => {
+    fetchSystemTools();
+  }, []);
 
   // 格式化工具描述
   const formatToolDescription = (description: string) => {
@@ -225,7 +251,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           const { summary, args, returns } = formatToolDescription(tool.description);
           
           return {
-            title: tool.name,
+            title: tool.display_name || tool.name,
             key: `system-${tool.name}`,
             children: [
               {
@@ -374,9 +400,9 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       
       if (isCreating) {
         // 新建时的默认值
-        setEditSystemTools(['get_current_time']);
+        setEditSystemTools([]);
         setEditMCPTools([]);
-        setEditSystemCheckedKeys(['system-get_current_time']);
+        setEditSystemCheckedKeys([]);
         setEditCheckedKeys([]);
         setEditSystemExpandedKeys(['system-root']);
         setEditExpandedKeys([]);

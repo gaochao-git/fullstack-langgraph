@@ -200,7 +200,7 @@ def get_tools_config_from_db(agent_id: str) -> Dict[str, Any]:
         if not agent_config:
             raise ValueError(f"数据库中没有找到智能体 '{agent_id}' 的配置")
             
-        tools_config = agent_config.get('tools_config', {})
+        tools_config = agent_config.get('tools_info', {})
         
         # Handle case where tools_config might be a JSON string
         if isinstance(tools_config, str):
@@ -220,6 +220,46 @@ def get_tools_config_from_db(agent_id: str) -> Dict[str, Any]:
         raise ValueError(error_msg)
 
 
+
+
+def get_system_tools_map():
+    """
+    动态获取所有系统工具的映射
+    
+    Returns:
+        Dict[str, Any]: 工具名称到工具实例的映射
+    """
+    import os
+    import importlib
+    import inspect
+    
+    tools_map = {}
+    tools_dir = os.path.join(os.path.dirname(__file__), '..', 'tools')
+    
+    # 扫描tools目录下的所有Python文件
+    for filename in os.listdir(tools_dir):
+        if filename.endswith('.py') and not filename.startswith('__'):
+            module_name = filename[:-3]  # 移除.py后缀
+            
+            try:
+                # 动态导入模块
+                module_path = f'src.apps.agent.tools.{module_name}'
+                module = importlib.import_module(module_path)
+                
+                # 扫描模块中的所有工具
+                for name, obj in inspect.getmembers(module):
+                    # 检查是否是LangChain工具对象
+                    if (hasattr(obj, 'name') and 
+                        hasattr(obj, 'description') and
+                        hasattr(obj, 'run')):  # LangChain工具都有run方法
+                        
+                        tools_map[obj.name] = obj
+                        logger.debug(f"注册系统工具: {obj.name} from {module_name}")
+                        
+            except Exception as e:
+                logger.warning(f"加载工具模块 {module_name} 失败: {e}")
+                
+    return tools_map
 
 
 async def get_system_prompt_from_db_async(agent_name: str) -> str:
@@ -274,5 +314,6 @@ __all__ = [
     "get_llm_config_for_agent",
     "get_system_prompt_from_db_async",
     "get_tools_config_from_db",
+    "get_system_tools_map",
     "validate_system_prompt"
 ]
