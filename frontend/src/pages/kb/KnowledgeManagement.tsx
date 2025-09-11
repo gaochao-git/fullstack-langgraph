@@ -675,7 +675,7 @@ const KnowledgeManagement: React.FC = () => {
         </div>
 
         {/* 右侧详情管理区域 */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#fff' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#fff', minWidth: 0, overflow: 'hidden' }}>
           {selectedKB ? (
             <>
               {/* 顶部面包屑和操作区域 */}
@@ -809,7 +809,7 @@ const KnowledgeManagement: React.FC = () => {
                   </div>
                 ) : (
                   // 选中知识库时显示基本信息（默认）
-                  <div style={{ flex: 1, padding: '24px', overflow: 'auto' }}>
+                  <div style={{ flex: 1, padding: '24px', overflow: 'auto', minWidth: 0 }}>
                     <Space direction="vertical" style={{ width: '100%' }} size="large">
                       {/* 基本信息 */}
                       <Card title="基本信息" size="small">
@@ -847,9 +847,11 @@ const KnowledgeManagement: React.FC = () => {
                       {/* 标签 */}
                       {selectedKB.tags && selectedKB.tags.length > 0 && (
                         <Card title="标签" size="small">
-                          <Space wrap>
+                          <Space wrap style={{ maxWidth: '100%' }}>
                             {selectedKB.tags.map((tag, index) => (
-                              <Tag key={index}>{tag}</Tag>
+                              <Tag key={index} style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {tag}
+                              </Tag>
                             ))}
                           </Space>
                         </Card>
