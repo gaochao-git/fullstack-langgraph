@@ -127,9 +127,13 @@ async def get_kb_documents(
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """获取知识库文档列表"""
-    result = await kb_service.get_kb_documents(
-        db, kb_id, current_user['username'], page, page_size
+    """获取知识库文档列表（已废弃，请使用 /knowledge-bases/{kb_id}/folders/root/documents）
+    
+    此端点将重定向到根目录文档查询以保持兼容性
+    """
+    # 重定向到根目录文档查询
+    result = await kb_folder_service.get_folder_documents(
+        db, kb_id, None, current_user['username'], page, page_size
     )
     return paginated_response(**result)
 
@@ -227,7 +231,7 @@ async def delete_folder(
 @router.get("/knowledge-bases/{kb_id}/folders/{folder_id}/documents")
 async def get_folder_documents(
     kb_id: str,
-    folder_id: Optional[str] = None,
+    folder_id: str,
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_async_db),
@@ -235,10 +239,13 @@ async def get_folder_documents(
 ):
     """获取目录下的文档列表
     
-    folder_id为None时获取根目录文档
+    folder_id为'root'时获取根目录文档
     """
+    # 将前端传来的 'root' 转换为 None
+    actual_folder_id = None if folder_id == 'root' else folder_id
+    
     result = await kb_folder_service.get_folder_documents(
-        db, kb_id, folder_id, current_user['username'], page, page_size
+        db, kb_id, actual_folder_id, current_user['username'], page, page_size
     )
     return paginated_response(**result)
 
@@ -246,14 +253,17 @@ async def get_folder_documents(
 @router.post("/knowledge-bases/{kb_id}/folders/{folder_id}/documents")
 async def add_document_to_folder(
     kb_id: str,
-    folder_id: Optional[str],
+    folder_id: str,
     move_data: DocumentMoveRequest,
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user)
 ):
     """添加文档到目录（拖拽功能）"""
+    # 将前端传来的 'root' 转换为 None
+    actual_folder_id = None if folder_id == 'root' else folder_id
+    
     await kb_folder_service.add_document_to_folder(
-        db, kb_id, move_data.dict().get('file_id'), folder_id,
+        db, kb_id, move_data.dict().get('file_id'), actual_folder_id,
         move_data.dict(), current_user['username']
     )
     return success_response({"message": "文档移动成功"})

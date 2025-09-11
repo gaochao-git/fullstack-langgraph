@@ -53,6 +53,7 @@ import {
 
 import { KnowledgeBase, ListParams, VISIBILITY_OPTIONS, KB_TYPES } from './types/kb';
 import { kbApi } from '@/services/kbApi';
+import { configService } from '@/services/configApi';
 import { KBCreateModal } from './components';
 import KBTreeStructure from './components/KBTreeStructure';
 
@@ -212,30 +213,45 @@ const KnowledgeManagement: React.FC = () => {
 
   // 处理树节点选择（知识库、目录或文档）
   const handleKBSelect = (kb: KnowledgeBase | null) => {
-    setSelectedKB(kb);
-    setSelectedNode(null); // 清空选中的具体节点，只选中知识库
-    setCurrentPath(kb ? [kb.kb_name] : []);
+    // 这个方法现在不再使用，保留为空以避免其他地方调用出错
+    // 所有处理都统一到 handleNodeSelect 中
   };
 
   // 加载文档列表
   const loadDocuments = async (kbId: string, folderId: string | null = null, page: number = 1) => {
     try {
       setDocumentsLoading(true);
+      console.log('🔄 开始加载文档 - kbId:', kbId, 'folderId:', folderId, 'page:', page);
+      console.log('📊 当前状态 - selectedKB:', selectedKB?.kb_id, 'selectedNode:', selectedNode?.key);
+      
       const response = await kbApi.getFolderDocuments(kbId, folderId, {
         page,
         page_size: docPageSize,
       });
       
+      console.log('📥 文档响应:', response);
+      
       if (response.status === 'ok') {
-        setDocuments(response.data.items || []);
-        setDocumentsTotal(response.data.total || 0);
+        const items = response.data.items || [];
+        const total = response.data.total || 0;
+        
+        console.log('✅ 设置文档数据 - 数量:', items.length, '总计:', total);
+        console.log('📋 文档列表:', items.map(d => d.file_name));
+        
+        setDocuments(items);
+        setDocumentsTotal(total);
+        
+        // 验证状态是否正确设置
+        setTimeout(() => {
+          console.log('🔍 状态验证 - documents.length:', documents.length, 'documentsTotal:', documentsTotal);
+        }, 100);
       } else {
         message.error(response.msg || '获取文档列表失败');
         setDocuments([]);
         setDocumentsTotal(0);
       }
     } catch (error) {
-      console.error('加载文档列表失败:', error);
+      console.error('❌ 加载文档列表失败:', error);
       message.error('加载文档失败，请重试');
       setDocuments([]);
       setDocumentsTotal(0);
@@ -257,7 +273,15 @@ const KnowledgeManagement: React.FC = () => {
     }
 
     if (node.type === 'kb') {
-      handleKBSelect(node.data as KnowledgeBase);
+      // 选中知识库时的统一处理
+      const kb = node.data as KnowledgeBase;
+      setSelectedKB(kb);
+      setSelectedNode(null); // 清空选中的具体节点，只选中知识库
+      setCurrentPath([kb.kb_name]);
+      setCurrentPage(1);
+      
+      // 选中知识库时，加载其根目录的文档
+      loadDocuments(kb.kb_id, null, 1);
     } else {
       // 选中目录或文档时，同时选中对应的知识库
       const kb = knowledgeBases.find(k => k.kb_id === node.kbId);
@@ -740,8 +764,8 @@ const KnowledgeManagement: React.FC = () => {
 
               {/* 内容区域 - 根据选中节点类型显示不同内容 */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {selectedNode?.type === 'folder' ? (
-                  // 选中目录时显示文档列表表格
+                {(selectedNode?.type === 'folder' || (!selectedNode && selectedKB)) ? (
+                  // 选中目录或知识库时显示文档列表表格
                   <div style={{ flex: 1, padding: '0', overflow: 'hidden' }}>
                     <Spin spinning={documentsLoading}>
                       <Table
@@ -756,6 +780,9 @@ const KnowledgeManagement: React.FC = () => {
                             setCurrentPage(page);
                             if (selectedNode?.kbId) {
                               loadDocuments(selectedNode.kbId, selectedNode.data?.folder_id || null, page);
+                            } else if (selectedKB) {
+                              // 选中知识库时，加载根目录文档
+                              loadDocuments(selectedKB.kb_id, null, page);
                             }
                           },
                           showSizeChanger: false,
@@ -770,7 +797,9 @@ const KnowledgeManagement: React.FC = () => {
                             <div style={{ padding: '40px', textAlign: 'center' }}>
                               <InboxOutlined style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }} />
                               <div style={{ marginBottom: 16 }}>
-                                <Text type="secondary">该目录暂无文档</Text>
+                                <Text type="secondary">
+                                  {selectedNode ? '该目录暂无文档' : '该知识库暂无文档'}
+                                </Text>
                               </div>
                               <Button 
                                 type="primary" 

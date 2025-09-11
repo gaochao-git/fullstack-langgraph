@@ -65,16 +65,11 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
   const loadFolderTree = async () => {
     try {
       setLoading(true);
-      const [folderResponse, rootDocsResponse] = await Promise.all([
-        kbApi.getFolderTree(kbId),
-        kbApi.getFolderDocuments(kbId, null, { page: 1, page_size: 100 })
-      ]);
+      const folderResponse = await kbApi.getFolderTree(kbId);
 
-      if (folderResponse.status === 'ok' && rootDocsResponse.status === 'ok') {
+      if (folderResponse.status === 'ok') {
         const folders = folderResponse.data.tree || [];
-        const rootDocuments = rootDocsResponse.data.items || [];
-        
-        const treeData = await buildTreeData(folders, rootDocuments);
+        const treeData = buildTreeData(folders);
         setTreeData(treeData);
         
         // 默认选中根目录
@@ -91,73 +86,41 @@ const KBFolderTree: React.FC<KBFolderTreeProps> = ({
     }
   };
 
-  // 构建树形数据
-  const buildTreeData = async (folders: KBFolder[], rootDocs: KBDocument[] = []): Promise<DataNode[]> => {
-    const folderNodes = await Promise.all(
-      folders.map(async (folder) => {
-        // 获取文件夹下的文档
-        let documents: KBDocument[] = [];
-        try {
-          const docsResponse = await kbApi.getFolderDocuments(kbId, folder.folder_id, { page: 1, page_size: 100 });
-          if (docsResponse.status === 'ok') {
-            documents = docsResponse.data.items || [];
-          }
-        } catch (error) {
-          console.error(`获取目录 ${folder.folder_id} 下的文档失败:`, error);
-        }
+  // 构建树形数据（只包含文件夹，不包含文档）
+  const buildTreeData = (folders: KBFolder[]): DataNode[] => {
+    const folderNodes = folders.map((folder) => {
+      // 构建子目录
+      const childrenNodes: DataNode[] = [];
+      
+      if (folder.children && folder.children.length > 0) {
+        const subFolderNodes = buildTreeData(folder.children);
+        childrenNodes.push(...subFolderNodes);
+      }
 
-        // 构建子节点（子目录 + 文档）
-        const childrenNodes: DataNode[] = [];
-        
-        // 子目录
-        if (folder.children && folder.children.length > 0) {
-          const subFolderNodes = await buildTreeData(folder.children);
-          childrenNodes.push(...subFolderNodes);
-        }
-        
-        // 文档节点
-        const documentNodes: DataNode[] = documents.map((doc) => ({
-          key: `doc-${doc.file_id}`,
-          title: doc.display_name || doc.file_name,
-          icon: <FileTextOutlined />,
-          isLeaf: true,
-          data: doc,
-          type: 'document',
-          className: doc.is_pinned ? 'pinned-document' : undefined,
-        }));
-        
-        childrenNodes.push(...documentNodes);
+      // 显示文件数量
+      const fileCount = folder.file_count || 0;
+      const title = fileCount > 0 ? `${folder.folder_name} (${fileCount})` : folder.folder_name;
 
-        return {
-          key: `folder-${folder.folder_id}`,
-          title: folder.folder_name,
-          icon: expandedKeys.includes(`folder-${folder.folder_id}`) ? <FolderOpenOutlined /> : <FolderOutlined />,
-          children: childrenNodes.length > 0 ? childrenNodes : undefined,
-          data: folder,
-          type: 'folder',
-        };
-      })
-    );
-
-    // 根目录文档节点
-    const rootDocumentNodes: DataNode[] = rootDocs.map((doc) => ({
-      key: `doc-${doc.file_id}`,
-      title: doc.display_name || doc.file_name,
-      icon: <FileTextOutlined />,
-      isLeaf: true,
-      data: doc,
-      type: 'document',
-      className: doc.is_pinned ? 'pinned-document' : undefined,
-    }));
+      return {
+        key: `folder-${folder.folder_id}`,
+        title: title,
+        icon: expandedKeys.includes(`folder-${folder.folder_id}`) ? <FolderOpenOutlined /> : <FolderOutlined />,
+        children: childrenNodes,
+        data: folder,
+        type: 'folder',
+        isLeaf: false,
+      };
+    });
 
     // 构建根节点
     const rootNode: DataNode = {
       key: 'root',
       title: '根目录',
       icon: <FolderOpenOutlined />,
-      children: [...folderNodes, ...rootDocumentNodes],
+      children: folderNodes,
       type: 'folder',
       data: null,
+      isLeaf: false,
     };
 
     return [rootNode];

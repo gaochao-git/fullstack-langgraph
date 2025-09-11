@@ -417,50 +417,94 @@ class KBFolderService:
             raise BusinessException("无权限访问此知识库", ResponseCode.FORBIDDEN)
         
         offset = (page - 1) * page_size
-        
-        # 构建查询条件
-        folder_condition = KBDocumentFolder.folder_id == folder_id
-        if folder_id is None:
-            folder_condition = KBDocumentFolder.folder_id.is_(None)
-        
-        # 查询文档
         from ...agent.models import AgentDocumentUpload
         
-        query = select(
-            KBDocumentFolder,
-            AgentDocumentUpload.file_name,
-            AgentDocumentUpload.file_size,
-            AgentDocumentUpload.file_type,
-            AgentDocumentUpload.process_status,
-            KBDocument.doc_status
-        ).join(
-            AgentDocumentUpload,
-            KBDocumentFolder.file_id == AgentDocumentUpload.file_id
-        ).join(
-            KBDocument,
-            and_(
-                KBDocument.kb_id == KBDocumentFolder.kb_id,
-                KBDocument.file_id == KBDocumentFolder.file_id
+        if folder_id is None:
+            # 根目录文档：查询存在于KBDocument但不在KBDocumentFolder中的文档
+            query = select(
+                KBDocument.file_id,
+                KBDocument.doc_title,
+                AgentDocumentUpload.file_name,
+                AgentDocumentUpload.file_size,
+                AgentDocumentUpload.file_type,
+                AgentDocumentUpload.process_status,
+                KBDocument.doc_status,
+                KBDocument.create_time,
+                KBDocument.create_by
+            ).join(
+                AgentDocumentUpload,
+                KBDocument.file_id == AgentDocumentUpload.file_id
+            ).outerjoin(
+                KBDocumentFolder,
+                and_(
+                    KBDocument.file_id == KBDocumentFolder.file_id,
+                    KBDocument.kb_id == KBDocumentFolder.kb_id
+                )
+            ).where(
+                and_(
+                    KBDocument.kb_id == kb_id,
+                    KBDocument.doc_status == 1,
+                    KBDocumentFolder.file_id.is_(None)  # 不在任何文件夹中
+                )
+            ).order_by(
+                KBDocument.create_time.desc()
             )
-        ).where(
-            and_(
-                KBDocumentFolder.kb_id == kb_id,
-                folder_condition,
-                KBDocument.doc_status == 1
+            
+            # 分页查询
+            result = await db.execute(query.offset(offset).limit(page_size))
+            rows = result.all()
+            
+            # 统计总数
+            count_result = await db.execute(
+                select(func.count()).select_from(KBDocument)
+                .outerjoin(
+                    KBDocumentFolder,
+                    and_(
+                        KBDocument.file_id == KBDocumentFolder.file_id,
+                        KBDocument.kb_id == KBDocumentFolder.kb_id
+                    )
+                )
+                .where(
+                    and_(
+                        KBDocument.kb_id == kb_id,
+                        KBDocument.doc_status == 1,
+                        KBDocumentFolder.file_id.is_(None)
+                    )
+                )
             )
-        ).order_by(
-            KBDocumentFolder.is_pinned.desc(),
-            KBDocumentFolder.sort_order,
-            KBDocumentFolder.create_time.desc()
-        )
-        
-        # 分页
-        result = await db.execute(query.offset(offset).limit(page_size))
-        rows = result.all()
-        
-        # 统计总数
-        count_query = select(func.count()).select_from(
-            select(KBDocumentFolder.id).join(
+            total = count_result.scalar()
+            
+            # 格式化根目录文档结果
+            documents = []
+            for row in rows:
+                file_id, doc_title, file_name, file_size, file_type, process_status, doc_status, create_time, create_by = row
+                documents.append({
+                    'file_id': file_id,
+                    'file_name': file_name,
+                    'doc_title': doc_title,
+                    'file_size': file_size,
+                    'file_type': file_type,
+                    'process_status': process_status,
+                    'doc_status': doc_status,
+                    'create_time': create_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'add_by': create_by,
+                    'display_name': None,  # 根目录文档没有display_name
+                    'sort_order': 0,
+                    'is_pinned': False
+                })
+        else:
+            # 特定文件夹的文档：查询KBDocumentFolder表
+            query = select(
+                KBDocumentFolder,
+                AgentDocumentUpload.file_name,
+                AgentDocumentUpload.file_size,
+                AgentDocumentUpload.file_type,
+                AgentDocumentUpload.process_status,
+                KBDocument.doc_status
+            ).join(
+                AgentDocumentUpload,
+                KBDocumentFolder.file_id == AgentDocumentUpload.file_id
+            ).join(
                 KBDocument,
                 and_(
                     KBDocument.kb_id == KBDocumentFolder.kb_id,
@@ -469,31 +513,57 @@ class KBFolderService:
             ).where(
                 and_(
                     KBDocumentFolder.kb_id == kb_id,
-                    folder_condition,
+                    KBDocumentFolder.folder_id == folder_id,
                     KBDocument.doc_status == 1
                 )
-            ).subquery()
-        )
-        
-        total_result = await db.execute(count_query)
-        total = total_result.scalar()
-        
-        # 格式化结果
-        documents = []
-        for row in rows:
-            doc_folder, file_name, file_size, file_type, process_status, doc_status = row
-            documents.append({
-                'file_id': doc_folder.file_id,
-                'file_name': file_name,
-                'display_name': doc_folder.display_name or file_name,
-                'file_size': file_size,
-                'file_type': file_type,
-                'process_status': process_status,
-                'doc_status': doc_status,
-                'is_pinned': doc_folder.is_pinned,
-                'sort_order': doc_folder.sort_order,
-                'create_time': doc_folder.create_time.strftime('%Y-%m-%d %H:%M:%S')
-            })
+            ).order_by(
+                KBDocumentFolder.is_pinned.desc(),
+                KBDocumentFolder.sort_order,
+                KBDocumentFolder.create_time.desc()
+            )
+            
+            # 分页查询
+            result = await db.execute(query.offset(offset).limit(page_size))
+            rows = result.all()
+            
+            # 统计总数
+            count_query = select(func.count()).select_from(
+                select(KBDocumentFolder.id).join(
+                    KBDocument,
+                    and_(
+                        KBDocument.kb_id == KBDocumentFolder.kb_id,
+                        KBDocument.file_id == KBDocumentFolder.file_id
+                    )
+                ).where(
+                    and_(
+                        KBDocumentFolder.kb_id == kb_id,
+                        KBDocumentFolder.folder_id == folder_id,
+                        KBDocument.doc_status == 1
+                    )
+                ).subquery()
+            )
+            
+            total_result = await db.execute(count_query)
+            total = total_result.scalar()
+            
+            # 格式化文件夹文档结果
+            documents = []
+            for row in rows:
+                doc_folder, file_name, file_size, file_type, process_status, doc_status = row
+                documents.append({
+                    'file_id': doc_folder.file_id,
+                    'file_name': file_name,
+                    'doc_title': doc_folder.display_name or file_name,
+                    'file_size': file_size,
+                    'file_type': file_type,
+                    'process_status': process_status,
+                    'doc_status': doc_status,
+                    'create_time': doc_folder.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'add_by': doc_folder.create_by,
+                    'display_name': doc_folder.display_name,
+                    'sort_order': doc_folder.sort_order,
+                    'is_pinned': doc_folder.is_pinned
+                })
         
         return {
             'items': documents,

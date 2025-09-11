@@ -289,21 +289,17 @@ const KBTreeStructure: React.FC<KBTreeStructureProps> = ({
     if (node.type === 'kb') {
       // 选中知识库时，使用最新的知识库数据
       const latestKB = knowledgeBases.find(kb => kb.kb_id === (node.data as KnowledgeBase).kb_id);
-      onKBSelect(latestKB || (node.data as KnowledgeBase));
-      onNodeSelect?.(node, nodePath);
+      const kbNode = {
+        ...node,
+        data: latestKB || node.data
+      };
+      // 只调用 onNodeSelect，由父组件统一处理
+      onNodeSelect?.(kbNode, nodePath);
     } else if (node.type === 'folder') {
-      // 选中目录时，同时选中所属的知识库
-      const kb = knowledgeBases.find(k => k.kb_id === node.kbId);
-      if (kb) {
-        onKBSelect(kb);
-      }
+      // 选中目录时，直接通知父组件
       onNodeSelect?.(node, nodePath);
     } else if (node.type === 'document') {
-      // 选中文档时，同时选中所属的知识库
-      const kb = knowledgeBases.find(k => k.kb_id === node.kbId);
-      if (kb) {
-        onKBSelect(kb);
-      }
+      // 选中文档时，直接通知父组件
       onNodeSelect?.(node, nodePath);
     }
   };
