@@ -17,8 +17,6 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from fastmcp import FastMCP
 from base_config import MCPServerConfig
-import aiomysql
-
 # LangChain imports
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -37,16 +35,6 @@ mcp = FastMCP("Sensitive Data Scanner Server")
 
 # 加载配置
 config = MCPServerConfig('sensitive_scan_server')
-
-# 获取数据库配置
-DB_CONFIG = {
-    'host': config.get('db_host', '82.156.xx.xx'),
-    'port': config.get('db_port', 3306),
-    'user': config.get('db_user', 'xxxx'),
-    'password': config.get('db_password', 'xxxx'),
-    'db': config.get('db_name', 'omind'),
-    'charset': 'utf8mb4'
-}
 
 # 获取LLM配置
 # 优先从配置文件读取，其次从环境变量读取
@@ -136,104 +124,92 @@ async def read_content_from_file(file_path: str) -> str:
         return ""
 
 
-async def get_file_content_from_db(file_id: str) -> Dict[str, Any]:
-    """从MySQL数据库获取文件内容"""
-    conn = None
-    cursor = None
+async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
+    """从文件系统获取文件内容"""
     try:
-        # 连接数据库
-        conn = await aiomysql.connect(**DB_CONFIG)
-        cursor = await conn.cursor(aiomysql.DictCursor)
+        # 构建文件路径
+        base_path = Path(DOCUMENT_STORAGE_PATH)
         
-        # 查询文件信息
-        query = """
-        SELECT file_id, file_name, file_size, file_type, doc_content, process_status, error_message,
-               doc_metadata
-        FROM agent_document_upload
-        WHERE file_id = %s
-        """
+        # 查找原始文件和解析后的文件
+        original_file_pattern = f"{file_id}.*"
+        parsed_file_path = base_path / f"{file_id}_parsed.txt"
+        metadata_file_path = base_path / f"{file_id}_metadata.json"
         
-        await cursor.execute(query, (file_id,))
-        row = await cursor.fetchone()
+        # 获取文件元数据
+        file_metadata = {}
+        file_name = f"document_{file_id}"
+        file_type = "unknown"
+        file_size = 0
         
-        if not row:
-            logger.error(f"数据库中找不到文件: {file_id}")
-            return {
-                'success': False,
-                'content': '',
-                'error': f'数据库中找不到文件: {file_id}'
-            }
-        
-        # 检查处理状态
-        if row['process_status'] == 3:  # failed
-            return {
-                'success': False,
-                'content': '',
-                'error': f'文件处理失败: {row["error_message"] or "未知错误"}'
-            }
-        
-        if row['process_status'] != 2:  # not ready
-            return {
-                'success': False,
-                'content': '',
-                'error': f'文件尚未处理完成，当前状态: {row["process_status"]}'
-            }
-        
-        # 获取文档内容
-        doc_content_field = row['doc_content']
-        if not doc_content_field:
-            return {
-                'success': False,
-                'content': '',
-                'error': '文档内容为空'
-            }
-        
-        # 从文件路径读取内容
-        content = await read_content_from_file(doc_content_field)
-        if not content:
-            return {
-                'success': False,
-                'content': '',
-                'error': f'无法读取解析文件: {doc_content_field}'
-            }
-        
-        # 解析文档元数据
-        doc_metadata = {}
-        if row.get('doc_metadata'):
+        if metadata_file_path.exists():
             try:
-                doc_metadata = json.loads(row['doc_metadata'])
-            except:
-                pass
+                async with aiofiles.open(str(metadata_file_path), 'r', encoding='utf-8') as f:
+                    metadata_content = await f.read()
+                    file_metadata = json.loads(metadata_content)
+                    file_name = file_metadata.get('file_name', file_name)
+                    file_type = file_metadata.get('file_type', file_type)
+                    file_size = file_metadata.get('file_size', file_size)
+            except Exception as e:
+                logger.warning(f"读取元数据文件失败: {metadata_file_path}, 错误: {e}")
+        
+        # 查找原始文件获取文件信息
+        if not file_name.startswith("document_"):
+            for file_path in base_path.glob(original_file_pattern):
+                if not str(file_path).endswith('_parsed.txt') and not str(file_path).endswith('_metadata.json'):
+                    file_name = file_path.name
+                    file_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
+                    file_size = file_path.stat().st_size
+                    break
+        
+        # 检查解析后的文件是否存在
+        if not parsed_file_path.exists():
+            # 尝试直接读取原始文本文件
+            for file_path in base_path.glob(original_file_pattern):
+                if file_path.suffix in ['.txt', '.md']:
+                    content = await read_content_from_file(str(file_path))
+                    if content:
+                        break
+            else:
+                logger.error(f"找不到文件: {file_id}")
+                return {
+                    'success': False,
+                    'content': '',
+                    'error': f'找不到文件: {file_id}'
+                }
+        else:
+            # 读取解析后的内容
+            content = await read_content_from_file(str(parsed_file_path))
+            if not content:
+                return {
+                    'success': False,
+                    'content': '',
+                    'error': f'无法读取解析文件: {parsed_file_path}'
+                }
         
         # 统计图片数量（匹配 [图片 数字] 格式）
         image_count = len(re.findall(r'\[图片\s*\d*\]', content))
         
-        # 获取字符数（如果元数据中没有，使用内容长度）
-        char_count = doc_metadata.get('char_count', len(content))
+        # 获取字符数
+        char_count = file_metadata.get('char_count', len(content))
         
         return {
             'success': True,
             'content': content,
-            'file_name': row['file_name'],
-            'file_type': row['file_type'],
-            'file_size': row['file_size'],
-            'doc_metadata': doc_metadata,
+            'file_name': file_name,
+            'file_type': file_type,
+            'file_size': file_size,
+            'doc_metadata': file_metadata,
             'image_count': image_count,
             'char_count': char_count
         }
             
     except Exception as e:
-        logger.error(f"从数据库读取文件失败: {str(e)}")
+        logger.error(f"从文件系统读取文件失败: {str(e)}")
         return {
             'success': False,
             'content': '',
-            'error': f'从数据库读取文件失败: {str(e)}'
+            'error': f'从文件系统读取文件失败: {str(e)}'
         }
-    finally:
-        if cursor:
-            await cursor.close()
-        if conn:
-            conn.close()
 
 
 async def scan_content_with_llm(content: str, file_name: str = "未知文件") -> Dict[str, Any]:
@@ -329,7 +305,7 @@ async def scan_content_with_llm(content: str, file_name: str = "未知文件") -
 
 async def scan_single_file(file_id: str) -> Dict[str, Any]:
     """扫描单个文件并返回结果字典"""
-    file_data = await get_file_content_from_db(file_id)
+    file_data = await get_file_content_from_filesystem(file_id)
     
     if not file_data['success']:
         return {
@@ -369,90 +345,104 @@ async def scan_document(file_ids: List[str]) -> str:
     扫描文档中的敏感信息
     
     Args:
-        file_ids: 文件ID列表（数据库中的file_id列表）
+        file_ids: 文件ID列表（文件系统中的file_id列表）
     
     Returns:
         扫描结果报告
     """
-    logger.info(f"开始扫描 {len(file_ids)} 个文件")
-    
-    if not file_ids:
-        return "错误: 未提供文件ID"
-    
-    # 统一使用批量处理逻辑（无论是1个还是多个文件）
-    output = ""
-    
-    # 显示扫描报告头部
-    output = f"扫描报告\n"
-    output += f"{'='*50}\n"
-    output += f"扫描文件数: {len(file_ids)}\n"
-    output += f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    output += f"{'='*50}\n\n"
-    
-    # 使用信号量控制并发度
-    semaphore = Semaphore(FILE_CONCURRENCY)
-    
-    async def scan_with_semaphore(file_id: str):
-        async with semaphore:
-            return await scan_single_file(file_id)
-    
-    # 并发扫描所有文件
-    scan_tasks = [scan_with_semaphore(file_id) for file_id in file_ids]
-    scan_results = await asyncio.gather(*scan_tasks)
-    
-    # 处理扫描结果
-    total_sensitive_count = 0
-    files_with_sensitive = 0
-    
-    for idx, scan_data in enumerate(scan_results, 1):
-        if not scan_data['success']:
-            output += f"\n内容源{idx}: {scan_data['file_id']}\n"
-            output += f"扫描失败: {scan_data['error']}\n"
+    try:
+        logger.info(f"开始扫描 {len(file_ids)} 个文件")
+        
+        if not file_ids:
+            return "错误: 未提供文件ID"
+        
+        # 统一使用批量处理逻辑（无论是1个还是多个文件）
+        output = ""
+        
+        # 显示扫描报告头部
+        output = f"扫描报告\n"
+        output += f"{'='*50}\n"
+        output += f"扫描文件数: {len(file_ids)}\n"
+        output += f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        output += f"{'='*50}\n\n"
+        
+        # 使用信号量控制并发度
+        semaphore = Semaphore(FILE_CONCURRENCY)
+        
+        async def scan_with_semaphore(file_id: str):
+            async with semaphore:
+                return await scan_single_file(file_id)
+        
+        # 并发扫描所有文件
+        scan_tasks = [scan_with_semaphore(file_id) for file_id in file_ids]
+        # 使用 return_exceptions=True 确保即使有任务失败也能获取结果
+        scan_results = await asyncio.gather(*scan_tasks, return_exceptions=True)
+        
+        # 处理扫描结果
+        total_sensitive_count = 0
+        files_with_sensitive = 0
+        
+        for idx, scan_data in enumerate(scan_results, 1):
+            # 处理异常情况
+            if isinstance(scan_data, Exception):
+                output += f"\n内容源{idx}: {file_ids[idx-1]}\n"
+                output += f"扫描失败: 处理过程中发生异常 - {str(scan_data)}\n"
+                output += "="*50 + "\n"
+                continue
+                
+            if not scan_data.get('success', False):
+                output += f"\n内容源{idx}: {scan_data.get('file_id', file_ids[idx-1])}\n"
+                output += f"扫描失败: {scan_data.get('error', '未知错误')}\n"
+                output += "="*50 + "\n"
+                continue
+            
+            result = scan_data.get('result', {})
+            
+            # 格式化文件大小
+            file_size_kb = scan_data.get('file_size', 0) / 1024
+            
+            # 判断解析状态
+            parse_status = "内容完整"
+            if result.get('summary', '').find('解析失败') >= 0:
+                parse_status = "内容解析异常"
+            
+            # 输出文件结果
+            output += f"\n内容源{idx}: {scan_data.get('file_name', '未知文件')}\n"
+            output += f"1.文档信息：{file_size_kb:.1f}KB、文字{scan_data.get('char_count', 0)}"
+            if scan_data.get('image_count', 0) > 0:
+                output += f"(包含图片{scan_data['image_count']}张的解析内容)"
+            output += "\n"
+            output += f"2.文档解析状态：{parse_status}\n"
+            output += f"3.文档摘要：{result.get('summary', '无摘要')[:100]}\n"
+            output += f"4.敏感信息扫描结果："
+            
+            if result.get('has_sensitive', False):
+                files_with_sensitive += 1
+                total_sensitive_count += result.get('sensitive_count', 0)
+                output += f"发现{result.get('sensitive_count', 0)}个敏感信息\n"
+                # 最多展示3个
+                sensitive_items = result.get('sensitive_items', [])
+                for i, item in enumerate(sensitive_items[:3], 1):
+                    output += f"  {i}) {item.get('type', '未知类型')}: {item.get('masked_value', '***')}\n"
+                if len(sensitive_items) > 3:
+                    output += f"  ...还有{len(sensitive_items)-3}个敏感信息未展示\n"
+            else:
+                output += "未发现敏感信息\n"
+            
             output += "="*50 + "\n"
-            continue
         
-        result = scan_data['result']
+        # 显示汇总统计
+        output += f"\n{'='*50}\n"
+        output += f"扫描汇总:\n"
+        output += f"   - 扫描文件总数: {len(file_ids)}\n"
+        output += f"   - 包含敏感信息的文件: {files_with_sensitive}\n"
+        output += f"   - 敏感信息总数: {total_sensitive_count}\n"
         
-        # 格式化文件大小
-        file_size_kb = scan_data['file_size'] / 1024
+        return output.rstrip()  # 去掉末尾换行
         
-        # 判断解析状态
-        parse_status = "内容完整"
-        if result.get('summary', '').find('解析失败') >= 0:
-            parse_status = "内容解析异常"
-        
-        # 输出文件结果
-        output += f"\n内容源{idx}: {scan_data['file_name']}\n"
-        output += f"1.文档信息：{file_size_kb:.1f}KB、文字{scan_data.get('char_count', 0)}"
-        if scan_data.get('image_count', 0) > 0:
-            output += f"(包含图片{scan_data['image_count']}张的解析内容)"
-        output += "\n"
-        output += f"2.文档解析状态：{parse_status}\n"
-        output += f"3.文档摘要：{result['summary'][:100]}\n"
-        output += f"4.敏感信息扫描结果："
-        
-        if result['has_sensitive']:
-            files_with_sensitive += 1
-            total_sensitive_count += result['sensitive_count']
-            output += f"发现{result['sensitive_count']}个敏感信息\n"
-            # 最多展示3个
-            for i, item in enumerate(result['sensitive_items'][:3], 1):
-                output += f"  {i}) {item['type']}: {item['masked_value']}\n"
-            if len(result['sensitive_items']) > 3:
-                output += f"  ...还有{len(result['sensitive_items'])-3}个敏感信息未展示\n"
-        else:
-            output += "未发现敏感信息\n"
-        
-        output += "="*50 + "\n"
-    
-    # 显示汇总统计
-    output += f"\n{'='*50}\n"
-    output += f"扫描汇总:\n"
-    output += f"   - 扫描文件总数: {len(file_ids)}\n"
-    output += f"   - 包含敏感信息的文件: {files_with_sensitive}\n"
-    output += f"   - 敏感信息总数: {total_sensitive_count}\n"
-    
-    return output.rstrip()  # 去掉末尾换行
+    except Exception as e:
+        logger.error(f"扫描文档过程中发生异常: {str(e)}", exc_info=True)
+        return f"错误: 扫描过程中发生异常 - {str(e)}"
 
 
 if __name__ == "__main__":
