@@ -719,6 +719,7 @@ const MCPManagement: React.FC = () => {
             icon={<EditOutlined />}
             onClick={() => handleEditServer(record)}
             title="编辑"
+            disabled={record.createBy !== currentUser?.username}
           />
           <Button
             type="text"
@@ -742,6 +743,7 @@ const MCPManagement: React.FC = () => {
             okText="确定"
             cancelText="取消"
             okButtonProps={{ danger: true }}
+            disabled={record.createBy !== currentUser?.username}
           >
             <Button 
               type="text" 
@@ -749,6 +751,7 @@ const MCPManagement: React.FC = () => {
               icon={<DeleteOutlined />}
               danger
               title="删除"
+              disabled={record.createBy !== currentUser?.username}
             />
           </Popconfirm>
         </Space>

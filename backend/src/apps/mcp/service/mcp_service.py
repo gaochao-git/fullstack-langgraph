@@ -165,6 +165,11 @@ class MCPService:
             if not existing:
                 raise ValueError(f"MCP server with ID {server_id} not found")
             
+            # 检查当前用户是否是服务器创建者
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if existing.create_by != username:
+                raise ValueError("只有服务器创建者才能更新服务器配置")
+            
             # 转换数据
             data = server_data.dict(exclude_unset=True)
             
@@ -215,7 +220,12 @@ class MCPService:
             if not existing:
                 return False
             
-            logger.info(f"Deleting MCP server: {server_id}")
+            # 检查当前用户是否是服务器创建者
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if existing.create_by != username:
+                raise ValueError("只有服务器创建者才能删除服务器")
+            
+            logger.info(f"Deleting MCP server: {server_id} by user: {username}")
             result = await db.execute(
                 delete(MCPServer).where(MCPServer.server_id == server_id)
             )
