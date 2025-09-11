@@ -342,12 +342,32 @@ class DocumentService:
                 # 新方式：从文件读取
                 parse_file_path = Path(doc_upload.doc_content)
                 if parse_file_path.exists():
-                    try:
-                        async with aiofiles.open(parse_file_path, 'r', encoding='utf-8') as f:
-                            content = await f.read()
-                    except Exception as e:
-                        logger.error(f"读取解析文件失败: {e}")
-                        content = ""
+                    content = ""
+                    # 尝试不同的编码
+                    encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
+                    
+                    for encoding in encodings:
+                        try:
+                            async with aiofiles.open(parse_file_path, 'r', encoding=encoding) as f:
+                                content = await f.read()
+                                logger.info(f"成功使用 {encoding} 编码读取解析文件")
+                                break
+                        except UnicodeDecodeError:
+                            continue
+                        except Exception as e:
+                            if 'UnicodeDecodeError' not in str(e):
+                                logger.debug(f"使用 {encoding} 编码读取失败: {e}")
+                            continue
+                    
+                    # 如果所有编码都失败，使用忽略错误的方式
+                    if not content:
+                        try:
+                            async with aiofiles.open(parse_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = await f.read()
+                                logger.warning(f"使用 utf-8 编码（忽略错误）读取解析文件")
+                        except Exception as e:
+                            logger.error(f"读取解析文件失败: {e}")
+                            content = ""
                 else:
                     logger.warning(f"解析文件不存在: {parse_file_path}")
             else:
@@ -538,13 +558,33 @@ class DocumentService:
                         # 新方式：从文件读取
                         parse_file_path = Path(result.doc_content)
                         if parse_file_path.exists():
-                            try:
-                                # 同步读取文件
-                                with open(parse_file_path, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                            except Exception as e:
-                                logger.error(f"读取解析文件失败: {e}")
-                                content = f"读取文件失败: {str(e)}"
+                            content = ""
+                            # 尝试不同的编码
+                            encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
+                            
+                            for encoding in encodings:
+                                try:
+                                    # 同步读取文件
+                                    with open(parse_file_path, 'r', encoding=encoding) as f:
+                                        content = f.read()
+                                        logger.info(f"成功使用 {encoding} 编码读取解析文件")
+                                        break
+                                except UnicodeDecodeError:
+                                    continue
+                                except Exception as e:
+                                    if 'UnicodeDecodeError' not in str(e):
+                                        logger.debug(f"使用 {encoding} 编码读取失败: {e}")
+                                    continue
+                            
+                            # 如果所有编码都失败，使用忽略错误的方式
+                            if not content:
+                                try:
+                                    with open(parse_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                        content = f.read()
+                                        logger.warning(f"使用 utf-8 编码（忽略错误）读取解析文件")
+                                except Exception as e:
+                                    logger.error(f"读取解析文件失败: {e}")
+                                    content = f"读取文件失败: {str(e)}"
                         else:
                             logger.warning(f"解析文件不存在: {parse_file_path}")
                             content = "解析文件不存在"

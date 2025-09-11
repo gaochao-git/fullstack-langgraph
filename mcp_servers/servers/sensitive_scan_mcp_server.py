@@ -111,10 +111,31 @@ SYSTEM_PROMPT = """你是一个专业的敏感数据扫描助手。你的任务�
 
 async def read_content_from_file(file_path: str) -> str:
     """从文件读取内容"""
+    # 尝试不同的编码
+    encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
+    
+    for encoding in encodings:
+        try:
+            async with aiofiles.open(file_path, 'r', encoding=encoding) as f:
+                content = await f.read()
+                logger.info(f"成功使用 {encoding} 编码从文件读取内容: {file_path}")
+                return content
+        except FileNotFoundError:
+            logger.error(f"解析文件不存在: {file_path}")
+            return ""
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            if isinstance(e, FileNotFoundError):
+                logger.error(f"解析文件不存在: {file_path}")
+                return ""
+            continue
+    
+    # 如果所有编码都失败，尝试使用错误处理策略
     try:
-        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+        async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = await f.read()
-            logger.info(f"成功从文件读取内容: {file_path}")
+            logger.warning(f"使用 utf-8 编码（忽略错误）读取文件: {file_path}")
             return content
     except FileNotFoundError:
         logger.error(f"解析文件不存在: {file_path}")
