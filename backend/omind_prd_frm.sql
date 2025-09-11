@@ -882,6 +882,25 @@ CREATE TABLE `user_threads` (
   KEY `ix_user_threads_user_name` (`user_name`),
   KEY `ix_user_threads_thread_id` (`thread_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+DROP TABLE IF EXISTS `mcp_servers_permission`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `mcp_servers_permission` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `server_id` varchar(100) NOT NULL COMMENT 'mcp server id',
+  `user_name` varchar(64) DEFAULT NULL COMMENT '分配的用户名',
+  `server_key` varchar(64) DEFAULT NULL COMMENT '分配的用户密钥，接口调用时校验，校验在各个mcp_server里面',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否处于活跃状态',
+  `mark_comment` varchar(100) NOT NULL DEFAULT '' COMMENT '工单号',
+  `create_by` varchar(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `server_id_user` (`server_id`,`user_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COMMENT='mcp server权限表';
+
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
