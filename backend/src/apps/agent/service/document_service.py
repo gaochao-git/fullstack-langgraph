@@ -588,8 +588,31 @@ class DocumentService:
     async def _process_text_file(self, file_path: Path, file_name: str) -> str:
         """处理文本文件"""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                return f.read()
+            # 尝试不同的编码
+            encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
+            
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as f:
+                        content = f.read()
+                        logger.info(f"成功使用 {encoding} 编码读取文本文件: {file_name}")
+                        return content
+                except UnicodeDecodeError:
+                    continue
+                except Exception as e:
+                    logger.debug(f"使用 {encoding} 编码读取失败: {e}")
+                    continue
+            
+            # 如果所有编码都失败，尝试使用错误处理策略
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    logger.warning(f"使用 utf-8 编码（忽略错误）读取文本文件: {file_name}")
+                    return f"[警告: 文件可能包含无法识别的字符]\n{content}"
+            except Exception as e:
+                logger.error(f"文本文件读取错误: {e}")
+                return f"文本文件读取失败: {str(e)}"
+                
         except Exception as e:
             logger.error(f"文本文件读取错误: {e}")
             return f"文本文件读取失败: {str(e)}"
