@@ -203,15 +203,12 @@ async def create_server_permission(
     current_user: dict = Depends(get_current_user)
 ):
     """为MCP服务器添加用户权限"""
-    try:
-        permission = await mcp_service.create_server_permission(db, server_id, permission_data, current_user)
-        return success_response(
-            data=permission,
-            msg="权限添加成功",
-            code=ResponseCode.CREATED
-        )
-    except ValueError as e:
-        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+    permission = await mcp_service.create_server_permission(db, server_id, permission_data, current_user)
+    return success_response(
+        data=permission,
+        msg="权限添加成功",
+        code=ResponseCode.CREATED
+    )
 
 
 @router.get("/v1/mcp/servers/{server_id}/permissions", response_model=UnifiedResponse)
@@ -221,16 +218,13 @@ async def get_server_permissions(
     current_user: dict = Depends(get_current_user)
 ):
     """获取MCP服务器的权限列表"""
-    try:
-        permissions = await mcp_service.get_server_permissions(db, server_id, current_user)
-        # 手动序列化列表，因为success_response只处理单个对象
-        permission_list = [p.to_dict() for p in permissions]
-        return success_response(
-            data=permission_list,
-            msg="获取权限列表成功"
-        )
-    except ValueError as e:
-        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+    permissions = await mcp_service.get_server_permissions(db, server_id, current_user)
+    # 手动序列化列表，因为success_response只处理单个对象
+    permission_list = [p.to_dict() for p in permissions]
+    return success_response(
+        data=permission_list,
+        msg="获取权限列表成功"
+    )
 
 
 @router.put("/v1/mcp/servers/{server_id}/permissions/{permission_id}", response_model=UnifiedResponse)
@@ -242,16 +236,13 @@ async def update_server_permission(
     current_user: dict = Depends(get_current_user)
 ):
     """更新MCP服务器权限"""
-    try:
-        permission = await mcp_service.update_server_permission(db, server_id, permission_id, permission_data, current_user)
-        if not permission:
-            raise BusinessException(f"权限 {permission_id} 不存在", ResponseCode.NOT_FOUND)
-        return success_response(
-            data=permission,
-            msg="权限更新成功"
-        )
-    except ValueError as e:
-        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+    permission = await mcp_service.update_server_permission(db, server_id, permission_id, permission_data, current_user)
+    if not permission:
+        raise BusinessException(f"权限 {permission_id} 不存在", ResponseCode.NOT_FOUND)
+    return success_response(
+        data=permission,
+        msg="权限更新成功"
+    )
 
 
 @router.delete("/v1/mcp/servers/{server_id}/permissions/{permission_id}", response_model=UnifiedResponse)
@@ -262,16 +253,13 @@ async def delete_server_permission(
     current_user: dict = Depends(get_current_user)
 ):
     """删除MCP服务器权限"""
-    try:
-        success = await mcp_service.delete_server_permission(db, server_id, permission_id, current_user)
-        if not success:
-            raise BusinessException(f"权限 {permission_id} 不存在", ResponseCode.NOT_FOUND)
-        return success_response(
-            data={"deleted_id": permission_id},
-            msg="权限删除成功"
-        )
-    except ValueError as e:
-        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+    success = await mcp_service.delete_server_permission(db, server_id, permission_id, current_user)
+    if not success:
+        raise BusinessException(f"权限 {permission_id} 不存在", ResponseCode.NOT_FOUND)
+    return success_response(
+        data={"deleted_id": permission_id},
+        msg="权限删除成功"
+    )
 
 
 @router.patch("/v1/mcp/servers/{server_id}/status", response_model=UnifiedResponse)

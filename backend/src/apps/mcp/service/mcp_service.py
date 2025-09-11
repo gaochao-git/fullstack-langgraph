@@ -343,7 +343,7 @@ class MCPService:
             )
             existing = result.scalar_one_or_none()
             if existing:
-                raise ValueError(f"用户 {permission_data.user_name} 的权限已存在")
+                raise BusinessException(f"用户 {permission_data.user_name} 的权限已存在", ResponseCode.CONFLICT)
             
             # 创建权限记录
             data = permission_data.dict()
@@ -374,12 +374,12 @@ class MCPService:
         # 检查服务器是否存在
         server = await self.get_server_by_id(db, server_id)
         if not server:
-            raise ValueError(f"MCP server {server_id} does not exist")
+            raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
         
         # 检查当前用户是否是服务器创建者
         username = current_user.get('username') or current_user.get('sub', 'system')
         if server.create_by != username:
-            raise ValueError("只有服务器创建者才能查看权限")
+            raise BusinessException("只有服务器创建者才能查看权限", ResponseCode.FORBIDDEN)
         
         result = await db.execute(
             select(MCPServerPermission).where(
