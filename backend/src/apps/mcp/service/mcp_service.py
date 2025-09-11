@@ -3,12 +3,12 @@
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update, delete, and_, func, case, distinct
+from sqlalchemy import select, update, delete, and_, func, case, distinct, or_
 
-from src.apps.mcp.models import MCPServer
+from src.apps.mcp.models import MCPServer, MCPServerPermission
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
-from src.apps.mcp.schema import MCPServerCreate, MCPServerUpdate, MCPQueryParams
+from src.apps.mcp.schema import MCPServerCreate, MCPServerUpdate, MCPQueryParams, MCPServerPermissionCreate, MCPServerPermissionUpdate
 
 logger = get_logger(__name__)
 
@@ -298,6 +298,190 @@ class MCPService:
             select(MCPServer).where(MCPServer.server_id == server_id)
         )
         return result.scalar_one_or_none()
+    
+    # ==================== 权限管理相关方法 ====================
+    
+    async def create_server_permission(
+        self,
+        db: AsyncSession,
+        server_id: str,
+        permission_data: MCPServerPermissionCreate,
+        current_user: dict
+    ) -> MCPServerPermission:
+        """创建服务器权限"""
+        async with db.begin():
+            # 检查服务器是否存在
+            server = await self.get_server_by_id(db, server_id)
+            if not server:
+                raise ValueError(f"MCP server {server_id} does not exist")
+            
+            # 检查当前用户是否是服务器创建者
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if server.create_by != username:
+                raise ValueError("只有服务器创建者才能管理权限")
+            
+            # 检查权限是否已存在
+            result = await db.execute(
+                select(MCPServerPermission).where(
+                    and_(
+                        MCPServerPermission.server_id == server_id,
+                        MCPServerPermission.user_name == permission_data.user_name
+                    )
+                )
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                raise ValueError(f"用户 {permission_data.user_name} 的权限已存在")
+            
+            # 创建权限记录
+            data = permission_data.dict()
+            data['server_id'] = server_id
+            data['create_by'] = username
+            data['update_by'] = username
+            data['create_time'] = now_shanghai()
+            data['update_time'] = now_shanghai()
+            
+            # 如果没有提供server_key，自动生成一个
+            if not data.get('server_key'):
+                import secrets
+                data['server_key'] = f"sk_{secrets.token_urlsafe(32)}"
+            
+            instance = MCPServerPermission(**data)
+            db.add(instance)
+            await db.flush()
+            await db.refresh(instance)
+            return instance
+    
+    async def get_server_permissions(
+        self,
+        db: AsyncSession,
+        server_id: str,
+        current_user: dict
+    ) -> List[MCPServerPermission]:
+        """获取服务器的所有权限"""
+        # 检查服务器是否存在
+        server = await self.get_server_by_id(db, server_id)
+        if not server:
+            raise ValueError(f"MCP server {server_id} does not exist")
+        
+        # 检查当前用户是否是服务器创建者
+        username = current_user.get('username') or current_user.get('sub', 'system')
+        if server.create_by != username:
+            raise ValueError("只有服务器创建者才能查看权限")
+        
+        result = await db.execute(
+            select(MCPServerPermission).where(
+                MCPServerPermission.server_id == server_id
+            ).order_by(MCPServerPermission.create_time.desc())
+        )
+        permissions = list(result.scalars().all())
+        return permissions
+    
+    async def update_server_permission(
+        self,
+        db: AsyncSession,
+        server_id: str,
+        permission_id: int,
+        permission_data: MCPServerPermissionUpdate,
+        current_user: dict
+    ) -> Optional[MCPServerPermission]:
+        """更新服务器权限"""
+        async with db.begin():
+            # 检查服务器是否存在
+            server = await self.get_server_by_id(db, server_id)
+            if not server:
+                raise ValueError(f"MCP server {server_id} does not exist")
+            
+            # 检查当前用户是否是服务器创建者
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if server.create_by != username:
+                raise ValueError("只有服务器创建者才能管理权限")
+            
+            # 检查权限是否存在
+            result = await db.execute(
+                select(MCPServerPermission).where(
+                    and_(
+                        MCPServerPermission.id == permission_id,
+                        MCPServerPermission.server_id == server_id
+                    )
+                )
+            )
+            permission = result.scalar_one_or_none()
+            if not permission:
+                return None
+            
+            # 更新权限
+            update_data = permission_data.dict(exclude_unset=True)
+            if update_data:
+                update_data['update_by'] = username
+                update_data['update_time'] = now_shanghai()
+                
+                await db.execute(
+                    update(MCPServerPermission).where(
+                        MCPServerPermission.id == permission_id
+                    ).values(**update_data)
+                )
+                
+                result = await db.execute(
+                    select(MCPServerPermission).where(MCPServerPermission.id == permission_id)
+                )
+                permission = result.scalar_one_or_none()
+            
+            return permission
+    
+    async def delete_server_permission(
+        self,
+        db: AsyncSession,
+        server_id: str,
+        permission_id: int,
+        current_user: dict
+    ) -> bool:
+        """删除服务器权限"""
+        async with db.begin():
+            # 检查服务器是否存在
+            server = await self.get_server_by_id(db, server_id)
+            if not server:
+                raise ValueError(f"MCP server {server_id} does not exist")
+            
+            # 检查当前用户是否是服务器创建者
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if server.create_by != username:
+                raise ValueError("只有服务器创建者才能管理权限")
+            
+            # 删除权限
+            result = await db.execute(
+                delete(MCPServerPermission).where(
+                    and_(
+                        MCPServerPermission.id == permission_id,
+                        MCPServerPermission.server_id == server_id
+                    )
+                )
+            )
+            return result.rowcount > 0
+    
+    async def get_user_accessible_servers(
+        self,
+        db: AsyncSession,
+        username: str
+    ) -> List[MCPServer]:
+        """获取用户有权限访问的服务器列表"""
+        # 查询用户创建的服务器或有权限的服务器
+        result = await db.execute(
+            select(MCPServer).where(
+                or_(
+                    MCPServer.create_by == username,
+                    MCPServer.server_id.in_(
+                        select(MCPServerPermission.server_id).where(
+                            and_(
+                                MCPServerPermission.user_name == username,
+                                MCPServerPermission.is_active == 1
+                            )
+                        )
+                    )
+                )
+            ).where(MCPServer.is_enabled == 'on')
+        )
+        return list(result.scalars().all())
 
 
 # 全局实例

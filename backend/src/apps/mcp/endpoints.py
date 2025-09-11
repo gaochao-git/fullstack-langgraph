@@ -9,11 +9,12 @@ import logging
 import traceback
 
 from src.shared.db.config import get_async_db
-from src.apps.auth.dependencies import get_current_user
+from src.apps.auth.dependencies import get_current_user, get_current_user_optional
 from src.apps.mcp.schema import (
     MCPServerCreate, MCPServerUpdate, MCPQueryParams,
     MCPTestRequest, MCPTestResponse, MCPStatusUpdate, MCPEnableUpdate,
-    MCPGatewayConfigCreate, MCPGatewayConfigUpdate, MCPGatewayConfigQueryParams
+    MCPGatewayConfigCreate, MCPGatewayConfigUpdate, MCPGatewayConfigQueryParams,
+    MCPServerPermissionCreate, MCPServerPermissionUpdate, MCPServerPermissionResponse
 )
 from src.apps.mcp.service.mcp_service import mcp_service
 from src.apps.mcp.service.mcp_gateway_service import mcp_gateway_service
@@ -98,13 +99,45 @@ async def get_mcp_server(
 async def list_mcp_servers(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(10, ge=1, le=100, description="每页数量"),
+    filter_by_permission: bool = Query(False, description="是否根据权限过滤"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
     is_enabled: Optional[str] = Query(None, description="启用状态过滤"),
     connection_status: Optional[str] = Query(None, description="连接状态过滤"),
     team_name: Optional[str] = Query(None, max_length=100, description="团队过滤"),
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """查询MCP服务器列表"""
+    # 如果需要根据权限过滤，则使用权限过滤的方法
+    if filter_by_permission and current_user:
+        username = current_user.get('username') or current_user.get('sub')
+        if username:
+            servers = await mcp_service.get_user_accessible_servers(db, username)
+            # 应用其他过滤条件
+            if search:
+                servers = [s for s in servers if search.lower() in s.server_name.lower()]
+            if is_enabled:
+                servers = [s for s in servers if s.is_enabled == is_enabled]
+            if connection_status:
+                servers = [s for s in servers if s.connection_status == connection_status]
+            if team_name:
+                servers = [s for s in servers if s.team_name == team_name]
+            
+            # 分页
+            total = len(servers)
+            start = (page - 1) * size
+            end = start + size
+            servers = servers[start:end]
+            
+            return paginated_response(
+                items=servers,
+                total=total,
+                page=page,
+                size=size,
+                msg="查询MCP服务器列表成功"
+            )
+    
+    # 否则返回所有服务器
     params = MCPQueryParams(
         search=search,
         is_enabled=is_enabled,
@@ -158,6 +191,87 @@ async def delete_mcp_server(
         data={"deleted_id": server_id},
         msg="MCP服务器删除成功"
     )
+
+
+# ==================== MCP服务器权限管理API ====================
+
+@router.post("/v1/mcp/servers/{server_id}/permissions", response_model=UnifiedResponse)
+async def create_server_permission(
+    server_id: str,
+    permission_data: MCPServerPermissionCreate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """为MCP服务器添加用户权限"""
+    try:
+        permission = await mcp_service.create_server_permission(db, server_id, permission_data, current_user)
+        return success_response(
+            data=permission,
+            msg="权限添加成功",
+            code=ResponseCode.CREATED
+        )
+    except ValueError as e:
+        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+
+
+@router.get("/v1/mcp/servers/{server_id}/permissions", response_model=UnifiedResponse)
+async def get_server_permissions(
+    server_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """获取MCP服务器的权限列表"""
+    try:
+        permissions = await mcp_service.get_server_permissions(db, server_id, current_user)
+        # 手动序列化列表，因为success_response只处理单个对象
+        permission_list = [p.to_dict() for p in permissions]
+        return success_response(
+            data=permission_list,
+            msg="获取权限列表成功"
+        )
+    except ValueError as e:
+        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+
+
+@router.put("/v1/mcp/servers/{server_id}/permissions/{permission_id}", response_model=UnifiedResponse)
+async def update_server_permission(
+    server_id: str,
+    permission_id: int,
+    permission_data: MCPServerPermissionUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """更新MCP服务器权限"""
+    try:
+        permission = await mcp_service.update_server_permission(db, server_id, permission_id, permission_data, current_user)
+        if not permission:
+            raise BusinessException(f"权限 {permission_id} 不存在", ResponseCode.NOT_FOUND)
+        return success_response(
+            data=permission,
+            msg="权限更新成功"
+        )
+    except ValueError as e:
+        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
+
+
+@router.delete("/v1/mcp/servers/{server_id}/permissions/{permission_id}", response_model=UnifiedResponse)
+async def delete_server_permission(
+    server_id: str,
+    permission_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """删除MCP服务器权限"""
+    try:
+        success = await mcp_service.delete_server_permission(db, server_id, permission_id, current_user)
+        if not success:
+            raise BusinessException(f"权限 {permission_id} 不存在", ResponseCode.NOT_FOUND)
+        return success_response(
+            data={"deleted_id": permission_id},
+            msg="权限删除成功"
+        )
+    except ValueError as e:
+        raise BusinessException(str(e), ResponseCode.BAD_REQUEST)
 
 
 @router.patch("/v1/mcp/servers/{server_id}/status", response_model=UnifiedResponse)

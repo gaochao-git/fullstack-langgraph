@@ -286,3 +286,43 @@ class MCPGatewayConfigExport(BaseModel):
     tools: List[Dict[str, Any]]
     prompts: List[Dict[str, Any]]
     mcpServers: List[Dict[str, Any]]
+
+
+# MCP服务器权限相关Schema
+class MCPServerPermissionCreate(BaseModel):
+    """创建MCP服务器权限"""
+    user_name: str = Field(..., description="用户名", min_length=1, max_length=64)
+    server_key: Optional[str] = Field(None, description="服务器密钥", max_length=64)
+    is_active: Optional[int] = Field(1, description="是否激活", ge=0, le=1)
+    mark_comment: Optional[str] = Field("", description="备注/工单号", max_length=100)
+    
+    @field_validator('user_name')
+    def validate_user_name(cls, v):
+        """验证用户名"""
+        if not v or not v.strip():
+            raise ValueError("用户名不能为空")
+        return v.strip()
+
+
+class MCPServerPermissionUpdate(BaseModel):
+    """更新MCP服务器权限"""
+    server_key: Optional[str] = Field(None, description="服务器密钥", max_length=64)
+    is_active: Optional[int] = Field(None, description="是否激活", ge=0, le=1)
+    mark_comment: Optional[str] = Field(None, description="备注/工单号", max_length=100)
+
+
+class MCPServerPermissionResponse(BaseModel):
+    """MCP服务器权限响应"""
+    id: int
+    server_id: str
+    user_name: str
+    server_key: Optional[str]
+    is_active: int
+    mark_comment: str
+    create_by: str
+    update_by: Optional[str]
+    create_time: str
+    update_time: str
+    
+    class Config:
+        from_attributes = True

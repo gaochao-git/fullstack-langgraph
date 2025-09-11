@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '@/hooks/ThemeContext';
-import { getBaseUrl } from '@/utils/base_api';
+import { omind_get, omind_post, omind_put, omind_del } from '@/utils/base_api';
 import { 
   Card, 
   Table, 
@@ -35,10 +35,12 @@ import {
   SettingOutlined,
   ApiOutlined,
   ToolOutlined,
-  LinkOutlined
+  LinkOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import MCPGatewayManagement from '../components/MCPGatewayManagement';
+import MCPPermissionModal from '../components/MCPPermissionModal';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -74,8 +76,6 @@ interface MCPServer {
 }
 
 
-// API基础URL
-const API_BASE_URL = getBaseUrl();
 
 // 将后端数据转换为前端格式
 const transformServerFromAPI = (apiServer: any): MCPServer => {
@@ -134,6 +134,7 @@ const MCPManagement: React.FC = () => {
   const [servers, setServers] = useState<MCPServer[]>([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<{ username: string } | null>(null);
   
   // 模态框状态
   const [serverDetailModal, setServerDetailModal] = useState(false);
@@ -142,6 +143,8 @@ const MCPManagement: React.FC = () => {
   const [editingServer, setEditingServer] = useState<MCPServer | null>(null);
   const [formConnectionStatus, setFormConnectionStatus] = useState<'idle' | 'testing' | 'connected' | 'error'>('idle');
   const [formDiscoveredTools, setFormDiscoveredTools] = useState<MCPTool[]>([]);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [permissionServer, setPermissionServer] = useState<MCPServer | null>(null);
   
   const { message } = App.useApp();
   const [form] = Form.useForm();
@@ -149,17 +152,12 @@ const MCPManagement: React.FC = () => {
   // API调用函数
   const fetchServers = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers?size=100`);
-      if (response.ok) {
-        const result = await response.json();
-        if (result.status === 'ok' && result.data && result.data.items) {
-          const transformedServers = result.data.items.map(transformServerFromAPI);
-          setServers(transformedServers);
-        } else {
-          message.error(result.msg || '获取服务器列表失败');
-        }
+      const result = await omind_get('/api/v1/mcp/servers?size=100');
+      if (result.status === 'ok' && result.data && result.data.items) {
+        const transformedServers = result.data.items.map(transformServerFromAPI);
+        setServers(transformedServers);
       } else {
-        message.error('获取服务器列表失败');
+        message.error(result.msg || '获取服务器列表失败');
       }
     } catch (error) {
       console.error('获取服务器列表错误:', error);
@@ -170,19 +168,14 @@ const MCPManagement: React.FC = () => {
   const createServer = async (serverData: Partial<MCPServer>) => {
     try {
       const apiData = transformServerToAPI(serverData);
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiData)
-      });
+      const result = await omind_post('/api/v1/mcp/servers', apiData);
       
-      if (response.ok) {
+      if (result.status === 'ok') {
         message.success('服务器创建成功');
         await fetchServers();
         return true;
       } else {
-        const errorData = await response.json();
-        message.error(`创建服务器失败: ${errorData.detail || '未知错误'}`);
+        message.error(result.msg || '创建服务器失败');
         return false;
       }
     } catch (error) {
@@ -195,19 +188,14 @@ const MCPManagement: React.FC = () => {
   const updateServer = async (serverId: string, serverData: Partial<MCPServer>) => {
     try {
       const apiData = transformServerToAPI(serverData);
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiData)
-      });
+      const result = await omind_put(`/api/v1/mcp/servers/${serverId}`, apiData);
       
-      if (response.ok) {
+      if (result.status === 'ok') {
         message.success('服务器更新成功');
         await fetchServers();
         return true;
       } else {
-        const errorData = await response.json();
-        message.error(`更新服务器失败: ${errorData.detail || '未知错误'}`);
+        message.error(result.msg || '更新服务器失败');
         return false;
       }
     } catch (error) {
@@ -219,17 +207,14 @@ const MCPManagement: React.FC = () => {
 
   const deleteServer = async (serverId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}`, {
-        method: 'DELETE'
-      });
+      const result = await omind_del(`/api/v1/mcp/servers/${serverId}`);
       
-      if (response.ok) {
+      if (result.status === 'ok') {
         message.success('服务器删除成功');
         await fetchServers();
         return true;
       } else {
-        const errorData = await response.json();
-        message.error(`删除服务器失败: ${errorData.detail || '未知错误'}`);
+        message.error(result.msg || '删除服务器失败');
         return false;
       }
     } catch (error) {
@@ -256,15 +241,10 @@ const MCPManagement: React.FC = () => {
         api_key_header: server.apiKeyHeader || null
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
+      const result = await omind_post('/api/v1/mcp/test', requestBody);
       
-      if (response.ok) {
-        const result = await response.json();
-        const data = result.data; // 解析统一响应格式
+      if (result.status === 'ok') {
+        const data = result.data;
         if (data) {
           message.success('服务器连接测试成功');
           await fetchServers(); // 刷新状态
@@ -273,7 +253,7 @@ const MCPManagement: React.FC = () => {
         }
         return data;
       } else {
-        message.error('连接测试失败');
+        message.error(result.msg || '连接测试失败');
         return { healthy: false, tools: [], error: '请求失败' };
       }
     } catch (error) {
@@ -283,9 +263,33 @@ const MCPManagement: React.FC = () => {
     }
   };
 
+  // 获取当前用户信息
+  const fetchCurrentUser = async () => {
+    try {
+      const result = await omind_get('/api/v1/auth/me');
+      if (result.status === 'ok') {
+        console.log('当前用户信息:', result.data);
+        // 用户信息在 data.user 下
+        const userInfo = result.data.user || result.data;
+        setCurrentUser({ username: userInfo.username });
+      } else {
+        console.error('获取用户信息失败:', result.msg);
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+    }
+  };
+
+  // 处理权限管理
+  const handleManagePermissions = (server: MCPServer) => {
+    setPermissionServer(server);
+    setPermissionModalVisible(true);
+  };
+
   // 初始化数据
   useEffect(() => {
     fetchServers();
+    fetchCurrentUser();
   }, []);
 
   // 获取状态颜色
@@ -336,17 +340,15 @@ const MCPManagement: React.FC = () => {
     
     const newEnabled = !server.enabled;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/mcp/servers/${serverId}/enable`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: newEnabled ? 'on' : 'off' })
+      const result = await omind_put(`/api/v1/mcp/servers/${serverId}/enable`, { 
+        enabled: newEnabled ? 'on' : 'off' 
       });
       
-      if (response.ok) {
+      if (result.status === 'ok') {
         await fetchServers(); // 刷新数据
         message.success(`服务器已${newEnabled ? '启用' : '禁用'}`);
       } else {
-        message.error('更新服务器状态失败');
+        message.error(result.msg || '更新服务器状态失败');
       }
     } catch (error) {
       console.error('更新服务器状态错误:', error);
@@ -495,12 +497,7 @@ const MCPManagement: React.FC = () => {
       
       // 对于表单中的测试，我们创建一个临时服务器来测试
       // 这里先简化处理，只检查URL格式
-      const resp = await fetch(`${API_BASE_URL}/api/v1/mcp/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      });
-      const response = await resp.json();
+      const response = await omind_post('/api/v1/mcp/test', requestBody);
       const tools = response.data; // 解析统一响应格式
       const msg = response.msg; // 解析统一响应格式
       if (tools) {
@@ -722,6 +719,21 @@ const MCPManagement: React.FC = () => {
             icon={<EditOutlined />}
             onClick={() => handleEditServer(record)}
             title="编辑"
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<TeamOutlined />}
+            onClick={() => {
+              console.log('权限管理按钮调试信息:');
+              console.log('record.createBy:', record.createBy);
+              console.log('currentUser:', currentUser);
+              console.log('currentUser?.username:', currentUser?.username);
+              console.log('比较结果:', record.createBy !== currentUser?.username);
+              handleManagePermissions(record);
+            }}
+            title="权限管理"
+            disabled={record.createBy !== currentUser?.username}
           />
           <Popconfirm
             title="删除服务器"
@@ -1288,6 +1300,16 @@ const MCPManagement: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 权限管理弹窗 */}
+      <MCPPermissionModal
+        visible={permissionModalVisible}
+        server={permissionServer}
+        onClose={() => {
+          setPermissionModalVisible(false);
+          setPermissionServer(null);
+        }}
+      />
 
     </div>
   );

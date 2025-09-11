@@ -2,8 +2,9 @@
 MCP Server Model
 """
 
-from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, UniqueConstraint, Index, ForeignKey
 from sqlalchemy.dialects.mysql import TINYINT
+from sqlalchemy.orm import relationship
 from src.shared.db.config import Base
 from src.shared.db.models import now_shanghai, BaseModel
 import json
@@ -32,6 +33,9 @@ class MCPServer(Base):
     update_by = Column(String(100), nullable=True)
     create_time = Column(DateTime, default=now_shanghai, nullable=False)
     update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
+    
+    # 定义关系
+    permissions = relationship("MCPServerPermission", back_populates="server", cascade="all, delete-orphan")
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -76,6 +80,34 @@ class MCPServer(Base):
             'create_time': self.create_time.strftime('%Y-%m-%d %H:%M:%S') if self.create_time else None,
             'update_time': self.update_time.strftime('%Y-%m-%d %H:%M:%S') if self.update_time else None,
         }
+
+
+class MCPServerPermission(BaseModel):
+    """MCP Server Permission model matching mcp_servers_permission table."""
+    __tablename__ = "mcp_servers_permission"
+    
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True, comment='主键ID，自增')
+    server_id = Column(String(100), ForeignKey('mcp_servers.server_id'), nullable=False, comment='mcp server id')
+    user_name = Column(String(64), comment='分配的用户名')
+    server_key = Column(String(64), comment='分配的用户密钥，接口调用时校验，校验在各个mcp_server里面')
+    is_active = Column(TINYINT(1), nullable=False, default=1, comment='是否处于活跃状态')
+    mark_comment = Column(String(100), nullable=False, default='', comment='工单号')
+    create_by = Column(String(100), nullable=False, default='system', comment='创建人用户名')
+    update_by = Column(String(100), comment='最后更新人用户名')
+    create_time = Column(DateTime, default=now_shanghai, nullable=False)
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False)
+    
+    # 定义关系
+    server = relationship("MCPServer", back_populates="permissions")
+    
+    # 唯一约束
+    __table_args__ = (
+        UniqueConstraint('server_id', 'user_name', name='server_id_user'),
+    )
+    
+    
+    def __repr__(self):
+        return f"<MCPServerPermission(server_id={self.server_id}, user_name={self.user_name})>"
 
 
 class MCPConfig(BaseModel):

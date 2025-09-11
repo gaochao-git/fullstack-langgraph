@@ -300,8 +300,8 @@ class AgentApiService {
   /**
    * 获取MCP服务器信息（兼容接口）
    */
-  async getMCPServers() {
-    return await omind_get('/api/v1/mcp/servers?size=100');
+  async getMCPServers(filterByPermission = true) {
+    return await omind_get(`/api/v1/mcp/servers?size=100&filter_by_permission=${filterByPermission}`);
   }
 
   /**
