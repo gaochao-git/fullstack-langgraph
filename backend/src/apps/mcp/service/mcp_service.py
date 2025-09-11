@@ -8,6 +8,8 @@ from sqlalchemy import select, update, delete, and_, func, case, distinct, or_
 from src.apps.mcp.models import MCPServer, MCPServerPermission
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
+from src.shared.core.exceptions import BusinessException
+from src.shared.schemas.response import ResponseCode
 from src.apps.mcp.schema import MCPServerCreate, MCPServerUpdate, MCPQueryParams, MCPServerPermissionCreate, MCPServerPermissionUpdate
 
 logger = get_logger(__name__)
@@ -30,7 +32,7 @@ class MCPService:
             )
             existing = result.scalar_one_or_none()
             if existing:
-                raise ValueError(f"MCP server with ID {server_data.server_id} already exists")
+                raise BusinessException(f"MCP服务器ID {server_data.server_id} 已存在", ResponseCode.CONFLICT)
             
             # 转换数据
             data = server_data.dict()
@@ -163,12 +165,12 @@ class MCPService:
             )
             existing = result.scalar_one_or_none()
             if not existing:
-                raise ValueError(f"MCP server with ID {server_id} not found")
+                raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
             
             # 检查当前用户是否是服务器创建者
             username = current_user.get('username') or current_user.get('sub', 'system')
             if existing.create_by != username:
-                raise ValueError("只有服务器创建者才能更新服务器配置")
+                raise BusinessException("只有服务器创建者才能更新服务器配置", ResponseCode.FORBIDDEN)
             
             # 转换数据
             data = server_data.dict(exclude_unset=True)
@@ -223,7 +225,7 @@ class MCPService:
             # 检查当前用户是否是服务器创建者
             username = current_user.get('username') or current_user.get('sub', 'system')
             if existing.create_by != username:
-                raise ValueError("只有服务器创建者才能删除服务器")
+                raise BusinessException("只有服务器创建者才能删除服务器", ResponseCode.FORBIDDEN)
             
             logger.info(f"Deleting MCP server: {server_id} by user: {username}")
             result = await db.execute(
@@ -323,12 +325,12 @@ class MCPService:
             # 检查服务器是否存在
             server = await self.get_server_by_id(db, server_id)
             if not server:
-                raise ValueError(f"MCP server {server_id} does not exist")
+                raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
             
             # 检查当前用户是否是服务器创建者
             username = current_user.get('username') or current_user.get('sub', 'system')
             if server.create_by != username:
-                raise ValueError("只有服务器创建者才能管理权限")
+                raise BusinessException("只有服务器创建者才能管理权限", ResponseCode.FORBIDDEN)
             
             # 检查权限是否已存在
             result = await db.execute(
@@ -400,12 +402,12 @@ class MCPService:
             # 检查服务器是否存在
             server = await self.get_server_by_id(db, server_id)
             if not server:
-                raise ValueError(f"MCP server {server_id} does not exist")
+                raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
             
             # 检查当前用户是否是服务器创建者
             username = current_user.get('username') or current_user.get('sub', 'system')
             if server.create_by != username:
-                raise ValueError("只有服务器创建者才能管理权限")
+                raise BusinessException("只有服务器创建者才能管理权限", ResponseCode.FORBIDDEN)
             
             # 检查权限是否存在
             result = await db.execute(
@@ -451,12 +453,12 @@ class MCPService:
             # 检查服务器是否存在
             server = await self.get_server_by_id(db, server_id)
             if not server:
-                raise ValueError(f"MCP server {server_id} does not exist")
+                raise BusinessException(f"MCP服务器 {server_id} 不存在", ResponseCode.NOT_FOUND)
             
             # 检查当前用户是否是服务器创建者
             username = current_user.get('username') or current_user.get('sub', 'system')
             if server.create_by != username:
-                raise ValueError("只有服务器创建者才能管理权限")
+                raise BusinessException("只有服务器创建者才能管理权限", ResponseCode.FORBIDDEN)
             
             # 删除权限
             result = await db.execute(
