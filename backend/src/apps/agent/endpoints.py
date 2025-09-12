@@ -880,6 +880,71 @@ async def get_extract_result(
         # JSON提取结果数据
         with open(extract_path, 'r', encoding='utf-8') as f:
             extract_data = json.load(f)
+        
+        # 处理单个文件格式：将 files 数组转换为 items 数组
+        if 'files' in extract_data and isinstance(extract_data['files'], list) and 'items' not in extract_data:
+            items = []
+            for file in extract_data['files']:
+                if 'sensitive_items' in file and isinstance(file['sensitive_items'], list):
+                    for item in file['sensitive_items']:
+                        # 合并文件信息和敏感项信息
+                        items.append({
+                            **item,  # 包含 type, masked_value, context 等
+                            'file_id': file.get('file_id', ''),
+                            'file_name': file.get('file_name', ''),
+                            'file_size': file.get('file_size', 0),
+                            'char_count': file.get('char_count', 0),
+                            'image_count': file.get('image_count', 0)
+                        })
+            extract_data['items'] = items
+            
+            # 使用 summary 中的统计信息更新顶层字段
+            if 'summary' in extract_data:
+                summary = extract_data['summary']
+                extract_data['total_files'] = summary.get('total_files', extract_data.get('total_files', 0))
+                extract_data['files_with_sensitive'] = summary.get('files_with_sensitive', extract_data.get('files_with_sensitive', 0))
+                extract_data['total_sensitive'] = summary.get('total_sensitive_count', extract_data.get('total_sensitive', 0))
+                if 'statistics' in summary:
+                    extract_data['statistics'] = summary['statistics']
+        
+        # 如果是扫描报告，补充文件元数据信息
+        if 'items' in extract_data and isinstance(extract_data['items'], list):
+            # 收集所有的file_id
+            file_ids = set()
+            for item in extract_data['items']:
+                if 'file_id' in item and item['file_id']:
+                    file_ids.add(item['file_id'])
+            
+            if file_ids:
+                # 批量获取文件元数据
+                from .service.document_service import document_service
+                from src.shared.db.config import get_async_db_context
+                
+                # 获取文件元数据
+                file_metadata_map = {}
+                async with get_async_db_context() as db:
+                    user_name = current_user.get('username') if current_user else None
+                    file_info_map = await document_service.get_batch_file_info(
+                        db=db,
+                        file_ids=list(file_ids),
+                        user_name=user_name
+                    )
+                    
+                    # 构建文件元数据映射
+                    for file_id, info in file_info_map.items():
+                        file_metadata_map[file_id] = {
+                            "file_name": info.get("file_name", ""),
+                            "file_size": info.get("file_size", 0),
+                            "char_count": info.get("char_count", 0),
+                            "image_count": info.get("image_count", 0)
+                        }
+                
+                # 为每个item补充文件元数据
+                for item in extract_data['items']:
+                    file_id = item.get('file_id', '')
+                    if file_id in file_metadata_map:
+                        item.update(file_metadata_map[file_id])
+        
         return success_response(data=extract_data, msg="获取提取结果成功")
     elif filename.endswith('.html'):
         # HTML文件直接返回内容

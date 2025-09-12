@@ -1405,13 +1405,23 @@ class DocumentService:
             # 构建文件路径，需要加上文件扩展名
             file_path = os.path.join(UPLOAD_DIR, f"{doc.file_id}{doc.file_type}")
             
+            # 解析元数据
+            metadata = {}
+            try:
+                if doc.doc_metadata:
+                    metadata = json.loads(doc.doc_metadata)
+            except:
+                pass
+            
             file_info_map[doc.file_id] = {
                 "file_id": doc.file_id,
                 "file_name": doc.file_name,
                 "file_path": file_path,
                 "file_type": doc.file_type,
                 "file_size": doc.file_size,
-                "upload_time": doc.upload_time.isoformat() if doc.upload_time else None
+                "upload_time": doc.upload_time.isoformat() if doc.upload_time else None,
+                "char_count": metadata.get("char_count", 0),
+                "image_count": 0  # 图片数量需要从内容中解析，批量查询时暂不提供
             }
         
         return file_info_map
