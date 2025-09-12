@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Table, Tag, Space, Spin, Typography, message, Input, Button, Card, Row, Col, Statistic } from 'antd';
-import { FileTextOutlined, AlertOutlined, DownloadOutlined, FolderOpenOutlined, WarningOutlined, FileSearchOutlined } from '@ant-design/icons';
+import { FileTextOutlined, AlertOutlined, DownloadOutlined, FolderOpenOutlined, WarningOutlined, FileSearchOutlined, FileImageOutlined } from '@ant-design/icons';
 import { omind_get, omind_post } from '@/utils/base_api';
 import { fileApi } from '@/services/fileApi';
 
@@ -355,6 +355,29 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                       const i = Math.floor(Math.log(totalSize) / Math.log(k));
                       return parseFloat((totalSize / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
                     })()}
+                  />
+                </Col>
+                <Col span={4}>
+                  <Statistic
+                    title="扫描图片数量"
+                    value={(() => {
+                      // 计算所有文件的图片总数
+                      let totalImages = 0;
+                      if (data.items && Array.isArray(data.items)) {
+                        // 使用Map去重file_id，避免重复计算
+                        const fileImageMap = new Map();
+                        data.items.forEach((item: any) => {
+                          if (item.file_id && item.image_count !== undefined) {
+                            fileImageMap.set(item.file_id, item.image_count);
+                          }
+                        });
+                        fileImageMap.forEach(imageCount => {
+                          totalImages += imageCount;
+                        });
+                      }
+                      return totalImages;
+                    })()}
+                    prefix={<FileImageOutlined />}
                   />
                 </Col>
               </Row>
