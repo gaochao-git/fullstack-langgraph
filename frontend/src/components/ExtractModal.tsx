@@ -7,6 +7,91 @@ import zhCN from 'antd/locale/zh_CN';
 
 const { TextArea } = Input;
 
+// 敏感信息高亮组件
+interface HighlightedTextProps {
+  content: string;
+  sensitiveItems: Array<{
+    type: string;
+    masked_value: string;
+    position?: {
+      start: number;
+      end: number;
+    };
+  }>;
+}
+
+const HighlightedText: React.FC<HighlightedTextProps> = ({ content, sensitiveItems }) => {
+  // 根据position信息构建高亮片段
+  const highlights: Array<{ start: number; end: number }> = [];
+  
+  sensitiveItems.forEach(item => {
+    if (item.position) {
+      highlights.push({
+        start: item.position.start,
+        end: item.position.end
+      });
+    }
+  });
+  
+  // 按照起始位置排序
+  highlights.sort((a, b) => a.start - b.start);
+  
+  // 构建渲染片段
+  const segments: Array<{ text: string; isHighlight: boolean }> = [];
+  let lastEnd = 0;
+  
+  highlights.forEach(highlight => {
+    // 添加高亮前的普通文本
+    if (highlight.start > lastEnd) {
+      segments.push({
+        text: content.substring(lastEnd, highlight.start),
+        isHighlight: false
+      });
+    }
+    
+    // 添加高亮文本
+    segments.push({
+      text: content.substring(highlight.start, highlight.end),
+      isHighlight: true
+    });
+    
+    lastEnd = highlight.end;
+  });
+  
+  // 添加最后的普通文本
+  if (lastEnd < content.length) {
+    segments.push({
+      text: content.substring(lastEnd),
+      isHighlight: false
+    });
+  }
+  
+  return (
+    <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', fontFamily: 'monospace', lineHeight: '1.8' }}>
+      {segments.map((segment, index) => {
+        if (segment.isHighlight) {
+          return (
+            <span 
+              key={index} 
+              style={{ 
+                backgroundColor: '#ff4d4f',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: 'bold',
+                margin: '0 2px'
+              }}
+            >
+              {segment.text}
+            </span>
+          );
+        }
+        return <span key={index}>{segment.text}</span>;
+      })}
+    </div>
+  );
+};
+
 interface ExtractModalProps {
   visible: boolean;
   onClose: () => void;
@@ -28,6 +113,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
   const [fileContent, setFileContent] = useState('');
   const [fileContentLoading, setFileContentLoading] = useState(false);
   const [currentFileName, setCurrentFileName] = useState('');
+  const [currentFileSensitiveItems, setCurrentFileSensitiveItems] = useState<any[]>([]);
   useEffect(() => {
     if (visible && reportPath) {
       loadReport();
@@ -82,6 +168,14 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
       if (response.status === 'ok' && response.data) {
         setFileContent(response.data.content || '暂无内容');
         setCurrentFileName(response.data.file_name || '文档内容');
+        
+        // 收集当前文件的敏感信息
+        if (data && data.items) {
+          const fileSensitiveItems = data.items.filter((item: any) => 
+            item.file_id === fileId
+          );
+          setCurrentFileSensitiveItems(fileSensitiveItems);
+        }
       } else {
         message.error(response.msg || '获取文件内容失败');
         setFileContentVisible(false);
@@ -424,7 +518,10 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
       <Modal
         title={currentFileName}
         open={fileContentVisible}
-        onCancel={() => setFileContentVisible(false)}
+        onCancel={() => {
+          setFileContentVisible(false);
+          setCurrentFileSensitiveItems([]);
+        }}
         width="80%"
         style={{ top: 20 }}
         styles={{
@@ -435,12 +532,19 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
         {fileContentLoading ? (
           <Spin size="large" tip="加载中..." style={{ display: 'block', margin: '50px auto' }} />
         ) : (
-          <TextArea
-            value={fileContent}
-            readOnly
-            autoSize={{ minRows: 10, maxRows: 30 }}
-            style={{ fontSize: '14px', fontFamily: 'monospace' }}
-          />
+          <div style={{ 
+            maxHeight: '70vh', 
+            overflowY: 'auto', 
+            padding: '16px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+            border: '1px solid #d9d9d9'
+          }}>
+            <HighlightedText 
+              content={fileContent} 
+              sensitiveItems={currentFileSensitiveItems}
+            />
+          </div>
         )}
       </Modal>
     </>

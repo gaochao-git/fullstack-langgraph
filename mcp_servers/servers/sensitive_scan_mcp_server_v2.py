@@ -380,7 +380,8 @@ async def scan_document_v2(file_ids: List[str]) -> str:
                         "type": item.get('type', '未知类型'),
                         "masked_value": item.get('masked_value', '***'),
                         "context": item.get('context', ''),
-                        "file_id": scan_data.get('file_id', '')  # 只保留file_id
+                        "file_id": scan_data.get('file_id', ''),  # 只保留file_id
+                        "position": item.get('position')  # 添加位置信息
                     }
                     report_data["items"].append(report_item)
                 
