@@ -582,6 +582,54 @@ async def get_document_content(
     )
 
 
+@router.get("/v1/chat/files/{file_id}/metadata", response_model=UnifiedResponse)
+async def get_file_metadata(
+    file_id: str,
+    agent_id: Optional[str] = Query(None, description="智能体ID（agent_key认证时必须）"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取文件元数据（文件名、大小、类型等）"""
+    # 获取当前用户名用于权限检查
+    user_name = current_user.get('username') if current_user else None
+    
+    # 使用已有的 get_file_info 方法获取文件信息
+    file_info = await document_service.get_file_info(db, file_id, user_name)
+    if not file_info:
+        raise BusinessException("文件不存在或无权访问", ResponseCode.NOT_FOUND)
+    
+    return success_response(
+        data=file_info,
+        msg="获取文件元数据成功"
+    )
+
+
+@router.post("/v1/chat/files/batch/metadata", response_model=UnifiedResponse)
+async def get_batch_file_metadata(
+    file_ids: List[str],
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """批量获取文件元数据"""
+    # 获取当前用户名用于权限检查
+    user_name = current_user.get('username') if current_user else None
+    
+    # 限制最多500个文件，防止请求过大
+    if len(file_ids) > 500:
+        file_ids = file_ids[:500]
+    
+    # 使用批量查询方法
+    file_map = await document_service.get_batch_file_info(db, file_ids, user_name)
+    
+    return success_response(
+        data={
+            'files': file_map,
+            'total': len(file_map)
+        },
+        msg="批量获取文件元数据成功"
+    )
+
+
 @router.get("/v1/chat/files/{file_id}/status", response_model=UnifiedResponse)
 async def get_file_status(
     file_id: str,

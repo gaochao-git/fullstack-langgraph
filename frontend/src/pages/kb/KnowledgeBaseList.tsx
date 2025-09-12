@@ -356,7 +356,9 @@ const KnowledgeBaseList: React.FC = () => {
                         borderColor: selectedKB?.kb_id === kb.kb_id ? '#1890ff' : undefined,
                         backgroundColor: selectedKB?.kb_id === kb.kb_id ? '#f6ffed' : undefined
                       }}
-                      bodyStyle={{ padding: '12px' }}
+                      styles={{
+                        body: { padding: '12px' }
+                      }}
                       onClick={() => setSelectedKB(kb)}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

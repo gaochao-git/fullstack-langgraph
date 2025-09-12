@@ -1377,6 +1377,45 @@ class DocumentService:
         except Exception as e:
             logger.error(f"异步处理文档失败: {file_id}, 错误: {str(e)}")
 
+    async def get_batch_file_info(self, db: AsyncSession, file_ids: List[str], user_name: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """
+        批量获取文件信息
+        
+        Args:
+            db: 数据库会话
+            file_ids: 文件ID列表
+            user_name: 用户名（用于权限检查）
+            
+        Returns:
+            文件信息字典，key为file_id
+        """
+        # 构建查询
+        query = select(AgentDocumentUpload).where(AgentDocumentUpload.file_id.in_(file_ids))
+        
+        # 如果提供了用户名，检查所有权
+        if user_name:
+            query = query.where(AgentDocumentUpload.create_by == user_name)
+        
+        result = await db.execute(query)
+        doc_uploads = result.scalars().all()
+        
+        # 构建返回结果
+        file_info_map = {}
+        for doc in doc_uploads:
+            # 构建文件路径，需要加上文件扩展名
+            file_path = os.path.join(UPLOAD_DIR, f"{doc.file_id}{doc.file_type}")
+            
+            file_info_map[doc.file_id] = {
+                "file_id": doc.file_id,
+                "file_name": doc.file_name,
+                "file_path": file_path,
+                "file_type": doc.file_type,
+                "file_size": doc.file_size,
+                "upload_time": doc.upload_time.isoformat() if doc.upload_time else None
+            }
+        
+        return file_info_map
+    
     async def get_file_info(self, db: AsyncSession, file_id: str, user_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         获取文件信息（用于下载）

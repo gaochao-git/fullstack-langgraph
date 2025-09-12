@@ -404,7 +404,8 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
                         "type": item.get('type', '未知类型'),
                         "masked_value": item.get('masked_value', '***'),
                         "context": item.get('context', ''),
-                        "file": file_name
+                        "file": file_name,
+                        "file_id": scan_data.get('file_id', '')  # 添加file_id
                     }
                     report_data["items"].append(report_item)
                     
