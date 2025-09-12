@@ -2,7 +2,7 @@
 """
 Sensitive Data Scanner MCP Server V2
 敏感数据扫描MCP服务器 V2 版本
-集成 LangExtract 进行更精确的敏感信息提取和可视化
+使用 LangExtract 进行精确的敏感信息提取和可视化
 """
 
 import json
@@ -31,8 +31,7 @@ mcp = FastMCP("Sensitive Data Scanner Server V2")
 # 加载配置
 config = MCPServerConfig('sensitive_scan_server_v2')
 
-# 获取配置
-USE_LANGEXTRACT = config.get('use_langextract', False)
+# 获取LangExtract配置
 LANGEXTRACT_PROVIDER = config.get('langextract_provider', 'gemini')  # gemini, openai, custom
 LANGEXTRACT_MODEL = config.get('langextract_model', 'gemini-2.0-flash-exp')
 LANGEXTRACT_API_KEY = config.get('langextract_api_key', '')
@@ -49,111 +48,35 @@ FILE_CONCURRENCY = config.get('file_concurrency', 3)
 DOCUMENT_STORAGE_PATH = config.get('document_storage_path', '/tmp/documents/uploads')
 
 logger.info(f"文档存储路径配置: DOCUMENT_STORAGE_PATH = {DOCUMENT_STORAGE_PATH}")
-logger.info(f"使用 LangExtract: {USE_LANGEXTRACT}")
 
-# 根据配置选择扫描器
-if USE_LANGEXTRACT:
-    try:
-        from langextract_sensitive_scanner import LangExtractSensitiveScanner
-        
-        # 准备API密钥
-        api_key = LANGEXTRACT_API_KEY
-        if not api_key:
-            # 根据提供商从环境变量读取
-            if LANGEXTRACT_PROVIDER == 'gemini':
-                api_key = os.environ.get('GOOGLE_API_KEY')
-            elif LANGEXTRACT_PROVIDER == 'openai' or LANGEXTRACT_PROVIDER == 'custom':
-                api_key = os.environ.get('OPENAI_API_KEY')
-        
-        langextract_scanner = LangExtractSensitiveScanner(
-            model_id=LANGEXTRACT_MODEL,
-            api_key=api_key,
-            provider=LANGEXTRACT_PROVIDER,
-            base_url=LANGEXTRACT_BASE_URL if LANGEXTRACT_PROVIDER == 'custom' else None,
-            enable_visualization=True  # 启用可视化以支持原生报告生成
-        )
-        logger.info(f"已启用 LangExtract 扫描器 (提供商: {LANGEXTRACT_PROVIDER}, 模型: {LANGEXTRACT_MODEL})")
-    except ImportError as e:
-        logger.error(f"无法导入 LangExtract: {str(e)}")
-        logger.error("请确保 langextract_sensitive_scanner.py 在同目录下")
-        # 强制使用 LangExtract，不回退
-        raise ImportError(f"必须使用 LangExtract 但导入失败: {str(e)}")
-    except Exception as e:
-        logger.error(f"初始化 LangExtract 扫描器失败: {str(e)}")
-        # 强制使用 LangExtract，不回退
-        raise Exception(f"必须使用 LangExtract 但初始化失败: {str(e)}")
-else:
-    langextract_scanner = None
-
-# 如果不使用 LangExtract，则使用原有的 LangChain 实现
-if not USE_LANGEXTRACT:
-    # LangChain imports
-    from langchain_openai import ChatOpenAI
-    from langchain_core.messages import SystemMessage, HumanMessage
-    from langchain_core.output_parsers import JsonOutputParser
-    from langchain_core.prompts import ChatPromptTemplate
+# 初始化LangExtract扫描器
+try:
+    from langextract_sensitive_scanner import LangExtractSensitiveScanner
     
-    # 获取LLM配置
-    LLM_API_BASE = config.get('llm_api_base') or os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
-    LLM_API_KEY = config.get('llm_api_key') or os.environ.get('DEEPSEEK_API_KEY', '')
-    LLM_MODEL = config.get('llm_model') or os.environ.get('LLM_MODEL', 'deepseek-chat')
+    # 准备API密钥
+    api_key = LANGEXTRACT_API_KEY
+    if not api_key:
+        # 根据提供商从环境变量读取
+        if LANGEXTRACT_PROVIDER == 'gemini':
+            api_key = os.environ.get('GOOGLE_API_KEY')
+        elif LANGEXTRACT_PROVIDER == 'openai' or LANGEXTRACT_PROVIDER == 'custom':
+            api_key = os.environ.get('OPENAI_API_KEY')
     
-    # 初始化LangChain LLM
-    llm = ChatOpenAI(
-        model=LLM_MODEL,
-        openai_api_base=LLM_API_BASE,
-        openai_api_key=LLM_API_KEY,
-        temperature=0.1,
-        timeout=60.0,
-        max_tokens=1000
+    langextract_scanner = LangExtractSensitiveScanner(
+        model_id=LANGEXTRACT_MODEL,
+        api_key=api_key,
+        provider=LANGEXTRACT_PROVIDER,
+        base_url=LANGEXTRACT_BASE_URL if LANGEXTRACT_PROVIDER == 'custom' else None,
+        enable_visualization=True  # 启用可视化以支持原生报告生成
     )
-    
-    # JSON输出解析器
-    json_parser = JsonOutputParser()
-    
-    # 默认扫描提示词
-    SYSTEM_PROMPT = """你是一个专业的敏感数据扫描助手。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
-
-需要识别的敏感信息类型：
-1. 个人身份信息：身份证号、护照号、驾驶证号
-2. 联系方式：手机号、座机号、邮箱地址
-3. 金融信息：银行卡号、信用卡号、账号信息
-4. 账户凭据：用户名密码组合、API密钥、Token、证书密钥
-5. 网络信息：内网IP地址、服务器地址、数据库连接串
-6. 医疗信息：病历号、医保号、诊断信息
-7. 其他敏感：社保号、车牌号、家庭住址
-
-重要提示：
-- 单独的用户名（如：admin、root、gaochao等）不属于敏感信息
-- 只有用户名+密码的组合才是敏感信息
-- 公开的域名（如：baidu.com）不属于敏感信息
-- 需要重点关注上下文，判断信息是否真的敏感
-
-脱敏规则：
-- 手机号：只显示前3位和后4位（如：138****5678）
-- 身份证号：只显示前6位和后4位（如：110101****1234）
-- 银行卡号：只显示前4位和后4位（如：6222****4321）
-- 邮箱：@前面部分隐藏一半（如：te**@163.com）
-- IP地址：隐藏中间两段（如：192.***.***234）
-- 密码/密钥：全部替换为星号
-- 其他敏感信息：保留首尾，中间用星号替换
-
-输出要求：
-你必须以JSON格式输出，包含以下字段：
-{
-    "has_sensitive": true/false,  // 是否包含敏感信息
-    "sensitive_count": 0,         // 敏感信息数量
-    "sensitive_items": [          // 敏感信息列表
-        {
-            "type": "身份证号",
-            "masked_value": "110101****1234",
-            "context": "出现的上下文"
-        }
-    ],
-    "summary": "文档摘要"         // 50字以内的文档内容摘要
-}
-
-注意：绝对不要在输出中包含敏感信息的原始值！"""
+    logger.info(f"LangExtract 扫描器已初始化 (提供商: {LANGEXTRACT_PROVIDER}, 模型: {LANGEXTRACT_MODEL})")
+except ImportError as e:
+    logger.error(f"无法导入 LangExtract: {str(e)}")
+    logger.error("请确保 langextract_sensitive_scanner.py 在同目录下")
+    raise ImportError(f"无法导入 LangExtract 模块: {str(e)}")
+except Exception as e:
+    logger.error(f"初始化 LangExtract 扫描器失败: {str(e)}")
+    raise Exception(f"LangExtract 扫描器初始化失败: {str(e)}")
 
 
 async def read_content_from_file(file_path: str) -> str:
@@ -267,96 +190,6 @@ async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
         }
 
 
-async def scan_content_with_llm(content: str, file_name: str = "未知文件") -> Dict[str, Any]:
-    """使用LLM扫描内容中的敏感信息（原有LangChain实现）"""
-    try:
-        max_chunk_size = CHUNK_SIZE
-        
-        # 如果内容较短，直接扫描
-        if len(content) <= max_chunk_size:
-            messages = [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=f"请扫描以下文档内容：\n\n文件名：{file_name}\n\n内容：\n{content}")
-            ]
-            
-            response = await llm.ainvoke(messages)
-            result = json_parser.parse(response.content)
-            
-            return {
-                'success': True,
-                'result': result
-            }
-        
-        # 对大文件进行分片处理
-        chunks = []
-        for i in range(0, len(content), max_chunk_size):
-            chunks.append(content[i:i + max_chunk_size])
-        
-        logger.info(f"大文件 {file_name} 被分成 {len(chunks)} 个分片（每片最大 {max_chunk_size} 字符）")
-        
-        # 串行扫描所有分片，保持文本顺序
-        responses = []
-        for idx, chunk in enumerate(chunks):
-            messages = [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=f"请扫描以下文档内容：\n\n文件名：{file_name}（第{idx+1}/{len(chunks)}部分）\n\n内容：\n{chunk}")
-            ]
-            response = await llm.ainvoke(messages)
-            responses.append(response)
-            logger.debug(f"完成扫描 {file_name} 的第 {idx+1}/{len(chunks)} 部分")
-        
-        # 合并分片结果
-        merged_result = {
-            'has_sensitive': False,
-            'sensitive_count': 0,
-            'sensitive_items': [],
-            'summary': f'大文件分{len(chunks)}部分扫描'
-        }
-        
-        all_summaries = []
-        for idx, response in enumerate(responses):
-            try:
-                chunk_result = json_parser.parse(response.content)
-                
-                if chunk_result.get('has_sensitive'):
-                    merged_result['has_sensitive'] = True
-                    merged_result['sensitive_count'] += chunk_result.get('sensitive_count', 0)
-                    
-                    # 添加敏感项，标注来源分片
-                    for item in chunk_result.get('sensitive_items', []):
-                        item['chunk'] = idx + 1
-                        merged_result['sensitive_items'].append(item)
-                
-                if chunk_result.get('summary'):
-                    all_summaries.append(f"第{idx+1}部分: {chunk_result['summary']}")
-                    
-            except Exception as e:
-                logger.error(f"解析第{idx+1}部分结果失败: {e}")
-        
-        # 限制敏感信息项数量
-        if len(merged_result['sensitive_items']) > 10:
-            merged_result['sensitive_items'] = merged_result['sensitive_items'][:10]
-            merged_result['summary'] += f"（仅显示前10个敏感信息）"
-        
-        # 合并摘要
-        if all_summaries:
-            merged_result['summary'] = " | ".join(all_summaries[:3])
-            if len(all_summaries) > 3:
-                merged_result['summary'] += f" 等{len(all_summaries)}部分"
-        
-        return {
-            'success': True,
-            'result': merged_result
-        }
-        
-    except Exception as e:
-        logger.error(f"LLM扫描失败: {str(e)}")
-        return {
-            'success': False,
-            'error': f'扫描失败: {str(e)}'
-        }
-
-
 async def scan_content_with_langextract(content: str, file_name: str = "未知文件") -> Dict[str, Any]:
     """使用LangExtract扫描内容中的敏感信息"""
     try:
@@ -415,17 +248,11 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
             'error': file_data['error']
         }
     
-    # 根据配置选择扫描方法
-    if USE_LANGEXTRACT and langextract_scanner:
-        scan_result = await scan_content_with_langextract(
-            file_data['content'], 
-            file_data['file_name']
-        )
-    else:
-        scan_result = await scan_content_with_llm(
-            file_data['content'], 
-            file_data['file_name']
-        )
+    # 使用LangExtract扫描
+    scan_result = await scan_content_with_langextract(
+        file_data['content'], 
+        file_data['file_name']
+    )
     
     if not scan_result['success']:
         return {
@@ -444,7 +271,7 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
         'char_count': file_data.get('char_count', 0),
         'success': True,
         'result': scan_result['result'],
-        'langextract_result': scan_result.get('langextract_result')  # 如果使用LangExtract
+        'langextract_result': scan_result.get('langextract_result')  # LangExtract原始结果
     }
 
 
@@ -469,19 +296,13 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
         # 统一使用批量处理逻辑（无论是1个还是多个文件）
         output = ""
         
-        # 获取引擎信息
-        engine_info = get_scan_engine_info()
-        
         # 显示扫描报告头部
         output = f"扫描报告\n"
         output += f"{'='*50}\n"
         output += f"扫描文件数: {len(file_ids)}\n"
         output += f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        output += f"扫描引擎: {engine_info['engine']}"
-        if engine_info['langextract_enabled']:
-            output += f" ({engine_info['langextract_provider']})"
-        output += "\n"
-        output += f"使用模型: {engine_info.get('langextract_model') or engine_info.get('langchain_model')}\n"
+        output += f"扫描引擎: LangExtract ({LANGEXTRACT_PROVIDER})\n"
+        output += f"使用模型: {LANGEXTRACT_MODEL}\n"
         output += f"{'='*50}\n\n"
         
         # 使用信号量控制并发度
@@ -566,8 +387,8 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
             "total_files": len(file_ids),
             "total_sensitive": total_sensitive_count,
             "files_with_sensitive": files_with_sensitive,
-            "engine": engine_info['engine'],
-            "model": engine_info.get('langextract_model') or engine_info.get('langchain_model'),
+            "engine": "LangExtract",
+            "model": LANGEXTRACT_MODEL,
             "items": [],
             "statistics": {}
         }
@@ -611,8 +432,8 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
                 output += f"   {report_id}\n"
                 logger.info(f"扫描报告已生成: {report_path}")
                 
-                # 如果使用LangExtract，仍然可以生成HTML可视化
-                if enable_visualization and USE_LANGEXTRACT and langextract_results:
+                # 生成LangExtract HTML可视化报告
+                if enable_visualization and langextract_results:
                     try:
                         viz_filename = f"scan_viz_{timestamp}.html"
                         viz_path = os.path.join(VISUALIZATION_OUTPUT_DIR, viz_filename)
@@ -640,40 +461,19 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
         return f"错误: 扫描过程中发生异常 - {str(e)}"
 
 
-def get_scan_engine_info() -> Dict[str, Any]:
-    """
-    获取当前扫描引擎信息（内部方法）
-    
-    Returns:
-        扫描引擎配置信息字典
-    """
-    return {
-        "engine": "LangExtract" if USE_LANGEXTRACT else "LangChain",
-        "langextract_enabled": USE_LANGEXTRACT,
-        "langextract_provider": LANGEXTRACT_PROVIDER if USE_LANGEXTRACT else None,
-        "langextract_model": LANGEXTRACT_MODEL if USE_LANGEXTRACT else None,
-        "langextract_base_url": LANGEXTRACT_BASE_URL if USE_LANGEXTRACT and LANGEXTRACT_PROVIDER == 'custom' else None,
-        "langchain_model": LLM_MODEL if not USE_LANGEXTRACT else None,
-        "chunk_size": CHUNK_SIZE,
-        "file_concurrency": FILE_CONCURRENCY,
-        "visualization_enabled": USE_LANGEXTRACT,
-        "visualization_output_dir": VISUALIZATION_OUTPUT_DIR if USE_LANGEXTRACT else None
-    }
-
-
 if __name__ == "__main__":
     # 启动服务器
     port = config.get('port', 3008)
     logger.info(f"Starting Sensitive Data Scanner MCP Server V2 on port {port}")
     
     # 显示引擎配置信息
-    engine_info = get_scan_engine_info()
-    logger.info(f"扫描引擎: {engine_info['engine']}")
-    logger.info(f"模型: {engine_info.get('langextract_model') or engine_info.get('langchain_model')}")
-    if engine_info['langextract_enabled']:
-        logger.info(f"提供商: {engine_info['langextract_provider']}")
-        logger.info(f"可视化: 已启用 (输出目录: {engine_info['visualization_output_dir']})")
-    logger.info(f"分块大小: {engine_info['chunk_size']} 字符")
-    logger.info(f"文件并发度: {engine_info['file_concurrency']}")
+    logger.info(f"扫描引擎: LangExtract")
+    logger.info(f"模型: {LANGEXTRACT_MODEL}")
+    logger.info(f"提供商: {LANGEXTRACT_PROVIDER}")
+    if LANGEXTRACT_PROVIDER == 'custom':
+        logger.info(f"API地址: {LANGEXTRACT_BASE_URL}")
+    logger.info(f"可视化: 已启用 (输出目录: {VISUALIZATION_OUTPUT_DIR})")
+    logger.info(f"分块大小: {CHUNK_SIZE} 字符")
+    logger.info(f"文件并发度: {FILE_CONCURRENCY}")
     
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)

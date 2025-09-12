@@ -90,15 +90,11 @@ servers:
     config:
       document_storage_path: "/tmp/documents/uploads"  # 文档存储路径
       # LangExtract 配置
-      use_langextract: true  # 是否使用 LangExtract
       langextract_provider: "custom"  # 提供商: gemini, openai, custom
       langextract_model: "Qwen/QwQ-32B"  # 模型ID
       langextract_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm"
       langextract_base_url: "https://api.siliconflow.cn/v1"  # SiliconFlow API地址
       visualization_output_dir: "/tmp/scan_visualizations"  # 可视化报告输出目录
-      # 原 LangChain 配置（当 use_langextract=false 时使用）
-      llm_api_base: "https://api.siliconflow.cn/v1"
-      llm_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm" 
-      llm_model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      # 扫描配置
       chunk_size: 10000  # 扫描分块大小（字符数），默认10000
       file_concurrency: 3  # 文件并发度（同时扫描的文件数），默认3
