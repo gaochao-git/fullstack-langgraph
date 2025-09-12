@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from src.shared.db.models import now_shanghai
 import uuid
+import json
+import os
 
 from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
@@ -791,4 +793,67 @@ async def extract_image_content(
         raise
     except Exception as e:
         logger.error(f"提取图片内容失败: {e}")
-        raise BusinessException(f"处理失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+        raise BusinessException("提取图片内容失败", ResponseCode.INTERNAL_ERROR)
+
+
+# ==================== 报告访问路由 ====================
+
+@router.get("/v1/extract/{filename}")
+async def get_extract_result(
+    filename: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    获取数据提取结果文件
+    
+    Args:
+        filename: 文件名
+    
+    Returns:
+        提取结果文件内容
+    """
+    from fastapi.responses import HTMLResponse, FileResponse
+    import os
+    
+    # 检查认证（支持JWT和Cookie认证）
+    if not current_user:
+        raise BusinessException("需要登录才能查看提取结果", ResponseCode.UNAUTHORIZED)
+    
+    # 构建文件路径
+    # 敏感数据扫描结果路径
+    extract_path = f"/tmp/scan_visualizations/{filename}"
+    
+    # 检查文件是否存在
+    if not os.path.exists(extract_path):
+        raise BusinessException("提取结果文件不存在", ResponseCode.NOT_FOUND)
+    
+    # 检查文件扩展名
+    if filename.endswith('.json'):
+        # JSON提取结果数据
+        with open(extract_path, 'r', encoding='utf-8') as f:
+            extract_data = json.load(f)
+        return success_response(data=extract_data, msg="获取提取结果成功")
+    elif filename.endswith('.html'):
+        # HTML文件直接返回内容
+        with open(extract_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # 添加允许iframe嵌入的头部
+        return HTMLResponse(
+            content=content,
+            headers={
+                # 移除 X-Frame-Options，使用更灵活的 CSP
+                # "X-Frame-Options": "SAMEORIGIN",  # 这个会限制只能同源
+                # 允许同源和所有 HTTP/HTTPS 的 localhost/127.0.0.1
+                # 生产环境通常也是同源访问，所以 'self' 就足够了
+                "Content-Security-Policy": "frame-ancestors 'self' http://localhost:* https://localhost:* http://127.0.0.1:* https://127.0.0.1:*"
+            }
+        )
+    elif filename.endswith('.jsonl'):
+        # JSONL文件作为下载返回
+        return FileResponse(
+            report_path,
+            media_type='application/jsonl',
+            filename=filename
+        )
+    else:
+        raise BusinessException("不支持的文件格式", ResponseCode.BAD_REQUEST)

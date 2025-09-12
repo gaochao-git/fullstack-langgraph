@@ -1,9 +1,10 @@
 import { Typography, theme } from 'antd';
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import { MermaidDiagram } from './MermaidDiagram';
+import { ExtractModal } from './ExtractModal';
 
 const md: MarkdownIt = new MarkdownIt({ 
   html: true, 
@@ -59,6 +60,10 @@ const isToolOutput = (content: string): boolean => {
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const { token } = theme.useToken();
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportType, setReportType] = useState<string>('');
+  const [reportPath, setReportPath] = useState<string>('');
+  const [reportTitle, setReportTitle] = useState<string>('查看报告');
   
   // 根据主题动态设置表格渲染规则
   md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="markdown-table">';
@@ -261,18 +266,19 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     return null;
   }
 
-  // 分割内容为 Markdown 和 Mermaid 部分
+  // 分割内容为 Markdown、Mermaid 和报告链接部分
   const parts = useMemo(() => {
-    const result: Array<{ type: 'markdown' | 'mermaid'; content: string; id?: string }> = [];
+    const result: Array<{ type: 'markdown' | 'mermaid' | 'report'; content: string; id?: string; reportData?: { type: string; path: string; title: string } }> = [];
     let currentContent = processedContent;
     let mermaidIndex = 0;
     
-    // 正则匹配 mermaid 代码块
-    const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+    // 合并的正则表达式，同时匹配 mermaid 代码块和报告标识符
+    // 报告标识符格式：[REPORT:type:path:title] 或 REPORT:type:path:title
+    const combinedRegex = /```mermaid\n([\s\S]*?)```|\[REPORT:([^:]+):([^:]+):([^\]]+)\]|(?<!\[)REPORT:([^:]+):([^:\s]+)(?::([^\s\]]+))?/g;
     let lastIndex = 0;
     let match;
     
-    while ((match = mermaidRegex.exec(processedContent)) !== null) {
+    while ((match = combinedRegex.exec(processedContent)) !== null) {
       // 添加之前的 Markdown 内容
       if (match.index > lastIndex) {
         const mdContent = processedContent.slice(lastIndex, match.index);
@@ -281,12 +287,36 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
         }
       }
       
-      // 添加 Mermaid 图表
-      result.push({
-        type: 'mermaid',
-        content: match[1].trim(),
-        id: `mermaid-${mermaidIndex++}`
-      });
+      if (match[0].startsWith('```mermaid')) {
+        // 添加 Mermaid 图表
+        result.push({
+          type: 'mermaid',
+          content: match[1].trim(),
+          id: `mermaid-${mermaidIndex++}`
+        });
+      } else if (match[0].startsWith('[REPORT:')) {
+        // 添加带方括号的报告链接
+        result.push({
+          type: 'report',
+          content: match[0],
+          reportData: {
+            type: match[2],
+            path: match[3],
+            title: match[4]
+          }
+        });
+      } else if (match[0].startsWith('REPORT:')) {
+        // 添加不带方括号的报告链接
+        result.push({
+          type: 'report',
+          content: match[0],
+          reportData: {
+            type: match[5],
+            path: match[6],
+            title: match[7] || '查看完整可视化报告'  // 如果没有标题，使用默认值
+          }
+        });
+      }
       
       lastIndex = match.index + match[0].length;
     }
@@ -314,14 +344,64 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
               dangerouslySetInnerHTML={{ __html: md.render(part.content) }} 
             />
           );
-        } else {
+        } else if (part.type === 'mermaid') {
           return (
             <div key={part.id} className="my-4">
               <MermaidDiagram id={part.id!} chart={part.content} />
             </div>
           );
+        } else if (part.type === 'report' && part.reportData) {
+          // 渲染报告链接按钮
+          return (
+            <div key={`report-${index}`} className="my-2">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  // 设置报告信息
+                  setReportType(part.reportData.type);
+                  setReportPath(part.reportData.path);
+                  setReportTitle(part.reportData.title);
+                  setReportVisible(true);
+                }}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer"
+                style={{
+                  backgroundColor: token.colorPrimaryBg,
+                  border: `1px solid ${token.colorPrimaryBorder}`,
+                  color: token.colorPrimary,
+                  outline: 'none'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = token.colorPrimaryBgHover;
+                  e.currentTarget.style.borderColor = token.colorPrimaryBorderHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = token.colorPrimaryBg;
+                  e.currentTarget.style.borderColor = token.colorPrimaryBorder;
+                }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>{part.reportData.title}</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </button>
+            </div>
+          );
         }
+        return null;
       })}
+      
+      {/* 通用报告查看Modal */}
+      <ExtractModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        reportType={reportType}
+        reportPath={reportPath}
+        title={reportTitle}
+      />
     </Typography>
   );
 };

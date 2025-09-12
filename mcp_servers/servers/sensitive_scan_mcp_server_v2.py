@@ -449,13 +449,13 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def scan_document_v2(file_ids: List[str], enable_visualization: bool = False) -> str:
+async def scan_document_v2(file_ids: List[str], enable_visualization: bool = True) -> str:
     """
     扫描文档中的敏感信息
     
     Args:
         file_ids: 文件ID列表（文件系统中的file_id列表）
-        enable_visualization: 是否生成可视化报告（仅在使用LangExtract时有效）
+        enable_visualization: 是否生成可视化报告（仅在使用LangExtract时有效，默认为True）
     
     Returns:
         扫描结果报告
@@ -469,12 +469,19 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Fal
         # 统一使用批量处理逻辑（无论是1个还是多个文件）
         output = ""
         
+        # 获取引擎信息
+        engine_info = get_scan_engine_info()
+        
         # 显示扫描报告头部
         output = f"扫描报告\n"
         output += f"{'='*50}\n"
         output += f"扫描文件数: {len(file_ids)}\n"
         output += f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        output += f"扫描引擎: {'LangExtract (' + LANGEXTRACT_PROVIDER + ')' if USE_LANGEXTRACT else 'LangChain'}\n"
+        output += f"扫描引擎: {engine_info['engine']}"
+        if engine_info['langextract_enabled']:
+            output += f" ({engine_info['langextract_provider']})"
+        output += "\n"
+        output += f"使用模型: {engine_info.get('langextract_model') or engine_info.get('langchain_model')}\n"
         output += f"{'='*50}\n\n"
         
         # 使用信号量控制并发度
@@ -553,27 +560,78 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Fal
         output += f"   - 包含敏感信息的文件: {files_with_sensitive}\n"
         output += f"   - 敏感信息总数: {total_sensitive_count}\n"
         
-        # 生成可视化报告（如果启用且使用LangExtract）
-        if enable_visualization and USE_LANGEXTRACT and langextract_results:
+        # 准备报告数据
+        report_data = {
+            "scan_time": datetime.now().isoformat(),
+            "total_files": len(file_ids),
+            "total_sensitive": total_sensitive_count,
+            "files_with_sensitive": files_with_sensitive,
+            "engine": engine_info['engine'],
+            "model": engine_info.get('langextract_model') or engine_info.get('langchain_model'),
+            "items": [],
+            "statistics": {}
+        }
+        
+        # 收集所有敏感信息项
+        for scan_data in scan_results:
+            if isinstance(scan_data, dict) and scan_data.get('success'):
+                result = scan_data.get('result', {})
+                file_name = scan_data.get('file_name', '未知文件')
+                
+                for item in result.get('sensitive_items', []):
+                    report_item = {
+                        "type": item.get('type', '未知类型'),
+                        "masked_value": item.get('masked_value', '***'),
+                        "context": item.get('context', ''),
+                        "file": file_name
+                    }
+                    report_data["items"].append(report_item)
+                    
+                    # 统计
+                    item_type = item.get('type', '未知类型')
+                    if item_type not in report_data["statistics"]:
+                        report_data["statistics"][item_type] = 0
+                    report_data["statistics"][item_type] += 1
+        
+        # 保存报告数据为JSON
+        if total_sensitive_count > 0:
             try:
                 os.makedirs(VISUALIZATION_OUTPUT_DIR, exist_ok=True)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                viz_path = os.path.join(VISUALIZATION_OUTPUT_DIR, f"scan_report_{timestamp}.html")
+                report_filename = f"scan_report_{timestamp}.json"
+                report_path = os.path.join(VISUALIZATION_OUTPUT_DIR, report_filename)
                 
-                loop = asyncio.get_event_loop()
-                html_path = await loop.run_in_executor(
-                    None,
-                    langextract_scanner.generate_visualization,
-                    langextract_results,
-                    viz_path
-                )
+                with open(report_path, 'w', encoding='utf-8') as f:
+                    json.dump(report_data, f, ensure_ascii=False, indent=2)
                 
-                if html_path:
-                    output += f"\n可视化报告已生成: {html_path}\n"
-                    logger.info(f"可视化报告已生成: {html_path}")
+                # 生成报告标识符
+                report_id = f"[REPORT:SENSITIVE_SCAN:{report_filename}:查看完整扫描报告]"
+                output += f"\n{'='*50}\n"
+                output += f"📊 扫描报告:\n"
+                output += f"   {report_id}\n"
+                logger.info(f"扫描报告已生成: {report_path}")
+                
+                # 如果使用LangExtract，仍然可以生成HTML可视化
+                if enable_visualization and USE_LANGEXTRACT and langextract_results:
+                    try:
+                        viz_filename = f"scan_viz_{timestamp}.html"
+                        viz_path = os.path.join(VISUALIZATION_OUTPUT_DIR, viz_filename)
+                        
+                        loop = asyncio.get_event_loop()
+                        html_path = await loop.run_in_executor(
+                            None,
+                            langextract_scanner.generate_visualization,
+                            langextract_results,
+                            viz_path
+                        )
+                        
+                        if html_path:
+                            logger.info(f"LangExtract可视化报告已生成: {html_path}")
+                    except Exception as e:
+                        logger.error(f"生成LangExtract可视化报告失败: {str(e)}")
             except Exception as e:
-                logger.error(f"生成可视化报告失败: {str(e)}")
-                output += f"\n生成可视化报告失败: {str(e)}\n"
+                logger.error(f"保存报告数据失败: {str(e)}")
+                output += f"\n保存报告失败: {str(e)}\n"
         
         return output.rstrip()  # 去掉末尾换行
         
@@ -582,15 +640,14 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Fal
         return f"错误: 扫描过程中发生异常 - {str(e)}"
 
 
-@mcp.tool()
-async def get_scan_engine_info_v2() -> str:
+def get_scan_engine_info() -> Dict[str, Any]:
     """
-    获取当前扫描引擎信息
+    获取当前扫描引擎信息（内部方法）
     
     Returns:
-        扫描引擎配置信息
+        扫描引擎配置信息字典
     """
-    info = {
+    return {
         "engine": "LangExtract" if USE_LANGEXTRACT else "LangChain",
         "langextract_enabled": USE_LANGEXTRACT,
         "langextract_provider": LANGEXTRACT_PROVIDER if USE_LANGEXTRACT else None,
@@ -602,16 +659,21 @@ async def get_scan_engine_info_v2() -> str:
         "visualization_enabled": USE_LANGEXTRACT,
         "visualization_output_dir": VISUALIZATION_OUTPUT_DIR if USE_LANGEXTRACT else None
     }
-    
-    return json.dumps(info, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":
     # 启动服务器
     port = config.get('port', 3008)
     logger.info(f"Starting Sensitive Data Scanner MCP Server V2 on port {port}")
-    if USE_LANGEXTRACT:
-        logger.info(f"扫描引擎: LangExtract (提供商: {LANGEXTRACT_PROVIDER}, 模型: {LANGEXTRACT_MODEL})")
-    else:
-        logger.info(f"扫描引擎: LangChain (模型: {LLM_MODEL})")
+    
+    # 显示引擎配置信息
+    engine_info = get_scan_engine_info()
+    logger.info(f"扫描引擎: {engine_info['engine']}")
+    logger.info(f"模型: {engine_info.get('langextract_model') or engine_info.get('langchain_model')}")
+    if engine_info['langextract_enabled']:
+        logger.info(f"提供商: {engine_info['langextract_provider']}")
+        logger.info(f"可视化: 已启用 (输出目录: {engine_info['visualization_output_dir']})")
+    logger.info(f"分块大小: {engine_info['chunk_size']} 字符")
+    logger.info(f"文件并发度: {engine_info['file_concurrency']}")
+    
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
