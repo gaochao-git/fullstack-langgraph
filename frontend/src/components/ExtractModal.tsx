@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Table, Tag, Space, Spin, Typography, message, Input } from 'antd';
-import { FileTextOutlined, AlertOutlined } from '@ant-design/icons';
+import { Modal, Table, Tag, Space, Spin, Typography, message, Input, Button } from 'antd';
+import { FileTextOutlined, AlertOutlined, DownloadOutlined } from '@ant-design/icons';
 import { omind_get, omind_post } from '@/utils/base_api';
+import { fileApi } from '@/services/fileApi';
 
 const { TextArea } = Input;
 
@@ -173,7 +174,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
     {
       title: '文件名',
       key: 'fileName',
-      width: 250,
+      width: 300,
       render: (_: any, record: any) => {
         // 获取file_id，兼容新旧数据格式
         let fileId = record.file_id;
@@ -184,11 +185,46 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
         // 如果有fileId且在nameMap中有对应的文件名，使用真实文件名
         const fileName = fileId && fileNameMap[fileId] ? fileNameMap[fileId] : (record.file || '-');
         
+        // 下载文件函数
+        const handleDownload = async () => {
+          if (!fileId) {
+            message.error('无法下载：文件ID不存在');
+            return;
+          }
+          
+          try {
+            const blob = await fileApi.downloadDocument(fileId);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('下载文件失败:', error);
+            message.error('下载文件失败');
+          }
+        };
+        
         return (
-          <Typography.Text ellipsis={{ tooltip: fileName }} style={{ fontSize: '12px' }}>
-            <FileTextOutlined style={{ marginRight: 4 }} />
-            {fileName}
-          </Typography.Text>
+          <Space size={4}>
+            <Typography.Text ellipsis={{ tooltip: fileName }} style={{ fontSize: '12px', maxWidth: '200px' }}>
+              <FileTextOutlined style={{ marginRight: 4 }} />
+              {fileName}
+            </Typography.Text>
+            {fileId && (
+              <Button
+                type="link"
+                size="small"
+                icon={<DownloadOutlined />}
+                onClick={handleDownload}
+                style={{ padding: '0 4px' }}
+                title="下载原始文件"
+              />
+            )}
+          </Space>
         );
       }
     },
