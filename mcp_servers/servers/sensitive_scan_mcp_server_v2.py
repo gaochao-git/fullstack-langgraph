@@ -202,38 +202,15 @@ async def scan_content_with_langextract(content: str, file_name: str = "未知�
             file_name
         )
         
-        if result["success"]:
-            # 转换为原有格式
-            llm_format_result = {
-                'has_sensitive': result['has_sensitive'],
-                'sensitive_count': result['sensitive_count'],
-                'sensitive_items': [
-                    {
-                        'type': item['type'],
-                        'masked_value': item['masked_value'],
-                        'context': item['context']
-                    }
-                    for item in result.get('sensitive_items', [])
-                ],
-                'summary': f"LangExtract扫描，发现{result['sensitive_count']}个敏感信息"
-            }
-            
-            return {
-                'success': True,
-                'result': llm_format_result,
-                'langextract_result': result  # 保留原始结果用于可视化
-            }
-        else:
-            return {
-                'success': False,
-                'error': result.get('error', '未知错误')
-            }
+        # 直接返回Scanner的结果
+        return result
             
     except Exception as e:
         logger.error(f"LangExtract扫描失败: {str(e)}")
         return {
             'success': False,
-            'error': f'扫描失败: {str(e)}'
+            'error': str(e),
+            'document_name': file_name
         }
 
 
@@ -262,33 +239,31 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
             'error': scan_result.get('error', '未知错误')
         }
     
+    # 合并文件信息和扫描结果
     return {
+        **scan_result,  # 直接使用Scanner返回的所有字段
         'file_id': file_id,
-        'file_name': file_data['file_name'],
+        'file_name': file_data['file_name'],  # 添加file_name以保持兼容性
         'file_type': file_data['file_type'],
         'file_size': file_data['file_size'],
         'image_count': file_data.get('image_count', 0),
-        'char_count': file_data.get('char_count', 0),
-        'success': True,
-        'result': scan_result['result'],
-        'langextract_result': scan_result.get('langextract_result')  # LangExtract原始结果
+        'char_count': file_data.get('char_count', 0)
     }
 
 
 @mcp.tool()
-async def scan_document_v2(file_ids: List[str], enable_visualization: bool = True) -> str:
+async def scan_document_v2(file_ids: List[str]) -> str:
     """
     扫描文档中的敏感信息
     
     Args:
         file_ids: 文件ID列表（文件系统中的file_id列表）
-        enable_visualization: 是否生成可视化报告（仅在使用LangExtract时有效，默认为True）
     
     Returns:
-        扫描结果报告
+        扫描结果报告（包含可视化报告链接）
     """
     try:
-        logger.info(f"开始扫描 {len(file_ids)} 个文件，可视化: {enable_visualization}")
+        logger.info(f"开始扫描 {len(file_ids)} 个文件")
         
         if not file_ids:
             return "错误: 未提供文件ID"
@@ -335,9 +310,7 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
                 output += "="*50 + "\n"
                 continue
             
-            result = scan_data.get('result', {})
-            
-            # 收集LangExtract结果用于可视化
+            # 收集LangExtract结果用于可视化（如果启用了可视化）
             if scan_data.get('langextract_result'):
                 langextract_results.append(scan_data['langextract_result'])
             
@@ -346,25 +319,28 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
             
             # 判断解析状态
             parse_status = "内容完整"
-            if result.get('summary', '').find('解析失败') >= 0:
-                parse_status = "内容解析异常"
             
             # 输出文件结果
-            output += f"\n内容源{idx}: {scan_data.get('file_name', '未知文件')}\n"
+            output += f"\n内容源{idx}: {scan_data.get('document_name', scan_data.get('file_name', '未知文件'))}\n"
             output += f"1.文档信息：{file_size_kb:.1f}KB、文字{scan_data.get('char_count', 0)}"
             if scan_data.get('image_count', 0) > 0:
                 output += f"(包含图片{scan_data['image_count']}张的解析内容)"
             output += "\n"
             output += f"2.文档解析状态：{parse_status}\n"
-            output += f"3.文档摘要：{result.get('summary', '无摘要')[:100]}\n"
+            # 显示文档摘要
+            document_summary = scan_data.get('document_summary', '')
+            if document_summary:
+                output += f"3.文档摘要：{document_summary}\n"
+            else:
+                output += f"3.文档摘要：无摘要\n"
             output += f"4.敏感信息扫描结果："
             
-            if result.get('has_sensitive', False):
+            if scan_data.get('has_sensitive', False):
                 files_with_sensitive += 1
-                total_sensitive_count += result.get('sensitive_count', 0)
-                output += f"发现{result.get('sensitive_count', 0)}个敏感信息\n"
+                total_sensitive_count += scan_data.get('sensitive_count', 0)
+                output += f"发现{scan_data.get('sensitive_count', 0)}个敏感信息\n"
                 # 最多展示3个
-                sensitive_items = result.get('sensitive_items', [])
+                sensitive_items = scan_data.get('sensitive_items', [])
                 for i, item in enumerate(sensitive_items[:3], 1):
                     output += f"  {i}) {item.get('type', '未知类型')}: {item.get('masked_value', '***')}\n"
                 if len(sensitive_items) > 3:
@@ -395,11 +371,11 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
         
         # 收集所有敏感信息项
         for scan_data in scan_results:
-            if isinstance(scan_data, dict) and scan_data.get('success'):
-                result = scan_data.get('result', {})
-                file_name = scan_data.get('file_name', '未知文件')
+            if isinstance(scan_data, dict) and scan_data.get('success') and scan_data.get('has_sensitive'):
+                file_name = scan_data.get('document_name', scan_data.get('file_name', '未知文件'))
                 
-                for item in result.get('sensitive_items', []):
+                # 直接使用Scanner返回的sensitive_items
+                for item in scan_data.get('sensitive_items', []):
                     report_item = {
                         "type": item.get('type', '未知类型'),
                         "masked_value": item.get('masked_value', '***'),
@@ -408,12 +384,13 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
                         "file_id": scan_data.get('file_id', '')  # 添加file_id
                     }
                     report_data["items"].append(report_item)
-                    
-                    # 统计
-                    item_type = item.get('type', '未知类型')
-                    if item_type not in report_data["statistics"]:
-                        report_data["statistics"][item_type] = 0
-                    report_data["statistics"][item_type] += 1
+                
+                # 直接使用Scanner返回的sensitive_stats统计
+                if scan_data.get('sensitive_stats'):
+                    for item_type, count in scan_data['sensitive_stats'].items():
+                        if item_type not in report_data["statistics"]:
+                            report_data["statistics"][item_type] = 0
+                        report_data["statistics"][item_type] += count
         
         # 保存报告数据为JSON
         if total_sensitive_count > 0:
@@ -434,7 +411,7 @@ async def scan_document_v2(file_ids: List[str], enable_visualization: bool = Tru
                 logger.info(f"扫描报告已生成: {report_path}")
                 
                 # 生成LangExtract HTML可视化报告
-                if enable_visualization and langextract_results:
+                if langextract_results:
                     try:
                         viz_filename = f"scan_viz_{timestamp}.html"
                         viz_path = os.path.join(VISUALIZATION_OUTPUT_DIR, viz_filename)

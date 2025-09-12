@@ -175,6 +175,17 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
+        # 文档摘要示例
+        examples.append(lx.data.ExampleData(
+            text="本公司2023年度财务报告显示，营业收入达到5000万元，同比增长20%。主要增长来自于新产品线的推出和市场拓展。",
+            extractions=[
+                lx.data.Extraction(
+                    extraction_class="文档摘要",
+                    extraction_text="公司2023年营收5000万元，同比增长20%，主要得益于新产品和市场拓展"
+                )
+            ]
+        ))
+        
         return examples
     
     def scan_text(self, text: str, document_name: str = "document") -> Dict[str, Any]:
@@ -190,18 +201,20 @@ class LangExtractSensitiveScanner:
         """
         try:
             # 创建提示词
-            prompt = """识别文本中的以下类型敏感信息：
+            prompt = """识别文本中的以下类型信息：
 1. 个人身份信息：身份证号、护照号、驾驶证号
 2. 联系方式：手机号、座机号、邮箱地址
 3. 金融信息：银行卡号、信用卡号、账号信息
 4. 账户凭据：用户名密码组合、API密钥、Token
 5. 网络信息：内网IP地址、服务器地址
 6. 其他敏感：社保号、车牌号、家庭住址
+7. 文档摘要：用一句话概括文档的主要内容（限50字以内）
 
 注意：
 - 单独的用户名不算敏感信息，只有用户名+密码的组合才算
 - 公开域名不算敏感信息
-- 需要根据上下文判断是否真的敏感"""
+- 需要根据上下文判断是否真的敏感
+- 文档摘要应该简洁准确地概括文档主题"""
             
             # 执行提取
             logger.info(f"开始扫描文档: {document_name} (使用 {self.provider} 提供商)")
@@ -355,9 +368,15 @@ class LangExtractSensitiveScanner:
             # 统计各类型敏感信息
             sensitive_stats = {}
             sensitive_items = []
+            document_summary = None  # 文档摘要
             
             for extraction in extractions:
-                # 统计
+                # 如果是文档摘要，单独处理
+                if extraction.extraction_class == "文档摘要":
+                    document_summary = extraction.extraction_text
+                    continue
+                
+                # 统计敏感信息
                 if extraction.extraction_class not in sensitive_stats:
                     sensitive_stats[extraction.extraction_class] = 0
                 sensitive_stats[extraction.extraction_class] += 1
@@ -412,12 +431,16 @@ class LangExtractSensitiveScanner:
                 })
             
             # 构建返回结果
+            # 注意：sensitive_count 不包括文档摘要
+            sensitive_count = len([e for e in extractions if e.extraction_class != "文档摘要"])
+            
             result = {
                 "success": True,
-                "has_sensitive": len(extractions) > 0,
-                "sensitive_count": len(extractions),
+                "has_sensitive": sensitive_count > 0,
+                "sensitive_count": sensitive_count,
                 "sensitive_stats": sensitive_stats,
                 "sensitive_items": sensitive_items,
+                "document_summary": document_summary,  # 添加文档摘要
                 "document_name": document_name,
                 "document_length": len(text),
                 "model_used": self.model_id
