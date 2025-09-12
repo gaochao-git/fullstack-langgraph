@@ -249,25 +249,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
             {/* 扫描统计信息 */}
             <Card style={{ marginBottom: 16 }}>
               <Row gutter={16}>
-                <Col span={4}>
-                  <Statistic
-                    title="扫描文件总数"
-                    value={(() => {
-                      // 使用Set去重计算实际的文件数量
-                      const uniqueFileIds = new Set();
-                      if (data.items && Array.isArray(data.items)) {
-                        data.items.forEach((item: any) => {
-                          if (item.file_id) {
-                            uniqueFileIds.add(item.file_id);
-                          }
-                        });
-                      }
-                      return uniqueFileIds.size || data.total_files || 0;
-                    })()}
-                    prefix={<FolderOpenOutlined />}
-                  />
-                </Col>
-                <Col span={4}>
+                <Col span={6}>
                   <Statistic
                     title="包含敏感信息的文件"
                     value={(() => {
@@ -307,7 +289,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     valueStyle={{ color: '#cf1322' }}
                   />
                 </Col>
-                <Col span={4}>
+                <Col span={5}>
                   <Statistic
                     title="扫描总字数"
                     value={(() => {
@@ -329,7 +311,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     })()}
                   />
                 </Col>
-                <Col span={4}>
+                <Col span={5}>
                   <Statistic
                     title="扫描总大小"
                     value={(() => {

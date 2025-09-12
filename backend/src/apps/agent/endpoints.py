@@ -943,7 +943,13 @@ async def get_extract_result(
                 for item in extract_data['items']:
                     file_id = item.get('file_id', '')
                     if file_id in file_metadata_map:
+                        # 保存原始的 image_count
+                        original_image_count = item.get('image_count', 0)
+                        # 更新其他元数据
                         item.update(file_metadata_map[file_id])
+                        # 恢复原始的 image_count（如果存在）
+                        if original_image_count > 0:
+                            item['image_count'] = original_image_count
         
         return success_response(data=extract_data, msg="获取提取结果成功")
     elif filename.endswith('.html'):
