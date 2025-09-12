@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Table, Tag, Space, Spin, Typography, message, Input, Button, Card, Row, Col, Statistic } from 'antd';
+import { Modal, Table, Tag, Space, Spin, Typography, message, Input, Button, Card, Row, Col, Statistic, ConfigProvider } from 'antd';
 import { FileTextOutlined, AlertOutlined, DownloadOutlined, FolderOpenOutlined, WarningOutlined, FileSearchOutlined, FileImageOutlined } from '@ant-design/icons';
 import { omind_get, omind_post } from '@/utils/base_api';
 import { fileApi } from '@/services/fileApi';
+import zhCN from 'antd/locale/zh_CN';
 
 const { TextArea } = Input;
 
@@ -381,15 +382,40 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
               )}
             </Card>
             
-            <Table
-              columns={columns}
-              dataSource={data.items.map((item: any, index: number) => ({ ...item, key: index }))}
-              pagination={{ 
-                pageSize: 10,
-                showTotal: (total) => `共 ${total} 条`
-              }}
-              size="small"
-            />
+            <ConfigProvider locale={zhCN}>
+              <Table
+                columns={columns}
+                dataSource={data.items.map((item: any, index: number) => ({ ...item, key: index }))}
+                pagination={{ 
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                  showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`,
+                  position: ['bottomRight'],
+                  responsive: true,
+                  showLessItems: false,
+                  showTitle: true,
+                  itemRender: (page, type, originalElement) => {
+                    if (type === 'prev') {
+                      return <a>上一页</a>;
+                    }
+                    if (type === 'next') {
+                      return <a>下一页</a>;
+                    }
+                    return originalElement;
+                  }
+                }}
+                size="small"
+                scroll={{ x: 'max-content' }}
+                locale={{
+                  filterTitle: '筛选',
+                  filterConfirm: '确定',
+                  filterReset: '重置',
+                  emptyText: '暂无数据'
+                }}
+              />
+            </ConfigProvider>
           </div>
         )}
       </Modal>
