@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Sensitive Data Scanner MCP Server
-敏感数据扫描MCP服务器
-使用LangChain调用大模型识别文档中的敏感信息
+Sensitive Data Scanner MCP Server V2
+敏感数据扫描MCP服务器 V2 版本
+集成 LangExtract 进行更精确的敏感信息提取和可视化
 """
 
 import json
@@ -17,11 +17,6 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from fastmcp import FastMCP
 from base_config import MCPServerConfig
-# LangChain imports
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import ChatPromptTemplate
 
 # 配置日志
 logging.basicConfig(
@@ -31,16 +26,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 创建MCP服务器实例
-mcp = FastMCP("Sensitive Data Scanner Server")
+mcp = FastMCP("Sensitive Data Scanner Server V2")
 
 # 加载配置
-config = MCPServerConfig('sensitive_scan_server')
+config = MCPServerConfig('sensitive_scan_server_v2')
 
-# 获取LLM配置
-# 优先从配置文件读取，其次从环境变量读取
-LLM_API_BASE = config.get('llm_api_base') or os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
-LLM_API_KEY = config.get('llm_api_key') or os.environ.get('DEEPSEEK_API_KEY', '')
-LLM_MODEL = config.get('llm_model') or os.environ.get('LLM_MODEL', 'deepseek-chat')
+# 获取配置
+USE_LANGEXTRACT = config.get('use_langextract', False)
+LANGEXTRACT_PROVIDER = config.get('langextract_provider', 'gemini')  # gemini, openai, custom
+LANGEXTRACT_MODEL = config.get('langextract_model', 'gemini-2.0-flash-exp')
+LANGEXTRACT_API_KEY = config.get('langextract_api_key', '')
+LANGEXTRACT_BASE_URL = config.get('langextract_base_url', '')  # 用于自定义API地址
+VISUALIZATION_OUTPUT_DIR = config.get('visualization_output_dir', '/tmp/scan_visualizations')
 
 # 获取分块大小配置（默认10000字符）
 CHUNK_SIZE = config.get('chunk_size', 10000)
@@ -52,23 +49,70 @@ FILE_CONCURRENCY = config.get('file_concurrency', 3)
 DOCUMENT_STORAGE_PATH = config.get('document_storage_path', '/tmp/documents/uploads')
 
 logger.info(f"文档存储路径配置: DOCUMENT_STORAGE_PATH = {DOCUMENT_STORAGE_PATH}")
-logger.info(f"路径是否存在: {os.path.exists(DOCUMENT_STORAGE_PATH)}")
+logger.info(f"使用 LangExtract: {USE_LANGEXTRACT}")
 
-# 初始化LangChain LLM
-llm = ChatOpenAI(
-    model=LLM_MODEL,
-    openai_api_base=LLM_API_BASE,
-    openai_api_key=LLM_API_KEY,
-    temperature=0.1,
-    timeout=60.0,
-    max_tokens=1000  # 敏感数据扫描输出限制
-)
+# 根据配置选择扫描器
+if USE_LANGEXTRACT:
+    try:
+        from langextract_sensitive_scanner import LangExtractSensitiveScanner
+        
+        # 准备API密钥
+        api_key = LANGEXTRACT_API_KEY
+        if not api_key:
+            # 根据提供商从环境变量读取
+            if LANGEXTRACT_PROVIDER == 'gemini':
+                api_key = os.environ.get('GOOGLE_API_KEY')
+            elif LANGEXTRACT_PROVIDER == 'openai' or LANGEXTRACT_PROVIDER == 'custom':
+                api_key = os.environ.get('OPENAI_API_KEY')
+        
+        langextract_scanner = LangExtractSensitiveScanner(
+            model_id=LANGEXTRACT_MODEL,
+            api_key=api_key,
+            provider=LANGEXTRACT_PROVIDER,
+            base_url=LANGEXTRACT_BASE_URL if LANGEXTRACT_PROVIDER == 'custom' else None,
+            enable_visualization=True  # 启用可视化以支持原生报告生成
+        )
+        logger.info(f"已启用 LangExtract 扫描器 (提供商: {LANGEXTRACT_PROVIDER}, 模型: {LANGEXTRACT_MODEL})")
+    except ImportError as e:
+        logger.error(f"无法导入 LangExtract: {str(e)}")
+        logger.error("请确保 langextract_sensitive_scanner.py 在同目录下")
+        # 强制使用 LangExtract，不回退
+        raise ImportError(f"必须使用 LangExtract 但导入失败: {str(e)}")
+    except Exception as e:
+        logger.error(f"初始化 LangExtract 扫描器失败: {str(e)}")
+        # 强制使用 LangExtract，不回退
+        raise Exception(f"必须使用 LangExtract 但初始化失败: {str(e)}")
+else:
+    langextract_scanner = None
 
-# JSON输出解析器
-json_parser = JsonOutputParser()
-
-# 默认扫描提示词
-SYSTEM_PROMPT = """你是一个专业的敏感数据扫描助手。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
+# 如果不使用 LangExtract，则使用原有的 LangChain 实现
+if not USE_LANGEXTRACT:
+    # LangChain imports
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+    
+    # 获取LLM配置
+    LLM_API_BASE = config.get('llm_api_base') or os.environ.get('DEEPSEEK_BASE_URL', 'https://api.deepseek.com/v1')
+    LLM_API_KEY = config.get('llm_api_key') or os.environ.get('DEEPSEEK_API_KEY', '')
+    LLM_MODEL = config.get('llm_model') or os.environ.get('LLM_MODEL', 'deepseek-chat')
+    
+    # 初始化LangChain LLM
+    llm = ChatOpenAI(
+        model=LLM_MODEL,
+        openai_api_base=LLM_API_BASE,
+        openai_api_key=LLM_API_KEY,
+        temperature=0.1,
+        timeout=60.0,
+        max_tokens=1000
+    )
+    
+    # JSON输出解析器
+    json_parser = JsonOutputParser()
+    
+    # 默认扫描提示词
+    SYSTEM_PROMPT = """你是一个专业的敏感数据扫描助手。你的任务是扫描文本中的敏感信息并生成脱敏后的安全报告。
 
 需要识别的敏感信息类型：
 1. 个人身份信息：身份证号、护照号、驾驶证号
@@ -114,7 +158,6 @@ SYSTEM_PROMPT = """你是一个专业的敏感数据扫描助手。你的任务�
 
 async def read_content_from_file(file_path: str) -> str:
     """从文件读取内容"""
-    # 尝试不同的编码
     encodings = ['utf-8', 'gbk', 'gb2312', 'cp1252', 'iso-8859-1']
     
     for encoding in encodings:
@@ -156,7 +199,6 @@ async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
         
         # 查找原始文件和解析后的文件
         original_file_pattern = f"{file_id}.*"
-        # 使用与后端一致的命名规则：{file_id}.parse.txt
         parsed_file_path = base_path / f"{file_id}.parse.txt"
         
         # 获取文件元数据
@@ -168,7 +210,6 @@ async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
         # 查找原始文件获取文件信息
         if not file_name.startswith("document_"):
             for file_path in base_path.glob(original_file_pattern):
-                # 排除解析文件
                 if not str(file_path).endswith('.parse.txt'):
                     file_name = file_path.name
                     file_type = file_path.suffix[1:] if file_path.suffix else 'unknown'
@@ -227,9 +268,8 @@ async def get_file_content_from_filesystem(file_id: str) -> Dict[str, Any]:
 
 
 async def scan_content_with_llm(content: str, file_name: str = "未知文件") -> Dict[str, Any]:
-    """使用LLM扫描内容中的敏感信息"""
+    """使用LLM扫描内容中的敏感信息（原有LangChain实现）"""
     try:
-        # 使用配置的分片大小
         max_chunk_size = CHUNK_SIZE
         
         # 如果内容较短，直接扫描
@@ -317,6 +357,53 @@ async def scan_content_with_llm(content: str, file_name: str = "未知文件") -
         }
 
 
+async def scan_content_with_langextract(content: str, file_name: str = "未知文件") -> Dict[str, Any]:
+    """使用LangExtract扫描内容中的敏感信息"""
+    try:
+        # 使用同步方法（因为langextract目前是同步的）
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, 
+            langextract_scanner.scan_text,
+            content,
+            file_name
+        )
+        
+        if result["success"]:
+            # 转换为原有格式
+            llm_format_result = {
+                'has_sensitive': result['has_sensitive'],
+                'sensitive_count': result['sensitive_count'],
+                'sensitive_items': [
+                    {
+                        'type': item['type'],
+                        'masked_value': item['masked_value'],
+                        'context': item['context']
+                    }
+                    for item in result.get('sensitive_items', [])
+                ],
+                'summary': f"LangExtract扫描，发现{result['sensitive_count']}个敏感信息"
+            }
+            
+            return {
+                'success': True,
+                'result': llm_format_result,
+                'langextract_result': result  # 保留原始结果用于可视化
+            }
+        else:
+            return {
+                'success': False,
+                'error': result.get('error', '未知错误')
+            }
+            
+    except Exception as e:
+        logger.error(f"LangExtract扫描失败: {str(e)}")
+        return {
+            'success': False,
+            'error': f'扫描失败: {str(e)}'
+        }
+
+
 async def scan_single_file(file_id: str) -> Dict[str, Any]:
     """扫描单个文件并返回结果字典"""
     file_data = await get_file_content_from_filesystem(file_id)
@@ -328,10 +415,17 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
             'error': file_data['error']
         }
     
-    scan_result = await scan_content_with_llm(
-        file_data['content'], 
-        file_data['file_name']
-    )
+    # 根据配置选择扫描方法
+    if USE_LANGEXTRACT and langextract_scanner:
+        scan_result = await scan_content_with_langextract(
+            file_data['content'], 
+            file_data['file_name']
+        )
+    else:
+        scan_result = await scan_content_with_llm(
+            file_data['content'], 
+            file_data['file_name']
+        )
     
     if not scan_result['success']:
         return {
@@ -349,23 +443,25 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
         'image_count': file_data.get('image_count', 0),
         'char_count': file_data.get('char_count', 0),
         'success': True,
-        'result': scan_result['result']
+        'result': scan_result['result'],
+        'langextract_result': scan_result.get('langextract_result')  # 如果使用LangExtract
     }
 
 
 @mcp.tool()
-async def scan_document(file_ids: List[str]) -> str:
+async def scan_document_v2(file_ids: List[str], enable_visualization: bool = False) -> str:
     """
     扫描文档中的敏感信息
     
     Args:
         file_ids: 文件ID列表（文件系统中的file_id列表）
+        enable_visualization: 是否生成可视化报告（仅在使用LangExtract时有效）
     
     Returns:
         扫描结果报告
     """
     try:
-        logger.info(f"开始扫描 {len(file_ids)} 个文件")
+        logger.info(f"开始扫描 {len(file_ids)} 个文件，可视化: {enable_visualization}")
         
         if not file_ids:
             return "错误: 未提供文件ID"
@@ -378,6 +474,7 @@ async def scan_document(file_ids: List[str]) -> str:
         output += f"{'='*50}\n"
         output += f"扫描文件数: {len(file_ids)}\n"
         output += f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        output += f"扫描引擎: {'LangExtract (' + LANGEXTRACT_PROVIDER + ')' if USE_LANGEXTRACT else 'LangChain'}\n"
         output += f"{'='*50}\n\n"
         
         # 使用信号量控制并发度
@@ -389,12 +486,12 @@ async def scan_document(file_ids: List[str]) -> str:
         
         # 并发扫描所有文件
         scan_tasks = [scan_with_semaphore(file_id) for file_id in file_ids]
-        # 使用 return_exceptions=True 确保即使有任务失败也能获取结果
         scan_results = await asyncio.gather(*scan_tasks, return_exceptions=True)
         
         # 处理扫描结果
         total_sensitive_count = 0
         files_with_sensitive = 0
+        langextract_results = []  # 用于可视化
         
         for idx, scan_data in enumerate(scan_results, 1):
             # 处理异常情况
@@ -411,6 +508,10 @@ async def scan_document(file_ids: List[str]) -> str:
                 continue
             
             result = scan_data.get('result', {})
+            
+            # 收集LangExtract结果用于可视化
+            if scan_data.get('langextract_result'):
+                langextract_results.append(scan_data['langextract_result'])
             
             # 格式化文件大小
             file_size_kb = scan_data.get('file_size', 0) / 1024
@@ -452,6 +553,28 @@ async def scan_document(file_ids: List[str]) -> str:
         output += f"   - 包含敏感信息的文件: {files_with_sensitive}\n"
         output += f"   - 敏感信息总数: {total_sensitive_count}\n"
         
+        # 生成可视化报告（如果启用且使用LangExtract）
+        if enable_visualization and USE_LANGEXTRACT and langextract_results:
+            try:
+                os.makedirs(VISUALIZATION_OUTPUT_DIR, exist_ok=True)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                viz_path = os.path.join(VISUALIZATION_OUTPUT_DIR, f"scan_report_{timestamp}.html")
+                
+                loop = asyncio.get_event_loop()
+                html_path = await loop.run_in_executor(
+                    None,
+                    langextract_scanner.generate_visualization,
+                    langextract_results,
+                    viz_path
+                )
+                
+                if html_path:
+                    output += f"\n可视化报告已生成: {html_path}\n"
+                    logger.info(f"可视化报告已生成: {html_path}")
+            except Exception as e:
+                logger.error(f"生成可视化报告失败: {str(e)}")
+                output += f"\n生成可视化报告失败: {str(e)}\n"
+        
         return output.rstrip()  # 去掉末尾换行
         
     except Exception as e:
@@ -459,8 +582,36 @@ async def scan_document(file_ids: List[str]) -> str:
         return f"错误: 扫描过程中发生异常 - {str(e)}"
 
 
+@mcp.tool()
+async def get_scan_engine_info_v2() -> str:
+    """
+    获取当前扫描引擎信息
+    
+    Returns:
+        扫描引擎配置信息
+    """
+    info = {
+        "engine": "LangExtract" if USE_LANGEXTRACT else "LangChain",
+        "langextract_enabled": USE_LANGEXTRACT,
+        "langextract_provider": LANGEXTRACT_PROVIDER if USE_LANGEXTRACT else None,
+        "langextract_model": LANGEXTRACT_MODEL if USE_LANGEXTRACT else None,
+        "langextract_base_url": LANGEXTRACT_BASE_URL if USE_LANGEXTRACT and LANGEXTRACT_PROVIDER == 'custom' else None,
+        "langchain_model": LLM_MODEL if not USE_LANGEXTRACT else None,
+        "chunk_size": CHUNK_SIZE,
+        "file_concurrency": FILE_CONCURRENCY,
+        "visualization_enabled": USE_LANGEXTRACT,
+        "visualization_output_dir": VISUALIZATION_OUTPUT_DIR if USE_LANGEXTRACT else None
+    }
+    
+    return json.dumps(info, ensure_ascii=False, indent=2)
+
+
 if __name__ == "__main__":
     # 启动服务器
-    port = config.get('port', 3007)
-    logger.info(f"Starting Sensitive Data Scanner MCP Server on port {port}")
+    port = config.get('port', 3008)
+    logger.info(f"Starting Sensitive Data Scanner MCP Server V2 on port {port}")
+    if USE_LANGEXTRACT:
+        logger.info(f"扫描引擎: LangExtract (提供商: {LANGEXTRACT_PROVIDER}, 模型: {LANGEXTRACT_MODEL})")
+    else:
+        logger.info(f"扫描引擎: LangChain (模型: {LLM_MODEL})")
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
