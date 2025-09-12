@@ -218,7 +218,7 @@ class LangExtractSensitiveScanner:
                 "prompt_description": prompt,
                 "examples": self.sensitive_types,
                 "max_workers": 4,  # 并行处理
-                "extraction_passes": 2  # 多轮提取提高召回率
+                "extraction_passes": 1  # 单轮提取，提高速度
             }
             
             # 如果是自定义OpenAI兼容服务，创建一个不使用response_format的模型
