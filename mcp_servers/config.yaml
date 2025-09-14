@@ -69,19 +69,6 @@ servers:
       port: 3006
       document_dir: "/tmp/mcp_documents"
       
-  sensitive_scan_server:
-    enabled: true
-    script: "servers/sensitive_scan_server/runserver.py"
-    display_name: "敏感数据扫描服务"
-    config:
-      port: 3007
-      document_storage_path: "/tmp/documents/uploads"  # 文档存储路径
-      llm_api_base: "https://api.siliconflow.cn/v1"
-      llm_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm" 
-      llm_model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
-      chunk_size: 10000  # 扫描分块大小（字符数），默认10000
-      file_concurrency: 3  # 文件并发度（同时扫描的文件数），默认3
-      
   sensitive_scan_server_v2:
     enabled: true  # 启用 V2 版本
     script: "servers/sensitive_scan_server_v2/runserver.py"
