@@ -28,7 +28,7 @@ class LangExtractSensitiveScanner:
     """使用 LangExtract 的敏感数据扫描器"""
     
     def __init__(self, 
-                 model_id: str = "Qwen/QwQ-32B", 
+                 model_id: str = "Qwen/Qwen3-30B-A3B-Instruct-2507", 
                  api_key: Optional[str] = None,
                  base_url: str = "https://api.siliconflow.cn/v1"):
         """
@@ -111,11 +111,11 @@ class LangExtractSensitiveScanner:
         
         # 密码示例
         examples.append(lx.data.ExampleData(
-            text="默认管理员账号：admin，密码：Admin@123，请及时修改。",
+            text="用户名：admin，密码：Admin@123，请及时修改。",
             extractions=[
                 lx.data.Extraction(
                     extraction_class="用户名密码",
-                    extraction_text="admin，密码：Admin@123"
+                    extraction_text="用户名：admin，密码：Admin@123"
                 )
             ]
         ))
@@ -244,22 +244,28 @@ class LangExtractSensitiveScanner:
         # 转换为列表，因为 lx.extract 返回的是生成器
         return list(result)
     
-    def scan_files(self, texts: List[str]):
+    def scan_files(self, file_contents: List[dict]):
         """
         批量扫描文本内容
         
         Args:
-            texts: 文本内容列表
+            file_contents: 文件内容列表，格式为 [{"file_id": "xxx", "content": "text"}, ...]
             
         Returns:
             langextract的AnnotatedDocument对象列表
         """
+        if not file_contents:
+            raise ValueError("file_contents 不能为空")
+        
         # 将文本转换为 Document 对象
         documents = []
-        for i, text in enumerate(texts):
+        for item in file_contents:
+            if "file_id" not in item or "content" not in item:
+                raise ValueError(f"缺少必要字段 file_id 或 content: {item}")
+            
             doc = lx.data.Document(
-                document_id=f"doc_{i}",
-                text=text
+                document_id=item["file_id"],
+                text=item["content"]
             )
             documents.append(doc)
         # 创建SiliconFlow模型
@@ -356,7 +362,7 @@ class LangExtractSensitiveScanner:
 if __name__ == "__main__":
     # 初始化扫描器
     scanner = LangExtractSensitiveScanner(
-        model_id="Qwen/QwQ-32B",
+        model_id="Qwen/Qwen3-30B-A3B-Instruct-2507",
         api_key="your-api-key"
     )
     

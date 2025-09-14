@@ -846,133 +846,38 @@ async def extract_image_content(
 
 # ==================== 报告访问路由 ====================
 
-@router.get("/v1/extract/{filename}")
+@router.get("/v1/extract/{scan_id}")
 async def get_extract_result(
-    filename: str,
+    scan_id: str,
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """
-    获取数据提取结果文件
+    获取数据提取结果
     
     Args:
-        filename: 文件名
+        scan_id: 扫描ID
     
     Returns:
-        提取结果文件内容
+        提取结果内容（JSONL转换为JSON数组）
     """
-    from fastapi.responses import HTMLResponse, FileResponse
     import os
     
     # 检查认证（支持JWT和Cookie认证）
     if not current_user:
         raise BusinessException("需要登录才能查看提取结果", ResponseCode.UNAUTHORIZED)
     
-    # 构建文件路径
-    # 敏感数据扫描结果路径
-    extract_path = f"/tmp/scan_visualizations/{filename}"
+    # 构建 JSONL 文件路径
+    jsonl_path = f"/tmp/scan_visualizations/{scan_id}.jsonl"
     
     # 检查文件是否存在
-    if not os.path.exists(extract_path):
-        raise BusinessException("提取结果文件不存在", ResponseCode.NOT_FOUND)
+    if not os.path.exists(jsonl_path):
+        raise BusinessException(f"扫描结果不存在: {scan_id}", ResponseCode.NOT_FOUND)
     
-    # 检查文件扩展名
-    if filename.endswith('.json'):
-        # JSON提取结果数据
-        with open(extract_path, 'r', encoding='utf-8') as f:
-            extract_data = json.load(f)
-        
-        # 处理单个文件格式：将 files 数组转换为 items 数组
-        if 'files' in extract_data and isinstance(extract_data['files'], list) and 'items' not in extract_data:
-            items = []
-            for file in extract_data['files']:
-                if 'sensitive_items' in file and isinstance(file['sensitive_items'], list):
-                    for item in file['sensitive_items']:
-                        # 合并文件信息和敏感项信息
-                        items.append({
-                            **item,  # 包含 type, masked_value, context 等
-                            'file_id': file.get('file_id', ''),
-                            'file_name': file.get('file_name', ''),
-                            'file_size': file.get('file_size', 0),
-                            'char_count': file.get('char_count', 0),
-                            'image_count': file.get('image_count', 0)
-                        })
-            extract_data['items'] = items
-            
-            # 使用 summary 中的统计信息更新顶层字段
-            if 'summary' in extract_data:
-                summary = extract_data['summary']
-                extract_data['total_files'] = summary.get('total_files', extract_data.get('total_files', 0))
-                extract_data['files_with_sensitive'] = summary.get('files_with_sensitive', extract_data.get('files_with_sensitive', 0))
-                extract_data['total_sensitive'] = summary.get('total_sensitive_count', extract_data.get('total_sensitive', 0))
-                if 'statistics' in summary:
-                    extract_data['statistics'] = summary['statistics']
-        
-        # 如果是扫描报告，补充文件元数据信息
-        if 'items' in extract_data and isinstance(extract_data['items'], list):
-            # 收集所有的file_id
-            file_ids = set()
-            for item in extract_data['items']:
-                if 'file_id' in item and item['file_id']:
-                    file_ids.add(item['file_id'])
-            
-            if file_ids:
-                # 批量获取文件元数据
-                from .service.document_service import document_service
-                from src.shared.db.config import get_async_db_context
-                
-                # 获取文件元数据
-                file_metadata_map = {}
-                async with get_async_db_context() as db:
-                    user_name = current_user.get('username') if current_user else None
-                    file_info_map = await document_service.get_batch_file_info(
-                        db=db,
-                        file_ids=list(file_ids),
-                        user_name=user_name
-                    )
-                    
-                    # 构建文件元数据映射
-                    for file_id, info in file_info_map.items():
-                        file_metadata_map[file_id] = {
-                            "file_name": info.get("file_name", ""),
-                            "file_size": info.get("file_size", 0),
-                            "char_count": info.get("char_count", 0),
-                            "image_count": info.get("image_count", 0)
-                        }
-                
-                # 为每个item补充文件元数据
-                for item in extract_data['items']:
-                    file_id = item.get('file_id', '')
-                    if file_id in file_metadata_map:
-                        # 保存原始的 image_count
-                        original_image_count = item.get('image_count', 0)
-                        # 更新其他元数据
-                        item.update(file_metadata_map[file_id])
-                        # 恢复原始的 image_count（如果存在）
-                        if original_image_count > 0:
-                            item['image_count'] = original_image_count
-        
-        return success_response(data=extract_data, msg="获取提取结果成功")
-    elif filename.endswith('.html'):
-        # HTML文件直接返回内容
-        with open(extract_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        # 添加允许iframe嵌入的头部
-        return HTMLResponse(
-            content=content,
-            headers={
-                # 移除 X-Frame-Options，使用更灵活的 CSP
-                # "X-Frame-Options": "SAMEORIGIN",  # 这个会限制只能同源
-                # 允许同源和所有 HTTP/HTTPS 的 localhost/127.0.0.1
-                # 生产环境通常也是同源访问，所以 'self' 就足够了
-                "Content-Security-Policy": "frame-ancestors 'self' http://localhost:* https://localhost:* http://127.0.0.1:* https://127.0.0.1:*"
-            }
-        )
-    elif filename.endswith('.jsonl'):
-        # JSONL文件作为下载返回
-        return FileResponse(
-            report_path,
-            media_type='application/jsonl',
-            filename=filename
-        )
-    else:
-        raise BusinessException("不支持的文件格式", ResponseCode.BAD_REQUEST)
+    # 读取 JSONL 文件，转换为 JSON 数组
+    documents = []
+    with open(jsonl_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                documents.append(json.loads(line))
+    
+    return success_response(documents)

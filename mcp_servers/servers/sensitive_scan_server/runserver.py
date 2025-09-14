@@ -38,7 +38,7 @@ from langextract_sensitive_scanner import LangExtractSensitiveScanner
 
 # 初始化Scanner
 scanner = LangExtractSensitiveScanner(
-    model_id=config.get("langextract_model", "Qwen/QwQ-32B"),
+    model_id=config.get("langextract_model", "Qwen/Qwen3-30B-A3B-Instruct-2507"),
     api_key=config.get("langextract_api_key"),
     base_url=config.get("langextract_base_url", "https://api.siliconflow.cn/v1")
 )
@@ -89,22 +89,23 @@ def scan_documents(file_ids: List[str]) -> str:
     result_id = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     
     # 读取所有文件内容
-    texts = []
-    valid_file_ids = []
+    file_contents = []
     
     for file_id in file_ids:
         try:
             content = read_file_content(file_id)
-            texts.append(content)
-            valid_file_ids.append(file_id)
+            file_contents.append({
+                "file_id": file_id,
+                "content": content
+            })
         except Exception as e:
             logger.error(f"读取文件 {file_id} 失败: {e}")
     
-    if not texts:
+    if not file_contents:
         return "错误：没有可扫描的文件"
     
-    # 直接调用 langextract 扫描
-    results = scanner.scan_files(texts)
+    # 调用 langextract 扫描
+    results = scanner.scan_files(file_contents)
     
     # 保存结果
     output_path = OUTPUT_DIR / f"{result_id}.jsonl"

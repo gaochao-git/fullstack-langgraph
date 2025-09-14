@@ -211,7 +211,7 @@ curl --request POST \
   --header 'Authorization: Bearer sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm' \
   --header 'Content-Type: application/json' \
   --data '{
-  "model": "Qwen/QwQ-32B",
+  "model": "Qwen/Qwen3-30B-A3B-Instruct-2507",
   "messages": [
     {
       "role": "user",
