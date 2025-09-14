@@ -142,6 +142,17 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
+        # IP地址示例2 - 确保提取完整IP
+        examples.append(lx.data.ExampleData(
+            text="请登陆10.100.21.121进行系统配置。",
+            extractions=[
+                lx.data.Extraction(
+                    extraction_class="内网IP",
+                    extraction_text="10.100.21.121"
+                )
+            ]
+        ))
+        
         # 车牌号示例
         examples.append(lx.data.ExampleData(
             text="车辆信息：京A12345，停放在B2层。",
@@ -214,8 +225,9 @@ class LangExtractSensitiveScanner:
 注意：
 1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
 2. 手机号是11位数字，以13/14/15/16/17/18/19开头
-3. 单独用户名不算敏感，需要上下文判断
-4. 确保提取完整的敏感信息，不要截断"""
+3. IP地址格式为x.x.x.x（如192.168.1.100或10.100.21.121），可能带端口号，要提取完整
+4. 单独用户名不算敏感，需要上下文判断
+5. 确保提取完整的敏感信息，不要截断"""
         
         # 执行提取
         result = lx.extract(
@@ -258,8 +270,9 @@ class LangExtractSensitiveScanner:
 注意：
 1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
 2. 手机号是11位数字，以13/14/15/16/17/18/19开头
-3. 单独用户名不算敏感，需要上下文判断
-4. 确保提取完整的敏感信息，不要截断"""
+3. IP地址格式为x.x.x.x（如192.168.1.100或10.100.21.121），可能带端口号，要提取完整
+4. 单独用户名不算敏感，需要上下文判断
+5. 确保提取完整的敏感信息，不要截断"""
         
         # 逐个处理每个文档，避免 langextract 批量处理的 bug
         all_results = []
