@@ -28,35 +28,27 @@ class LangExtractSensitiveScanner:
     """使用 LangExtract 的敏感数据扫描器"""
     
     def __init__(self, 
-                 model_id: str = "gemini-2.0-flash-exp", 
+                 model_id: str = "Qwen/QwQ-32B", 
                  api_key: Optional[str] = None,
-                 provider: str = "gemini",
-                 base_url: Optional[str] = None,
+                 base_url: str = "https://api.siliconflow.cn/v1",
                  enable_visualization: bool = False):
         """
-        初始化扫描器
+        初始化扫描器（专用于SiliconFlow）
         
         Args:
             model_id: 模型ID
             api_key: API密钥，如果为None则从环境变量读取
-            provider: 模型提供商 ("gemini", "openai", "custom")
-            base_url: 自定义API地址（用于兼容OpenAI接口的服务）
+            base_url: API地址，默认为SiliconFlow
             enable_visualization: 是否启用原生可视化（会保存原文）
         """
         self.model_id = model_id
-        self.provider = provider
         self.base_url = base_url
         self.enable_visualization = enable_visualization
         
-        # 根据提供商设置API密钥
-        if provider == "gemini":
-            self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-            if self.api_key:
-                os.environ["GOOGLE_API_KEY"] = self.api_key
-        elif provider == "openai" or (provider == "custom" and base_url):
-            self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-            if self.api_key:
-                os.environ["OPENAI_API_KEY"] = self.api_key
+        # 设置API密钥
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("SILICONFLOW_API_KEY")
+        if self.api_key:
+            os.environ["OPENAI_API_KEY"] = self.api_key
         
         # 定义敏感信息类型和示例
         self.sensitive_types = self._create_sensitive_examples()
@@ -201,28 +193,101 @@ class LangExtractSensitiveScanner:
         """
         try:
             # 创建提示词
-            prompt = """识别文本中的以下类型信息：
-1. 个人身份信息：身份证号、护照号、驾驶证号
-2. 联系方式：手机号、座机号、邮箱地址
-3. 金融信息：银行卡号、信用卡号、账号信息
-4. 账户凭据：用户名密码组合、API密钥、Token
-5. 网络信息：内网IP地址、服务器地址
-6. 其他敏感：社保号、车牌号、家庭住址
-7. 文档摘要：用一句话概括文档的主要内容（限50字以内）
-
-注意：
-- 单独的用户名不算敏感信息，只有用户名+密码的组合才算
-- 公开域名不算敏感信息
-- 需要根据上下文判断是否真的敏感
-- 文档摘要应该简洁准确地概括文档主题"""
+            prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
+同时生成一句话的文档摘要（限50字）。
+注意：单独用户名不算敏感，需要上下文判断。"""
             
             # 执行提取
-            logger.info(f"开始扫描文档: {document_name} (使用 {self.provider} 提供商)")
+            logger.info(f"开始扫描文档: {document_name}")
             
             # 创建文档对象
             doc = lx.data.Document(
                 text=text,
                 document_id=document_name
+            )
+            
+            # 创建SiliconFlow兼容的OpenAI模型（不使用response_format）
+            from langextract.providers.openai import OpenAILanguageModel
+            from langextract.core import data
+            
+            class SiliconFlowModel(OpenAILanguageModel):
+                """SiliconFlow模型，不使用response_format"""
+                
+                @property
+                def requires_fence_output(self) -> bool:
+                    """强制使用fence输出"""
+                    return True
+                
+                def _process_single_prompt(self, prompt: str, config: dict):
+                    """重写以移除response_format"""
+                    from langextract.core import types as core_types
+                    
+                    try:
+                        normalized_config = self._normalize_reasoning_params(config)
+                        
+                        system_message = ''
+                        if self.format_type == data.FormatType.JSON:
+                            system_message = (
+                                'You are a helpful assistant that responds in JSON format. '
+                                'Wrap your JSON response in ```json ... ``` code blocks.'
+                            )
+                        elif self.format_type == data.FormatType.YAML:
+                            system_message = (
+                                'You are a helpful assistant that responds in YAML format.'
+                            )
+                        
+                        messages = [{'role': 'user', 'content': prompt}]
+                        if system_message:
+                            messages.insert(0, {'role': 'system', 'content': system_message})
+                        
+                        api_params = {
+                            'model': self.model_id,
+                            'messages': messages,
+                            'n': 1,
+                        }
+                        
+                        temp = normalized_config.get('temperature', self.temperature)
+                        if temp is not None:
+                            api_params['temperature'] = temp
+                        
+                        # 跳过 response_format，SiliconFlow不支持
+                        
+                        if (v := normalized_config.get('max_output_tokens')) is not None:
+                            api_params['max_tokens'] = v
+                        if (v := normalized_config.get('top_p')) is not None:
+                            api_params['top_p'] = v
+                        
+                        # 复制其他参数处理逻辑
+                        for key in [
+                            'frequency_penalty',
+                            'presence_penalty', 
+                            'seed',
+                            'stop',
+                            'logprobs',
+                            'top_logprobs',
+                            'reasoning'
+                        ]:
+                            if (v := normalized_config.get(key)) is not None:
+                                api_params[key] = v
+                        
+                        # 调用API
+                        response = self._client.chat.completions.create(**api_params)
+                        
+                        return core_types.ScoredOutput(
+                            output=response.choices[0].message.content,
+                            score=1.0
+                        )
+                        
+                    except Exception as e:
+                        raise Exception(f"API error: {e}") from e
+            
+            # 创建模型实例
+            model = SiliconFlowModel(
+                model_id=self.model_id,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=0.1,
+                format_type=data.FormatType.JSON
             )
             
             # 准备提取参数
@@ -231,138 +296,26 @@ class LangExtractSensitiveScanner:
                 "prompt_description": prompt,
                 "examples": self.sensitive_types,
                 "max_workers": 4,  # 并行处理
-                "extraction_passes": 1  # 单轮提取，提高速度
+                "extraction_passes": 1,  # 单轮提取，提高速度
+                "model": model
             }
             
-            # 如果是自定义OpenAI兼容服务，创建一个不使用response_format的模型
-            if self.provider == "custom" and self.base_url:
-                # 创建一个自定义的OpenAI模型类，禁用response_format
-                from langextract.providers.openai import OpenAILanguageModel
-                from langextract.core import data
-                
-                class CustomOpenAIModel(OpenAILanguageModel):
-                    """自定义OpenAI模型，不使用response_format（兼容SiliconFlow）"""
-                    
-                    @property
-                    def requires_fence_output(self) -> bool:
-                        """强制使用fence输出"""
-                        return True
-                    
-                    def _process_single_prompt(self, prompt: str, config: dict):
-                        """重写以移除response_format"""
-                        from langextract.core import types as core_types
-                        
-                        try:
-                            normalized_config = self._normalize_reasoning_params(config)
-                            
-                            system_message = ''
-                            if self.format_type == data.FormatType.JSON:
-                                system_message = (
-                                    'You are a helpful assistant that responds in JSON format. '
-                                    'Wrap your JSON response in ```json ... ``` code blocks.'
-                                )
-                            elif self.format_type == data.FormatType.YAML:
-                                system_message = (
-                                    'You are a helpful assistant that responds in YAML format.'
-                                )
-                            
-                            messages = [{'role': 'user', 'content': prompt}]
-                            if system_message:
-                                messages.insert(0, {'role': 'system', 'content': system_message})
-                            
-                            api_params = {
-                                'model': self.model_id,
-                                'messages': messages,
-                                'n': 1,
-                            }
-                            
-                            temp = normalized_config.get('temperature', self.temperature)
-                            if temp is not None:
-                                api_params['temperature'] = temp
-                            
-                            # 跳过 response_format，SiliconFlow不支持
-                            
-                            if (v := normalized_config.get('max_output_tokens')) is not None:
-                                api_params['max_tokens'] = v
-                            if (v := normalized_config.get('top_p')) is not None:
-                                api_params['top_p'] = v
-                            
-                            # 复制其他参数处理逻辑
-                            for key in [
-                                'frequency_penalty',
-                                'presence_penalty', 
-                                'seed',
-                                'stop',
-                                'logprobs',
-                                'top_logprobs',
-                                'reasoning'
-                            ]:
-                                if (v := normalized_config.get(key)) is not None:
-                                    api_params[key] = v
-                            
-                            # 调用API
-                            response = self._client.chat.completions.create(**api_params)
-                            
-                            return core_types.ScoredOutput(
-                                output=response.choices[0].message.content,
-                                score=1.0
-                            )
-                            
-                        except Exception as e:
-                            raise Exception(f"OpenAI API error: {e}") from e
-                
-                model = CustomOpenAIModel(
-                    model_id=self.model_id,
-                    api_key=self.api_key,
-                    base_url=self.base_url,
-                    temperature=0.1,
-                    format_type=data.FormatType.JSON
-                )
-                extract_kwargs["model"] = model
-            elif self.provider == "openai":
-                extract_kwargs["model_id"] = self.model_id
-                extract_kwargs["api_key"] = self.api_key
-                extract_kwargs["temperature"] = 0.1
-            else:  # gemini
-                extract_kwargs["model_id"] = self.model_id
-                if self.api_key:
-                    extract_kwargs["api_key"] = self.api_key
-            
             # 执行提取
-            logger.debug(f"执行 lx.extract，参数: text_or_documents 类型={type(extract_kwargs.get('text_or_documents'))}")
             result = lx.extract(**extract_kwargs)
             
             # 处理结果 - 当传入文档列表时，result 是一个可迭代对象
-            # 获取第一个文档的结果
-            logger.debug(f"lx.extract 返回类型: {type(result)}")
-            
-            # 检查是否是生成器
-            if hasattr(result, '__iter__') and hasattr(result, '__next__'):
-                logger.debug("返回值是生成器，需要转换为列表")
-            
             if result:
                 # 将迭代器转换为列表并获取第一个
                 try:
                     result_list = list(result)
-                    logger.debug(f"转换为列表成功，长度: {len(result_list)}")
-                    if result_list:
-                        first_result = result_list[0]
-                        logger.debug(f"第一个结果类型: {type(first_result)}")
-                        if hasattr(first_result, 'extractions'):
-                            extractions = first_result.extractions
-                            logger.debug(f"获取到 {len(extractions) if extractions else 0} 个提取结果")
-                        else:
-                            logger.error(f"结果对象没有 extractions 属性: {dir(first_result)}")
-                            extractions = []
+                    if result_list and hasattr(result_list[0], 'extractions'):
+                        extractions = result_list[0].extractions
                     else:
-                        logger.debug("结果列表为空")
                         extractions = []
                 except Exception as e:
-                    logger.error(f"处理提取结果时出错: {type(e).__name__}: {e}")
-                    logger.error(f"result 类型: {type(result)}")
+                    logger.error(f"处理提取结果时出错: {e}")
                     raise
             else:
-                logger.debug("lx.extract 返回空结果")
                 extractions = []
             
             # 统计各类型敏感信息
@@ -381,26 +334,17 @@ class LangExtractSensitiveScanner:
                     sensitive_stats[extraction.extraction_class] = 0
                 sensitive_stats[extraction.extraction_class] += 1
                 
-                # 脱敏处理
-                masked_value = self._mask_sensitive_value(
-                    extraction.extraction_text,
-                    extraction.extraction_class
-                )
-                
                 # 获取位置信息（如果有）
                 start_pos = None
                 end_pos = None
                 if hasattr(extraction, 'char_interval') and extraction.char_interval:
-                    # CharInterval 可能有不同的属性名
-                    if hasattr(extraction.char_interval, 'start'):
-                        start_pos = extraction.char_interval.start
-                        end_pos = extraction.char_interval.end
-                    elif hasattr(extraction.char_interval, 'start_pos'):
-                        start_pos = extraction.char_interval.start_pos
-                        end_pos = extraction.char_interval.end_pos
-                    elif hasattr(extraction.char_interval, 'start_index'):
-                        start_pos = extraction.char_interval.start_index
-                        end_pos = extraction.char_interval.end_index
+                    interval = extraction.char_interval
+                    # 尝试不同的属性名
+                    for start_attr, end_attr in [('start', 'end'), ('start_pos', 'end_pos'), ('start_index', 'end_index')]:
+                        if hasattr(interval, start_attr):
+                            start_pos = getattr(interval, start_attr)
+                            end_pos = getattr(interval, end_attr)
+                            break
                 
                 # 获取上下文
                 context = ""
@@ -420,7 +364,7 @@ class LangExtractSensitiveScanner:
                 
                 sensitive_items.append({
                     "type": extraction.extraction_class,
-                    "masked_value": masked_value,
+                    "value": extraction.extraction_text,  # 直接使用原始值，不脱敏
                     "original_length": len(extraction.extraction_text),
                     "position": {
                         "start": start_pos,
@@ -452,11 +396,8 @@ class LangExtractSensitiveScanner:
                     'original_text': text,
                     'sensitive_items': []
                 }
-                # 保存原始敏感值（仅在可视化时使用）
-                for extraction, item in zip(extractions, sensitive_items):
-                    enhanced_item = item.copy()
-                    enhanced_item['original_value'] = extraction.extraction_text
-                    result['langextract_result']['sensitive_items'].append(enhanced_item)
+                # 保存敏感值用于可视化
+                result['langextract_result']['sensitive_items'] = sensitive_items
             
             return result
             
@@ -467,55 +408,6 @@ class LangExtractSensitiveScanner:
                 "error": str(e),
                 "document_name": document_name
             }
-    
-    def _mask_sensitive_value(self, value: str, sensitive_type: str) -> str:
-        """
-        对敏感信息进行脱敏处理
-        
-        Args:
-            value: 原始值
-            sensitive_type: 敏感信息类型
-            
-        Returns:
-            脱敏后的值
-        """
-        if not value:
-            return "***"
-        
-        length = len(value)
-        
-        # 根据类型进行不同的脱敏处理
-        if sensitive_type == "手机号" and length == 11:
-            return f"{value[:3]}****{value[-4:]}"
-        elif sensitive_type == "身份证号" and length == 18:
-            return f"{value[:6]}********{value[-4:]}"
-        elif sensitive_type == "银行卡号" and length >= 16:
-            return f"{value[:4]}****{value[-4:]}"
-        elif sensitive_type == "邮箱地址" and "@" in value:
-            parts = value.split("@")
-            if len(parts) == 2:
-                username = parts[0]
-                if len(username) > 2:
-                    masked_username = username[0] + "*" * (len(username) - 2) + username[-1]
-                else:
-                    masked_username = "*" * len(username)
-                return f"{masked_username}@{parts[1]}"
-        elif sensitive_type == "内网IP":
-            parts = value.split(".")
-            if len(parts) == 4:
-                return f"{parts[0]}.***.***{parts[3]}"
-        elif sensitive_type in ["API密钥", "用户名密码"]:
-            return "*" * len(value)
-        elif sensitive_type == "车牌号" and length >= 7:
-            return f"{value[:2]}***{value[-2:]}"
-        
-        # 默认脱敏规则：保留首尾，中间用星号
-        if length <= 4:
-            return "*" * length
-        elif length <= 8:
-            return value[0] + "*" * (length - 2) + value[-1]
-        else:
-            return value[:2] + "*" * (length - 4) + value[-2:]
     
     def scan_files(self, file_paths: List[str], output_dir: str = "./scan_results") -> Dict[str, Any]:
         """
@@ -607,7 +499,7 @@ class LangExtractSensitiveScanner:
                         if item.get("position") and item["position"]["start"] is not None:
                             extraction = lx.data.Extraction(
                                 extraction_class=item["type"],
-                                extraction_text=item.get("original_value", item["masked_value"]),  # 使用原始值
+                                extraction_text=item["value"],  # 直接使用value字段
                                 char_interval=lx.data.CharInterval(
                                     start_pos=item["position"]["start"],
                                     end_pos=item["position"]["end"]
@@ -670,13 +562,11 @@ class LangExtractSensitiveScanner:
 
 # 测试代码
 if __name__ == "__main__":
-    # 初始化扫描器（必须启用可视化）
+    # 初始化扫描器（使用SiliconFlow）
     scanner = LangExtractSensitiveScanner(
-        model_id="Qwen/QwQ-32B",  # 或其他模型
-        provider="custom",
-        base_url="https://api.siliconflow.cn/v1",
-        api_key="your-api-key",
-        enable_visualization=True  # 必须设置为True
+        model_id="Qwen/QwQ-32B",  # 或其他SiliconFlow支持的模型
+        api_key="your-api-key",  # 替换为实际的API密钥
+        enable_visualization=True  # 如果需要可视化
     )
     
     # 测试文本
