@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Sensitive Data Scanner MCP Server V2
-敏感数据扫描MCP服务器 V2 版本
+Sensitive Data Scanner MCP Server
+敏感数据扫描MCP服务器
 使用 LangExtract 进行精确的敏感信息提取和可视化
 """
 
@@ -26,10 +26,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # 创建MCP服务器实例
-mcp = FastMCP("Sensitive Data Scanner Server V2")
+mcp = FastMCP("Sensitive Data Scanner Server")
 
 # 加载配置
-config = MCPServerConfig('sensitive_scan_server_v2')
+config = MCPServerConfig('sensitive_scan_server')
 
 # 获取LangExtract配置
 LANGEXTRACT_PROVIDER = config.get('langextract_provider', 'gemini')  # gemini, openai, custom
@@ -252,7 +252,7 @@ async def scan_single_file(file_id: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def scan_document_v2(file_ids: List[str]) -> str:
+async def scan_document(file_ids: List[str]) -> str:
     """
     扫描文档中的敏感信息
     
@@ -442,7 +442,7 @@ async def scan_document_v2(file_ids: List[str]) -> str:
 if __name__ == "__main__":
     # 启动服务器
     port = config.get('port', 3008)  # 从 config 中获取端口
-    logger.info(f"Starting Sensitive Data Scanner MCP Server V2 on port {port}")
+    logger.info(f"Starting Sensitive Data Scanner MCP Server on port {port}")
     
     # 显示引擎配置信息
     logger.info(f"扫描引擎: LangExtract")
