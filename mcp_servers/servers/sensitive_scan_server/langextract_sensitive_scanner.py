@@ -241,18 +241,27 @@ class LangExtractSensitiveScanner:
             extraction_passes=1
         )
         
-        return result
+        # 转换为列表，因为 lx.extract 返回的是生成器
+        return list(result)
     
-    def scan_files(self, file_paths: List[str]):
+    def scan_files(self, texts: List[str]):
         """
-        批量扫描文件
+        批量扫描文本内容
         
         Args:
-            file_paths: 文件路径列表
+            texts: 文本内容列表
             
         Returns:
-            langextract的结果迭代器
+            langextract的AnnotatedDocument对象列表
         """
+        # 将文本转换为 Document 对象
+        documents = []
+        for i, text in enumerate(texts):
+            doc = lx.data.Document(
+                document_id=f"doc_{i}",
+                text=text
+            )
+            documents.append(doc)
         # 创建SiliconFlow模型
         class SiliconFlowModel(OpenAILanguageModel):
             @property
@@ -298,15 +307,15 @@ class LangExtractSensitiveScanner:
         
         # 批量提取
         results = lx.extract(
-            text_or_documents=file_paths,
+            text_or_documents=documents,  # 传入 Document 对象列表
             prompt_description=prompt,
             examples=self.sensitive_types,
             model=model,
-            max_workers=4,
+            max_workers=4,  # langextract会自动处理并发
             extraction_passes=1
         )
         
-        return results
+        return list(results)  # 转换为列表返回
     
     def generate_visualization(self, annotated_documents: List, output_path: str = "scan_visualization.html") -> str:
         """
@@ -360,7 +369,14 @@ if __name__ == "__main__":
     
     # 扫描单个文本
     result = scanner.scan_text(test_text)
-    print(f"提取到 {len(result.extractions)} 个敏感信息")
+    # result 是一个 AnnotatedDocument 对象或列表
+    if isinstance(result, list) and len(result) > 0:
+        doc = result[0]
+        print(f"提取到 {len(doc.extractions)} 个敏感信息")
+        for extraction in doc.extractions:
+            print(f"- {extraction.extraction_class}: {extraction.extraction_text}")
+    else:
+        print("未提取到敏感信息")
     
     # 批量扫描文件
     files = ["doc1.txt", "doc2.txt"]
