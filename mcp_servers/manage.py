@@ -139,17 +139,26 @@ class MCPServerManager:
         try:
             # 设置环境变量
             env = os.environ.copy()
-            env['PYTHONPATH'] = str(SCRIPT_DIR)
+            # 添加 servers 目录到 PYTHONPATH，以支持相对导入
+            pythonpath = env.get('PYTHONPATH', '')
+            servers_dir = str(SCRIPT_DIR / 'servers')
+            if pythonpath:
+                env['PYTHONPATH'] = f"{pythonpath}:{servers_dir}:{SCRIPT_DIR}"
+            else:
+                env['PYTHONPATH'] = f"{servers_dir}:{SCRIPT_DIR}"
             env['MCP_SERVER_NAME'] = server_name
             
             # 启动进程
+            # 使用 -m 参数运行模块，以支持相对导入
+            module_name = f"servers.{server_name}.runserver"
             with open(log_file, 'a') as log:
                 process = subprocess.Popen(
-                    [sys.executable, str(script_path)],
+                    [sys.executable, "-m", module_name],
                     env=env,
                     stdout=log,
                     stderr=log,
-                    start_new_session=True
+                    start_new_session=True,
+                    cwd=str(SCRIPT_DIR)  # 设置工作目录
                 )
             
             # 等待服务启动
@@ -286,7 +295,7 @@ class MCPServerManager:
                 continue
             
             pid = self.read_pid(server_name)
-            port = server_config['port']
+            port = server_config.get('config', {}).get('port', 'N/A')
             display_name = server_config.get('display_name', server_name)
             
             if pid and self.is_process_running(pid):

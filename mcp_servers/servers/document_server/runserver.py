@@ -16,7 +16,7 @@ from docx import Document
 from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_PARAGRAPH_ALIGNMENT
 from docx.enum.style import WD_STYLE_TYPE
-from base_config import MCPServerConfig
+from ..common.base_config import MCPServerConfig
 
 # 配置日志
 logging.basicConfig(

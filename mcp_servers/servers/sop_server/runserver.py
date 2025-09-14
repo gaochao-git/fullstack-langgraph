@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List
 import os
 import pymysql
 from fastmcp import FastMCP
-from base_config import MCPServerConfig
+from ..common.base_config import MCPServerConfig
 
 # 配置日志
 logging.basicConfig(

@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 from fastmcp import FastMCP
-from base_config import MCPServerConfig
+from ..common.base_config import MCPServerConfig
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)

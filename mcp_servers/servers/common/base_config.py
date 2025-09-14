@@ -25,7 +25,8 @@ class MCPServerConfig:
     
     def _load_config(self):
         """加载配置文件"""
-        config_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.yaml')
+        # 配置文件在 mcp_servers 目录下，需要向上两级
+        config_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.yaml')
         
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"配置文件不存在: {config_file}")

@@ -4,7 +4,7 @@
 servers:
   db_query:
     enabled: false
-    script: "servers/db_mcp_server.py"
+    script: "servers/db_query/runserver.py"
     display_name: "数据库查询服务"
     config:
       port: 3001
@@ -13,7 +13,7 @@ servers:
       
   ssh_exec:
     enabled: false
-    script: "servers/ssh_mcp_server.py"
+    script: "servers/ssh_exec/runserver.py"
     display_name: "SSH远程连接服务"
     config:
       port: 3002
@@ -27,7 +27,7 @@ servers:
           
   es_search:
     enabled: false
-    script: "servers/es_mcp_server.py"
+    script: "servers/es_search/runserver.py"
     display_name: "Elasticsearch搜索服务"
     config:
       port: 3003
@@ -41,7 +41,7 @@ servers:
       
   zabbix_monitor:
     enabled: true
-    script: "servers/zabbix_mcp_server.py"
+    script: "servers/zabbix_monitor/runserver.py"
     display_name: "Zabbix监控服务"
     config:
       port: 3004
@@ -51,7 +51,7 @@ servers:
       
   sop_server:
     enabled: false
-    script: "servers/sop_mcp_server.py"
+    script: "servers/sop_server/runserver.py"
     display_name: "SOP标准操作程序服务"
     config:
       port: 3005
@@ -63,7 +63,7 @@ servers:
       
   document_server:
     enabled: true
-    script: "servers/document_mcp_server.py"
+    script: "servers/document_server/runserver.py"
     display_name: "文档生成服务"
     config:
       port: 3006
@@ -71,7 +71,7 @@ servers:
       
   sensitive_scan_server:
     enabled: true
-    script: "servers/sensitive_scan_mcp_server.py"
+    script: "servers/sensitive_scan_server/runserver.py"
     display_name: "敏感数据扫描服务"
     config:
       port: 3007
@@ -84,7 +84,7 @@ servers:
       
   sensitive_scan_server_v2:
     enabled: true  # 启用 V2 版本
-    script: "servers/sensitive_scan_mcp_server_v2.py"
+    script: "servers/sensitive_scan_server_v2/runserver.py"
     display_name: "敏感数据扫描服务V2(LangExtract)"
     config:
       port: 3008
