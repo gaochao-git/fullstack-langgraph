@@ -65,6 +65,17 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
+        # 身份证号示例2 - 不同上下文
+        examples.append(lx.data.ExampleData(
+            text="按照152822198810154515标准进行身份验证。",
+            extractions=[
+                lx.data.Extraction(
+                    extraction_class="身份证号",
+                    extraction_text="152822198810154515"
+                )
+            ]
+        ))
+        
         # 手机号示例
         examples.append(lx.data.ExampleData(
             text="请联系客服：13812345678，工作时间9:00-18:00。",
@@ -229,7 +240,11 @@ class LangExtractSensitiveScanner:
         # 提示词
         prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
 同时生成一句话的文档摘要（限50字）。
-注意：单独用户名不算敏感，需要上下文判断。"""
+注意：
+1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
+2. 手机号是11位数字，以13/14/15/16/17/18/19开头
+3. 单独用户名不算敏感，需要上下文判断
+4. 确保提取完整的敏感信息，不要截断"""
         
         # 执行提取
         result = lx.extract(
@@ -257,18 +272,7 @@ class LangExtractSensitiveScanner:
         if not file_contents:
             raise ValueError("file_contents 不能为空")
         
-        # 将文本转换为 Document 对象
-        documents = []
-        for item in file_contents:
-            if "file_id" not in item or "content" not in item:
-                raise ValueError(f"缺少必要字段 file_id 或 content: {item}")
-            
-            doc = lx.data.Document(
-                document_id=item["file_id"],
-                text=item["content"]
-            )
-            documents.append(doc)
-        # 创建SiliconFlow模型
+        # 创建SiliconFlow模型（只创建一次）
         class SiliconFlowModel(OpenAILanguageModel):
             @property
             def requires_fence_output(self) -> bool:
@@ -309,19 +313,43 @@ class LangExtractSensitiveScanner:
         # 提示词
         prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
 同时生成一句话的文档摘要（限50字）。
-注意：单独用户名不算敏感，需要上下文判断。"""
+注意：
+1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
+2. 手机号是11位数字，以13/14/15/16/17/18/19开头
+3. 单独用户名不算敏感，需要上下文判断
+4. 确保提取完整的敏感信息，不要截断"""
         
-        # 批量提取
-        results = lx.extract(
-            text_or_documents=documents,  # 传入 Document 对象列表
-            prompt_description=prompt,
-            examples=self.sensitive_types,
-            model=model,
-            max_workers=4,  # langextract会自动处理并发
-            extraction_passes=1
-        )
+        # 逐个处理每个文档，避免 langextract 批量处理的 bug
+        all_results = []
         
-        return list(results)  # 转换为列表返回
+        for item in file_contents:
+            if "file_id" not in item or "content" not in item:
+                raise ValueError(f"缺少必要字段 file_id 或 content: {item}")
+            
+            # 创建单个文档对象
+            doc = lx.data.Document(
+                document_id=item["file_id"],
+                text=item["content"]
+            )
+            
+            # 单独处理这个文档
+            # 注意：即使是单个文档，也要传入列表
+            result = lx.extract(
+                text_or_documents=[doc],  # 传入包含单个 Document 对象的列表
+                prompt_description=prompt,
+                examples=self.sensitive_types,
+                model=model,
+                max_workers=1,
+                extraction_passes=1
+            )
+            
+            # 将结果添加到列表中
+            # result 是一个生成器，需要转换为列表
+            result_list = list(result)
+            if result_list:
+                all_results.extend(result_list)
+        
+        return all_results
     
     def generate_visualization(self, annotated_documents: List, output_path: str = "scan_visualization.html") -> str:
         """
