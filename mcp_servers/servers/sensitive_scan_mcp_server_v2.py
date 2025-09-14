@@ -441,7 +441,7 @@ async def scan_document_v2(file_ids: List[str]) -> str:
 
 if __name__ == "__main__":
     # 启动服务器
-    port = config.get('port', 3008)
+    port = config.get('port', 3008)  # 从 config 中获取端口
     logger.info(f"Starting Sensitive Data Scanner MCP Server V2 on port {port}")
     
     # 显示引擎配置信息

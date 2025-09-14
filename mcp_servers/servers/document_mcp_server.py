@@ -657,8 +657,8 @@ async def get_document_content(file_id: str) -> str:
 
 # 运行服务器
 if __name__ == "__main__":
-    # 从配置获取端口
-    port = config._server_info.get('port', 3006)
+    # 获取端口
+    port = config.get('port', 3006)
     logger.info(f"Document MCP Server starting on port {port}")
     logger.info(f"Documents stored in: {DOCUMENT_DIR}")
     logger.info(f"Access at: http://localhost:{port}/sse/")

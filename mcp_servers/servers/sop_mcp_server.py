@@ -308,8 +308,8 @@ async def search_sops(keyword: str) -> str:
         }, ensure_ascii=False)
 
 if __name__ == "__main__":
-    # 获取端口（从环境变量或配置）
-    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    # 获取端口
+    port = config.get('port', 3005)
     
     logger.info(f"Starting {config.display_name} on port {port}")
     logger.info(f"SOP database config: host={config.get('host')}, database={config.get('database', 'omind')}")

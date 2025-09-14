@@ -360,8 +360,8 @@ async def get_zabbix_metrics(hostname: str = None) -> str:
         return json.dumps({"error": f"Failed to get zabbix metrics: {str(e)}"})
 
 if __name__ == "__main__":
-    # 获取端口（从环境变量或配置）
-    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    # 获取端口
+    port = config.get('port', 3004)
     
     logger.info(f"Starting {config.display_name} on port {port}")
     logger.info(f"Zabbix config: url={config.get('url')}, user={config.get('username')}")

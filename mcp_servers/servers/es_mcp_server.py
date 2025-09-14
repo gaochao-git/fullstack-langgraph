@@ -320,8 +320,8 @@ async def get_es_indices() -> str:
         return json.dumps({"error": f"Failed to get ES indices: {str(e)}"})
 
 if __name__ == "__main__":
-    # 获取端口（从环境变量或配置）
-    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    # 获取端口
+    port = config.get('port', 3003)
     
     logger.info(f"Starting {config.display_name} on port {port}")
     logger.info(f"ES config: {ES_BASE_URL}, timeout={ES_TIMEOUT}s")

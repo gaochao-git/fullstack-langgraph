@@ -30,41 +30,6 @@ CONFIG_FILE = SCRIPT_DIR / "config.yaml"
 PID_DIR = SCRIPT_DIR / "pids"
 LOG_DIR = SCRIPT_DIR / "logs"
 
-# 默认配置（如果配置文件不存在）
-DEFAULT_CONFIG = {
-    "servers": {
-        "db_query": {
-            "enabled": True,
-            "port": 3001,
-            "script": "servers/db_mcp_server.py",
-            "display_name": "MySQL数据库服务"
-        },
-        "ssh_exec": {
-            "enabled": True,
-            "port": 3002,
-            "script": "servers/ssh_mcp_server.py",
-            "display_name": "SSH远程连接服务"
-        },
-        "es_search": {
-            "enabled": True,
-            "port": 3003,
-            "script": "servers/es_mcp_server.py",
-            "display_name": "Elasticsearch搜索服务"
-        },
-        "zabbix_monitor": {
-            "enabled": True,
-            "port": 3004,
-            "script": "servers/zabbix_mcp_server.py",
-            "display_name": "Zabbix监控服务"
-        },
-        "sop_server": {
-            "enabled": True,
-            "port": 3005,
-            "script": "servers/sop_mcp_server.py",
-            "display_name": "SOP标准操作程序服务"
-        }
-    }
-}
 
 
 class MCPServerManager:
@@ -74,21 +39,21 @@ class MCPServerManager:
     
     def load_config(self) -> Dict:
         """加载配置文件"""
-        if CONFIG_FILE.exists():
-            try:
-                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                    # 确保有 servers 配置
-                    if 'servers' not in config:
-                        logger.warning("配置文件缺少 servers 部分，使用默认配置")
-                        return DEFAULT_CONFIG
-                    return config
-            except Exception as e:
-                logger.error(f"加载配置文件失败: {e}")
-                return DEFAULT_CONFIG
-        else:
-            logger.info("配置文件不存在，使用默认配置")
-            return DEFAULT_CONFIG
+        if not CONFIG_FILE.exists():
+            logger.error(f"配置文件不存在: {CONFIG_FILE}")
+            raise FileNotFoundError(f"配置文件不存在: {CONFIG_FILE}")
+        
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                # 确保有 servers 配置
+                if 'servers' not in config:
+                    logger.error("配置文件缺少 servers 部分")
+                    raise ValueError("配置文件缺少 servers 部分")
+                return config
+        except Exception as e:
+            logger.error(f"加载配置文件失败: {e}")
+            raise
     
     def ensure_directories(self):
         """确保必要的目录存在"""
@@ -157,7 +122,10 @@ class MCPServerManager:
             return True
         
         # 检查端口占用
-        port = server_config['port']
+        port = server_config.get('config', {}).get('port')
+        if not port:
+            logger.error(f"{server_name} 未配置端口")
+            return False
         if self.is_port_in_use(port):
             logger.error(f"{server_name} 端口 {port} 已被占用")
             return False
@@ -173,7 +141,6 @@ class MCPServerManager:
             env = os.environ.copy()
             env['PYTHONPATH'] = str(SCRIPT_DIR)
             env['MCP_SERVER_NAME'] = server_name
-            env['MCP_SERVER_PORT'] = str(port)
             
             # 启动进程
             with open(log_file, 'a') as log:
@@ -246,62 +213,11 @@ class MCPServerManager:
         # 检查Python环境
         logger.info(f"Python版本: {sys.version}")
         
-        # 创建示例配置文件
+        # 检查配置文件
         if not CONFIG_FILE.exists():
-            logger.info("创建示例配置文件...")
-            example_config = """# MCP服务器配置文件
-servers:
-  db_query:
-    enabled: true
-    port: 3001
-    script: "servers/db_mcp_server.py"
-    display_name: "MySQL数据库服务"
-    config:
-      host: localhost
-      port: 3306
-      username: root
-      password: ""
-      
-  ssh_exec:
-    enabled: true
-    port: 3002
-    script: "servers/ssh_mcp_server.py"
-    display_name: "SSH远程连接服务"
-    config:
-      host: localhost
-      port: 22
-      username: root
-      password: ""
-      
-  es_search:
-    enabled: true
-    port: 3003
-    script: "servers/es_mcp_server.py"
-    display_name: "Elasticsearch搜索服务"
-    config:
-      base_url: "http://localhost:9200"
-      
-  zabbix_monitor:
-    enabled: true
-    port: 3004
-    script: "servers/zabbix_mcp_server.py"
-    display_name: "Zabbix监控服务"
-    config:
-      url: "http://localhost/zabbix"
-      username: "Admin"
-      password: "zabbix"
-      
-  sop_server:
-    enabled: true
-    port: 3005
-    script: "servers/sop_mcp_server.py"
-    display_name: "SOP标准操作程序服务"
-    config:
-      api_url: "http://localhost:8000"
-"""
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                f.write(example_config)
-            logger.info(f"✅ 已创建配置文件: {CONFIG_FILE}")
+            logger.error(f"配置文件不存在: {CONFIG_FILE}")
+            logger.info("请创建 config.yaml 配置文件")
+            return
         
         logger.info("✅ 初始化完成")
     

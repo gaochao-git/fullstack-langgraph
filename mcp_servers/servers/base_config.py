@@ -54,10 +54,6 @@ class MCPServerConfig:
         """服务是否启用"""
         return self._server_info.get('enabled', True)
     
-    @property
-    def port(self) -> int:
-        """服务端口"""
-        return self._server_info.get('port', 3000)
     
     @property
     def display_name(self) -> str:

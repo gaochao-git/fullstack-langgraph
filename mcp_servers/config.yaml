@@ -4,21 +4,21 @@
 servers:
   db_query:
     enabled: false
-    port: 3001
     script: "servers/db_mcp_server.py"
     display_name: "数据库查询服务"
     config:
+      port: 3001
       api_base_url: "http://172.20.10.2:8111"
       api_token: "app-tbCzKza1riIJ6M3Grn4nWSQa"
       
   ssh_exec:
     enabled: false
-    port: 3002
     script: "servers/ssh_mcp_server.py"
     display_name: "SSH远程连接服务"
     config:
+      port: 3002
       host: 82.156.146.51
-      port: 22
+      ssh_port: 22
       configs:
         - username: root
           password: "123456"
@@ -27,13 +27,13 @@ servers:
           
   es_search:
     enabled: false
-    port: 3003
     script: "servers/es_mcp_server.py"
     display_name: "Elasticsearch搜索服务"
     config:
+      port: 3003
       protocol: "http"
       host: "82.156.146.51"
-      port: 9200
+      es_port: 9200
       timeout: 30
       username: ""
       password: ""
@@ -41,40 +41,40 @@ servers:
       
   zabbix_monitor:
     enabled: true
-    port: 3004
     script: "servers/zabbix_mcp_server.py"
     display_name: "Zabbix监控服务"
     config:
+      port: 3004
       url: "http://82.156.146.51:8080/zabbix/api_jsonrpc.php"
       username: "Admin"
       password: "zabbix"
       
   sop_server:
     enabled: false
-    port: 3005
     script: "servers/sop_mcp_server.py"
     display_name: "SOP标准操作程序服务"
     config:
+      port: 3005
       host: 82.156.146.51
-      port: 3306
+      db_port: 3306
       username: gaochao
       password: "fffjjj"
       database: omind  # SOP数据库名称
       
   document_server:
     enabled: true
-    port: 3006
     script: "servers/document_mcp_server.py"
     display_name: "文档生成服务"
     config:
+      port: 3006
       document_dir: "/tmp/mcp_documents"
       
   sensitive_scan_server:
     enabled: true
-    port: 3007
     script: "servers/sensitive_scan_mcp_server.py"
     display_name: "敏感数据扫描服务"
     config:
+      port: 3007
       document_storage_path: "/tmp/documents/uploads"  # 文档存储路径
       llm_api_base: "https://api.siliconflow.cn/v1"
       llm_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm" 
@@ -84,10 +84,10 @@ servers:
       
   sensitive_scan_server_v2:
     enabled: true  # 启用 V2 版本
-    port: 3008
     script: "servers/sensitive_scan_mcp_server_v2.py"
     display_name: "敏感数据扫描服务V2(LangExtract)"
     config:
+      port: 3008
       document_storage_path: "/tmp/documents/uploads"  # 文档存储路径
       # LangExtract 配置
       langextract_provider: "custom"  # 提供商: gemini, openai, custom

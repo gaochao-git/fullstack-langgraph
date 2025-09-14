@@ -134,8 +134,8 @@ async def get_table_structure(
         }, ensure_ascii=False)
 
 if __name__ == "__main__":
-    # 获取端口（从环境变量或配置）
-    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    # 获取端口
+    port = config.get('port', 3001)
     
     logger.info(f"Starting {config.display_name} on port {port}")
     logger.info(f"API Base URL: {API_BASE_URL}")

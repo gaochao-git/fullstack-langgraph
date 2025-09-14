@@ -460,8 +460,8 @@ async def execute_system_command(
                 logger.warning(f"关闭SSH连接时出错: {e}")
 
 if __name__ == "__main__":
-    # 获取端口（从环境变量或配置）
-    port = int(os.environ.get('MCP_SERVER_PORT', config.port))
+    # 获取端口
+    port = config.get('port', 3002)
     
     logger.info(f"Starting {config.display_name} on port {port}")
     logger.info(f"SSH config: host={config.get('host')}, configs={len(config.get('configs', []))} users")
