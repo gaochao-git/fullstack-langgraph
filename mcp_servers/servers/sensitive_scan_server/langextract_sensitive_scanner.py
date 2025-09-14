@@ -370,8 +370,7 @@ class LangExtractSensitiveScanner:
                         "start": start_pos,
                         "end": end_pos
                     } if start_pos is not None else None,
-                    "context": context,
-                    "confidence": getattr(extraction, 'confidence', 1.0)
+                    "context": context
                 })
             
             # 构建返回结果
