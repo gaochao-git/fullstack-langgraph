@@ -880,4 +880,55 @@ async def get_extract_result(
             if line.strip():
                 documents.append(json.loads(line))
     
-    return success_response(documents)
+    # 处理数据，将每个extraction转换为单独的记录
+    items = []
+    statistics = {}
+    files_with_sensitive = set()
+    
+    for doc in documents:
+        file_id = doc.get("document_id", "")
+        text = doc.get("text", "")
+        
+        # 计算文档基本信息
+        char_count = len(text)
+        file_size = len(text.encode('utf-8'))
+        
+        # 统计敏感信息
+        has_sensitive = False
+        for extraction in doc.get("extractions", []):
+            extraction_class = extraction.get("extraction_class", "")
+            
+            # 跳过文档摘要
+            if extraction_class == "文档摘要":
+                continue
+                
+            has_sensitive = True
+            
+            # 统计每种类型的数量
+            if extraction_class not in statistics:
+                statistics[extraction_class] = 0
+            statistics[extraction_class] += 1
+            
+            # 创建单条记录
+            item = {
+                "type": extraction_class,
+                "context": extraction.get("extraction_text", ""),
+                "file_id": file_id,
+                "file_name": f"文档_{file_id[:8]}",  # 简短的文件名
+                "file_size": file_size,
+                "char_count": char_count,
+                "position": extraction.get("char_interval"),
+                "image_count": 0  # 从文本无法判断图片数量
+            }
+            items.append(item)
+        
+        if has_sensitive:
+            files_with_sensitive.add(file_id)
+    
+    # 返回前端期望的格式
+    return success_response({
+        "items": items,
+        "statistics": statistics,
+        "total_sensitive": len(items),
+        "files_with_sensitive": len(files_with_sensitive)
+    })
