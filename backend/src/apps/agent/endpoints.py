@@ -849,7 +849,8 @@ async def extract_image_content(
 @router.get("/v1/extract/{scan_id}")
 async def get_extract_result(
     scan_id: str,
-    current_user: Optional[dict] = Depends(get_current_user_optional)
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     获取数据提取结果
@@ -880,6 +881,18 @@ async def get_extract_result(
             if line.strip():
                 documents.append(json.loads(line))
     
+    # 收集所有文件ID
+    file_ids = [doc.get("document_id", "") for doc in documents if doc.get("document_id")]
+    
+    # 批量从数据库获取文件信息
+    file_info_map = {}
+    if file_ids:
+        file_info_list = await document_service.get_documents_info_async(db, file_ids)
+        # 转换为字典，以file_id为key
+        for info in file_info_list:
+            file_info_map[info["file_id"]] = info
+        logger.info(f"从数据库获取到 {len(file_info_map)} 个文件的元信息")
+    
     # 处理数据，将每个extraction转换为单独的记录
     items = []
     statistics = {}
@@ -889,9 +902,13 @@ async def get_extract_result(
         file_id = doc.get("document_id", "")
         text = doc.get("text", "")
         
+        # 从数据库获取文件信息，如果没有则使用默认值
+        file_info = file_info_map.get(file_id, {})
+        file_name = file_info.get("file_name", f"文档_{file_id[:8]}")
+        file_size = file_info.get("file_size", len(text.encode('utf-8')))
+        
         # 计算文档基本信息
         char_count = len(text)
-        file_size = len(text.encode('utf-8'))
         
         # 统计敏感信息
         has_sensitive = False
@@ -914,8 +931,8 @@ async def get_extract_result(
                 "type": extraction_class,
                 "context": extraction.get("extraction_text", ""),
                 "file_id": file_id,
-                "file_name": f"文档_{file_id[:8]}",  # 简短的文件名
-                "file_size": file_size,
+                "file_name": file_name,  # 使用数据库中的真实文件名
+                "file_size": file_size,  # 使用数据库中的真实文件大小
                 "char_count": char_count,
                 "position": extraction.get("char_interval"),
                 "image_count": 0  # 从文本无法判断图片数量
