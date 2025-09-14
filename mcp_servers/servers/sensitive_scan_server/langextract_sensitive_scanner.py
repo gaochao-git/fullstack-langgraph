@@ -199,37 +199,8 @@ class LangExtractSensitiveScanner:
         Returns:
             langextract的AnnotatedDocument对象
         """
-        # 创建SiliconFlow兼容的OpenAI模型
-        class SiliconFlowModel(OpenAILanguageModel):
-            @property
-            def requires_fence_output(self) -> bool:
-                return True
-            
-            def _process_single_prompt(self, prompt: str, config: dict):
-                try:
-                    normalized_config = self._normalize_reasoning_params(config)
-                    system_message = 'You are a helpful assistant that responds in JSON format. Wrap your JSON response in ```json ... ``` code blocks.'
-                    messages = [
-                        {'role': 'system', 'content': system_message},
-                        {'role': 'user', 'content': prompt}
-                    ]
-                    api_params = {
-                        'model': self.model_id,
-                        'messages': messages,
-                        'n': 1,
-                        'temperature': normalized_config.get('temperature', self.temperature)
-                    }
-                    if (v := normalized_config.get('max_output_tokens')) is not None:
-                        api_params['max_tokens'] = v
-                    response = self._client.chat.completions.create(**api_params)
-                    return core_types.ScoredOutput(
-                        output=response.choices[0].message.content,
-                        score=1.0
-                    )
-                except Exception as e:
-                    raise Exception(f"API error: {e}") from e
-        
-        model = SiliconFlowModel(
+        # 创建模型实例
+        model = OpenAILanguageModel(
             model_id=self.model_id,
             api_key=self.api_key,
             base_url=self.base_url,
@@ -272,37 +243,8 @@ class LangExtractSensitiveScanner:
         if not file_contents:
             raise ValueError("file_contents 不能为空")
         
-        # 创建SiliconFlow模型（只创建一次）
-        class SiliconFlowModel(OpenAILanguageModel):
-            @property
-            def requires_fence_output(self) -> bool:
-                return True
-            
-            def _process_single_prompt(self, prompt: str, config: dict):
-                try:
-                    normalized_config = self._normalize_reasoning_params(config)
-                    system_message = 'You are a helpful assistant that responds in JSON format. Wrap your JSON response in ```json ... ``` code blocks.'
-                    messages = [
-                        {'role': 'system', 'content': system_message},
-                        {'role': 'user', 'content': prompt}
-                    ]
-                    api_params = {
-                        'model': self.model_id,
-                        'messages': messages,
-                        'n': 1,
-                        'temperature': normalized_config.get('temperature', self.temperature)
-                    }
-                    if (v := normalized_config.get('max_output_tokens')) is not None:
-                        api_params['max_tokens'] = v
-                    response = self._client.chat.completions.create(**api_params)
-                    return core_types.ScoredOutput(
-                        output=response.choices[0].message.content,
-                        score=1.0
-                    )
-                except Exception as e:
-                    raise Exception(f"API error: {e}") from e
-        
-        model = SiliconFlowModel(
+        # 创建模型实例
+        model = OpenAILanguageModel(
             model_id=self.model_id,
             api_key=self.api_key,
             base_url=self.base_url,
