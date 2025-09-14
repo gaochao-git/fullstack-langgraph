@@ -53,23 +53,17 @@ logger.info(f"文档存储路径配置: DOCUMENT_STORAGE_PATH = {DOCUMENT_STORAG
 try:
     from .langextract_sensitive_scanner import LangExtractSensitiveScanner
     
-    # 准备API密钥
+    # 准备API密钥（现在只支持SiliconFlow）
     api_key = LANGEXTRACT_API_KEY
     if not api_key:
-        # 根据提供商从环境变量读取
-        if LANGEXTRACT_PROVIDER == 'gemini':
-            api_key = os.environ.get('GOOGLE_API_KEY')
-        elif LANGEXTRACT_PROVIDER == 'openai' or LANGEXTRACT_PROVIDER == 'custom':
-            api_key = os.environ.get('OPENAI_API_KEY')
+        api_key = os.environ.get('OPENAI_API_KEY') or os.environ.get('SILICONFLOW_API_KEY')
     
     langextract_scanner = LangExtractSensitiveScanner(
         model_id=LANGEXTRACT_MODEL,
         api_key=api_key,
-        provider=LANGEXTRACT_PROVIDER,
-        base_url=LANGEXTRACT_BASE_URL if LANGEXTRACT_PROVIDER == 'custom' else None,
-        enable_visualization=True  # 启用可视化以支持原生报告生成
+        base_url=LANGEXTRACT_BASE_URL if LANGEXTRACT_BASE_URL else "https://api.siliconflow.cn/v1"
     )
-    logger.info(f"LangExtract 扫描器已初始化 (提供商: {LANGEXTRACT_PROVIDER}, 模型: {LANGEXTRACT_MODEL})")
+    logger.info(f"LangExtract 扫描器已初始化 (模型: {LANGEXTRACT_MODEL})")
 except ImportError as e:
     logger.error(f"无法导入 LangExtract: {str(e)}")
     logger.error("请确保 langextract_sensitive_scanner.py 在同目录下")

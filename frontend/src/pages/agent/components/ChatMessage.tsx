@@ -18,6 +18,7 @@ import { LoadingOutlined } from "@ant-design/icons";
 import { exportToWordWithImages } from "@/services/documentExportApi";
 import type { Agent } from "@/services/agentApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
+import VoiceInput from "@/components/VoiceInput";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -1749,6 +1750,16 @@ function ChatMessages({
                 ? "border-gray-600" 
                 : "border-gray-300"
             )}>
+              {/* 语音输入按钮 */}
+              {!(isLoading || interrupt) && (
+                <VoiceInput
+                  onTranscript={(text) => {
+                    setInputValue(inputValue + text);
+                  }}
+                  disabled={isLoading || !!interrupt}
+                />
+              )}
+              
               {/* 上传文件按钮 */}
               {!(isLoading || interrupt) && (
                 <FileUploadManager

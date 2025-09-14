@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_BASE_URL: Optional[str] = None
     
+    # 硅基流动配置
+    SILICONFLOW_API_KEY: Optional[str] = None
+    
     # 日志配置
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

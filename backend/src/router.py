@@ -15,6 +15,7 @@ from .apps.user import router as rbac_router
 from .apps.auth import router as auth_router
 from .apps.kb import router as kb_router
 from .shared.core.endpoints import router as common_router
+from .apps.speech import router as speech_router
 
 # 创建主API路由器
 api_router = APIRouter()
@@ -29,6 +30,7 @@ api_router.include_router(ai_models_router, tags=["ai-models"])
 api_router.include_router(scheduled_tasks_router, tags=["scheduled-tasks"])
 api_router.include_router(rbac_router, tags=["rbac"])
 api_router.include_router(kb_router, tags=["knowledge-base"])
+api_router.include_router(speech_router, tags=["speech"])
 
 @api_router.get("/health")
 async def health_check():
