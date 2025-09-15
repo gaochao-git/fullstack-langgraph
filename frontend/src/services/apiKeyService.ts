@@ -7,7 +7,7 @@ import { omind_del, omind_get, omind_post, omind_put } from '@/utils/base_api';
 export interface CreateAPIKeyRequest {
   user_id: string;
   key_name: string;
-  scopes?: string[];
+  scopes?: number[];  // 权限ID列表
   allowed_ips?: string[];
   expires_in_days?: number;
   mark_comment?: string;
@@ -18,14 +18,14 @@ export interface APIKeyInfo {
   user_id: string;
   user_name?: string;
   key_name: string;
-  key_prefix: string;
+  api_key?: string;  // 完整的API密钥（明文）
   created_at: string;
   expires_at?: string;
   last_used_at?: string;
   revoked_at?: string;
   revoke_reason?: string;
   is_active: boolean;
-  scopes?: string[];
+  scopes?: number[];  // 权限ID列表
   allowed_ips?: string[];
   mark_comment?: string;
   create_by?: string;
@@ -69,6 +69,13 @@ class APIKeyService {
    */
   async toggleAPIKeyStatus(keyId: string): Promise<{ message: string; is_active: boolean }> {
     return await omind_put(`${this.baseUrl}/api-keys/${keyId}/toggle`);
+  }
+
+  /**
+   * 更新API密钥权限
+   */
+  async updateAPIKeyScopes(keyId: string, scopes: number[]): Promise<any> {
+    return await omind_put(`${this.baseUrl}/api-keys/${keyId}/scopes`, scopes);
   }
 }
 

@@ -493,7 +493,7 @@ class AuthService:
         """创建API密钥"""
         async with self.db.begin():
             # 生成API密钥
-            api_key, prefix, key_hash = APIKeyUtils.generate_api_key()
+            api_key, key_hash = APIKeyUtils.generate_api_key()
             
             # 计算过期时间
             expires_at = None
@@ -504,8 +504,7 @@ class AuthService:
             api_key_record = AuthApiKey(
                 user_id=user_id,
                 key_name=request.key_name,
-                key_prefix=prefix,
-                key_hash=key_hash,
+                key_hash=key_hash,  # 临时存储明文
                 mark_comment=request.mark_comment,
                 scopes=json.dumps(request.scopes) if request.scopes else None,
                 allowed_ips=json.dumps(request.allowed_ips) if request.allowed_ips else None,
@@ -526,7 +525,7 @@ class AuthService:
                 key_id=str(api_key_record.id),
                 user_id=user_id,
                 key_name=request.key_name,
-                key_prefix=prefix,
+                api_key=api_key,  # 返回完整密钥
                 mark_comment=request.mark_comment,
                 created_at=api_key_record.create_time,
                 expires_at=expires_at,

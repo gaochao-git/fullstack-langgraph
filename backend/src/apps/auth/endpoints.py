@@ -36,6 +36,7 @@ from src.apps.auth.schema import (
     MenuCreateRequest, MenuUpdateRequest, MenuResponse, 
     MenuTreeResponse, MenuListResponse, UserMenuResponse
 )
+from src.shared.db.models import now_shanghai
 
 logger = get_logger(__name__)
 
@@ -660,7 +661,7 @@ async def list_api_keys(
             user_id=key.user_id,
             user_name=users.get(key.user_id).user_name if key.user_id in users else None,
             key_name=key.key_name,
-            key_prefix=key.key_prefix,
+            api_key=key.key_hash,  # 临时从key_hash字段返回明文
             mark_comment=key.mark_comment,
             scopes=json.loads(key.scopes) if key.scopes else [],
             is_active=bool(key.is_active),
@@ -718,6 +719,48 @@ async def revoke_api_key(
     key.update_by = current_user["username"]  # 记录更新人
     
     return {"message": "API密钥已永久撤销"}
+
+
+@router.put("/api-keys/{key_id}/scopes", summary="更新API密钥权限")
+async def update_api_key_scopes(
+    key_id: str,
+    scopes: List[int],  # 新的权限ID列表
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """更新API密钥的权限范围"""
+    async with db.begin():
+        stmt = select(AuthApiKey).where(
+            AuthApiKey.id == int(key_id)
+        )
+        
+        result = await db.execute(stmt)
+        key = result.scalar_one_or_none()
+        
+        if not key:
+            raise BusinessException(
+                "API密钥不存在",
+                ResponseCode.NOT_FOUND
+            )
+        
+        # 检查是否已经撤销
+        if key.revoked_at is not None:
+            raise BusinessException(
+                "已撤销的API密钥无法修改权限",
+                ResponseCode.BAD_REQUEST
+            )
+        
+        # 更新权限
+        key.scopes = json.dumps(scopes) if scopes else None
+        key.update_by = current_user["username"]
+        key.update_time = now_shanghai()
+        
+        await db.flush()
+        
+        return success_response({
+            "message": "权限更新成功",
+            "scopes": scopes
+        })
 
 
 @router.put("/api-keys/{key_id}/toggle", summary="切换API密钥激活状态")

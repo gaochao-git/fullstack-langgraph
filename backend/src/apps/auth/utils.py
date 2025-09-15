@@ -158,32 +158,34 @@ class APIKeyUtils:
     """API密钥工具"""
     
     @staticmethod
-    def generate_api_key() -> tuple[str, str, str]:
+    def generate_api_key() -> tuple[str, str]:
         """生成API密钥（Bearer Token格式）
-        返回: (完整密钥, 密钥前缀, 密钥哈希)
+        返回: (完整密钥, 明文密钥)
+        
+        注意：临时返回明文，后续稳定后再改为hash
         """
         # 生成Bearer Token格式的API Key
         # 格式：omind_ak_<random>
         key_id = f"omind_ak_{secrets.token_urlsafe(32)}"
         
-        # 计算哈希（用于存储）
-        key_hash = hashlib.sha256(key_id.encode()).hexdigest()
-        
-        # 前缀用于显示（只显示前16个字符）
-        prefix = key_id[:16]
-        
-        return key_id, prefix, key_hash
+        # 临时方案：直接返回明文作为"hash"
+        return key_id, key_id
     
     @staticmethod
     def hash_api_key(api_key: str) -> str:
-        """计算API密钥的哈希值"""
-        return hashlib.sha256(api_key.encode()).hexdigest()
+        """计算API密钥的哈希值
+        
+        临时方案：直接返回明文
+        """
+        return api_key
     
     @staticmethod
-    def verify_api_key(api_key: str, stored_hash: str) -> bool:
-        """验证API密钥"""
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        return key_hash == stored_hash
+    def verify_api_key(api_key: str, stored_value: str) -> bool:
+        """验证API密钥
+        
+        临时方案：直接比较明文
+        """
+        return api_key == stored_value
 
 
 class TokenBlacklist:

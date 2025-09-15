@@ -173,8 +173,7 @@ class AuthApiKey(BaseModel):
     
     # API密钥信息
     key_name = Column(String(100), nullable=False, comment="密钥名称")
-    key_prefix = Column(String(20), nullable=False, comment="密钥前缀（用于识别）")
-    key_hash = Column(String(255), unique=True, nullable=False, comment="密钥哈希")
+    key_hash = Column(String(255), unique=True, nullable=False, comment="密钥哈希（临时存储明文）")
     
     # 权限控制
     scopes = Column(Text, nullable=True, comment="权限范围（JSON数组）")

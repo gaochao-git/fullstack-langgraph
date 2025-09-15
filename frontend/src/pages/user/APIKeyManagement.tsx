@@ -42,7 +42,11 @@ export function APIKeyManagement() {
   }[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'revoked'>('active');
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [editingKey, setEditingKey] = useState<APIKeyInfo | null>(null);
+  const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
   const [form] = Form.useForm();
+  const [permissionForm] = Form.useForm();
   const isMobile = useIsMobile();
 
   // 加载API密钥列表
@@ -164,6 +168,41 @@ export function APIKeyManagement() {
       // 切换状态失败
       const errorMsg = error?.message || error?.msg || '切换状态失败';
       message.error(errorMsg);
+    }
+  };
+
+  // 处理编辑权限
+  const handleEditPermissions = (key: APIKeyInfo) => {
+    setEditingKey(key);
+    setSelectedPermissions(key.scopes || []);
+    permissionForm.setFieldsValue({
+      permissions: key.scopes || []
+    });
+    setShowPermissionModal(true);
+  };
+
+  // 更新API密钥权限
+  const handleUpdatePermissions = async () => {
+    try {
+      const values = await permissionForm.validateFields();
+      
+      if (!editingKey) return;
+      
+      // 调用API更新权限
+      await apiKeyService.updateAPIKeyScopes(editingKey.key_id, values.permissions);
+      
+      message.success('权限更新成功');
+      
+      // 刷新列表
+      await loadAPIKeys();
+      
+      // 关闭模态框
+      setShowPermissionModal(false);
+      setEditingKey(null);
+      permissionForm.resetFields();
+    } catch (error) {
+      console.error('Failed to update permissions:', error);
+      message.error('权限更新失败');
     }
   };
 
@@ -300,10 +339,37 @@ export function APIKeyManagement() {
       render: (text: string) => text || <Text type="secondary">-</Text>
     },
     {
-      title: '密钥前缀',
-      dataIndex: 'key_prefix',
-      key: 'key_prefix',
-      render: (text: string) => <Tag color="blue">{text}...</Tag>
+      title: '密钥',
+      dataIndex: 'api_key',
+      key: 'api_key',
+      width: 240,
+      render: (text: string) => {
+        if (text) {
+          // 显示密钥的前后部分，中间用省略号
+          const shortKey = text.length > 20 
+            ? `${text.substring(0, 12)}...${text.substring(text.length - 8)}`
+            : text;
+          
+          return (
+            <Space size={4} style={{ width: '100%' }}>
+              <Text code style={{ fontSize: 12 }}>{shortKey}</Text>
+              <Tooltip title="复制完整密钥">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CopyOutlined />}
+                  onClick={() => {
+                    navigator.clipboard.writeText(text);
+                    message.success('密钥已复制到剪贴板');
+                  }}
+                  style={{ minWidth: 'auto', padding: '0 4px' }}
+                />
+              </Tooltip>
+            </Space>
+          );
+        }
+        return <Text type="secondary">-</Text>;
+      }
     },
     {
       title: '权限范围',
@@ -356,7 +422,8 @@ export function APIKeyManagement() {
                   backgroundColor: '#f0f0f0', 
                   padding: '2px 8px', 
                   borderRadius: 4,
-                  fontSize: 12
+                  fontSize: 12,
+                  cursor: 'pointer'
                 }}>
                   +{scopes.length - 1}
                 </span>
@@ -444,6 +511,13 @@ export function APIKeyManagement() {
           <Space size="small">
             {!isRevoked && !isExpired && (
               <>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={() => handleEditPermissions(record)}
+                >
+                  修改权限
+                </Button>
                 <Switch
                   checked={record.is_active}
                   onChange={() => handleToggleStatus(record.key_id, record.key_name, record.is_active)}
@@ -453,6 +527,7 @@ export function APIKeyManagement() {
                 <Button
                   type="link"
                   danger
+                  size="small"
                   icon={<DeleteOutlined />}
                   onClick={() => handleRevokeAPIKey(record.key_id, record.key_name)}
                 >
@@ -878,6 +953,56 @@ const data = await response.json();
             </Form.Item>
           </Form>
         )}
+      </Modal>
+
+      {/* 编辑权限对话框 */}
+      <Modal
+        title={`编辑权限 - ${editingKey?.key_name || ''}`}
+        open={showPermissionModal}
+        onCancel={() => {
+          setShowPermissionModal(false);
+          setEditingKey(null);
+          permissionForm.resetFields();
+        }}
+        onOk={handleUpdatePermissions}
+        width={800}
+        okText="更新权限"
+      >
+        <Form
+          form={permissionForm}
+          layout="vertical"
+        >
+          <Form.Item
+            label="API权限范围"
+            name="permissions"
+            rules={[{ required: true, message: '请选择至少一个权限' }]}
+          >
+            <Select
+              mode="multiple"
+              placeholder="选择API权限"
+              loading={loadingPermissions}
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={permissions}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+          
+          <Alert
+            message="权限说明"
+            description={
+              <div>
+                <p>• API密钥只能访问被授予权限的接口</p>
+                <p>• 建议根据实际需求选择最小权限集</p>
+                <p>• 权限修改立即生效，无需重新生成密钥</p>
+              </div>
+            }
+            type="info"
+            showIcon
+          />
+        </Form>
       </Modal>
     </div>
   );

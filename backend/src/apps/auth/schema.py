@@ -196,7 +196,7 @@ class APIKeyInfo(BaseModel):
     user_id: str
     user_name: Optional[str] = None
     key_name: str
-    key_prefix: str
+    api_key: Optional[str] = None  # 明文密钥（临时方案）
     mark_comment: Optional[str] = None
     created_at: datetime
     expires_at: Optional[datetime] = None
