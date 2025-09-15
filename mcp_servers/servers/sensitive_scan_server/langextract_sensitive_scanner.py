@@ -32,7 +32,9 @@ class LangExtractSensitiveScanner:
     def __init__(self, 
                  model_id: str = "Qwen/Qwen3-30B-A3B-Instruct-2507", 
                  api_key: Optional[str] = None,
-                 base_url: str = "https://api.siliconflow.cn/v1"):
+                 base_url: str = "https://api.siliconflow.cn/v1",
+                 max_workers: int = 1,
+                 max_char_buffer: int = 50000):
         """
         初始化扫描器配置
         
@@ -40,9 +42,13 @@ class LangExtractSensitiveScanner:
             model_id: 模型ID
             api_key: API密钥，如果为None则从环境变量读取
             base_url: API地址，默认为SiliconFlow
+            max_workers: 并发扫描的最大工作线程数，默认为1
+            max_char_buffer: 单次推理的最大字符数（LangExtract会自动分块），默认50000
         """
         self.model_id = model_id
         self.base_url = base_url
+        self.max_workers = max_workers
+        self.max_char_buffer = max_char_buffer
         
         # 设置API密钥
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("SILICONFLOW_API_KEY")
@@ -188,20 +194,12 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
-        # 文档摘要示例
-        examples.append(lx.data.ExampleData(
-            text="本公司2023年度财务报告显示，营业收入达到5000万元，同比增长20%。主要增长来自于新产品线的推出和市场拓展。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="文档摘要",
-                    extraction_text="公司2023年营收5000万元，同比增长20%，主要得益于新产品和市场拓展"
-                )
-            ]
-        ))
         
         return examples
     
-    def scan_document(self, file_id: str, text: str, output_dir: str = "/tmp/scan_results", task_id: str = None) -> dict:
+    def scan_document(self, file_id: str, text: str, output_dir: str = "/tmp/scan_results", 
+                      task_id: str = None, max_workers: Optional[int] = None, 
+                      max_char_buffer: Optional[int] = None) -> dict:
         """
         扫描单个文档并生成结果文件
         
@@ -210,11 +208,17 @@ class LangExtractSensitiveScanner:
             text: 文件文本内容
             output_dir: 输出目录路径
             task_id: 任务ID（可选，用于生成文件名前缀）
+            max_workers: 覆盖默认的并发工作线程数（可选）
+            max_char_buffer: 覆盖默认的最大字符缓冲区大小（可选）
             
         Returns:
             {"status": "ok/error", "jsonl_path": xxx, "html_path": xxx}
         """
         try:
+            # 使用传入的参数或默认值
+            workers = max_workers if max_workers is not None else self.max_workers
+            char_buffer = max_char_buffer if max_char_buffer is not None else self.max_char_buffer
+            
             # 确保输出目录存在
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             
@@ -244,7 +248,6 @@ class LangExtractSensitiveScanner:
             
             # 提示词
             prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
-同时生成一句话的文档摘要（限50字）。
 注意：
 1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
 2. 手机号是11位数字，以13/14/15/16/17/18/19开头
@@ -252,15 +255,16 @@ class LangExtractSensitiveScanner:
 4. 单独用户名不算敏感，需要上下文判断
 5. 确保提取完整的敏感信息，不要截断"""
             
-            logger.info(f"开始扫描文档: {file_id}")
+            logger.info(f"开始扫描文档: {file_id}，文本长度: {len(text)} 字符，使用 {workers} 个工作线程，字符缓冲区: {char_buffer}")
             
-            # 执行提取
+            # 执行提取 - LangExtract 会自动处理分块和合并
             result = lx.extract(
                 text_or_documents=[lx_doc],
                 prompt_description=prompt,
                 examples=self.sensitive_types,
                 model=model,
-                max_workers=1,
+                max_workers=workers,
+                max_char_buffer=char_buffer,
                 extraction_passes=1
             )
             

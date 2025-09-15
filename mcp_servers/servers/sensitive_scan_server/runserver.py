@@ -42,7 +42,9 @@ from langextract_sensitive_scanner import LangExtractSensitiveScanner
 scanner = LangExtractSensitiveScanner(
     model_id=config.get("langextract_model", "Qwen/Qwen3-30B-A3B-Instruct-2507"),
     api_key=config.get("langextract_api_key"),
-    base_url=config.get("langextract_base_url", "https://api.siliconflow.cn/v1")
+    base_url=config.get("langextract_base_url", "https://api.siliconflow.cn/v1"),
+    max_workers=config.get("langextract_max_workers", 1),
+    max_char_buffer=config.get("langextract_max_char_buffer", 50000)
 )
 
 # 输出目录 - 保持与前端接口一致
@@ -477,6 +479,32 @@ def get_scan_result(task_id: str) -> str:
         }, ensure_ascii=False, indent=2)
 
 
+@mcp.tool()
+def sleep_interval(seconds: int) -> str:
+    """
+    暂停指定的时间，用于控制处理节奏或等待外部系统响应
+    
+    Args:
+        seconds: 要暂停的秒数（0-300秒）
+    
+    Returns:
+        暂停完成信息
+    """
+    # 限制最大暂停时间为5分钟
+    if seconds < 0:
+        seconds = 0
+    elif seconds > 300:
+        seconds = 300
+    
+    # 执行暂停
+    time.sleep(seconds)
+    
+    return json.dumps({
+        "success": True,
+        "message": f"已暂停{seconds}秒"
+    }, ensure_ascii=False, indent=2)
+
+
 if __name__ == "__main__":
     # 启动服务器
     port = config.get("port", 3008)
@@ -484,11 +512,14 @@ if __name__ == "__main__":
     logger.info(f"文档存储路径: {config.get('document_storage_path')}")
     logger.info(f"输出目录: {config.get('visualization_output_dir')}")
     logger.info(f"模型: {config.get('langextract_model')}")
+    logger.info(f"并发线程数: {config.get('langextract_max_workers', 1)}")
+    logger.info(f"字符缓冲区大小: {config.get('langextract_max_char_buffer', 50000)} 字符")
     logger.info("支持的工具：")
     logger.info("  - scan_documents: 创建扫描任务")
     logger.info("  - check_scan_progress: 查看任务进度")
     logger.info("  - list_scan_tasks: 列出任务列表")
     logger.info("  - get_scan_result: 获取任务结果")
     logger.info("  - get_file_scan_details: 获取特定文件的扫描详情")
+    logger.info("  - sleep_interval: 暂停指定秒数（0-300秒）")
     
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)

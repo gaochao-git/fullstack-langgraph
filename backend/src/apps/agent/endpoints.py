@@ -922,10 +922,6 @@ async def get_task_extract_results(
             for extraction in doc.get("extractions", []):
                 extraction_class = extraction.get("extraction_class", "")
                 
-                # 跳过文档摘要
-                if extraction_class == "文档摘要":
-                    continue
-                
                 has_sensitive = True
                 
                 # 统计每种类型的数量
@@ -1089,10 +1085,6 @@ async def get_extract_result(
         has_sensitive = False
         for extraction in doc.get("extractions", []):
             extraction_class = extraction.get("extraction_class", "")
-            
-            # 跳过文档摘要
-            if extraction_class == "文档摘要":
-                continue
                 
             has_sensitive = True
             
