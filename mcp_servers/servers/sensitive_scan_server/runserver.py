@@ -134,7 +134,7 @@ def process_scan_task(task_id: str, file_ids: List[str]):
                     }
                 
                 # 调用核心扫描模块
-                scan_result = scanner.scan_single_document(
+                scan_result = scanner.scan_document(
                     file_id=file_item["file_id"],
                     text=file_item["content"]
                 )

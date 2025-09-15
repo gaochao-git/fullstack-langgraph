@@ -198,7 +198,7 @@ class LangExtractSensitiveScanner:
         
         return examples
     
-    def scan_single_document(self, file_id: str, text: str) -> dict:
+    def scan_document(self, file_id: str, text: str) -> dict:
         """
         扫描单个文档的敏感信息
         
@@ -211,11 +211,7 @@ class LangExtractSensitiveScanner:
         """
         try:
             # 创建 LangExtract Document 对象
-            doc = lx.data.Document(
-                document_id=file_id,
-                text=text
-            )
-            
+            doc = lx.data.Document(document_id=file_id, text=text)
             # 创建模型实例
             model = OpenAILanguageModel(
                 model_id=self.model_id,
