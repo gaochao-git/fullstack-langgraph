@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-LangExtract 敏感数据扫描器
-使用 Google LangExtract 进行精确的敏感信息提取和可视化
+LangExtract 敏感数据扫描器配置
+提供敏感信息类型定义和模型配置
 """
 
 import os
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from langextract.providers.openai import OpenAILanguageModel
 from langextract.core import data
-from langextract.core import types as core_types
 
 try:
     import langextract as lx
@@ -25,14 +24,14 @@ logger = logging.getLogger(__name__)
 
 
 class LangExtractSensitiveScanner:
-    """使用 LangExtract 的敏感数据扫描器"""
+    """LangExtract 敏感信息扫描配置类"""
     
     def __init__(self, 
                  model_id: str = "Qwen/Qwen3-30B-A3B-Instruct-2507", 
                  api_key: Optional[str] = None,
                  base_url: str = "https://api.siliconflow.cn/v1"):
         """
-        初始化扫描器（专用于SiliconFlow）
+        初始化扫描器配置
         
         Args:
             model_id: 模型ID
@@ -199,98 +198,46 @@ class LangExtractSensitiveScanner:
         
         return examples
     
-    def scan_text(self, text: str, document_name: str = "document"):
+    def scan_single_document(self, file_id: str, text: str) -> dict:
         """
-        扫描文本中的敏感信息
+        扫描单个文档的敏感信息
         
         Args:
-            text: 要扫描的文本
-            document_name: 文档名称
+            file_id: 文件ID
+            text: 文件文本内容
             
         Returns:
-            langextract的AnnotatedDocument对象
+            扫描结果，包含提取的敏感信息
         """
-        # 创建模型实例
-        model = OpenAILanguageModel(
-            model_id=self.model_id,
-            api_key=self.api_key,
-            base_url=self.base_url,
-            temperature=0.1,
-            format_type=data.FormatType.JSON
-        )
-        
-        # 提示词
-        prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
-同时生成一句话的文档摘要（限50字）。
-注意：
-1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
-2. 手机号是11位数字，以13/14/15/16/17/18/19开头
-3. IP地址格式为x.x.x.x（如192.168.1.100或10.100.21.121），可能带端口号，要提取完整
-4. 单独用户名不算敏感，需要上下文判断
-5. 确保提取完整的敏感信息，不要截断"""
-        
-        # 执行提取
-        result = lx.extract(
-            text_or_documents=text,
-            prompt_description=prompt,
-            examples=self.sensitive_types,
-            model=model,
-            max_workers=1,
-            extraction_passes=1
-        )
-        
-        # 转换为列表，因为 lx.extract 返回的是生成器
-        return list(result)
-    
-    def scan_files(self, file_contents: List[dict]):
-        """
-        批量扫描文本内容
-        
-        Args:
-            file_contents: 文件内容列表，格式为 [{"file_id": "xxx", "content": "text"}, ...]
-            
-        Returns:
-            langextract的AnnotatedDocument对象列表
-        """
-        if not file_contents:
-            raise ValueError("file_contents 不能为空")
-        
-        # 创建模型实例
-        model = OpenAILanguageModel(
-            model_id=self.model_id,
-            api_key=self.api_key,
-            base_url=self.base_url,
-            temperature=0.1,
-            format_type=data.FormatType.JSON
-        )
-        
-        # 提示词
-        prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
-同时生成一句话的文档摘要（限50字）。
-注意：
-1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
-2. 手机号是11位数字，以13/14/15/16/17/18/19开头
-3. IP地址格式为x.x.x.x（如192.168.1.100或10.100.21.121），可能带端口号，要提取完整
-4. 单独用户名不算敏感，需要上下文判断
-5. 确保提取完整的敏感信息，不要截断"""
-        
-        # 逐个处理每个文档，避免 langextract 批量处理的 bug
-        all_results = []
-        
-        for item in file_contents:
-            if "file_id" not in item or "content" not in item:
-                raise ValueError(f"缺少必要字段 file_id 或 content: {item}")
-            
-            # 创建单个文档对象
+        try:
+            # 创建 LangExtract Document 对象
             doc = lx.data.Document(
-                document_id=item["file_id"],
-                text=item["content"]
+                document_id=file_id,
+                text=text
             )
             
-            # 单独处理这个文档
-            # 注意：即使是单个文档，也要传入列表
+            # 创建模型实例
+            model = OpenAILanguageModel(
+                model_id=self.model_id,
+                api_key=self.api_key,
+                base_url=self.base_url,
+                temperature=0.1,
+                format_type=data.FormatType.JSON
+            )
+            
+            # 提示词
+            prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
+同时生成一句话的文档摘要（限50字）。
+注意：
+1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
+2. 手机号是11位数字，以13/14/15/16/17/18/19开头
+3. IP地址格式为x.x.x.x（如192.168.1.100或10.100.21.121），可能带端口号，要提取完整
+4. 单独用户名不算敏感，需要上下文判断
+5. 确保提取完整的敏感信息，不要截断"""
+            
+            # 执行提取
             result = lx.extract(
-                text_or_documents=[doc],  # 传入包含单个 Document 对象的列表
+                text_or_documents=[doc],
                 prompt_description=prompt,
                 examples=self.sensitive_types,
                 model=model,
@@ -298,79 +245,77 @@ class LangExtractSensitiveScanner:
                 extraction_passes=1
             )
             
-            # 将结果添加到列表中
-            # result 是一个生成器，需要转换为列表
+            # 处理结果
             result_list = list(result)
-            if result_list:
-                all_results.extend(result_list)
-        
-        return all_results
+            if result_list and len(result_list) > 0:
+                annotated_doc = result_list[0]
+                return {
+                    "success": True,
+                    "file_id": file_id,
+                    "extractions": len(annotated_doc.extractions),
+                    "document": annotated_doc,
+                    "sensitive_items": [
+                        {
+                            "type": ext.extraction_class,
+                            "text": ext.extraction_text,
+                            "position": ext.char_interval
+                        }
+                        for ext in annotated_doc.extractions
+                    ]
+                }
+            else:
+                return {
+                    "success": True,
+                    "file_id": file_id,
+                    "extractions": 0,
+                    "document": None,
+                    "sensitive_items": []
+                }
+                
+        except Exception as e:
+            logger.error(f"扫描文件 {file_id} 时出错: {e}")
+            return {
+                "success": False,
+                "file_id": file_id,
+                "error": str(e)
+            }
     
-    def generate_visualization(self, annotated_documents: List, output_path: str = "scan_visualization.html") -> str:
+    def save_results(self, annotated_documents: List[Any], output_path: str):
         """
-        生成可视化HTML报告
+        保存扫描结果到JSONL文件
         
         Args:
-            annotated_documents: langextract的AnnotatedDocument对象列表
-            output_path: 输出HTML文件路径
-            
-        Returns:
-            HTML文件路径
+            annotated_documents: LangExtract的AnnotatedDocument对象列表
+            output_path: 输出文件路径
         """
-        # 保存为JSONL
-        output_dir = os.path.dirname(output_path) or "."
-        output_name = os.path.basename(output_path).replace('.html', '.jsonl')
+        import os
+        output_dir = os.path.dirname(output_path)
+        output_name = os.path.basename(output_path)
         
-        # 保存文档
         lx.io.save_annotated_documents(
-            annotated_documents, 
+            annotated_documents,
             output_dir=output_dir,
             output_name=output_name,
             show_progress=False
         )
+        logger.info(f"结果已保存到: {output_path}")
+    
+    def generate_visualization(self, jsonl_path: str, html_path: str) -> str:
+        """
+        生成可视化HTML
         
-        # 生成可视化
-        jsonl_path = os.path.join(output_dir, output_name)
+        Args:
+            jsonl_path: JSONL文件路径
+            html_path: 输出HTML文件路径
+            
+        Returns:
+            HTML文件路径
+        """
         html_content = lx.visualize(jsonl_path)
-        
-        # 保存HTML
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(html_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        
-        return output_path
+        logger.info(f"可视化已生成: {html_path}")
+        return html_path
     
 
 
-# 测试代码
-if __name__ == "__main__":
-    # 初始化扫描器
-    scanner = LangExtractSensitiveScanner(
-        model_id="Qwen/Qwen3-30B-A3B-Instruct-2507",
-        api_key="your-api-key"
-    )
-    
-    # 测试文本
-    test_text = """
-    尊敬的张先生（身份证：110101199001011234），
-    您的订单已确认，联系电话：13812345678
-    银行卡号：6222021234567890123
-    """
-    
-    # 扫描单个文本
-    result = scanner.scan_text(test_text)
-    # result 是一个 AnnotatedDocument 对象或列表
-    if isinstance(result, list) and len(result) > 0:
-        doc = result[0]
-        print(f"提取到 {len(doc.extractions)} 个敏感信息")
-        for extraction in doc.extractions:
-            print(f"- {extraction.extraction_class}: {extraction.extraction_text}")
-    else:
-        print("未提取到敏感信息")
-    
-    # 批量扫描文件
-    files = ["doc1.txt", "doc2.txt"]
-    results = scanner.scan_files(files)
-    
-    # 生成可视化
-    viz_path = scanner.generate_visualization(list(results))
-    print(f"可视化报告: {viz_path}")
