@@ -690,35 +690,38 @@ async def revoke_api_key(
     撤销后的密钥将无法再次启用，这是一个永久性操作。
     如果只是想临时禁用，请使用禁用/启用功能。
     """
-    
-    # 查询密钥
-    stmt = select(AuthApiKey).where(
-        AuthApiKey.id == int(key_id)
-    )
-    
-    result = await db.execute(stmt)
-    key = result.scalar_one_or_none()
-    
-    if not key:
-        raise BusinessException(
-            "API密钥不存在",
-            ResponseCode.NOT_FOUND
+    async with db.begin():
+        # 查询密钥
+        stmt = select(AuthApiKey).where(
+            AuthApiKey.id == int(key_id)
         )
-    
-    # 检查是否已经撤销
-    if key.revoked_at is not None:
-        raise BusinessException(
-            "API密钥已经被撤销",
-            ResponseCode.BAD_REQUEST
-        )
-    
-    # 永久撤销密钥
-    key.revoked_at = datetime.now(timezone.utc)
-    key.revoke_reason = reason
-    key.is_active = 0  # 同时设置为非激活状态
-    key.update_by = current_user["username"]  # 记录更新人
-    
-    return {"message": "API密钥已永久撤销"}
+        
+        result = await db.execute(stmt)
+        key = result.scalar_one_or_none()
+        
+        if not key:
+            raise BusinessException(
+                "API密钥不存在",
+                ResponseCode.NOT_FOUND
+            )
+        
+        # 检查是否已经撤销
+        if key.revoked_at is not None:
+            raise BusinessException(
+                "API密钥已经被撤销",
+                ResponseCode.BAD_REQUEST
+            )
+        
+        # 永久撤销密钥
+        key.revoked_at = now_shanghai()
+        key.revoke_reason = reason
+        key.is_active = 0  # 同时设置为非激活状态
+        key.update_by = current_user["username"]  # 记录更新人
+        key.update_time = now_shanghai()
+        
+        await db.flush()
+        
+        return success_response({"message": "API密钥已永久撤销"})
 
 
 @router.put("/api-keys/{key_id}/scopes", summary="更新API密钥权限")
@@ -774,33 +777,39 @@ async def toggle_api_key_status(
     这是一个临时性操作，可以随时切换。
     已撤销的密钥无法再次启用。
     """
-    
-    stmt = select(AuthApiKey).where(
-        AuthApiKey.id == int(key_id)
-    )
-    
-    result = await db.execute(stmt)
-    key = result.scalar_one_or_none()
-    
-    if not key:
-        raise BusinessException(
-            "API密钥不存在",
-            ResponseCode.NOT_FOUND
+    async with db.begin():
+        stmt = select(AuthApiKey).where(
+            AuthApiKey.id == int(key_id)
         )
-    
-    # 检查是否已经撤销
-    if key.revoked_at is not None:
-        raise BusinessException(
-            "已撤销的API密钥无法重新启用",
-            ResponseCode.BAD_REQUEST
-        )
-    
-    # 切换激活状态
-    key.is_active = 0 if key.is_active == 1 else 1
-    key.update_by = current_user["username"]  # 记录更新人
-    
-    status = "启用" if key.is_active == 1 else "禁用"
-    return {"message": f"API密钥已{status}", "is_active": bool(key.is_active)}
+        
+        result = await db.execute(stmt)
+        key = result.scalar_one_or_none()
+        
+        if not key:
+            raise BusinessException(
+                "API密钥不存在",
+                ResponseCode.NOT_FOUND
+            )
+        
+        # 检查是否已经撤销
+        if key.revoked_at is not None:
+            raise BusinessException(
+                "已撤销的API密钥无法重新启用",
+                ResponseCode.BAD_REQUEST
+            )
+        
+        # 切换激活状态
+        key.is_active = 0 if key.is_active == 1 else 1
+        key.update_by = current_user["username"]  # 记录更新人
+        key.update_time = now_shanghai()
+        
+        await db.flush()
+        
+        status = "启用" if key.is_active == 1 else "禁用"
+        return success_response({
+            "message": f"API密钥已{status}", 
+            "is_active": bool(key.is_active)
+        })
 
 
 # ============= 会话管理 =============

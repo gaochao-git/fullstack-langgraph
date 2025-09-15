@@ -165,8 +165,8 @@ class APIKeyUtils:
         注意：临时返回明文，后续稳定后再改为hash
         """
         # 生成Bearer Token格式的API Key
-        # 格式：omind_ak_<random>
-        key_id = f"omind_ak_{secrets.token_urlsafe(32)}"
+        # 格式：ak-<random>
+        key_id = f"ak-{secrets.token_urlsafe(32)}"
         
         # 临时方案：直接返回明文作为"hash"
         return key_id, key_id

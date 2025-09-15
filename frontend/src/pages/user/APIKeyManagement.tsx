@@ -162,7 +162,9 @@ export function APIKeyManagement() {
   const handleToggleStatus = async (keyId: string, keyName: string, currentStatus: boolean) => {
     try {
       const result = await apiKeyService.toggleAPIKeyStatus(keyId);
-      message.success(result.message);
+      // 处理标准响应格式 - 后端使用 success_response 返回
+      const msg = result?.message || '操作成功';
+      message.success(msg);
       loadAPIKeys();
     } catch (error: any) {
       // 切换状态失败
@@ -229,8 +231,10 @@ export function APIKeyManagement() {
       width: 500,
       onOk: async () => {
         try {
-          await apiKeyService.revokeAPIKey(keyId);
-          message.success('API密钥已永久撤销');
+          const result = await apiKeyService.revokeAPIKey(keyId);
+          // 处理标准响应格式 - 后端使用 success_response 返回
+          const msg = result?.message || 'API密钥已永久撤销';
+          message.success(msg);
           loadAPIKeys();
         } catch (error: any) {
           // 撤销API密钥失败

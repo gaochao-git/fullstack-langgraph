@@ -57,7 +57,7 @@ class APIKeyService {
   /**
    * 撤销API密钥（永久操作）
    */
-  async revokeAPIKey(keyId: string, reason?: string): Promise<void> {
+  async revokeAPIKey(keyId: string, reason?: string): Promise<any> {
     const url = reason 
       ? `${this.baseUrl}/api-keys/${keyId}?reason=${encodeURIComponent(reason)}`
       : `${this.baseUrl}/api-keys/${keyId}`;
@@ -67,7 +67,7 @@ class APIKeyService {
   /**
    * 切换API密钥激活状态
    */
-  async toggleAPIKeyStatus(keyId: string): Promise<{ message: string; is_active: boolean }> {
+  async toggleAPIKeyStatus(keyId: string): Promise<any> {
     return await omind_put(`${this.baseUrl}/api-keys/${keyId}/toggle`);
   }
 
