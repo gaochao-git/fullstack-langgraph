@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
 """
-LangExtract 敏感数据扫描器配置
-提供敏感信息类型定义和模型配置
+LangExtract 敏感数据扫描器
+提供敏感信息扫描功能
 """
 
 import os
@@ -18,40 +17,39 @@ try:
 except ImportError:
     raise ImportError("请先安装 langextract: pip install langextract")
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from src.shared.core.logging import get_logger
+from src.shared.core.config import settings
+
+logger = get_logger(__name__)
 
 
 class LangExtractSensitiveScanner:
     """LangExtract 敏感信息扫描配置类"""
     
     def __init__(self, 
-                 model_id: str = "Qwen/Qwen3-30B-A3B-Instruct-2507", 
+                 model_id: Optional[str] = None, 
                  api_key: Optional[str] = None,
-                 base_url: str = "https://api.siliconflow.cn/v1",
-                 max_workers: int = 1,
-                 max_char_buffer: int = 50000):
+                 base_url: Optional[str] = None,
+                 max_workers: Optional[int] = None,
+                 max_char_buffer: Optional[int] = None):
         """
         初始化扫描器配置
         
         Args:
-            model_id: 模型ID
-            api_key: API密钥，如果为None则从环境变量读取
-            base_url: API地址，默认为SiliconFlow
-            max_workers: 并发扫描的最大工作线程数，默认为1
-            max_char_buffer: 单次推理的最大字符数（LangExtract会自动分块），默认50000
+            model_id: 模型ID，默认从配置读取
+            api_key: API密钥，默认从配置读取
+            base_url: API地址，默认从配置读取
+            max_workers: 并发扫描的最大工作线程数，默认从配置读取
+            max_char_buffer: 单次推理的最大字符数，默认从配置读取
         """
-        self.model_id = model_id
-        self.base_url = base_url
-        self.max_workers = max_workers
-        self.max_char_buffer = max_char_buffer
+        # 从配置或环境变量读取默认值
+        self.model_id = model_id or getattr(settings, 'LANGEXTRACT_MODEL', 'Qwen/Qwen3-30B-A3B-Instruct-2507')
+        self.base_url = base_url or getattr(settings, 'LANGEXTRACT_BASE_URL', 'https://api.siliconflow.cn/v1')
+        self.max_workers = max_workers or getattr(settings, 'LANGEXTRACT_MAX_WORKERS', 1)
+        self.max_char_buffer = max_char_buffer or getattr(settings, 'LANGEXTRACT_MAX_CHAR_BUFFER', 50000)
         
         # 设置API密钥
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("SILICONFLOW_API_KEY")
+        self.api_key = api_key or getattr(settings, 'LANGEXTRACT_API_KEY', None) or os.environ.get("SILICONFLOW_API_KEY")
         if self.api_key:
             os.environ["OPENAI_API_KEY"] = self.api_key
         
@@ -194,7 +192,6 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
-        
         return examples
     
     def scan_document(self, file_id: str, text: str, output_dir: str = "/tmp/scan_results", 
@@ -330,6 +327,7 @@ class LangExtractSensitiveScanner:
             f.write(html_content)
         logger.info(f"可视化已生成: {html_path}")
         return html_path
-    
 
 
+# 创建全局扫描器实例
+sensitive_scanner = LangExtractSensitiveScanner()

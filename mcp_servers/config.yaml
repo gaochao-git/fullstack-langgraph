@@ -75,13 +75,6 @@ servers:
     display_name: "敏感数据扫描服务"
     config:
       port: 3008
-      document_storage_path: "/tmp/documents/uploads"  # 文档存储路径
-      # LangExtract 配置
-      langextract_provider: "custom"  # 提供商: gemini, openai, custom
-      langextract_model: "Qwen/Qwen3-30B-A3B-Instruct-2507"  # 模型ID
-      langextract_api_key: "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm"
-      langextract_base_url: "https://api.siliconflow.cn/v1"  # SiliconFlow API地址
-      visualization_output_dir: "/tmp/scan_visualizations"  # 可视化报告输出目录
-      # 扫描配置
-      chunk_size: 10000  # 扫描分块大小（字符数），默认10000
-      file_concurrency: 3  # 文件并发度（同时扫描的文件数），默认3
+      # 后端API配置
+      api_base_url: "http://localhost:8000"  # 后端API地址
+      api_timeout: 300  # API调用超时时间（秒）
