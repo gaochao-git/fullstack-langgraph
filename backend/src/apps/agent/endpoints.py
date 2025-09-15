@@ -955,11 +955,17 @@ async def get_task_extract_results(
             if has_sensitive:
                 all_files_with_sensitive.add(file_id)
         
+        # 计算文档字符数（从第一个文档获取，所有文档应该有相同的文本）
+        char_count = 0
+        if documents and documents[0].get("text"):
+            char_count = len(documents[0].get("text", ""))
+        
         # 添加文件结果摘要
         file_results.append({
             "file_id": file_id,
             "file_name": file_name,
             "file_size": file_size,
+            "char_count": char_count,
             "sensitive_count": len(file_items),
             "sensitive_types": file_statistics,
             "items": file_items
@@ -994,9 +1000,9 @@ async def get_extract_html(
     from fastapi.responses import FileResponse
     import os
     
-    # 检查认证
-    if not current_user:
-        raise BusinessException("需要登录才能查看提取结果", ResponseCode.UNAUTHORIZED)
+    # HTML查看不需要强制认证，允许公开访问
+    # if not current_user:
+    #     raise BusinessException("需要登录才能查看提取结果", ResponseCode.UNAUTHORIZED)
     
     # 构建 HTML 文件路径
     html_path = f"/tmp/scan_visualizations/{scan_id}.html"

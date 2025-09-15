@@ -37,6 +37,8 @@ AUTH_EXCLUDE_PATHS = [
     "/openapi.json",
     "/health",
     "/api/health",
+    # 添加 LangExtract HTML 查看接口（公开访问）
+    "/api/v1/extract/",  # 匹配所有 /api/v1/extract/xxx/html 路径
 ]
 
 # 定义RBAC权限检查排除路径常量

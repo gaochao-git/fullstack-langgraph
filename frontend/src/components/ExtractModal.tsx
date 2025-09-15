@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Table, Tag, Space, Spin, Typography, message, Input, Button, Card, Row, Col, Statistic, ConfigProvider } from 'antd';
 import { FileTextOutlined, AlertOutlined, DownloadOutlined, FolderOpenOutlined, WarningOutlined, FileSearchOutlined, FileImageOutlined } from '@ant-design/icons';
 import { omind_get, omind_post } from '@/utils/base_api';
@@ -6,91 +6,6 @@ import { fileApi } from '@/services/fileApi';
 import zhCN from 'antd/locale/zh_CN';
 
 const { TextArea } = Input;
-
-// 敏感信息高亮组件
-interface HighlightedTextProps {
-  content: string;
-  sensitiveItems: Array<{
-    type: string;
-    masked_value: string;
-    position?: {
-      start: number;
-      end: number;
-    };
-  }>;
-}
-
-const HighlightedText: React.FC<HighlightedTextProps> = ({ content, sensitiveItems }) => {
-  // 根据position信息构建高亮片段
-  const highlights: Array<{ start: number; end: number }> = [];
-  
-  sensitiveItems.forEach(item => {
-    if (item.position) {
-      highlights.push({
-        start: item.position.start,
-        end: item.position.end
-      });
-    }
-  });
-  
-  // 按照起始位置排序
-  highlights.sort((a, b) => a.start - b.start);
-  
-  // 构建渲染片段
-  const segments: Array<{ text: string; isHighlight: boolean }> = [];
-  let lastEnd = 0;
-  
-  highlights.forEach(highlight => {
-    // 添加高亮前的普通文本
-    if (highlight.start > lastEnd) {
-      segments.push({
-        text: content.substring(lastEnd, highlight.start),
-        isHighlight: false
-      });
-    }
-    
-    // 添加高亮文本
-    segments.push({
-      text: content.substring(highlight.start, highlight.end),
-      isHighlight: true
-    });
-    
-    lastEnd = highlight.end;
-  });
-  
-  // 添加最后的普通文本
-  if (lastEnd < content.length) {
-    segments.push({
-      text: content.substring(lastEnd),
-      isHighlight: false
-    });
-  }
-  
-  return (
-    <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', fontFamily: 'monospace', lineHeight: '1.8' }}>
-      {segments.map((segment, index) => {
-        if (segment.isHighlight) {
-          return (
-            <span 
-              key={index} 
-              style={{ 
-                backgroundColor: '#ff4d4f',
-                color: '#fff',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                fontWeight: 'bold',
-                margin: '0 2px'
-              }}
-            >
-              {segment.text}
-            </span>
-          );
-        }
-        return <span key={index}>{segment.text}</span>;
-      })}
-    </div>
-  );
-};
 
 interface ExtractModalProps {
   visible: boolean;
@@ -113,7 +28,6 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
   const [fileContent, setFileContent] = useState('');
   const [fileContentLoading, setFileContentLoading] = useState(false);
   const [currentFileName, setCurrentFileName] = useState('');
-  const [currentFileSensitiveItems, setCurrentFileSensitiveItems] = useState<any[]>([]);
   useEffect(() => {
     if (visible && reportPath) {
       loadReport();
@@ -179,14 +93,6 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
       if (response.status === 'ok' && response.data) {
         setFileContent(response.data.content || '暂无内容');
         setCurrentFileName(response.data.file_name || '文档内容');
-        
-        // 收集当前文件的敏感信息
-        if (data && data.items) {
-          const fileSensitiveItems = data.items.filter((item: any) => 
-            item.file_id === fileId
-          );
-          setCurrentFileSensitiveItems(fileSensitiveItems);
-        }
       } else {
         message.error(response.msg || '获取文件内容失败');
         setFileContentVisible(false);
@@ -199,7 +105,242 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
     }
   };
 
-  // 通用表格列定义
+  // 根据reportType决定是否需要转换数据
+  const fileBasedData = useMemo(() => {
+    if (!data || reportType !== 'LANGEXTRACT') {
+      return data;
+    }
+    
+    // 如果后端已经返回了files字段，直接使用
+    if (data.files && Array.isArray(data.files)) {
+      // 处理后端返回的文件列表
+      const processedFiles = data.files.map((file: any) => {
+        // 收集该文件的所有敏感信息
+        const fileSensitiveItems = data.items?.filter((item: any) => item.file_id === file.file_id) || [];
+        
+        // 从敏感信息项中获取文件信息（如果file对象中没有）
+        const firstItem = fileSensitiveItems[0];
+        const char_count = file.char_count || firstItem?.char_count || 0;
+        const image_count = file.image_count || firstItem?.image_count || 0;
+        
+        return {
+          file_id: file.file_id,
+          file_name: file.file_name || `文档_${file.file_id}`,
+          file_size: file.file_size || 0,
+          char_count: char_count,
+          image_count: image_count,
+          sensitive_items: fileSensitiveItems.map((item: any) => ({
+            type: item.type,
+            context: item.context,
+            masked_value: item.masked_value,
+            position: item.position
+          })),
+          sensitive_count: file.sensitive_count || fileSensitiveItems.length,
+          status: 'completed',
+          // 基于文件名构建路径
+          jsonl_path: `/tmp/scan_visualizations/${reportPath}_${file.file_id}.jsonl`,
+          html_path: `/tmp/scan_visualizations/${reportPath}_${file.file_id}.html`
+        };
+      });
+      
+      return {
+        ...data,
+        files: processedFiles,
+        total_files: processedFiles.length,
+        files_with_sensitive: processedFiles.filter(f => f.sensitive_items.length > 0).length
+      };
+    }
+    
+    // 如果没有files字段，从items构建（兼容旧版本）
+    const fileMap = new Map();
+    
+    if (data.items) {
+      data.items.forEach((item: any) => {
+        const fileId = item.file_id;
+        if (!fileMap.has(fileId)) {
+          fileMap.set(fileId, {
+            file_id: fileId,
+            file_name: item.file_name || `文档_${fileId}`,
+            file_size: item.file_size || 0,
+            char_count: item.char_count || 0,
+            image_count: item.image_count || 0,
+            sensitive_items: [],
+            status: 'completed',
+            jsonl_path: `/tmp/scan_visualizations/${reportPath}_${fileId}.jsonl`,
+            html_path: `/tmp/scan_visualizations/${reportPath}_${fileId}.html`
+          });
+        }
+        // 添加敏感信息到文件记录中
+        fileMap.get(fileId).sensitive_items.push({
+          type: item.type,
+          context: item.context,
+          masked_value: item.masked_value,
+          position: item.position
+        });
+      });
+    }
+    
+    const files = Array.from(fileMap.values());
+    
+    return {
+      ...data,
+      files: files,
+      total_files: data.total_files || files.length,
+      files_with_sensitive: data.files_with_sensitive || files.filter(f => f.sensitive_items.length > 0).length
+    };
+  }, [data, reportType, reportPath]);
+
+  // 文件列表表格列定义（用于LANGEXTRACT类型）
+  const fileColumns = [
+    {
+      title: '文件名',
+      dataIndex: 'file_name',
+      key: 'file_name',
+      width: 300,
+      render: (fileName: string, record: any) => {
+        const fileId = record.file_id;
+        
+        // 下载文件函数
+        const handleDownload = async () => {
+          if (!fileId) {
+            message.error('无法下载：文件ID不存在');
+            return;
+          }
+          
+          try {
+            const blob = await fileApi.downloadDocument(fileId);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error('下载文件失败:', error);
+            message.error('下载文件失败');
+          }
+        };
+        
+        return (
+          <Space size={4}>
+            <Typography.Text ellipsis={{ tooltip: fileName }} style={{ maxWidth: '200px' }}>
+              <FileTextOutlined style={{ marginRight: 4 }} />
+              {fileName}
+            </Typography.Text>
+            <Button
+              type="link"
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={handleDownload}
+              style={{ padding: '0 4px' }}
+              title="下载原始文件"
+            />
+          </Space>
+        );
+      }
+    },
+    {
+      title: '扫描状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status: string) => {
+        const statusMap: Record<string, { color: string; text: string }> = {
+          'completed': { color: 'green', text: '已完成' },
+          'failed': { color: 'red', text: '失败' },
+          'scanning': { color: 'blue', text: '扫描中' },
+          'pending': { color: 'gray', text: '待处理' }
+        };
+        const config = statusMap[status] || { color: 'gray', text: status };
+        return <Tag color={config.color}>{config.text}</Tag>;
+      }
+    },
+    {
+      title: '敏感信息',
+      key: 'sensitive_count',
+      width: 120,
+      render: (_: any, record: any) => {
+        const count = record.sensitive_items?.length || 0;
+        return count > 0 ? (
+          <Tag color="red" icon={<AlertOutlined />}>{count} 条</Tag>
+        ) : (
+          <Tag color="green">无</Tag>
+        );
+      }
+    },
+    {
+      title: '文件大小',
+      dataIndex: 'file_size',
+      key: 'file_size',
+      width: 100,
+      render: (fileSize: number) => {
+        // 格式化文件大小
+        const formatFileSize = (bytes: number) => {
+          if (bytes === 0) return '0 B';
+          const k = 1024;
+          const sizes = ['B', 'KB', 'MB', 'GB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        };
+        
+        return <span style={{ fontSize: '12px' }}>{formatFileSize(fileSize)}</span>;
+      }
+    },
+    {
+      title: '文档字数',
+      dataIndex: 'char_count',
+      key: 'char_count',
+      width: 100,
+      render: (charCount: number, record: any) => {
+        const imageCount = record.image_count || 0;
+        
+        return (
+          <Space direction="vertical" size={0} style={{ fontSize: '12px' }}>
+            <span>{(charCount || 0).toLocaleString()}</span>
+            {imageCount > 0 && <span style={{ color: '#8c8c8c' }}>含{imageCount}图</span>}
+          </Space>
+        );
+      }
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 200,
+      render: (_: any, record: any) => {
+        const fileId = record.file_id;
+        const hasSensitiveInfo = record.sensitive_items?.length > 0 || record.sensitive_count > 0;
+        
+        // 构建扫描报告文件名：task_id_file_id
+        const scanId = `${reportPath}_${fileId}`;
+        
+        return (
+          <Space size={8}>
+            {hasSensitiveInfo && (
+              <Typography.Link 
+                onClick={() => {
+                  // 在新标签页打开HTML报告
+                  window.open(`/api/v1/extract/${scanId}/html`, '_blank');
+                }}
+                style={{ fontSize: '12px' }}
+              >
+                查看报告
+              </Typography.Link>
+            )}
+            <Typography.Link 
+              onClick={() => viewFileContent(fileId)}
+              style={{ fontSize: '12px' }}
+            >
+              查看原始文本
+            </Typography.Link>
+          </Space>
+        );
+      }
+    }
+  ];
+
+  // 通用表格列定义（用于其他类型）
   const columns = [
     {
       title: '类型',
@@ -318,7 +459,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
             onClick={() => viewFileContent(fileId)}
             style={{ fontSize: '12px' }}
           >
-            查看原始解析文档
+            查看原始文本
           </Typography.Link>
         ) : '-';
       }
@@ -355,11 +496,23 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
             {/* 扫描统计信息 */}
             <Card style={{ marginBottom: 16 }}>
               <Row gutter={16}>
-                <Col span={6}>
+                {reportType === 'LANGEXTRACT' && (
+                  <Col span={4}>
+                    <Statistic
+                      title="扫描文件总数"
+                      value={fileBasedData.total_files || 0}
+                      prefix={<FolderOpenOutlined />}
+                    />
+                  </Col>
+                )}
+                <Col span={reportType === 'LANGEXTRACT' ? 4 : 6}>
                   <Statistic
                     title="包含敏感信息的文件"
                     value={(() => {
                       // 使用Set去重计算包含敏感信息的文件数量
+                      if (reportType === 'LANGEXTRACT' && fileBasedData.files_with_sensitive !== undefined) {
+                        return fileBasedData.files_with_sensitive;
+                      }
                       const sensitiveFileIds = new Set();
                       if (data.items && Array.isArray(data.items)) {
                         data.items.forEach((item: any) => {
@@ -373,6 +526,9 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     prefix={<FileSearchOutlined />}
                     valueStyle={{ color: (() => {
                       const count = (() => {
+                        if (reportType === 'LANGEXTRACT' && fileBasedData.files_with_sensitive !== undefined) {
+                          return fileBasedData.files_with_sensitive;
+                        }
                         const sensitiveFileIds = new Set();
                         if (data.items && Array.isArray(data.items)) {
                           data.items.forEach((item: any) => {
@@ -387,7 +543,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     })() }}
                   />
                 </Col>
-                <Col span={4}>
+                <Col span={reportType === 'LANGEXTRACT' ? 3 : 4}>
                   <Statistic
                     title="敏感信息总数"
                     value={data.total_sensitive || data.items?.length || 0}
@@ -395,7 +551,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     valueStyle={{ color: '#cf1322' }}
                   />
                 </Col>
-                <Col span={5}>
+                <Col span={reportType === 'LANGEXTRACT' ? 4 : 5}>
                   <Statistic
                     title="扫描总字数"
                     value={(() => {
@@ -417,7 +573,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     })()}
                   />
                 </Col>
-                <Col span={5}>
+                <Col span={reportType === 'LANGEXTRACT' ? 4 : 5}>
                   <Statistic
                     title="扫描总大小"
                     value={(() => {
@@ -445,7 +601,7 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
                     })()}
                   />
                 </Col>
-                <Col span={4}>
+                <Col span={reportType === 'LANGEXTRACT' ? 5 : 4}>
                   <Statistic
                     title="扫描图片数量"
                     value={(() => {
@@ -473,15 +629,17 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
               {/* 敏感信息类型分布 */}
               {data.statistics && Object.keys(data.statistics).length > 0 && (
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
-                  <Typography.Text type="secondary" style={{ marginBottom: 8, display: 'block' }}>
-                    敏感信息类型分布：
-                  </Typography.Text>
-                  <Space wrap>
-                    {Object.entries(data.statistics).map(([type, count]) => (
-                      <Tag key={type} color={getTypeColor(type)}>
-                        {type}: {count as number}
-                      </Tag>
-                    ))}
+                  <Space align="start" style={{ width: '100%' }}>
+                    <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
+                      敏感信息类型分布：
+                    </Typography.Text>
+                    <Space wrap>
+                      {Object.entries(data.statistics).map(([type, count]) => (
+                        <Tag key={type} color={getTypeColor(type)}>
+                          {type}: {count as number}
+                        </Tag>
+                      ))}
+                    </Space>
                   </Space>
                 </div>
               )}
@@ -489,8 +647,12 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
             
             <ConfigProvider locale={zhCN}>
               <Table
-                columns={columns}
-                dataSource={data.items.map((item: any, index: number) => ({ ...item, key: index }))}
+                columns={reportType === 'LANGEXTRACT' ? fileColumns : columns}
+                dataSource={
+                  reportType === 'LANGEXTRACT' 
+                    ? fileBasedData.files?.map((item: any, index: number) => ({ ...item, key: index })) || []
+                    : data.items.map((item: any, index: number) => ({ ...item, key: index }))
+                }
                 pagination={{ 
                   pageSize: 10,
                   showSizeChanger: true,
@@ -531,7 +693,6 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
         open={fileContentVisible}
         onCancel={() => {
           setFileContentVisible(false);
-          setCurrentFileSensitiveItems([]);
         }}
         width="80%"
         style={{ top: 20 }}
@@ -551,10 +712,16 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
             borderRadius: '4px',
             border: '1px solid #d9d9d9'
           }}>
-            <HighlightedText 
-              content={fileContent} 
-              sensitiveItems={currentFileSensitiveItems}
-            />
+            <pre style={{ 
+              whiteSpace: 'pre-wrap', 
+              wordWrap: 'break-word',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              lineHeight: '1.6',
+              margin: 0
+            }}>
+              {fileContent}
+            </pre>
           </div>
         )}
       </Modal>
