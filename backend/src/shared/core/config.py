@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     LLM_BASE_URL: Optional[str] = None
     LLM_MODEL: Optional[str] = None
     
+    # 语音模型配置
+    AUDIO_MODEL_NAME: Optional[str] = None
+    AUDIO_API_BASE_URL: Optional[str] = None
+    AUDIO_API_KEY: Optional[str] = None
+    
     # 日志配置
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

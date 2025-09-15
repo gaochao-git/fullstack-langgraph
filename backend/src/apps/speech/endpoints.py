@@ -16,9 +16,13 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/speech-to-text", tags=["Speech"])
 
-# 硅基流动 API 配置
-SILICONFLOW_API_KEY = settings.SILICONFLOW_API_KEY or os.environ.get("SILICONFLOW_API_KEY", "sk-dldltbdokxccwaqhjvpvjuvznimwztmfvpxpikypeysftktm")
-SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
+# 语音 API 配置（从settings获取）
+if not settings.AUDIO_API_KEY or not settings.AUDIO_API_BASE_URL or not settings.AUDIO_MODEL_NAME:
+    raise ValueError("必须在配置文件中设置 AUDIO_API_KEY, AUDIO_API_BASE_URL 和 AUDIO_MODEL_NAME")
+
+AUDIO_API_KEY = settings.AUDIO_API_KEY
+AUDIO_BASE_URL = settings.AUDIO_API_BASE_URL
+AUDIO_MODEL_NAME = settings.AUDIO_MODEL_NAME
 
 
 async def speech_to_text_siliconflow(audio: UploadFile, language: Optional[str] = None):
@@ -49,7 +53,7 @@ async def speech_to_text_siliconflow(audio: UploadFile, language: Optional[str] 
                 
                 # 构建请求数据
                 data = {
-                    'model': 'FunAudioLLM/SenseVoiceSmall'
+                    'model': AUDIO_MODEL_NAME
                 }
                 
                 if language:
@@ -67,9 +71,9 @@ async def speech_to_text_siliconflow(audio: UploadFile, language: Optional[str] 
                 # 调用硅基流动 API
                 logger.info(f"调用硅基流动 API 进行语音识别: {audio.filename}")
                 response = await client.post(
-                    f"{SILICONFLOW_BASE_URL}/audio/transcriptions",
+                    f"{AUDIO_BASE_URL}/audio/transcriptions",
                     headers={
-                        "Authorization": f"Bearer {SILICONFLOW_API_KEY}"
+                        "Authorization": f"Bearer {AUDIO_API_KEY}"
                     },
                     files=files,
                     data=data
@@ -91,8 +95,7 @@ async def speech_to_text_siliconflow(audio: UploadFile, language: Optional[str] 
                 return success_response({
                     "text": text,
                     "language": language or "auto",
-                    "model": "FunAudioLLM/SenseVoiceSmall",
-                    "provider": "siliconflow"
+                    "model": AUDIO_MODEL_NAME
                 })
                 
     except httpx.RequestError as e:
