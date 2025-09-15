@@ -463,12 +463,18 @@ class LangExtractScanTaskService:
             # 获取文件统计
             file_stats = await self._get_task_file_stats(db, task.task_id)
             
+            # 获取敏感项统计（仅对已完成的任务）
+            sensitive_items = 0
+            if task.task_status == 'completed':
+                sensitive_items = await self._count_sensitive_items(db, task.task_id)
+            
             task_list.append({
                 "task_id": task.task_id,
                 "status": task.task_status,
                 "total_files": file_stats['total'],
                 "completed_files": file_stats['completed'],
                 "failed_files": file_stats['failed'],
+                "sensitive_items": sensitive_items,
                 "create_by": task.create_by,
                 "create_time": task.create_time.isoformat(),
                 "start_time": task.start_time.isoformat() if task.start_time else None,

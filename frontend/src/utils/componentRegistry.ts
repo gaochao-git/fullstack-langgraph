@@ -30,6 +30,10 @@ export const componentRegistry = {
   
   'APIKeyManagement': lazy(() => import('../pages/user').then(m => ({ default: m.APIKeyManagement }))),
   
+  // 敏感数据扫描
+  'SensitiveScanManagement': lazy(() => import('../pages/sensitive_scan').then(m => ({ default: m.SensitiveScanManagement }))),
+  'ScanTaskDetail': lazy(() => import('../pages/sensitive_scan').then(m => ({ default: m.ScanTaskDetail }))),
+  
   // 待开发的页面
   'HomePage': lazy(() => Promise.resolve({ 
     default: () => React.createElement('div', { style: { padding: '20px', textAlign: 'center' } }, '首页 - 待开发')
