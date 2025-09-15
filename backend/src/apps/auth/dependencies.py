@@ -82,8 +82,8 @@ async def get_current_user_optional(
         if credentials:
             token = credentials.credentials
             
-            # 检查是否是API Key（以omind_ak_开头）
-            if token.startswith("omind_ak_"):
+            # 检查是否是API Key（以ak-开头）
+            if token.startswith("ak-"):
                 # API Key认证
                 key_hash = APIKeyUtils.hash_api_key(token)
                 
