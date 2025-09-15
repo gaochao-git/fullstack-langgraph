@@ -1,8 +1,6 @@
-"""敏感数据扫描任务服务层 - 完整实现"""
+"""敏感数据扫描任务服务层 - 使用原生langextract实现"""
 
 import os
-import re
-import json
 import asyncio
 import uuid
 from typing import List, Dict, Optional, Any
@@ -10,6 +8,9 @@ from datetime import datetime
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, func
+
+import json
+import langextract as lx
 
 from src.shared.db.models import now_shanghai
 from src.shared.core.logging import get_logger
@@ -21,65 +22,26 @@ from .models import ScanTask, ScanFile
 logger = get_logger(__name__)
 
 
-class SensitiveDataScanner:
-    """敏感数据扫描器"""
-    
-    # 敏感数据正则表达式
-    PATTERNS = {
-        "身份证号": r'\b[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b',
-        "手机号": r'\b1[3-9]\d{9}\b',
-        "银行卡号": r'\b[1-9]\d{15,18}\b',
-        "邮箱地址": r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-        "统一社会信用代码": r'\b[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}\b',
-        "车牌号": r'\b[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳]\b',
-        "护照号": r'\b[GgEe]\d{8}\b',
-        "IPv4地址": r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b',
-        "密码": r'(?i)(password|passwd|pwd|密码)\s*[:=]\s*[^\s]+',
-        "API密钥": r'(?i)(api[_-]?key|apikey|secret[_-]?key|access[_-]?key)\s*[:=]\s*[\'"]?[\w-]{16,}[\'"]?'
-    }
-    
-    def scan_text(self, text: str) -> List[Dict[str, Any]]:
-        """扫描文本中的敏感数据"""
-        results = []
-        
-        for data_type, pattern in self.PATTERNS.items():
-            matches = re.finditer(pattern, text, re.IGNORECASE if data_type in ["邮箱地址", "密码", "API密钥"] else 0)
-            for match in matches:
-                # 获取匹配位置的上下文
-                start = max(0, match.start() - 20)
-                end = min(len(text), match.end() + 20)
-                context = text[start:end]
-                
-                # 脱敏处理
-                sensitive_value = match.group()
-                if len(sensitive_value) > 4:
-                    masked_value = sensitive_value[:3] + '*' * (len(sensitive_value) - 6) + sensitive_value[-3:]
-                else:
-                    masked_value = '*' * len(sensitive_value)
-                
-                results.append({
-                    "type": data_type,
-                    "value": masked_value,
-                    "original_value": sensitive_value,  # 实际应用中不应返回原始值
-                    "position": {
-                        "start": match.start(),
-                        "end": match.end()
-                    },
-                    "context": context,
-                    "line_number": text[:match.start()].count('\n') + 1
-                })
-        
-        return results
-
-
-class FullScanTaskService:
-    """扫描任务服务层 - 完整实现"""
+class LangExtractScanTaskService:
+    """扫描任务服务层 - 使用langextract实现"""
     
     def __init__(self):
-        self.scanner = SensitiveDataScanner()
         # 确保扫描结果目录存在
         self.scan_results_dir = Path(settings.UPLOAD_DIR) / "scan_results"
         self.scan_results_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 设置langextract提供者
+        # 使用环境变量或默认配置
+        provider = os.getenv("LLM_TYPE", "openai")
+        api_key = os.getenv("LLM_API_KEY", "")
+        base_url = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
+        model = os.getenv("LLM_MODEL", "deepseek-chat")
+        
+        if provider == "openai":
+            # 配置OpenAI兼容的provider（如DeepSeek）
+            os.environ["OPENAI_API_KEY"] = api_key
+            if base_url:
+                os.environ["OPENAI_BASE_URL"] = base_url
     
     async def create_scan_task(
         self, 
@@ -131,7 +93,6 @@ class FullScanTaskService:
     async def _process_scan_task(self, task_id: str, file_ids: List[str]):
         """后台处理扫描任务"""
         from src.shared.db.config import get_async_db_context
-        from src.apps.agent.service.document_service import document_service
         
         logger.info(f"开始处理扫描任务: {task_id}")
         
@@ -151,7 +112,7 @@ class FullScanTaskService:
                 
                 # 处理每个文件
                 for file_id in file_ids:
-                    await self._scan_file(task_id, file_id)
+                    await self._scan_file_with_langextract(task_id, file_id)
                 
                 # 更新任务状态为完成
                 async with db.begin():
@@ -180,9 +141,8 @@ class FullScanTaskService:
                         )
                     )
     
-    async def _scan_file(self, task_id: str, file_id: str):
-        """扫描单个文件"""
-        from src.apps.agent.service.document_service import document_service
+    async def _scan_file_with_langextract(self, task_id: str, file_id: str):
+        """使用langextract扫描单个文件"""
         from src.shared.db.config import get_async_db_context
         
         try:
@@ -200,8 +160,7 @@ class FullScanTaskService:
                         )
                     )
                 
-                # 直接读取文件内容，不查询数据库
-                # 直接使用file_id构建文件路径
+                # 构建文件路径
                 file_path = Path(settings.UPLOAD_DIR) / f"{file_id}.txt"
                 
                 if not file_path.exists() or not file_path.is_file():
@@ -214,6 +173,7 @@ class FullScanTaskService:
                 # 获取文件名
                 original_filename = file_path.name
                 
+                # 读取文件内容
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
                 
@@ -228,14 +188,75 @@ class FullScanTaskService:
                         )
                     )
                 
-                # 执行扫描
-                scan_results = self.scanner.scan_text(content)
+                # 使用langextract进行扫描
+                # 创建任务目录
+                task_dir = self.scan_results_dir / task_id
+                task_dir.mkdir(parents=True, exist_ok=True)
                 
-                # 生成结果文件
-                jsonl_path, html_path = await self._save_scan_results(
-                    task_id, file_id, original_filename, 
-                    content, scan_results
+                # 生成输出文件路径
+                base_name = f"{file_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                jsonl_path = task_dir / f"{base_name}.jsonl"
+                html_path = task_dir / f"{base_name}.html"
+                
+                # 创建文档对象
+                doc = lx.Document(
+                    text=content,
+                    document_id=file_id,
+                    metadata={"filename": original_filename}
                 )
+                
+                # 定义要提取的敏感数据模式
+                extraction_schema = lx.Extraction(
+                    names=["sensitive_data"],
+                    descriptions=[
+                        """Extract all sensitive data including:
+                        - Personal ID numbers (身份证号)
+                        - Phone numbers (手机号) 
+                        - Bank card numbers (银行卡号)
+                        - Email addresses (邮箱地址)
+                        - Social credit codes (统一社会信用代码)
+                        - License plate numbers (车牌号)
+                        - Passport numbers (护照号)
+                        - IP addresses (IP地址)
+                        - Passwords (密码)
+                        - API keys (API密钥)
+                        
+                        For each found item, extract:
+                        - type: The type of sensitive data
+                        - value: The actual value (will be masked later)
+                        - context: 20 characters before and after the value
+                        - line_number: The line number where it appears
+                        """
+                    ]
+                )
+                
+                # 执行提取
+                logger.info(f"开始使用langextract扫描文件: {file_id}")
+                
+                # 使用同步方式调用langextract
+                # 在异步上下文中运行同步代码
+                loop = asyncio.get_event_loop()
+                
+                def extract_sync():
+                    return lx.extract(
+                        documents=[doc],
+                        extraction=extraction_schema,
+                        output_jsonl_path=str(jsonl_path),
+                        output_viz_path=str(html_path),
+                        provider="openai",  # 使用OpenAI兼容的provider
+                        model=os.getenv("LLM_MODEL", "deepseek-chat"),
+                        chunk_size=2000,  # 每次处理2000字符
+                        overlap=100  # 重叠100字符确保不遗漏
+                    )
+                
+                # 在线程池中执行同步操作
+                await loop.run_in_executor(None, extract_sync)
+                
+                logger.info(f"langextract扫描完成: {file_id}")
+                
+                # 返回相对路径
+                jsonl_relative = f"scan_results/{task_id}/{base_name}.jsonl"
+                html_relative = f"scan_results/{task_id}/{base_name}.html"
                 
                 # 更新文件状态为完成
                 async with scan_db.begin():
@@ -244,8 +265,8 @@ class FullScanTaskService:
                         .where(and_(ScanFile.task_id == task_id, ScanFile.file_id == file_id))
                         .values(
                             file_status='completed',
-                            jsonl_path=jsonl_path,
-                            html_path=html_path,
+                            jsonl_path=jsonl_relative,
+                            html_path=html_relative,
                             end_time=now_shanghai(),
                             update_time=now_shanghai()
                         )
@@ -265,252 +286,6 @@ class FullScanTaskService:
                             update_time=now_shanghai()
                         )
                     )
-    
-    async def _save_scan_results(
-        self, 
-        task_id: str, 
-        file_id: str, 
-        filename: str,
-        content: str,
-        scan_results: List[Dict[str, Any]]
-    ) -> tuple[str, str]:
-        """保存扫描结果为JSONL和HTML格式"""
-        # 创建任务目录
-        task_dir = self.scan_results_dir / task_id
-        task_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 生成文件名
-        base_name = f"{file_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        jsonl_filename = f"{base_name}.jsonl"
-        html_filename = f"{base_name}.html"
-        
-        # 保存JSONL文件
-        jsonl_path = task_dir / jsonl_filename
-        with open(jsonl_path, 'w', encoding='utf-8') as f:
-            # 写入文档信息
-            doc_info = {
-                "document_id": file_id,
-                "filename": filename,
-                "scan_time": datetime.now().isoformat(),
-                "total_findings": len(scan_results)
-            }
-            f.write(json.dumps(doc_info, ensure_ascii=False) + '\n')
-            
-            # 写入每个发现
-            for result in scan_results:
-                f.write(json.dumps(result, ensure_ascii=False) + '\n')
-        
-        # 生成HTML报告
-        html_path = task_dir / html_filename
-        html_content = self._generate_html_report(
-            filename, content, scan_results, task_id, file_id
-        )
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        # 返回相对路径
-        return (
-            f"scan_results/{task_id}/{jsonl_filename}",
-            f"scan_results/{task_id}/{html_filename}"
-        )
-    
-    def _generate_html_report(
-        self, 
-        filename: str, 
-        content: str,
-        scan_results: List[Dict[str, Any]], 
-        task_id: str,
-        file_id: str
-    ) -> str:
-        """生成HTML报告"""
-        # 按类型分组统计
-        stats = {}
-        for result in scan_results:
-            data_type = result['type']
-            if data_type not in stats:
-                stats[data_type] = 0
-            stats[data_type] += 1
-        
-        # 生成高亮的文本内容
-        highlighted_content = content
-        # 从后往前替换，避免位置偏移
-        for result in sorted(scan_results, key=lambda x: x['position']['start'], reverse=True):
-            start = result['position']['start']
-            end = result['position']['end']
-            original = result['original_value']
-            highlighted = f'<mark class="{result["type"].replace(" ", "-")}" title="{result["type"]}">{original}</mark>'
-            highlighted_content = highlighted_content[:start] + highlighted + highlighted_content[end:]
-        
-        # 转义HTML特殊字符
-        highlighted_content = highlighted_content.replace('\n', '<br>')
-        
-        html = f"""
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>敏感数据扫描报告 - {filename}</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }}
-        .header {{
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }}
-        h1 {{
-            color: #2c3e50;
-            margin: 0 0 10px 0;
-        }}
-        .meta {{
-            color: #7f8c8d;
-            font-size: 14px;
-        }}
-        .summary {{
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }}
-        .stats {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }}
-        .stat-card {{
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #3498db;
-        }}
-        .stat-card h3 {{
-            margin: 0 0 5px 0;
-            font-size: 16px;
-            color: #2c3e50;
-        }}
-        .stat-card .count {{
-            font-size: 24px;
-            font-weight: bold;
-            color: #3498db;
-        }}
-        .findings {{
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }}
-        .finding {{
-            background: #f8f9fa;
-            padding: 12px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-            border-left: 4px solid #e74c3c;
-        }}
-        .finding-type {{
-            font-weight: bold;
-            color: #e74c3c;
-            margin-bottom: 5px;
-        }}
-        .finding-details {{
-            font-size: 14px;
-            color: #555;
-        }}
-        .content {{
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            font-family: monospace;
-            font-size: 14px;
-            line-height: 1.8;
-            overflow-x: auto;
-        }}
-        mark {{
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-weight: bold;
-        }}
-        mark.身份证号 {{ background-color: #ffeb3b; }}
-        mark.手机号 {{ background-color: #ff9800; }}
-        mark.银行卡号 {{ background-color: #f44336; color: white; }}
-        mark.邮箱地址 {{ background-color: #2196f3; color: white; }}
-        mark.统一社会信用代码 {{ background-color: #9c27b0; color: white; }}
-        mark.车牌号 {{ background-color: #4caf50; color: white; }}
-        mark.护照号 {{ background-color: #00bcd4; }}
-        mark.IPv4地址 {{ background-color: #795548; color: white; }}
-        mark.密码 {{ background-color: #e91e63; color: white; }}
-        mark.API密钥 {{ background-color: #607d8b; color: white; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>敏感数据扫描报告</h1>
-        <div class="meta">
-            <p>文件名：{filename}</p>
-            <p>任务ID：{task_id}</p>
-            <p>文件ID：{file_id}</p>
-            <p>扫描时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        </div>
-    </div>
-    
-    <div class="summary">
-        <h2>扫描概要</h2>
-        <p>共发现 <strong>{len(scan_results)}</strong> 个敏感数据</p>
-        <div class="stats">
-"""
-        
-        for data_type, count in stats.items():
-            html += f"""
-            <div class="stat-card">
-                <h3>{data_type}</h3>
-                <div class="count">{count}</div>
-            </div>
-"""
-        
-        html += """
-        </div>
-    </div>
-    
-    <div class="findings">
-        <h2>详细发现</h2>
-"""
-        
-        for i, result in enumerate(scan_results, 1):
-            html += f"""
-        <div class="finding">
-            <div class="finding-type">{i}. {result['type']}</div>
-            <div class="finding-details">
-                <p>位置：第 {result['line_number']} 行，字符 {result['position']['start']}-{result['position']['end']}</p>
-                <p>脱敏值：<code>{result['value']}</code></p>
-                <p>上下文：<code>{result['context']}</code></p>
-            </div>
-        </div>
-"""
-        
-        html += f"""
-    </div>
-    
-    <div class="content">
-        <h2>文件内容（高亮显示）</h2>
-        <div>{highlighted_content}</div>
-    </div>
-</body>
-</html>
-"""
-        return html
     
     async def get_task_progress(
         self,
@@ -606,9 +381,16 @@ class FullScanTaskService:
                 full_path = Path(settings.UPLOAD_DIR) / jsonl_path
                 if full_path.exists():
                     with open(full_path, 'r', encoding='utf-8') as f:
-                        lines = f.readlines()
-                        # 第一行是文档信息，其余是敏感数据项
-                        total_items += len(lines) - 1
+                        # langextract生成的JSONL格式，每行是一个提取结果
+                        for line in f:
+                            if line.strip():
+                                try:
+                                    data = json.loads(line)
+                                    # 计算提取的敏感数据数量
+                                    if 'extractions' in data:
+                                        total_items += len(data['extractions'])
+                                except:
+                                    pass
         
         return total_items
     
@@ -841,8 +623,4 @@ class FullScanTaskService:
 
 
 # 创建服务实例
-# scan_task_service = FullScanTaskService()  # 原有的自定义实现
-
-# 使用langextract实现
-from .service_langextract import scan_task_service_langextract
-scan_task_service = scan_task_service_langextract
+scan_task_service_langextract = LangExtractScanTaskService()
