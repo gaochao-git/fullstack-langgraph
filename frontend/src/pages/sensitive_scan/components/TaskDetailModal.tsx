@@ -12,14 +12,12 @@ import {
 } from 'antd';
 import {
   ReloadOutlined,
-  FileTextOutlined,
   FilePdfOutlined,
   ExclamationCircleOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { TaskDetail, TaskResult, ScanFile } from '../types/scanTask';
 import { ScanApi } from '../services/scanApi';
-import ScanResultViewer from './ScanResultViewer';
 
 interface TaskDetailModalProps {
   visible: boolean;
@@ -33,8 +31,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
   const [taskResult, setTaskResult] = useState<TaskResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timer | null>(null);
-  const [resultViewerVisible, setResultViewerVisible] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<{ taskId: string; fileId: string } | null>(null);
   const [htmlModalVisible, setHtmlModalVisible] = useState(false);
   const [htmlReportUrl, setHtmlReportUrl] = useState<string>('');
   const [htmlLoading, setHtmlLoading] = useState(false);
@@ -82,12 +78,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
     }
   };
 
-  // 查看JSONL内容
-  const viewJsonlContent = (fileId: string) => {
-    if (!taskId) return;
-    setSelectedFile({ taskId, fileId });
-    setResultViewerVisible(true);
-  };
 
   // 查看HTML报告
   const viewHtmlReport = async (fileId: string) => {
@@ -198,33 +188,24 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
       ) : '-',
     },
     {
-      title: '操作',
-      key: 'actions',
-      width: 150,
+      title: '报告',
+      key: 'report',
+      width: 80,
+      align: 'center' as const,
       render: (_, record) => {
         if (record.status !== 'completed') {
           return '-';
         }
         
         return (
-          <Space size="small">
-            <Button
-              type="link"
-              size="small"
-              icon={<FileTextOutlined />}
-              onClick={() => viewJsonlContent(record.file_id)}
-            >
-              查看结果
-            </Button>
-            <Button
-              type="link"
-              size="small"
-              icon={<FilePdfOutlined />}
-              onClick={() => viewHtmlReport(record.file_id)}
-            >
-              HTML
-            </Button>
-          </Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<FilePdfOutlined />}
+            onClick={() => viewHtmlReport(record.file_id)}
+          >
+            查看
+          </Button>
         );
       },
     },
@@ -312,18 +293,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
         )}
       </Modal>
 
-      {/* 结果查看器 */}
-      {selectedFile && (
-        <ScanResultViewer
-          visible={resultViewerVisible}
-          taskId={selectedFile.taskId}
-          fileId={selectedFile.fileId}
-          onClose={() => {
-            setResultViewerVisible(false);
-            setSelectedFile(null);
-          }}
-        />
-      )}
 
       {/* HTML报告预览弹窗 */}
       <Modal
