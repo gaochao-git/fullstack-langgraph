@@ -4,172 +4,25 @@
 """
 
 import os
-import json
-import traceback
-import jwt
-from datetime import datetime, timezone
 from typing import Optional, List, Annotated
 from fastapi import Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from src.shared.db.config import get_async_db
-from src.apps.auth.utils import JWTUtils, TokenBlacklist, APIKeyUtils, SECRET_KEY, ALGORITHM
-from src.apps.auth.models import AuthToken, AuthApiKey
 from src.apps.user.models import RbacUser, RbacUsersRoles, RbacRole
 from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 
 
-# Security schemes
-bearer_scheme = HTTPBearer(auto_error=False)
-
-
 async def get_current_user_optional(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_async_db)
+    request: Request
 ) -> Optional[dict]:
     """
     获取当前用户（可选）
-    支持四种认证方式：
-    1. 中间件认证（优先）
-    2. CAS Session认证（SSO用户）
-    3. JWT Token认证（本地用户）  
-    4. API Key认证（系统集成）
+    只从中间件认证结果中获取用户信息
     """
-    try:
-        # 0. 优先从中间件获取（如果启用了认证中间件）
-        if hasattr(request.state, "current_user"):
-            return request.state.current_user
-        # 1. 首先尝试CAS Session认证
-        cas_session_id = request.cookies.get("cas_session_id")
-        if cas_session_id:
-            from src.apps.auth.models import AuthSession
-            # 查询session
-            stmt = select(AuthSession).where(
-                AuthSession.session_id == cas_session_id,
-                AuthSession.expires_at > datetime.now()
-            )
-            result = await db.execute(stmt)
-            session = result.scalar_one_or_none()
-            
-            if session and session.is_active:
-                # 查询用户信息
-                stmt = select(RbacUser).where(RbacUser.user_id == session.user_id)
-                result = await db.execute(stmt)
-                user = result.scalar_one_or_none()
-                
-                if user and user.is_active:
-                    # 获取用户角色
-                    roles_stmt = select(RbacRole).join(
-                        RbacUsersRoles, RbacUsersRoles.role_id == RbacRole.role_id
-                    ).where(RbacUsersRoles.user_id == user.user_id)
-                    
-                    roles_result = await db.execute(roles_stmt)
-                    roles = list(roles_result.scalars().all())
-                    
-                    return {
-                        "sub": user.user_id,
-                        "username": user.user_name,
-                        "email": user.email,
-                        "display_name": user.display_name,
-                        "auth_type": "cas",
-                        "roles": [{"role_id": r.role_id, "role_name": r.role_name} for r in roles]
-                    }
-        
-        # 2. 尝试Bearer Token认证
-        if credentials:
-            token = credentials.credentials
-            
-            # 检查是否是API Key（以ak-开头）
-            if token.startswith("ak-"):
-                # API Key认证
-                key_hash = APIKeyUtils.hash_api_key(token)
-                
-                # 查询API Key记录
-                stmt = select(AuthApiKey).where(
-                    AuthApiKey.key_hash == key_hash,
-                    AuthApiKey.is_active == 1,  # MySQL使用1表示True
-                    AuthApiKey.revoked_at.is_(None)  # 未被撤销
-                )
-                result = await db.execute(stmt)
-                api_key_record = result.scalar_one_or_none()
-                
-                if not api_key_record:
-                    return None
-                
-                # 检查是否过期
-                if api_key_record.expires_at and api_key_record.expires_at < datetime.now(timezone.utc):
-                    return None
-                
-                # 检查IP白名单
-                if api_key_record.allowed_ips:
-                    allowed_ips = json.loads(api_key_record.allowed_ips)
-                    client_ip = request.client.host if request.client else None
-                    if allowed_ips and client_ip not in allowed_ips:
-                        return None
-                
-                # 更新最后使用时间
-                api_key_record.last_used_at = datetime.now(timezone.utc)
-                # 注意：依赖项中的更新将由FastAPI的请求生命周期自动提交
-                
-                # 查询用户信息
-                stmt = select(RbacUser).where(RbacUser.user_id == api_key_record.user_id)
-                result = await db.execute(stmt)
-                user = result.scalar_one_or_none()
-                
-                if user and user.is_active:
-                    # 获取权限范围
-                    scopes = []
-                    if api_key_record.scopes:
-                        scopes = json.loads(api_key_record.scopes)
-                    
-                    return {
-                        "sub": user.user_id,
-                        "username": user.user_name,
-                        "email": user.email,
-                        "display_name": user.display_name,
-                        "token_type": "api_key",
-                        "api_key_name": api_key_record.key_name,
-                        "scopes": scopes
-                    }
-            else:
-                # 本地用户的JWT Token认证
-                # 解码token
-                payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-                
-                # 检查token是否在黑名单中
-                jti = payload.get("jti")
-                if jti and TokenBlacklist.is_blacklisted(jti):
-                    return None
-                
-                # 验证token类型
-                if payload.get("type") != "access":
-                    return None
-                
-                # 查询用户是否存在且活跃
-                stmt = select(RbacUser).where(RbacUser.user_id == payload.get("sub"))
-                result = await db.execute(stmt)
-                user = result.scalar_one_or_none()
-                
-                if user and user.is_active:
-                    return {
-                        "sub": user.user_id,
-                        "username": user.user_name,
-                        "email": user.email,
-                        "display_name": user.display_name,
-                        "auth_type": "local"
-                    }
-        
-            
-    except Exception as e:
-        # 认证失败时返回None而不是抛出异常，但打印错误用于调试
-        print(f"认证异常: {e}")
-        traceback.print_exc()
-        pass
-    
-    return None
+    # 从中间件获取认证信息
+    return getattr(request.state, "current_user", None)
 
 
 async def get_current_user(
@@ -355,3 +208,23 @@ is_user = RoleChecker(["user", "admin"])
 CurrentUser = Annotated[dict, Depends(get_current_user)]
 CurrentActiveUser = Annotated[RbacUser, Depends(get_current_active_user)]
 OptionalUser = Annotated[Optional[dict], Depends(get_current_user_optional)]
+
+
+# API密钥权限检查
+async def check_api_key_permission(
+    current_user: CurrentUser,
+    required_permission_id: int
+) -> bool:
+    """
+    检查API密钥是否有特定权限
+    仅对API密钥认证有效
+    """
+    # 只对API密钥认证进行权限检查
+    if current_user.get("auth_type") != "api_key":
+        return True  # 其他认证方式默认通过
+    
+    # 获取API密钥的权限范围
+    scopes = current_user.get("api_key_scopes", [])
+    
+    # 检查是否有所需权限
+    return required_permission_id in scopes

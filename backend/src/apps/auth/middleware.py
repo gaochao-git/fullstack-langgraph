@@ -85,6 +85,71 @@ class AuthMiddleware(BaseHTTPMiddleware):
             logger.debug(f"JWT认证失败: {e}")
             return None
     
+    async def _authenticate_api_key(self, token: str) -> Optional[dict]:
+        """
+        API Key认证 - 处理ak-前缀的API密钥
+        """
+        if not token.startswith("ak-"):
+            return None
+        
+        logger.info(f"开始API密钥认证: {token[:20]}...")
+        try:
+            async with AsyncSessionLocal() as db:
+                from sqlalchemy import select
+                from src.apps.auth.models import AuthApiKey
+                from src.apps.user.models import RbacUser
+                
+                # 查询API密钥 - 注意：key_hash字段当前存储的是明文
+                stmt = select(AuthApiKey).where(
+                    AuthApiKey.key_hash == token,  # key_hash字段目前存储明文
+                    AuthApiKey.is_active == 1,  # MySQL使用1表示True
+                    AuthApiKey.revoked_at == None
+                )
+                result = await db.execute(stmt)
+                api_key = result.scalar_one_or_none()
+                
+                if not api_key:
+                    logger.warning(f"未找到API密钥记录: {token}")
+                    return None
+                
+                logger.info(f"找到API密钥记录: id={api_key.id}, user_id={api_key.user_id}")
+                
+                # 检查是否过期
+                from datetime import datetime, timezone
+                if api_key.expires_at and api_key.expires_at < datetime.now(timezone.utc):
+                    return None
+                
+                # 获取用户信息
+                user_stmt = select(RbacUser).where(RbacUser.user_id == api_key.user_id)
+                user_result = await db.execute(user_stmt)
+                user = user_result.scalar_one_or_none()
+                
+                if not user or not user.is_active:
+                    return None
+                
+                # 更新最后使用时间
+                api_key.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+                
+                # 构建用户信息
+                return {
+                    "user_info": {
+                        "sub": user.user_id,
+                        "user_id": user.user_id,
+                        "username": user.user_name,
+                        "display_name": user.display_name,
+                        "email": user.email,
+                        "auth_type": "api_key",
+                        "api_key_id": api_key.id,
+                        "api_key_scopes": api_key.scopes or []
+                    },
+                    "auth_type": "api_key"
+                }
+                
+        except Exception as e:
+            logger.error(f"API Key认证失败: {e}")
+            return None
+    
     async def _authenticate_agent_key(self, token: str, request: Request) -> Optional[dict]:
         """
         Agent Key认证 - 通过agent_permission表查找关联信息
@@ -298,12 +363,21 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if authorization:
                 scheme, token = get_authorization_scheme_param(authorization)
                 if scheme.lower() == "bearer":
-                    # 尝试JWT认证
-                    auth_result = await self._authenticate_jwt(token)
+                    logger.debug(f"Bearer token detected: {token[:20]}...")
                     
-                    # 如果JWT失败，尝试Agent Key认证
-                    if not auth_result:
+                    # 根据token前缀判断认证类型
+                    if token.startswith("ak-"):
+                        # API Key认证
+                        logger.debug(f"Detected API Key token: {token[:20]}...")
+                        auth_result = await self._authenticate_api_key(token)
+                    elif token.startswith("sk-"):
+                        # Agent Key认证
+                        logger.debug(f"Detected Agent Key token: {token[:20]}...")
                         auth_result = await self._authenticate_agent_key(token, request)
+                    else:
+                        # JWT认证（默认）
+                        logger.debug(f"Detected JWT token: {token[:20]}...")
+                        auth_result = await self._authenticate_jwt(token)
             
             # 2. 如果Authorization认证失败，尝试CAS认证
             if not auth_result:
