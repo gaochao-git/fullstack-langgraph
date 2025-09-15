@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, or_
 from sqlalchemy.future import select
+from src.shared.db.models import now_shanghai
 
 from src.apps.auth.models import (
     AuthToken, AuthSession, AuthLoginHistory, 
@@ -509,7 +510,11 @@ class AuthService:
                 scopes=json.dumps(request.scopes) if request.scopes else None,
                 allowed_ips=json.dumps(request.allowed_ips) if request.allowed_ips else None,
                 expires_at=expires_at,
-                create_by=creator or user_id  # 使用创建者或默认为用户自己
+                issued_at=now_shanghai(),
+                create_by=creator or user_id,  # 使用创建者或默认为用户自己
+                update_by=creator or user_id,
+                create_time=now_shanghai(),
+                update_time=now_shanghai()
             )
             
             self.db.add(api_key_record)
