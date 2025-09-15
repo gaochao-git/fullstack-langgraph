@@ -34,23 +34,9 @@ class ScanTask(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID，自增")
     task_id = Column(String(64), nullable=False, unique=True, comment="任务ID")
     
-    # 任务基本信息
-    status = Column(SQLEnum(TaskStatus), default=TaskStatus.PENDING, nullable=False, comment="任务状态")
-    total_files = Column(Integer, default=0, nullable=False, comment="总文件数")
-    processed_files = Column(Integer, default=0, nullable=False, comment="已处理文件数")
-    failed_files = Column(Integer, default=0, nullable=False, comment="失败文件数")
-    
-    # 进度信息（JSON格式存储在TEXT中）
-    progress = Column(Text, comment="进度信息（JSON格式）")
-    
-    # 统计信息（JSON格式存储在TEXT中）
-    statistics = Column(Text, comment="统计信息（JSON格式）")
-    
-    # 摘要信息（JSON格式存储在TEXT中）
-    summary = Column(Text, comment="任务摘要（JSON格式）")
-    
-    # 错误信息（JSON数组格式存储在TEXT中）
-    errors = Column(Text, comment="错误信息列表（JSON格式）")
+    # 任务基本信息 - 匹配实际表结构
+    task_status = Column(String(64), default='pending', nullable=False, comment="任务状态,pending,processing,completed,failed")
+    task_errors = Column(Text, comment="错误信息")
     
     # 时间戳
     start_time = Column(DateTime, comment="开始时间")
@@ -64,9 +50,10 @@ class ScanTask(Base):
     
     # 创建索引
     __table_args__ = (
-        Index('idx_scan_task_status', 'status'),
-        Index('idx_scan_task_create_time', 'create_time'),
-        Index('idx_scan_task_create_by', 'create_by'),
+        Index('uk_task_id', 'task_id', unique=True),
+        Index('idx_status', 'task_status'),
+        Index('idx_create_time', 'create_time'),
+        Index('idx_create_by', 'create_by'),
     )
 
 
@@ -79,15 +66,15 @@ class ScanFile(Base):
     task_id = Column(String(64), nullable=False, comment="任务ID")
     file_id = Column(String(64), nullable=False, comment="文件ID")
     
-    # 文件状态
-    status = Column(SQLEnum(FileStatus), default=FileStatus.PENDING, nullable=False, comment="文件状态")
+    # 文件状态 - 匹配实际表结构
+    file_status = Column(String(64), default='pending', nullable=False, comment="任务状态,pending,processing,completed,failed")
     
     # 扫描结果路径
     jsonl_path = Column(String(500), comment="JSONL结果文件路径")
-    html_path = Column(String(500), comment="HTML报告文件路径")
+    html_path = Column(String(500), comment="HTML可视化文件路径")
     
     # 错误信息
-    error = Column(Text, comment="错误信息")
+    file_error = Column(Text, comment="错误信息")
     
     # 时间戳
     start_time = Column(DateTime, comment="开始时间")
@@ -102,7 +89,6 @@ class ScanFile(Base):
     # 创建索引
     __table_args__ = (
         Index('uk_task_file', 'task_id', 'file_id', unique=True),
-        Index('idx_scan_file_task_id', 'task_id'),
-        Index('idx_scan_file_status', 'status'),
-        Index('idx_scan_file_create_by', 'create_by'),
+        Index('idx_task_id', 'task_id'),
+        Index('idx_file_id', 'file_id'),
     )
