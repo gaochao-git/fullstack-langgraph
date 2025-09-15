@@ -2,6 +2,7 @@
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import PlainTextResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.db.config import get_async_db
@@ -86,3 +87,25 @@ async def list_scan_tasks(
         size=size,
         msg="查询任务列表成功"
     )
+
+
+@router.get("/v1/scan/results/{task_id}/{file_id}/jsonl", response_class=PlainTextResponse)
+async def get_scan_result_jsonl(
+    task_id: str,
+    file_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取扫描结果的JSONL内容"""
+    content = await scan_task_service.get_result_jsonl_content(db, task_id, file_id)
+    return PlainTextResponse(content=content, media_type="application/x-ndjson")
+
+
+@router.get("/v1/scan/results/{task_id}/{file_id}/html", response_class=HTMLResponse)
+async def get_scan_result_html(
+    task_id: str,
+    file_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取扫描结果的HTML报告"""
+    content = await scan_task_service.get_result_html_content(db, task_id, file_id)
+    return HTMLResponse(content=content)

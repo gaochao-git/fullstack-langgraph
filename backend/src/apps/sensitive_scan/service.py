@@ -752,6 +752,92 @@ class FullScanTaskService:
             return "任务失败"
         else:
             return "未知状态"
+    
+    async def get_result_jsonl_content(
+        self,
+        db: AsyncSession,
+        task_id: str,
+        file_id: str
+    ) -> str:
+        """获取JSONL结果文件内容"""
+        # 查询文件记录
+        result = await db.execute(
+            select(ScanFile).where(and_(
+                ScanFile.task_id == task_id,
+                ScanFile.file_id == file_id
+            ))
+        )
+        scan_file = result.scalar_one_or_none()
+        
+        if not scan_file:
+            raise BusinessException(
+                f"扫描文件不存在: task_id={task_id}, file_id={file_id}", 
+                ResponseCode.NOT_FOUND
+            )
+        
+        if not scan_file.jsonl_path:
+            raise BusinessException(
+                "该文件尚未完成扫描或扫描失败",
+                ResponseCode.BAD_REQUEST
+            )
+        
+        # 构建完整路径
+        full_path = Path(settings.UPLOAD_DIR) / scan_file.jsonl_path
+        
+        if not full_path.exists():
+            raise BusinessException(
+                "结果文件不存在",
+                ResponseCode.NOT_FOUND
+            )
+        
+        # 读取文件内容
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return content
+    
+    async def get_result_html_content(
+        self,
+        db: AsyncSession,
+        task_id: str,
+        file_id: str
+    ) -> str:
+        """获取HTML报告文件内容"""
+        # 查询文件记录
+        result = await db.execute(
+            select(ScanFile).where(and_(
+                ScanFile.task_id == task_id,
+                ScanFile.file_id == file_id
+            ))
+        )
+        scan_file = result.scalar_one_or_none()
+        
+        if not scan_file:
+            raise BusinessException(
+                f"扫描文件不存在: task_id={task_id}, file_id={file_id}", 
+                ResponseCode.NOT_FOUND
+            )
+        
+        if not scan_file.html_path:
+            raise BusinessException(
+                "该文件尚未完成扫描或扫描失败",
+                ResponseCode.BAD_REQUEST
+            )
+        
+        # 构建完整路径
+        full_path = Path(settings.UPLOAD_DIR) / scan_file.html_path
+        
+        if not full_path.exists():
+            raise BusinessException(
+                "报告文件不存在",
+                ResponseCode.NOT_FOUND
+            )
+        
+        # 读取文件内容
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        return content
 
 
 # 创建服务实例
