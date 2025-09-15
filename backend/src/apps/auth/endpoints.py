@@ -5,6 +5,7 @@
 from typing import Optional, List
 from urllib.parse import parse_qs
 from datetime import datetime, timezone
+import json
 
 from fastapi import APIRouter, Depends, Request, Response, Cookie
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -661,14 +662,14 @@ async def list_api_keys(
             key_name=key.key_name,
             key_prefix=key.key_prefix,
             mark_comment=key.mark_comment,
-            scopes=key.scopes.split(',') if key.scopes and isinstance(key.scopes, str) else [],
+            scopes=json.loads(key.scopes) if key.scopes else [],
             is_active=bool(key.is_active),
             last_used_at=key.last_used_at,
             expires_at=key.expires_at,
             revoked_at=key.revoked_at,
             revoke_reason=key.revoke_reason,
             created_at=key.issued_at or key.create_time,
-            allowed_ips=key.allowed_ips.split(',') if key.allowed_ips and isinstance(key.allowed_ips, str) else [],
+            allowed_ips=json.loads(key.allowed_ips) if key.allowed_ips else [],
             create_by=key.create_by,
             update_by=key.update_by
         )

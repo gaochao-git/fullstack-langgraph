@@ -186,7 +186,7 @@ class CreateAPIKeyRequest(BaseModel):
     key_name: str = Field(..., min_length=1, max_length=100, description="API Key名称")
     mark_comment: str = Field(..., min_length=1, max_length=64, description="工单号")
     expires_in_days: Optional[int] = Field(None, ge=1, le=3650, description="过期天数")
-    scopes: Optional[List[str]] = Field(default_factory=list, description="权限范围列表")
+    scopes: Optional[List[int]] = Field(default_factory=list, description="权限ID列表")
     allowed_ips: Optional[List[str]] = Field(default_factory=list, description="允许的IP列表")
 
 
@@ -204,7 +204,7 @@ class APIKeyInfo(BaseModel):
     revoked_at: Optional[datetime] = None
     revoke_reason: Optional[str] = None
     is_active: bool
-    scopes: Optional[List[str]] = []
+    scopes: Optional[List[int]] = []
     allowed_ips: Optional[List[str]] = []
     create_by: Optional[str] = None
     update_by: Optional[str] = None
