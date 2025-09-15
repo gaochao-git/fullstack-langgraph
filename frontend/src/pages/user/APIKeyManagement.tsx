@@ -3,7 +3,7 @@ import { useIsMobile } from '@/hooks';
 import { 
   Card, Table, Button, Form, Input, Modal,
   Space, Alert, Tag, Tooltip, Switch, Radio,
-  Select, Typography, Divider, Spin, App
+  Select, Typography, Divider, Spin, App, Checkbox
 } from 'antd';
 import { 
   PlusOutlined, DeleteOutlined, CopyOutlined, 
@@ -899,37 +899,13 @@ const data = await response.json();
                 placeholder="选择权限范围"
                 loading={loadingPermissions}
                 options={permissions}
+                showSearch
+                style={{ width: '100%' }}
                 filterOption={(input, option) =>
                   (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                 }
-                showSearch
-                optionFilterProp="label"
                 notFoundContent={loadingPermissions ? <Spin size="small" /> : '暂无权限数据'}
-                style={{ width: '100%' }}
-                popupMatchSelectWidth={false}
-                styles={{
-                  popup: {
-                    root: { maxHeight: 400, overflow: 'auto', minWidth: 500 }
-                  }
-                }}
-                optionRender={(option) => (
-                  <div style={{ padding: '4px 0' }}>
-                    <Space size={4}>
-                      <Tag size="small" color={
-                        option.data.http_method === 'GET' ? 'green' :
-                        option.data.http_method === 'POST' ? 'blue' :
-                        option.data.http_method === 'PUT' ? 'orange' :
-                        option.data.http_method === 'DELETE' ? 'red' : 'default'
-                      }>
-                        {option.data.http_method}
-                      </Tag>
-                      <span>{option.data.api_route}</span>
-                      {option.data.description && (
-                        <span style={{ color: '#666' }}>- {option.data.description}</span>
-                      )}
-                    </Space>
-                  </div>
-                )}
+                maxTagCount={999}
               />
             </Form.Item>
 
@@ -991,6 +967,8 @@ const data = await response.json();
               }
               options={permissions}
               style={{ width: '100%' }}
+              notFoundContent={loadingPermissions ? <Spin size="small" /> : '暂无权限数据'}
+              maxTagCount={999}
             />
           </Form.Item>
           
