@@ -66,12 +66,10 @@ class Settings(BaseSettings):
     REQUIRE_DIGITS: bool = True
     REQUIRE_SPECIAL_CHARS: bool = True
      
-    # DeepSeek配置
-    DEEPSEEK_API_KEY: Optional[str] = None
-    DEEPSEEK_BASE_URL: Optional[str] = None
-    
-    # 硅基流动配置
-    SILICONFLOW_API_KEY: Optional[str] = None
+    # LLM通用配置
+    LLM_API_KEY: Optional[str] = None
+    LLM_BASE_URL: Optional[str] = None
+    LLM_MODEL: Optional[str] = None
     
     # 日志配置
     LOG_LEVEL: str = "INFO"
@@ -141,15 +139,6 @@ class Settings(BaseSettings):
     # 消息监控配置
     MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8  # 当总消息量超过模型上下文长度的多少比例时触发警告（默认 0.8 = 80%）
     MULTIMODAL_SERVICE_API_KEY: Optional[str] = None
-    
-    # LangExtract敏感数据扫描配置
-    LANGEXTRACT_MODEL: str = "Qwen/Qwen3-30B-A3B-Instruct-2507"  # 模型ID
-    LANGEXTRACT_BASE_URL: str = "https://api.siliconflow.cn/v1"  # API地址
-    LANGEXTRACT_API_KEY: Optional[str] = None  # API密钥（优先从环境变量SILICONFLOW_API_KEY读取）
-    LANGEXTRACT_MAX_WORKERS: int = 1  # 并发扫描的最大工作线程数
-    LANGEXTRACT_MAX_CHAR_BUFFER: int = 50000  # 单次推理的最大字符数
-    SCAN_OUTPUT_DIR: str = "/tmp/scan_visualizations"  # 扫描结果输出目录
-    SCAN_EXECUTOR_WORKERS: int = 5  # 扫描任务执行线程池大小
     
     class Config:
         env_file = ".env"

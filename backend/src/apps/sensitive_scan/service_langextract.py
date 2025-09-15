@@ -1,15 +1,14 @@
 """敏感数据扫描任务服务层 - 使用原生langextract实现"""
 
-import os
 import asyncio
 import uuid
+import json
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_, func
 
-import json
 import langextract as lx
 
 from src.shared.db.models import now_shanghai
@@ -18,6 +17,7 @@ from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.config import settings
 from .models import ScanTask, ScanFile
+from .langextract_scanner import LangExtractSensitiveScanner
 
 logger = get_logger(__name__)
 
@@ -27,21 +27,17 @@ class LangExtractScanTaskService:
     
     def __init__(self):
         # 确保扫描结果目录存在
-        self.scan_results_dir = Path(settings.UPLOAD_DIR) / "scan_results"
+        # 使用 DOCUMENT_DIR 而不是 UPLOAD_DIR，将 scan_results 放在文档根目录下
+        self.scan_results_dir = Path(settings.DOCUMENT_DIR) / "scan_results"
         self.scan_results_dir.mkdir(parents=True, exist_ok=True)
         
-        # 设置langextract提供者
-        # 使用环境变量或默认配置
-        provider = os.getenv("LLM_TYPE", "openai")
-        api_key = os.getenv("LLM_API_KEY", "")
-        base_url = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
-        model = os.getenv("LLM_MODEL", "deepseek-chat")
+        # 初始化扫描器
+        # 从settings读取配置，必须配置
+        if not settings.LLM_MODEL or not settings.LLM_API_KEY or not settings.LLM_BASE_URL:
+            raise ValueError("必须在配置文件中设置 LLM_MODEL, LLM_API_KEY 和 LLM_BASE_URL")
         
-        if provider == "openai":
-            # 配置OpenAI兼容的provider（如DeepSeek）
-            os.environ["OPENAI_API_KEY"] = api_key
-            if base_url:
-                os.environ["OPENAI_BASE_URL"] = base_url
+        # 扫描器会自动从settings获取配置
+        self.scanner = LangExtractSensitiveScanner()
     
     async def create_scan_task(
         self, 
@@ -189,6 +185,24 @@ class LangExtractScanTaskService:
                     )
                 
                 # 使用langextract进行扫描
+                logger.info(f"开始使用langextract扫描文件: {file_id}")
+                
+                # 在异步上下文中运行同步代码
+                loop = asyncio.get_event_loop()
+                
+                def scan_sync():
+                    # 使用scanner进行扫描
+                    result = self.scanner.scan_document(file_id, content)
+                    return result
+                
+                # 在线程池中执行同步操作
+                scan_result = await loop.run_in_executor(None, scan_sync)
+                
+                if not scan_result["success"]:
+                    raise Exception(f"扫描失败: {scan_result.get('error', '未知错误')}")
+                
+                logger.info(f"langextract扫描完成: {file_id}, 发现 {scan_result['extractions']} 个敏感信息")
+                
                 # 创建任务目录
                 task_dir = self.scan_results_dir / task_id
                 task_dir.mkdir(parents=True, exist_ok=True)
@@ -198,61 +212,25 @@ class LangExtractScanTaskService:
                 jsonl_path = task_dir / f"{base_name}.jsonl"
                 html_path = task_dir / f"{base_name}.html"
                 
-                # 创建文档对象
-                doc = lx.Document(
-                    text=content,
-                    document_id=file_id,
-                    metadata={"filename": original_filename}
-                )
+                # 保存JSONL结果
+                if scan_result["document"]:
+                    # 保存langextract格式的JSONL
+                    self.scanner.save_results([scan_result["document"]], str(jsonl_path))
+                else:
+                    # 如果没有提取到任何内容，保存空结果
+                    with open(jsonl_path, 'w', encoding='utf-8') as f:
+                        empty_result = {
+                            "document_id": file_id,
+                            "text": content[:200] + "..." if len(content) > 200 else content,
+                            "extractions": []
+                        }
+                        f.write(json.dumps(empty_result, ensure_ascii=False) + '\n')
                 
-                # 定义要提取的敏感数据模式
-                extraction_schema = lx.Extraction(
-                    names=["sensitive_data"],
-                    descriptions=[
-                        """Extract all sensitive data including:
-                        - Personal ID numbers (身份证号)
-                        - Phone numbers (手机号) 
-                        - Bank card numbers (银行卡号)
-                        - Email addresses (邮箱地址)
-                        - Social credit codes (统一社会信用代码)
-                        - License plate numbers (车牌号)
-                        - Passport numbers (护照号)
-                        - IP addresses (IP地址)
-                        - Passwords (密码)
-                        - API keys (API密钥)
-                        
-                        For each found item, extract:
-                        - type: The type of sensitive data
-                        - value: The actual value (will be masked later)
-                        - context: 20 characters before and after the value
-                        - line_number: The line number where it appears
-                        """
-                    ]
-                )
+                # 生成可视化HTML
+                def generate_html_sync():
+                    return self.scanner.generate_visualization(str(jsonl_path), str(html_path))
                 
-                # 执行提取
-                logger.info(f"开始使用langextract扫描文件: {file_id}")
-                
-                # 使用同步方式调用langextract
-                # 在异步上下文中运行同步代码
-                loop = asyncio.get_event_loop()
-                
-                def extract_sync():
-                    return lx.extract(
-                        documents=[doc],
-                        extraction=extraction_schema,
-                        output_jsonl_path=str(jsonl_path),
-                        output_viz_path=str(html_path),
-                        provider="openai",  # 使用OpenAI兼容的provider
-                        model=os.getenv("LLM_MODEL", "deepseek-chat"),
-                        chunk_size=2000,  # 每次处理2000字符
-                        overlap=100  # 重叠100字符确保不遗漏
-                    )
-                
-                # 在线程池中执行同步操作
-                await loop.run_in_executor(None, extract_sync)
-                
-                logger.info(f"langextract扫描完成: {file_id}")
+                await loop.run_in_executor(None, generate_html_sync)
                 
                 # 返回相对路径
                 jsonl_relative = f"scan_results/{task_id}/{base_name}.jsonl"
@@ -378,10 +356,10 @@ class LangExtractScanTaskService:
         for row in result:
             jsonl_path = row.jsonl_path
             if jsonl_path:
-                full_path = Path(settings.UPLOAD_DIR) / jsonl_path
+                full_path = Path(settings.DOCUMENT_DIR) / jsonl_path
                 if full_path.exists():
                     with open(full_path, 'r', encoding='utf-8') as f:
-                        # langextract生成的JSONL格式，每行是一个提取结果
+                        # langextract生成的JSONL格式
                         for line in f:
                             if line.strip():
                                 try:
@@ -564,7 +542,7 @@ class LangExtractScanTaskService:
             )
         
         # 构建完整路径
-        full_path = Path(settings.UPLOAD_DIR) / scan_file.jsonl_path
+        full_path = Path(settings.DOCUMENT_DIR) / scan_file.jsonl_path
         
         if not full_path.exists():
             raise BusinessException(
@@ -607,7 +585,7 @@ class LangExtractScanTaskService:
             )
         
         # 构建完整路径
-        full_path = Path(settings.UPLOAD_DIR) / scan_file.html_path
+        full_path = Path(settings.DOCUMENT_DIR) / scan_file.html_path
         
         if not full_path.exists():
             raise BusinessException(
