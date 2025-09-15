@@ -87,6 +87,17 @@ def process_scan_task(task_id: str, file_ids: List[str]):
         with task_lock:
             task_storage[task_id]["status"] = "processing"
             task_storage[task_id]["start_time"] = datetime.now().isoformat()
+            
+            # 初始化每个文件的状态
+            for file_id in file_ids:
+                task_storage[task_id]["files"][file_id] = {
+                    "status": "pending",
+                    "jsonl_path": None,
+                    "html_path": None,
+                    "error": None,
+                    "start_time": None,
+                    "end_time": None
+                }
         
         # 读取所有文件内容
         file_contents = []
@@ -94,7 +105,7 @@ def process_scan_task(task_id: str, file_ids: List[str]):
         
         for i, file_id in enumerate(file_ids, 1):
             try:
-                # 更新进度
+                # 更新进度和文件状态
                 with task_lock:
                     task_storage[task_id]["progress"] = {
                         "phase": "reading",
@@ -102,15 +113,25 @@ def process_scan_task(task_id: str, file_ids: List[str]):
                         "total": total_files,
                         "message": f"读取文件 {i}/{total_files}: {file_id[:8]}..."
                     }
+                    task_storage[task_id]["files"][file_id]["status"] = "reading"
+                    task_storage[task_id]["files"][file_id]["start_time"] = datetime.now().isoformat()
                 
                 content = read_file_content(file_id)
                 file_contents.append({
                     "file_id": file_id,
                     "content": content
                 })
+                
+                with task_lock:
+                    task_storage[task_id]["files"][file_id]["status"] = "read_complete"
+                    
             except Exception as e:
                 logger.error(f"读取文件 {file_id} 失败: {e}")
                 with task_lock:
+                    task_storage[task_id]["files"][file_id]["status"] = "failed"
+                    task_storage[task_id]["files"][file_id]["error"] = str(e)
+                    task_storage[task_id]["files"][file_id]["end_time"] = datetime.now().isoformat()
+                    
                     errors = task_storage[task_id].get("errors", [])
                     errors.append(f"读取文件 {file_id} 失败: {str(e)}")
                     task_storage[task_id]["errors"] = errors
@@ -118,96 +139,74 @@ def process_scan_task(task_id: str, file_ids: List[str]):
         if not file_contents:
             raise Exception("没有可扫描的文件")
         
-        # 扫描文档
-        all_results = []
-        processed_files = len(file_contents)
+        # 扫描每个文档
+        total_files = len(file_contents)
         
         for i, file_item in enumerate(file_contents, 1):
+            file_id = file_item['file_id']
             try:
-                # 更新进度
+                # 更新进度和文件状态
                 with task_lock:
                     task_storage[task_id]["progress"] = {
                         "phase": "scanning",
                         "current": i,
-                        "total": processed_files,
-                        "message": f"扫描文件 {i}/{processed_files}: {file_item['file_id'][:8]}..."
+                        "total": total_files,
+                        "message": f"扫描文件 {i}/{total_files}: {file_id[:8]}..."
                     }
+                    task_storage[task_id]["files"][file_id]["status"] = "scanning"
                 
                 # 调用核心扫描模块
                 scan_result = scanner.scan_document(
-                    file_id=file_item["file_id"],
-                    text=file_item["content"]
+                    file_id=file_id,
+                    text=file_item["content"],
+                    output_dir=str(OUTPUT_DIR)
                 )
                 
                 # 处理扫描结果
-                if scan_result["success"]:
-                    if scan_result["document"]:
-                        all_results.append(scan_result["document"])
-                        sensitive_count = scan_result["extractions"]
-                        logger.info(f"    找到 {sensitive_count} 个敏感信息")
-                        
-                        # 更新统计
-                        with task_lock:
-                            task_storage[task_id]["statistics"]["sensitive_items"] += sensitive_count
-                            task_storage[task_id]["statistics"]["processed_files"] += 1
+                if scan_result["status"] == "ok":
+                    # 更新文件状态和结果
+                    with task_lock:
+                        task_storage[task_id]["files"][file_id]["status"] = "completed"
+                        task_storage[task_id]["files"][file_id]["jsonl_path"] = scan_result["jsonl_path"]
+                        task_storage[task_id]["files"][file_id]["html_path"] = scan_result["html_path"]
+                        task_storage[task_id]["files"][file_id]["end_time"] = datetime.now().isoformat()
+                        task_storage[task_id]["statistics"]["processed_files"] += 1
+                    
+                    logger.info(f"    文件 {file_id} 扫描完成")
                 else:
                     raise Exception(scan_result.get("error", "扫描失败"))
-                        
+                    
             except Exception as e:
-                logger.error(f"扫描文件 {file_item['file_id']} 时出错: {e}")
+                logger.error(f"扫描文件 {file_id} 时出错: {e}")
                 with task_lock:
+                    task_storage[task_id]["files"][file_id]["status"] = "failed"
+                    task_storage[task_id]["files"][file_id]["error"] = str(e)
+                    task_storage[task_id]["files"][file_id]["end_time"] = datetime.now().isoformat()
+                    
                     errors = task_storage[task_id].get("errors", [])
-                    errors.append(f"扫描文件 {file_item['file_id']} 失败: {str(e)}")
+                    errors.append(f"扫描文件 {file_id} 失败: {str(e)}")
                     task_storage[task_id]["errors"] = errors
-        
-        if not all_results:
-            raise Exception("扫描未产生任何结果")
-        
-        # 保存结果
-        with task_lock:
-            task_storage[task_id]["progress"] = {
-                "phase": "saving",
-                "current": 1,
-                "total": 1,
-                "message": "保存扫描结果..."
-            }
-        
-        result_id = task_storage[task_id]["result_id"]
-        output_path = OUTPUT_DIR / f"{result_id}.jsonl"
-        
-        # 使用 scanner 保存结果（需要在 scanner 中添加这个方法）
-        scanner.save_results(
-            all_results,
-            output_path=str(output_path)
-        )
-        
-        # 生成可视化
-        try:
-            html_path = OUTPUT_DIR / f"{result_id}.html"
-            visualization_path = scanner.generate_visualization(
-                str(output_path),
-                str(html_path)
-            )
-        except Exception as e:
-            logger.warning(f"生成可视化时出错: {e}")
-            visualization_path = None
         
         # 更新任务为完成状态
         with task_lock:
             task_storage[task_id]["status"] = "completed"
             task_storage[task_id]["end_time"] = datetime.now().isoformat()
-            task_storage[task_id]["result"] = {
-                "output_path": str(output_path),
-                "visualization_path": visualization_path,
+            
+            # 统计完成情况
+            completed_count = sum(1 for f in task_storage[task_id]["files"].values() if f["status"] == "completed")
+            failed_count = sum(1 for f in task_storage[task_id]["files"].values() if f["status"] == "failed")
+            
+            task_storage[task_id]["summary"] = {
                 "total_files": len(file_ids),
-                "processed_files": len(all_results),
-                "total_sensitive_items": task_storage[task_id]["statistics"]["sensitive_items"]
+                "completed_files": completed_count,
+                "failed_files": failed_count
             }
+            
             task_storage[task_id]["progress"] = {
                 "phase": "completed",
-                "current": 1,
-                "total": 1,
-                "message": "扫描完成"
+                "current": len(file_ids),
+                "total": len(file_ids),
+                "message": f"扫描完成: {completed_count} 成功, {failed_count} 失败"
             }
             
     except Exception as e:
@@ -235,19 +234,20 @@ def scan_documents(file_ids: List[str]) -> str:
     Returns:
         任务ID和状态信息
     """
-    # 生成任务ID和结果ID
+    # 生成任务ID
     task_id = f"task_{uuid.uuid4().hex[:12]}"
-    result_id = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     
     # 创建任务记录
     with task_lock:
         task_storage[task_id] = {
             "task_id": task_id,
-            "result_id": result_id,
             "status": "pending",
             "file_ids": file_ids,
+            "files": {},  # 将存储每个文件的状态
             "total_files": len(file_ids),
             "created_time": datetime.now().isoformat(),
+            "start_time": None,
+            "end_time": None,
             "progress": {
                 "phase": "pending",
                 "current": 0,
@@ -255,9 +255,9 @@ def scan_documents(file_ids: List[str]) -> str:
                 "message": "任务已创建，等待处理..."
             },
             "statistics": {
-                "sensitive_items": 0,
                 "processed_files": 0
             },
+            "summary": None,
             "errors": []
         }
     
@@ -313,20 +313,27 @@ def check_scan_progress(task_id: str) -> str:
     }
     
     # 添加时间信息
-    if "start_time" in task:
+    if task.get("start_time"):
         response["start_time"] = task["start_time"]
-    if "end_time" in task:
+    if task.get("end_time"):
         response["end_time"] = task["end_time"]
     
     # 添加错误信息
     if task.get("errors"):
         response["errors"] = task["errors"]
-    if task.get("error"):
-        response["error"] = task["error"]
     
-    # 如果任务完成，添加结果信息
-    if task["status"] == "completed" and "result" in task:
-        response["result"] = task["result"]
+    # 添加文件状态摘要
+    if task.get("files"):
+        file_status_summary = {}
+        for status in ["pending", "reading", "read_complete", "scanning", "completed", "failed"]:
+            count = sum(1 for f in task["files"].values() if f["status"] == status)
+            if count > 0:
+                file_status_summary[status] = count
+        response["file_status_summary"] = file_status_summary
+    
+    # 如果任务完成，添加总结信息
+    if task.get("summary"):
+        response["summary"] = task["summary"]
     
     return json.dumps(response, ensure_ascii=False, indent=2)
 
@@ -378,9 +385,51 @@ def list_scan_tasks(limit: Optional[int] = 10) -> str:
 
 
 @mcp.tool()
+def get_file_scan_details(task_id: str, file_id: str) -> str:
+    """
+    获取特定文件的扫描详情
+    
+    Args:
+        task_id: 任务ID
+        file_id: 文件ID
+    
+    Returns:
+        文件扫描详情
+    """
+    with task_lock:
+        if task_id not in task_storage:
+            return json.dumps({
+                "success": False,
+                "error": f"任务不存在: {task_id}"
+            }, ensure_ascii=False, indent=2)
+        
+        task = task_storage[task_id]
+        
+        if file_id not in task["files"]:
+            return json.dumps({
+                "success": False,
+                "error": f"文件不存在于此任务中: {file_id}"
+            }, ensure_ascii=False, indent=2)
+        
+        file_info = task["files"][file_id]
+        
+        return json.dumps({
+            "success": True,
+            "task_id": task_id,
+            "file_id": file_id,
+            "status": file_info["status"],
+            "jsonl_path": file_info.get("jsonl_path"),
+            "html_path": file_info.get("html_path"),
+            "error": file_info.get("error"),
+            "start_time": file_info.get("start_time"),
+            "end_time": file_info.get("end_time")
+        }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def get_scan_result(task_id: str) -> str:
     """
-    获取扫描任务的结果文件路径
+    获取扫描任务的结果（包含所有文件的扫描结果）
     
     Args:
         task_id: 任务ID
@@ -404,17 +453,24 @@ def get_scan_result(task_id: str) -> str:
                 "progress": task["progress"]
             }, ensure_ascii=False, indent=2)
         
-        if "result" not in task:
-            return json.dumps({
-                "success": False,
-                "error": "任务已完成但无结果数据"
-            }, ensure_ascii=False, indent=2)
+        # 构建文件结果列表
+        file_results = []
+        for file_id, file_info in task["files"].items():
+            file_results.append({
+                "file_id": file_id,
+                "status": file_info["status"],
+                "jsonl_path": file_info.get("jsonl_path"),
+                "html_path": file_info.get("html_path"),
+                "error": file_info.get("error"),
+                "start_time": file_info.get("start_time"),
+                "end_time": file_info.get("end_time")
+            })
         
         return json.dumps({
             "success": True,
             "task_id": task_id,
-            "result": task["result"],
-            "statistics": task["statistics"],
+            "summary": task.get("summary"),
+            "files": file_results,
             "completed_time": task.get("end_time")
         }, ensure_ascii=False, indent=2)
 
@@ -431,5 +487,6 @@ if __name__ == "__main__":
     logger.info("  - check_scan_progress: 查看任务进度")
     logger.info("  - list_scan_tasks: 列出任务列表")
     logger.info("  - get_scan_result: 获取任务结果")
+    logger.info("  - get_file_scan_details: 获取特定文件的扫描详情")
     
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)

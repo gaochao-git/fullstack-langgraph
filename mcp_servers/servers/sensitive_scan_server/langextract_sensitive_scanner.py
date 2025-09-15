@@ -6,6 +6,9 @@ LangExtract 敏感数据扫描器配置
 
 import os
 import logging
+import uuid
+from datetime import datetime
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from langextract.providers.openai import OpenAILanguageModel
 from langextract.core import data
@@ -198,20 +201,32 @@ class LangExtractSensitiveScanner:
         
         return examples
     
-    def scan_document(self, file_id: str, text: str) -> dict:
+    def scan_document(self, file_id: str, text: str, output_dir: str = "/tmp/scan_results") -> dict:
         """
-        扫描单个文档的敏感信息
+        扫描单个文档并生成结果文件
         
         Args:
             file_id: 文件ID
             text: 文件文本内容
+            output_dir: 输出目录路径
             
         Returns:
-            扫描结果，包含提取的敏感信息
+            {"status": "ok/error", "jsonl_path": xxx, "html_path": xxx, "statistics": {...}}
         """
         try:
+            # 确保输出目录存在
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            
+            # 使用 file_id 作为输出文件名
+            jsonl_path = Path(output_dir) / f"{file_id}.jsonl"
+            html_path = Path(output_dir) / f"{file_id}.html"
+            
             # 创建 LangExtract Document 对象
-            doc = lx.data.Document(document_id=file_id, text=text)
+            lx_doc = lx.data.Document(
+                document_id=file_id,
+                text=text
+            )
+            
             # 创建模型实例
             model = OpenAILanguageModel(
                 model_id=self.model_id,
@@ -231,9 +246,11 @@ class LangExtractSensitiveScanner:
 4. 单独用户名不算敏感，需要上下文判断
 5. 确保提取完整的敏感信息，不要截断"""
             
+            logger.info(f"开始扫描文档: {file_id}")
+            
             # 执行提取
             result = lx.extract(
-                text_or_documents=[doc],
+                text_or_documents=[lx_doc],
                 prompt_description=prompt,
                 examples=self.sensitive_types,
                 model=model,
@@ -241,39 +258,30 @@ class LangExtractSensitiveScanner:
                 extraction_passes=1
             )
             
-            # 处理结果
-            result_list = list(result)
-            if result_list and len(result_list) > 0:
-                annotated_doc = result_list[0]
-                return {
-                    "success": True,
-                    "file_id": file_id,
-                    "extractions": len(annotated_doc.extractions),
-                    "document": annotated_doc,
-                    "sensitive_items": [
-                        {
-                            "type": ext.extraction_class,
-                            "text": ext.extraction_text,
-                            "position": ext.char_interval
-                        }
-                        for ext in annotated_doc.extractions
-                    ]
-                }
-            else:
-                return {
-                    "success": True,
-                    "file_id": file_id,
-                    "extractions": 0,
-                    "document": None,
-                    "sensitive_items": []
-                }
-                
-        except Exception as e:
-            logger.error(f"扫描文件 {file_id} 时出错: {e}")
+            # 收集结果
+            annotated_documents = list(result)
+            
+            # 保存结果
+            self.save_results(annotated_documents, str(jsonl_path))
+            
+            # 生成可视化
+            self.generate_visualization(str(jsonl_path), str(html_path))
+            
             return {
-                "success": False,
-                "file_id": file_id,
-                "error": str(e)
+                "status": "ok",
+                "jsonl_path": str(jsonl_path),
+                "html_path": str(html_path)
+            }
+            
+        except Exception as e:
+            logger.error(f"扫描文档时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "status": "error",
+                "error": str(e),
+                "jsonl_path": None,
+                "html_path": None
             }
     
     def save_results(self, annotated_documents: List[Any], output_path: str):
