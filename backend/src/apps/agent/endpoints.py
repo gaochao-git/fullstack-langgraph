@@ -846,6 +846,175 @@ async def extract_image_content(
 
 # ==================== 报告访问路由 ====================
 
+@router.get("/v1/extract/task/{task_id}")
+async def get_task_extract_results(
+    task_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """
+    根据任务ID获取所有文件的扫描结果
+    
+    Args:
+        task_id: 任务ID
+    
+    Returns:
+        任务中所有文件的扫描结果
+    """
+    import os
+    import glob
+    
+    # 检查认证
+    if not current_user:
+        raise BusinessException("需要登录才能查看提取结果", ResponseCode.UNAUTHORIZED)
+    
+    # 扫描目录下所有 task_id 开头的文件
+    scan_dir = "/tmp/scan_visualizations"
+    pattern = f"{scan_dir}/{task_id}_*.jsonl"
+    jsonl_files = glob.glob(pattern)
+    
+    if not jsonl_files:
+        raise BusinessException(f"任务 {task_id} 的扫描结果不存在", ResponseCode.NOT_FOUND)
+    
+    # 收集所有文件的扫描结果
+    all_items = []
+    all_statistics = {}
+    all_files_with_sensitive = set()
+    
+    # 从文件名中提取file_id
+    file_results = []
+    
+    for jsonl_path in jsonl_files:
+        # 从文件名提取 file_id
+        filename = os.path.basename(jsonl_path)
+        # 去掉 .jsonl 后缀
+        name_without_ext = filename[:-6]
+        # 去掉 task_id_ 前缀
+        file_id = name_without_ext[len(task_id)+1:]
+        
+        # 读取 JSONL 文件
+        documents = []
+        with open(jsonl_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    documents.append(json.loads(line))
+        
+        # 获取文件信息
+        file_info = {}
+        if file_id:
+            file_info_list = await document_service.get_documents_info_async(db, [file_id])
+            if file_info_list:
+                file_info = file_info_list[0]
+        
+        file_name = file_info.get("file_name", f"文档_{file_id[:8]}")
+        file_size = file_info.get("file_size", 0)
+        
+        # 统计该文件的敏感信息
+        file_items = []
+        file_statistics = {}
+        
+        for doc in documents:
+            doc_file_id = doc.get("document_id", "")
+            text = doc.get("text", "")
+            char_count = len(text)
+            
+            has_sensitive = False
+            for extraction in doc.get("extractions", []):
+                extraction_class = extraction.get("extraction_class", "")
+                
+                # 跳过文档摘要
+                if extraction_class == "文档摘要":
+                    continue
+                
+                has_sensitive = True
+                
+                # 统计每种类型的数量
+                if extraction_class not in file_statistics:
+                    file_statistics[extraction_class] = 0
+                file_statistics[extraction_class] += 1
+                
+                # 总体统计
+                if extraction_class not in all_statistics:
+                    all_statistics[extraction_class] = 0
+                all_statistics[extraction_class] += 1
+                
+                # 创建单条记录
+                item = {
+                    "type": extraction_class,
+                    "context": extraction.get("extraction_text", ""),
+                    "file_id": file_id,
+                    "file_name": file_name,
+                    "file_size": file_size,
+                    "char_count": char_count,
+                    "position": extraction.get("char_interval"),
+                    "image_count": 0
+                }
+                file_items.append(item)
+                all_items.append(item)
+            
+            if has_sensitive:
+                all_files_with_sensitive.add(file_id)
+        
+        # 添加文件结果摘要
+        file_results.append({
+            "file_id": file_id,
+            "file_name": file_name,
+            "file_size": file_size,
+            "sensitive_count": len(file_items),
+            "sensitive_types": file_statistics,
+            "items": file_items
+        })
+    
+    # 返回结果
+    return success_response({
+        "task_id": task_id,
+        "files": file_results,
+        "total_files": len(jsonl_files),
+        "items": all_items,  # 所有敏感信息项
+        "statistics": all_statistics,  # 总体统计
+        "total_sensitive": len(all_items),
+        "files_with_sensitive": len(all_files_with_sensitive)
+    })
+
+
+@router.get("/v1/extract/{scan_id}/html")
+async def get_extract_html(
+    scan_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    获取扫描结果的HTML可视化页面
+    
+    Args:
+        scan_id: 扫描ID（可以是 task_id_file_id 格式）
+    
+    Returns:
+        HTML文件响应
+    """
+    from fastapi.responses import FileResponse
+    import os
+    
+    # 检查认证
+    if not current_user:
+        raise BusinessException("需要登录才能查看提取结果", ResponseCode.UNAUTHORIZED)
+    
+    # 构建 HTML 文件路径
+    html_path = f"/tmp/scan_visualizations/{scan_id}.html"
+    
+    # 检查文件是否存在
+    if not os.path.exists(html_path):
+        raise BusinessException(f"扫描结果不存在: {scan_id}", ResponseCode.NOT_FOUND)
+    
+    # 返回HTML文件
+    return FileResponse(
+        path=html_path,
+        media_type="text/html",
+        headers={
+            "Content-Type": "text/html; charset=utf-8"
+        }
+    )
+
+
 @router.get("/v1/extract/{scan_id}")
 async def get_extract_result(
     scan_id: str,

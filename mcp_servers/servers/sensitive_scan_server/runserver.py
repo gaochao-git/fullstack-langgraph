@@ -45,8 +45,8 @@ scanner = LangExtractSensitiveScanner(
     base_url=config.get("langextract_base_url", "https://api.siliconflow.cn/v1")
 )
 
-# 输出目录
-OUTPUT_DIR = Path(config.get("visualization_output_dir", "/tmp/scan_visualizations"))
+# 输出目录 - 保持与前端接口一致
+OUTPUT_DIR = Path("/tmp/scan_visualizations")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # 任务存储（生产环境应该使用Redis或数据库）
@@ -159,7 +159,8 @@ def process_scan_task(task_id: str, file_ids: List[str]):
                 scan_result = scanner.scan_document(
                     file_id=file_id,
                     text=file_item["content"],
-                    output_dir=str(OUTPUT_DIR)
+                    output_dir=str(OUTPUT_DIR),
+                    task_id=task_id
                 )
                 
                 # 处理扫描结果
@@ -255,7 +256,8 @@ def scan_documents(file_ids: List[str]) -> str:
                 "message": "任务已创建，等待处理..."
             },
             "statistics": {
-                "processed_files": 0
+                "processed_files": 0,
+                "sensitive_items": 0
             },
             "summary": None,
             "errors": []

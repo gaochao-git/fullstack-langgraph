@@ -121,12 +121,23 @@ export const ExtractModal: React.FC<ExtractModalProps> = ({
   }, [visible, reportPath]);
 
   const loadReport = async () => {
-    console.log('loadReport called with reportPath:', reportPath);
+    console.log('loadReport called with reportPath:', reportPath, 'reportType:', reportType);
     setLoading(true);
     try {
-      const filename = reportPath.split('/').pop() || '';
-      console.log('Loading report filename:', filename);
-      const response = await omind_get(`/api/v1/extract/${filename}`);
+      let response;
+      
+      // 根据不同的报告类型使用不同的API
+      if (reportType === 'LANGEXTRACT') {
+        // 对于 LANGEXTRACT 类型，reportPath 就是 task_id
+        console.log('Loading LANGEXTRACT report for task:', reportPath);
+        response = await omind_get(`/api/v1/extract/task/${reportPath}`);
+      } else {
+        // 默认处理（兼容旧格式）
+        const filename = reportPath.split('/').pop() || '';
+        console.log('Loading report filename:', filename);
+        response = await omind_get(`/api/v1/extract/${filename}`);
+      }
+      
       console.log('Extract response:', response);
       if (response.status === 'ok') {
         setData(response.data);

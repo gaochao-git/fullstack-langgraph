@@ -201,7 +201,7 @@ class LangExtractSensitiveScanner:
         
         return examples
     
-    def scan_document(self, file_id: str, text: str, output_dir: str = "/tmp/scan_results") -> dict:
+    def scan_document(self, file_id: str, text: str, output_dir: str = "/tmp/scan_results", task_id: str = None) -> dict:
         """
         扫描单个文档并生成结果文件
         
@@ -209,17 +209,23 @@ class LangExtractSensitiveScanner:
             file_id: 文件ID
             text: 文件文本内容
             output_dir: 输出目录路径
+            task_id: 任务ID（可选，用于生成文件名前缀）
             
         Returns:
-            {"status": "ok/error", "jsonl_path": xxx, "html_path": xxx, "statistics": {...}}
+            {"status": "ok/error", "jsonl_path": xxx, "html_path": xxx}
         """
         try:
             # 确保输出目录存在
             Path(output_dir).mkdir(parents=True, exist_ok=True)
             
-            # 使用 file_id 作为输出文件名
-            jsonl_path = Path(output_dir) / f"{file_id}.jsonl"
-            html_path = Path(output_dir) / f"{file_id}.html"
+            # 使用 task_id_file_id 作为输出文件名前缀
+            if task_id:
+                file_prefix = f"{task_id}_{file_id}"
+            else:
+                file_prefix = file_id
+                
+            jsonl_path = Path(output_dir) / f"{file_prefix}.jsonl"
+            html_path = Path(output_dir) / f"{file_prefix}.html"
             
             # 创建 LangExtract Document 对象
             lx_doc = lx.data.Document(
