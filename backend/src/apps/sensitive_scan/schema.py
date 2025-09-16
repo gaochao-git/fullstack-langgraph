@@ -54,6 +54,7 @@ class ScanTaskProgress(BaseModel):
 class FileScanResult(BaseModel):
     """单个文件的扫描结果"""
     file_id: str
+    file_name: Optional[str] = None
     status: str
     jsonl_path: Optional[str] = None
     html_path: Optional[str] = None

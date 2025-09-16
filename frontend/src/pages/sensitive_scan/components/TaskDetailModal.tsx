@@ -293,13 +293,16 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
 
             {/* 文件扫描结果列表 */}
             {taskResult && (
-              <Table
-                dataSource={taskResult.files}
-                columns={fileColumns}
-                rowKey="file_id"
-                pagination={false}
-                size="small"
-              />
+              <>
+                {console.log('渲染文件列表，taskResult.files:', taskResult.files)}
+                <Table
+                  dataSource={taskResult.files}
+                  columns={fileColumns}
+                  rowKey="file_id"
+                  pagination={false}
+                  size="small"
+                />
+              </>
             )}
           </div>
         ) : (
