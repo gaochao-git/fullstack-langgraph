@@ -394,49 +394,51 @@ class LangExtractScanTaskService:
                 ResponseCode.BAD_REQUEST
             )
         
-        # 获取所有文件的扫描结果
+        # 使用 LEFT JOIN 一次查询获取所有文件信息和文件名
         files_result = await db.execute(
-            select(ScanFile).where(ScanFile.task_id == task_id)
-        )
-        files = files_result.scalars().all()
-        
-        # 获取文件ID列表
-        file_ids = [f.file_id for f in files]
-        
-        # 批量查询文件名
-        file_names_map = {}
-        if file_ids:
-            doc_result = await db.execute(
-                select(AgentDocumentUpload.file_id, AgentDocumentUpload.file_name)
-                .where(AgentDocumentUpload.file_id.in_(file_ids))
+            select(ScanFile, AgentDocumentUpload.file_name)
+            .outerjoin(
+                AgentDocumentUpload,
+                ScanFile.file_id == AgentDocumentUpload.file_id
             )
-            for file_id, file_name in doc_result:
-                file_names_map[file_id] = file_name
+            .where(ScanFile.task_id == task_id)
+        )
+        files_with_names = files_result.all()
         
-        # 统计信息
-        completed_files = sum(1 for f in files if f.file_status == 'completed')
-        failed_files = sum(1 for f in files if f.file_status == 'failed')
+        # 统计信息 - 使用聚合查询优化
+        stats_result = await db.execute(
+            select(
+                ScanFile.file_status,
+                func.count(ScanFile.id).label('count')
+            )
+            .where(ScanFile.task_id == task_id)
+            .group_by(ScanFile.file_status)
+        )
+        
+        status_counts = {row.file_status: row.count for row in stats_result}
+        completed_files = status_counts.get('completed', 0)
+        failed_files = status_counts.get('failed', 0)
         
         return {
             "task_id": task.task_id,
             "status": task.task_status,
             "summary": {
-                "total_files": len(files),
+                "total_files": len(files_with_names),
                 "completed_files": completed_files,
                 "failed_files": failed_files
             },
             "files": [
                 {
-                    "file_id": f.file_id,
-                    "file_name": file_names_map.get(f.file_id),  # 添加文件名
-                    "status": f.file_status,
-                    "jsonl_path": f.jsonl_path,
-                    "html_path": f.html_path,
-                    "error": f.file_error,
-                    "start_time": f.start_time.isoformat() if f.start_time else None,
-                    "end_time": f.end_time.isoformat() if f.end_time else None
+                    "file_id": scan_file.file_id,
+                    "file_name": file_name,  # 从 JOIN 结果获取
+                    "status": scan_file.file_status,
+                    "jsonl_path": scan_file.jsonl_path,
+                    "html_path": scan_file.html_path,
+                    "error": scan_file.file_error,
+                    "start_time": scan_file.start_time.isoformat() if scan_file.start_time else None,
+                    "end_time": scan_file.end_time.isoformat() if scan_file.end_time else None
                 }
-                for f in files
+                for scan_file, file_name in files_with_names
             ],
             "completed_time": task.end_time.isoformat() if task.end_time else None
         }
