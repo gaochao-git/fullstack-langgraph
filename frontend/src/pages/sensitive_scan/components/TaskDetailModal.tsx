@@ -22,47 +22,17 @@ import { ScanApi } from '../services/scanApi';
 interface TaskDetailModalProps {
   visible: boolean;
   taskId: string | null;
+  taskStatus?: string;
   onClose: () => void;
 }
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onClose }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, taskStatus, onClose }) => {
   const [loading, setLoading] = useState(true);
-  const [taskDetail, setTaskDetail] = useState<TaskDetail | null>(null);
   const [taskResult, setTaskResult] = useState<TaskResult | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timer | null>(null);
   const [htmlModalVisible, setHtmlModalVisible] = useState(false);
   const [htmlReportUrl, setHtmlReportUrl] = useState<string>('');
   const [htmlLoading, setHtmlLoading] = useState(false);
-
-  // 获取任务详情
-  const fetchTaskDetail = async () => {
-    if (!taskId) return;
-    
-    try {
-      const response = await ScanApi.getTaskProgress(taskId);
-      if (response.data.status === 'ok') {
-        setTaskDetail(response.data.data);
-        
-        // 如果任务已完成，获取结果
-        if (['completed', 'failed'].includes(response.data.data.status)) {
-          fetchTaskResult();
-          // 停止轮询
-          if (pollingInterval) {
-            clearInterval(pollingInterval);
-            setPollingInterval(null);
-          }
-        }
-      } else {
-        message.error(response.data.msg || '获取任务详情失败');
-      }
-    } catch (error) {
-      message.error('获取任务详情失败');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   // 获取任务结果
   const fetchTaskResult = async () => {
@@ -72,9 +42,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
       const response = await ScanApi.getTaskResult(taskId);
       if (response.data.status === 'ok') {
         setTaskResult(response.data.data);
+      } else {
+        message.error(response.data.msg || '获取任务结果失败');
       }
     } catch (error) {
-      console.error('获取任务结果失败:', error);
+      message.error('获取任务结果失败');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -116,32 +91,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
   useEffect(() => {
     if (visible && taskId) {
       setLoading(true);
-      fetchTaskDetail();
-      
-      // 如果任务未完成，启动轮询
-      const startPolling = () => {
-        const interval = setInterval(() => {
-          fetchTaskDetail();
-        }, 3000); // 每3秒刷新一次
-        setPollingInterval(interval);
-      };
-      
-      if (taskDetail && ['pending', 'processing'].includes(taskDetail.status)) {
-        startPolling();
-      }
-    } else {
-      // 关闭时清理
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        setPollingInterval(null);
-      }
+      // 直接获取结果，因为结果接口包含了所有需要的信息
+      fetchTaskResult();
     }
-    
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
   }, [visible, taskId]);
 
   // 状态标签
@@ -246,7 +198,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
             icon={<ReloadOutlined />}
             onClick={() => {
               setRefreshing(true);
-              fetchTaskDetail();
+              fetchTaskResult();
             }}
             loading={refreshing}
           >
@@ -258,57 +210,30 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
           <div style={{ textAlign: 'center', padding: '50px' }}>
             <Spin size="large" />
           </div>
-        ) : taskDetail ? (
+        ) : taskResult ? (
           <div>
-            {/* 进度条 - 只在处理中时显示 */}
-            {['pending', 'processing'].includes(taskDetail.status) && (
-              <div style={{ marginBottom: 16 }}>
-                <Progress
-                  percent={Math.round((taskDetail.progress.current / taskDetail.progress.total) * 100)}
-                  status={taskDetail.status === 'processing' ? 'active' : 'normal'}
-                />
-                <p style={{ marginTop: 8, color: '#666' }}>
-                  {taskDetail.progress.message}
-                </p>
-              </div>
-            )}
-
-            {/* 错误信息 */}
-            {taskDetail.errors && taskDetail.errors.length > 0 && (
-              <Alert
-                style={{ marginBottom: 16 }}
-                message="错误信息"
-                description={
-                  <ul>
-                    {taskDetail.errors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                }
-                type="error"
-                showIcon
-                icon={<ExclamationCircleOutlined />}
-              />
-            )}
+            {/* 任务概要 */}
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <span>总文件数: <strong>{taskResult.summary.total_files}</strong></span>
+                <span>完成数: <strong style={{ color: '#52c41a' }}>{taskResult.summary.completed_files}</strong></span>
+                <span>失败数: <strong style={{ color: '#ff4d4f' }}>{taskResult.summary.failed_files}</strong></span>
+              </Space>
+            </div>
 
             {/* 文件扫描结果列表 */}
-            {taskResult && (
-              <>
-                {console.log('渲染文件列表，taskResult.files:', taskResult.files)}
-                <Table
-                  dataSource={taskResult.files}
-                  columns={fileColumns}
-                  rowKey="file_id"
-                  pagination={false}
-                  size="small"
-                />
-              </>
-            )}
+            <Table
+              dataSource={taskResult.files}
+              columns={fileColumns}
+              rowKey="file_id"
+              pagination={false}
+              size="small"
+            />
           </div>
         ) : (
           <Alert
-            message="任务不存在"
-            description="未找到指定的扫描任务"
+            message="获取任务详情失败"
+            description="请刷新重试"
             type="error"
             showIcon
           />

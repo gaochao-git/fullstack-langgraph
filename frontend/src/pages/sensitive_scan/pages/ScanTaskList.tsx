@@ -30,6 +30,7 @@ const ScanTaskList: React.FC = () => {
   const [searchCreateBy, setSearchCreateBy] = useState<string>('');
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskStatus, setSelectedTaskStatus] = useState<string | null>(null);
 
   // 获取任务列表
   const fetchTasks = async () => {
@@ -172,6 +173,7 @@ const ScanTaskList: React.FC = () => {
           icon={<EyeOutlined />}
           onClick={() => {
             setSelectedTaskId(record.task_id);
+            setSelectedTaskStatus(record.status);
             setDetailModalVisible(true);
           }}
         >
@@ -231,9 +233,11 @@ const ScanTaskList: React.FC = () => {
       <TaskDetailModal
         visible={detailModalVisible}
         taskId={selectedTaskId}
+        taskStatus={selectedTaskStatus || undefined}
         onClose={() => {
           setDetailModalVisible(false);
           setSelectedTaskId(null);
+          setSelectedTaskStatus(null);
         }}
       />
     </Card>
