@@ -26,6 +26,7 @@ export interface ScanTask {
 // 扫描文件
 export interface ScanFile {
   file_id: string;
+  file_name?: string;
   status: FileStatus;
   jsonl_path?: string;
   html_path?: string;

@@ -176,17 +176,6 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
-        # 文档摘要示例
-        examples.append(lx.data.ExampleData(
-            text="本公司2023年度财务报告显示，营业收入达到5000万元，同比增长20%。主要增长来自于新产品线的推出和市场拓展。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="文档摘要",
-                    extraction_text="公司2023年营收5000万元，同比增长20%，主要得益于新产品和市场拓展"
-                )
-            ]
-        ))
-        
         return examples
     
     def scan_document(self, file_id: str, text: str) -> dict:

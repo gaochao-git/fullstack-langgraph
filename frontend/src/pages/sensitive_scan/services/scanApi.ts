@@ -68,6 +68,6 @@ export class ScanApi {
    */
   static async downloadHtmlReport(taskId: string, fileId: string) {
     const response = await omind_get(`/api/v1/scan/results/${taskId}/${fileId}/html`);
-    return { data: response };
+    return response;
   }
 }

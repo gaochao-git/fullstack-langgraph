@@ -100,7 +100,7 @@ async def get_scan_result_jsonl(
     return PlainTextResponse(content=content, media_type="application/x-ndjson")
 
 
-@router.get("/v1/scan/results/{task_id}/{file_id}/html", response_class=HTMLResponse)
+@router.get("/v1/scan/results/{task_id}/{file_id}/html", response_model=UnifiedResponse)
 async def get_scan_result_html(
     task_id: str,
     file_id: str,
@@ -108,4 +108,4 @@ async def get_scan_result_html(
 ):
     """获取扫描结果的HTML报告"""
     content = await scan_task_service.get_result_html_content(db, task_id, file_id)
-    return HTMLResponse(content=content)
+    return success_response(data={"html": content}, msg="获取HTML报告成功")

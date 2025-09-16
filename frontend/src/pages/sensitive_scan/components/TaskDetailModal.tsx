@@ -87,15 +87,25 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
     setHtmlLoading(true);
     
     try {
-      // 下载HTML文件为blob
+      // 下载HTML文件
       const response = await ScanApi.downloadHtmlReport(taskId, fileId);
       
-      // 创建blob URL
-      const blob = new Blob([response.data], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      setHtmlReportUrl(url);
-    } catch (error) {
-      message.error('加载HTML报告失败');
+      if (response.status === 'ok' && response.data) {
+        // 从标准响应格式中获取HTML内容
+        const htmlContent = response.data.html;
+        
+        // 创建blob URL
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        setHtmlReportUrl(url);
+      } else {
+        // 处理业务错误
+        message.error(response.msg || '加载HTML报告失败');
+        setHtmlModalVisible(false);
+      }
+    } catch (error: any) {
+      // 处理网络错误
+      message.error('网络错误，加载HTML报告失败');
       setHtmlModalVisible(false);
     } finally {
       setHtmlLoading(false);
@@ -152,10 +162,19 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, onCl
   // 文件列表列定义
   const fileColumns: ColumnsType<ScanFile> = [
     {
-      title: '文件ID',
-      dataIndex: 'file_id',
-      key: 'file_id',
+      title: '文件名',
+      dataIndex: 'file_name',
+      key: 'file_name',
       ellipsis: true,
+      render: (name, record) => {
+        // 优先显示文件名，如果没有则显示文件ID的前8位
+        const displayName = name || `${record.file_id.substring(0, 8)}...`;
+        return (
+          <span title={name || record.file_id}>
+            {displayName}
+          </span>
+        );
+      },
     },
     {
       title: '状态',

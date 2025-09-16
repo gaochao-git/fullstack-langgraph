@@ -17,6 +17,7 @@ from src.shared.core.exceptions import BusinessException
 from src.shared.schemas.response import ResponseCode
 from src.shared.core.config import settings
 from .models import ScanTask, ScanFile
+from src.apps.agent.models import AgentDocumentUpload
 
 logger = get_logger(__name__)
 
@@ -633,35 +634,41 @@ class FullScanTaskService:
                 ResponseCode.BAD_REQUEST
             )
         
-        # 获取所有文件的扫描结果
+        # 获取所有文件的扫描结果，并关联查询文件名
         files_result = await db.execute(
-            select(ScanFile).where(ScanFile.task_id == task_id)
+            select(ScanFile, AgentDocumentUpload.file_name)
+            .outerjoin(
+                AgentDocumentUpload, 
+                ScanFile.file_id == AgentDocumentUpload.file_id
+            )
+            .where(ScanFile.task_id == task_id)
         )
-        files = files_result.scalars().all()
+        files_with_names = files_result.all()
         
         # 统计信息
-        completed_files = sum(1 for f in files if f.file_status == 'completed')
-        failed_files = sum(1 for f in files if f.file_status == 'failed')
+        completed_files = sum(1 for f in files_with_names if f[0].file_status == 'completed')
+        failed_files = sum(1 for f in files_with_names if f[0].file_status == 'failed')
         
         return {
             "task_id": task.task_id,
             "status": task.task_status,
             "summary": {
-                "total_files": len(files),
+                "total_files": len(files_with_names),
                 "completed_files": completed_files,
                 "failed_files": failed_files
             },
             "files": [
                 {
-                    "file_id": f.file_id,
-                    "status": f.file_status,
-                    "jsonl_path": f.jsonl_path,
-                    "html_path": f.html_path,
-                    "error": f.file_error,
-                    "start_time": f.start_time.isoformat() if f.start_time else None,
-                    "end_time": f.end_time.isoformat() if f.end_time else None
+                    "file_id": f[0].file_id,
+                    "file_name": f[1],  # 从关联查询中获取的文件名
+                    "status": f[0].file_status,
+                    "jsonl_path": f[0].jsonl_path,
+                    "html_path": f[0].html_path,
+                    "error": f[0].file_error,
+                    "start_time": f[0].start_time.isoformat() if f[0].start_time else None,
+                    "end_time": f[0].end_time.isoformat() if f[0].end_time else None
                 }
-                for f in files
+                for f in files_with_names
             ],
             "completed_time": task.end_time.isoformat() if task.end_time else None
         }
