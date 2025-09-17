@@ -6,7 +6,7 @@ import {
   Select, Typography, Divider, Spin, App, Checkbox
 } from 'antd';
 import { 
-  PlusOutlined, DeleteOutlined, CopyOutlined, 
+  PlusOutlined, DeleteOutlined, 
   KeyOutlined, InfoCircleOutlined, ExclamationCircleOutlined,
   UserOutlined
 } from '@ant-design/icons';
@@ -355,21 +355,9 @@ export function APIKeyManagement() {
             : text;
           
           return (
-            <Space size={4} style={{ width: '100%' }}>
-              <Text code style={{ fontSize: 12 }}>{shortKey}</Text>
-              <Tooltip title="复制完整密钥">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CopyOutlined />}
-                  onClick={() => {
-                    navigator.clipboard.writeText(text);
-                    message.success('密钥已复制到剪贴板');
-                  }}
-                  style={{ minWidth: 'auto', padding: '0 4px' }}
-                />
-              </Tooltip>
-            </Space>
+            <Text code copyable={{ text: text }} style={{ fontSize: 12 }}>
+              {shortKey}
+            </Text>
           );
         }
         return <Text type="secondary">-</Text>;
