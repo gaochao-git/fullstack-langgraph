@@ -77,4 +77,5 @@ servers:
       port: 3008
       # 后端API配置
       api_base_url: "http://localhost:8000"  # 后端API地址
-      api_timeout: 300  # API调用超时时间（秒）
+      api_key: "ak-qy3akU2Z0wPvM-pvXu-WB9yNsvSNofx11EVycDE5YyE"
+      api_timeout: 10  # API调用超时时间（秒）

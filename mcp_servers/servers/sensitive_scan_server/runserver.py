@@ -12,9 +12,7 @@ import uuid
 from pathlib import Path
 import json
 import time
-import aiohttp
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import requests
 
 from fastmcp import FastMCP
 
@@ -36,68 +34,8 @@ mcp = FastMCP(config.display_name)
 
 # 后端API配置
 API_BASE_URL = config.get("api_base_url", "http://localhost:8000")
+API_KEY = config.get("api_key", "")  # API密钥
 API_TIMEOUT = config.get("api_timeout", 300)  # 5分钟超时
-
-# 创建异步HTTP客户端会话
-async_session = None
-
-
-def get_async_session():
-    """获取异步HTTP会话"""
-    global async_session
-    if async_session is None:
-        async_session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=API_TIMEOUT)
-        )
-    return async_session
-
-
-async def call_backend_api(method: str, endpoint: str, **kwargs) -> Dict:
-    """
-    调用后端API
-    
-    Args:
-        method: HTTP方法 (GET, POST等)
-        endpoint: API端点路径
-        **kwargs: 其他参数(json, params等)
-        
-    Returns:
-        API响应数据
-    """
-    session = get_async_session()
-    url = f"{API_BASE_URL}{endpoint}"
-    
-    try:
-        async with session.request(method, url, **kwargs) as response:
-            data = await response.json()
-            
-            if response.status >= 400:
-                raise Exception(f"API错误 ({response.status}): {data.get('detail', 'Unknown error')}")
-            
-            # 处理统一响应格式
-            if isinstance(data, dict) and "status" in data:
-                if data["status"] == "error":
-                    raise Exception(f"业务错误: {data.get('msg', 'Unknown error')}")
-                return data.get("data", data)
-            
-            return data
-            
-    except aiohttp.ClientError as e:
-        logger.error(f"调用API失败 {method} {url}: {e}")
-        raise Exception(f"网络错误: {str(e)}")
-    except Exception as e:
-        logger.error(f"处理API响应失败: {e}")
-        raise
-
-
-def sync_call_api(method: str, endpoint: str, **kwargs) -> Dict:
-    """同步调用API（用于非异步工具函数）"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(call_backend_api(method, endpoint, **kwargs))
-    finally:
-        loop.close()
 
 
 @mcp.tool()
@@ -113,12 +51,24 @@ def scan_documents(file_ids: List[str]) -> str:
     """
     try:
         # 调用后端API创建扫描任务
-        result = sync_call_api(
-            "POST", 
-            "/api/v1/scan/tasks",
-            json={"file_ids": file_ids}
-        )
+        import requests
+        headers = {}
+        if API_KEY:
+            headers["Authorization"] = f"Bearer {API_KEY}"
         
+        response = requests.post(
+            f"{API_BASE_URL}/api/v1/scan/tasks",
+            json={"file_ids": file_ids},
+            headers=headers,
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        data = response.json()
+        if data.get("status") == "error":
+            raise Exception(f"业务错误: {data.get('msg', 'Unknown error')}")
+        
+        result = data.get("data", data)
         task_id = result.get("task_id")
         
         logger.info(f"创建扫描任务: {task_id}，包含 {len(file_ids)} 个文件")
@@ -152,10 +102,23 @@ def check_scan_progress(task_id: str) -> str:
     """
     try:
         # 调用后端API获取任务进度
-        result = sync_call_api(
-            "GET", 
-            f"/api/v1/scan/tasks/{task_id}/progress"
+        import requests
+        headers = {}
+        if API_KEY:
+            headers["Authorization"] = f"Bearer {API_KEY}"
+        
+        response = requests.get(
+            f"{API_BASE_URL}/api/v1/scan/tasks/{task_id}/progress",
+            headers=headers,
+            timeout=API_TIMEOUT
         )
+        response.raise_for_status()
+        
+        data = response.json()
+        if data.get("status") == "error":
+            raise Exception(f"业务错误: {data.get('msg', 'Unknown error')}")
+        
+        result = data.get("data", data)
         
         # 构建响应
         response = {
@@ -195,151 +158,6 @@ def check_scan_progress(task_id: str) -> str:
 
 
 @mcp.tool()
-def list_scan_tasks(limit: Optional[int] = 10) -> str:
-    """
-    列出扫描任务列表
-    
-    Args:
-        limit: 返回的任务数量限制，默认10
-    
-    Returns:
-        任务列表
-    """
-    try:
-        # 调用后端API获取任务列表
-        result = sync_call_api(
-            "GET", 
-            "/api/v1/scan/tasks",
-            params={"page": 1, "size": limit}
-        )
-        
-        # 处理分页响应
-        tasks = result.get("items", [])
-        total_tasks = result.get("total", 0)
-        
-        # 简化任务信息
-        task_list = []
-        for task in tasks:
-            progress = task.get("progress", {})
-            task_info = {
-                "task_id": task["task_id"],
-                "status": task["status"],
-                "created_time": task.get("create_time"),
-                "total_files": task["total_files"],
-                "progress": progress.get("message", "未知进度")
-            }
-            
-            # 添加统计信息
-            if task["status"] in ["processing", "completed"]:
-                task_info["processed_files"] = task.get("processed_files", 0)
-                task_info["failed_files"] = task.get("failed_files", 0)
-            
-            task_list.append(task_info)
-        
-        return json.dumps({
-            "success": True,
-            "total_tasks": total_tasks,
-            "returned_tasks": len(task_list),
-            "tasks": task_list
-        }, ensure_ascii=False, indent=2)
-        
-    except Exception as e:
-        logger.error(f"获取任务列表失败: {e}")
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
-def get_scan_result(task_id: str) -> str:
-    """
-    获取扫描任务的结果（包含所有文件的扫描结果）
-    
-    Args:
-        task_id: 任务ID
-    
-    Returns:
-        扫描结果信息
-    """
-    try:
-        # 调用后端API获取任务结果
-        result = sync_call_api(
-            "GET", 
-            f"/api/v1/scan/tasks/{task_id}/result"
-        )
-        
-        return json.dumps({
-            "success": True,
-            "task_id": task_id,
-            "status": result.get("status"),
-            "summary": result.get("summary"),
-            "files": result.get("files", []),
-            "completed_time": result.get("completed_time")
-        }, ensure_ascii=False, indent=2)
-        
-    except Exception as e:
-        logger.error(f"获取任务结果失败: {e}")
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
-def get_file_scan_details(task_id: str, file_id: str) -> str:
-    """
-    获取特定文件的扫描详情
-    
-    Args:
-        task_id: 任务ID
-        file_id: 文件ID
-    
-    Returns:
-        文件扫描详情
-    """
-    try:
-        # 先获取完整的任务结果
-        result = sync_call_api(
-            "GET", 
-            f"/api/v1/scan/tasks/{task_id}/result"
-        )
-        
-        # 查找特定文件
-        files = result.get("files", [])
-        file_info = None
-        for f in files:
-            if f.get("file_id") == file_id:
-                file_info = f
-                break
-        
-        if not file_info:
-            return json.dumps({
-                "success": False,
-                "error": f"文件不存在于此任务中: {file_id}"
-            }, ensure_ascii=False, indent=2)
-        
-        return json.dumps({
-            "success": True,
-            "task_id": task_id,
-            "file_id": file_id,
-            "status": file_info.get("status"),
-            "jsonl_path": file_info.get("jsonl_path"),
-            "html_path": file_info.get("html_path"),
-            "error": file_info.get("error"),
-            "start_time": file_info.get("start_time"),
-            "end_time": file_info.get("end_time")
-        }, ensure_ascii=False, indent=2)
-        
-    except Exception as e:
-        logger.error(f"获取文件扫描详情失败: {e}")
-        return json.dumps({
-            "success": False,
-            "error": str(e)
-        }, ensure_ascii=False, indent=2)
-
-
-@mcp.tool()
 def sleep_interval(seconds: int) -> str:
     """
     暂停指定的时间，用于控制处理节奏或等待外部系统响应
@@ -365,14 +183,6 @@ def sleep_interval(seconds: int) -> str:
     }, ensure_ascii=False, indent=2)
 
 
-async def cleanup_session():
-    """清理HTTP会话"""
-    global async_session
-    if async_session:
-        await async_session.close()
-        async_session = None
-
-
 if __name__ == "__main__":
     # 启动服务器
     port = config.get("port", 3008)
@@ -382,16 +192,6 @@ if __name__ == "__main__":
     logger.info("支持的工具：")
     logger.info("  - scan_documents: 创建扫描任务")
     logger.info("  - check_scan_progress: 查看任务进度")
-    logger.info("  - list_scan_tasks: 列出任务列表")
-    logger.info("  - get_scan_result: 获取任务结果")
-    logger.info("  - get_file_scan_details: 获取特定文件的扫描详情")
     logger.info("  - sleep_interval: 暂停指定秒数（0-300秒）")
     
-    try:
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
-    finally:
-        # 清理资源
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(cleanup_session())
-        loop.close()
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
