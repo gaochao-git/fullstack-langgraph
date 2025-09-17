@@ -184,7 +184,6 @@ CREATE TABLE `auth_api_keys` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `user_id` varchar(64) NOT NULL COMMENT '所属用户ID',
   `key_name` varchar(100) NOT NULL COMMENT '密钥名称',
-  `key_prefix` varchar(20) NOT NULL COMMENT '密钥前缀（用于识别）',
   `key_hash` varchar(255) NOT NULL COMMENT '密钥哈希',
   `scopes` text COMMENT '权限范围（JSON数组）',
   `allowed_ips` text COMMENT '允许的IP列表（JSON数组）',
