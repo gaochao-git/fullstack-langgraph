@@ -28,9 +28,13 @@ const ScanTaskList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchCreateBy, setSearchCreateBy] = useState<string>('');
+  const [searchTaskId, setSearchTaskId] = useState<string>('');
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTaskStatus, setSelectedTaskStatus] = useState<string | null>(null);
+  // 实际用于查询的参数
+  const [queryCreateBy, setQueryCreateBy] = useState<string>('');
+  const [queryTaskId, setQueryTaskId] = useState<string>('');
 
   // 获取任务列表
   const fetchTasks = async () => {
@@ -39,7 +43,8 @@ const ScanTaskList: React.FC = () => {
       const response = await ScanApi.listTasks({
         page: currentPage,
         size: pageSize,
-        create_by: searchCreateBy || undefined
+        create_by: queryCreateBy || undefined,
+        task_id: queryTaskId || undefined
       });
       
       if (response.data.status === 'ok') {
@@ -56,10 +61,10 @@ const ScanTaskList: React.FC = () => {
   };
 
 
-  // 初始化
+  // 初始化和查询参数变化时重新获取数据
   useEffect(() => {
     fetchTasks();
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, queryTaskId, queryCreateBy]);
 
   // 状态标签
   const getStatusTag = (status: string) => {
@@ -189,15 +194,42 @@ const ScanTaskList: React.FC = () => {
       <div style={{ marginBottom: 16 }}>
         <Space>
           <Search
+            placeholder="搜索任务ID"
+            allowClear
+            enterButton={<SearchOutlined />}
+            style={{ width: 200 }}
+            value={searchTaskId}
+            onChange={(e) => {
+              setSearchTaskId(e.target.value);
+              // 清空时立即查询
+              if (!e.target.value && searchTaskId) {
+                setCurrentPage(1);
+                setQueryTaskId('');
+              }
+            }}
+            onSearch={(value) => {
+              setCurrentPage(1);
+              setQueryTaskId(value);
+            }}
+          />
+          
+          <Search
             placeholder="搜索创建人"
             allowClear
             enterButton={<SearchOutlined />}
             style={{ width: 200 }}
             value={searchCreateBy}
-            onChange={(e) => setSearchCreateBy(e.target.value)}
-            onSearch={() => {
+            onChange={(e) => {
+              setSearchCreateBy(e.target.value);
+              // 清空时立即查询
+              if (!e.target.value && searchCreateBy) {
+                setCurrentPage(1);
+                setQueryCreateBy('');
+              }
+            }}
+            onSearch={(value) => {
               setCurrentPage(1);
-              fetchTasks();
+              setQueryCreateBy(value);
             }}
           />
           

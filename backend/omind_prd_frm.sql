@@ -901,6 +901,45 @@ CREATE TABLE `mcp_servers_permission` (
   UNIQUE KEY `server_id_user` (`server_id`,`user_name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COMMENT='mcp server权限表';
 
+CREATE TABLE `scan_tasks` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `task_id` varchar(64) NOT NULL COMMENT '任务ID',
+  `task_status` varchar(64) NOT NULL DEFAULT 'pending' COMMENT '任务状态,pending,processing,completed,failed',
+  `task_errors` text COMMENT '错误信息',
+  `start_time` datetime DEFAULT NULL COMMENT '开始时间',
+  `end_time` datetime DEFAULT NULL COMMENT '结束时间',
+  `create_by` varchar(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_id` (`task_id`),
+  KEY `idx_status` (`task_status`),
+  KEY `idx_create_by` (`create_by`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COMMENT='敏感数据扫描任务表';
+
+
+CREATE TABLE `scan_files` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `task_id` varchar(64) NOT NULL COMMENT '任务ID',
+  `file_id` varchar(64) NOT NULL COMMENT '文件ID',
+  `file_status` varchar(64) NOT NULL DEFAULT 'pending' COMMENT '任务状态,pending,processing,completed,failed',
+  `jsonl_path` varchar(500) DEFAULT NULL COMMENT 'JSONL结果文件路径',
+  `html_path` varchar(500) DEFAULT NULL COMMENT 'HTML可视化文件路径',
+  `file_error` text COMMENT '错误信息',
+  `start_time` datetime DEFAULT NULL COMMENT '开始时间',
+  `end_time` datetime DEFAULT NULL COMMENT '结束时间',
+  `create_by` varchar(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_file` (`task_id`,`file_id`),
+  KEY `idx_task_id` (`task_id`),
+  KEY `idx_file_id` (`file_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4 COMMENT='扫描文件表';
+
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

@@ -448,13 +448,16 @@ class LangExtractScanTaskService:
         db: AsyncSession,
         page: int = 1,
         size: int = 10,
-        create_by: Optional[str] = None
+        create_by: Optional[str] = None,
+        task_id: Optional[str] = None
     ) -> tuple[List[Dict[str, Any]], int]:
         """查询任务列表"""
         # 构建查询条件
         conditions = []
         if create_by:
             conditions.append(ScanTask.create_by == create_by)
+        if task_id:
+            conditions.append(ScanTask.task_id.contains(task_id))
         
         # 查询总数
         count_query = select(func.count(ScanTask.id))

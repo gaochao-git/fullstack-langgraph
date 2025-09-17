@@ -42,6 +42,7 @@ export class ScanApi {
     page?: number;
     size?: number;
     create_by?: string;
+    task_id?: string;
   }) {
     const response = await omind_get('/api/v1/scan/tasks', { body: params });
     return { data: response };

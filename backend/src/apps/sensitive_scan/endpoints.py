@@ -65,6 +65,7 @@ async def list_scan_tasks(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(10, ge=1, le=100, description="每页数量"),
     create_by: Optional[str] = Query(None, description="创建者过滤"),
+    task_id: Optional[str] = Query(None, description="任务ID过滤"),
     db: AsyncSession = Depends(get_async_db),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
@@ -77,7 +78,8 @@ async def list_scan_tasks(
         db=db,
         page=page,
         size=size,
-        create_by=create_by
+        create_by=create_by,
+        task_id=task_id
     )
     
     return paginated_response(
