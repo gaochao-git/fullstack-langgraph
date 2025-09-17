@@ -69,8 +69,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, task
         // 从标准响应格式中获取HTML内容
         const htmlContent = response.data.html;
         
-        // 创建blob URL
-        const blob = new Blob([htmlContent], { type: 'text/html' });
+        // 创建blob URL，明确指定UTF-8编码
+        const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
         const url = URL.createObjectURL(blob);
         setHtmlReportUrl(url);
       } else {

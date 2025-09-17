@@ -92,13 +92,20 @@ const ScanResultViewer: React.FC<ScanResultViewerProps> = ({
     setHtmlLoading(true);
     
     try {
-      // 下载HTML文件为blob
+      // 下载HTML文件
       const response = await ScanApi.downloadHtmlReport(taskId, fileId);
       
-      // 创建blob URL
-      const blob = new Blob([response.data], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      setHtmlReportUrl(url);
+      if (response.status === 'ok' && response.data) {
+        // 从标准响应格式中获取HTML内容
+        const htmlContent = response.data.html;
+        
+        // 创建blob URL，明确指定UTF-8编码
+        const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        setHtmlReportUrl(url);
+      } else {
+        throw new Error(response.msg || '加载HTML报告失败');
+      }
     } catch (error) {
       message.error('加载HTML报告失败');
       setHtmlModalVisible(false);
