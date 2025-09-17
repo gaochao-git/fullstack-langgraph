@@ -464,6 +464,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       title: '操作',
       key: 'actions',
       width: 160,
+      fixed: 'right',
       render: (_, record: MCPGatewayConfig) => (
         <Space size="small">
           <Button 
