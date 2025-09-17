@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getBaseUrl } from '@/utils/base_api';
 import MCPApi from '@/services/mcpApi';
+import { getCurrentUsername } from '@/utils/authInterceptor';
 import { 
   Card, 
   Table, 
@@ -77,6 +78,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [tenantFilter, setTenantFilter] = useState<string>('');
+  const currentUser = getCurrentUsername();
   
   // 模态框状态
   const [configDetailModal, setConfigDetailModal] = useState(false);
@@ -392,7 +394,8 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       title: '配置名称',
       dataIndex: 'name',
       key: 'name',
-      width: 150,
+      width: 200,
+      ellipsis: true,
       render: (name: string) => (
         <Space>
           <SettingOutlined />
@@ -465,37 +468,44 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
       key: 'actions',
       width: 160,
       fixed: 'right',
-      render: (_, record: MCPGatewayConfig) => (
-        <Space size="small">
-          <Button 
-            type="text" 
-            icon={<EyeOutlined />}
-            onClick={() => handleViewConfig(record)}
-            title="查看详情"
-          />
-          <Button 
-            type="text" 
-            icon={<EditOutlined />}
-            onClick={() => handleEditConfig(record)}
-            title="编辑"
-          />
-          <Popconfirm
-            title="删除配置"
-            description="确定要删除这个MCP Gateway配置吗？删除后无法恢复。"
-            onConfirm={() => handleDeleteConfig(record.id)}
-            okText="确定"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-          >
+      render: (_, record: MCPGatewayConfig) => {
+        const isCreator = record.create_by === currentUser;
+        
+        return (
+          <Space size="small">
             <Button 
               type="text" 
-              icon={<DeleteOutlined />}
-              danger
-              title="删除"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewConfig(record)}
+              title="查看详情"
             />
-          </Popconfirm>
-        </Space>
-      )
+            <Button 
+              type="text" 
+              icon={<EditOutlined />}
+              onClick={() => handleEditConfig(record)}
+              title={isCreator ? "编辑" : "只有创建人可以编辑"}
+              disabled={!isCreator}
+            />
+            <Popconfirm
+              title="删除配置"
+              description="确定要删除这个MCP Gateway配置吗？删除后无法恢复。"
+              onConfirm={() => handleDeleteConfig(record.id)}
+              okText="确定"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              disabled={!isCreator}
+            >
+              <Button 
+                type="text" 
+                icon={<DeleteOutlined />}
+                danger
+                title={isCreator ? "删除" : "只有创建人可以删除"}
+                disabled={!isCreator}
+              />
+            </Popconfirm>
+          </Space>
+        );
+      }
     }
   ];
 
@@ -564,7 +574,7 @@ const MCPGatewayManagement: React.FC<MCPGatewayManagementProps> = ({ onSuccess }
         dataSource={filteredConfigs}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1200 }}
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,

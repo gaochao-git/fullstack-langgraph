@@ -164,6 +164,14 @@ class MCPGatewayConfigService:
             config = await self.get_config_by_id(db, config_id)
             if not config:
                 return None
+                
+            # 检查权限：只有创建人可以修改
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if config.create_by != username:
+                raise BusinessException(
+                    f"您没有权限修改此配置，只有创建人 {config.create_by} 可以修改",
+                    ResponseCode.FORBIDDEN
+                )
 
             # 如果要修改名称或租户，检查是否冲突
             if config_data.name or config_data.tenant:
@@ -238,6 +246,14 @@ class MCPGatewayConfigService:
             config = await self.get_config_by_id(db, config_id)
             if not config:
                 return False
+                
+            # 检查权限：只有创建人可以删除
+            username = current_user.get('username') or current_user.get('sub', 'system')
+            if config.create_by != username:
+                raise BusinessException(
+                    f"您没有权限删除此配置，只有创建人 {config.create_by} 可以删除",
+                    ResponseCode.FORBIDDEN
+                )
 
             await db.execute(
                 update(MCPConfig)
