@@ -76,6 +76,17 @@ class LangExtractSensitiveScanner:
                 )
             ]
         ))
+
+        # 手机号示例
+        examples.append(lx.data.ExampleData(
+            text="请联系客服：一八八三三四五六七五二，工作时间9:00-18:00。",
+            extractions=[
+                lx.data.Extraction(
+                    extraction_class="手机号",
+                    extraction_text="一八八三三四五六七五二"
+                )
+            ]
+        ))
         
         # 银行卡号示例
         examples.append(lx.data.ExampleData(
@@ -203,13 +214,10 @@ class LangExtractSensitiveScanner:
             
             # 提示词
             prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
-同时生成一句话的文档摘要（限50字）。
 注意：
-1. 身份证号是15位或18位数字（18位最后一位可能是X），不要拆分
-2. 手机号是11位数字，以13/14/15/16/17/18/19开头
-3. IP地址格式为x.x.x.x（如192.168.1.100或10.100.21.121），可能带端口号，要提取完整
-4. 单独用户名不算敏感，需要上下文判断
-5. 确保提取完整的敏感信息，不要截断"""
+1. 单独用户名不算敏感，需要上下文判断
+2. 手机号和身份证号有可能不是用数字表示的也要识别
+"""
             
             # 执行提取
             result = lx.extract(

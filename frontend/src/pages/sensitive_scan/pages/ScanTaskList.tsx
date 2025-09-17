@@ -248,6 +248,7 @@ const ScanTaskList: React.FC = () => {
         dataSource={tasks}
         rowKey="task_id"
         loading={loading}
+        scroll={{ x: 1200 }}
         pagination={{
           current: currentPage,
           pageSize: pageSize,
