@@ -48,7 +48,7 @@ async def create_generic_agent(config: RunnableConfig):
     monitor_hook = create_monitor_hook(llm_config)
     
     # 获取 checkpointer
-    checkpointer = get_checkpointer()
+    checkpointer = await get_checkpointer()
     
     # 直接使用 create_react_agent 创建并返回图
     return create_react_agent(

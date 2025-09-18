@@ -3,6 +3,7 @@ FastAPI应用入口文件
 """
 
 import uvicorn
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,44 +25,15 @@ from .router import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
-    # 启动事件
+    """应用生命周期管理（极简版）"""
+    # 启动时仅打印日志
     logger = get_logger(__name__)
-    
-    # 初始化 checkpoint
-    try:
-        from .apps.agent import checkpoint_factory
-        await checkpoint_factory.init()
-    except Exception as e:
-        logger.error(f"Checkpoint 初始化失败: {e}", exc_info=True)
-    
-    # 自动扫描并同步API权限
-    try:
-        from .shared.core.api_permission_scanner import scan_and_sync_api_permissions
-        stats = await scan_and_sync_api_permissions(app)
-        logger.info(f"✅ API权限同步完成: 新增 {stats['created']}, 跳过 {stats['skipped']}")
-        if stats['orphaned'] > 0:
-            logger.warning(f"⚠️ 发现 {stats['orphaned']} 个孤立权限")
-    except Exception as e:
-        logger.error(f"❌ API权限同步失败: {e}", exc_info=True)
+    logger.info(f"应用启动 (PID: {os.getpid()})")
     
     yield  # 应用运行期间
     
-    # 关闭事件
-    try:
-        from .apps.agent import checkpoint_factory
-        await checkpoint_factory.cleanup()
-    except Exception as e:
-        logger.error(f"清理失败: {e}", exc_info=True)
-    
-    # 关闭数据库引擎
-    try:
-        from .shared.db.config import async_engine
-        if async_engine:
-            await async_engine.dispose()
-            logger.info("✅ 异步数据库引擎已关闭")
-    except Exception as e:
-        logger.error(f"关闭数据库引擎失败: {e}", exc_info=True)
+    # 关闭时仅打印日志
+    logger.info("应用关闭")
 
 
 def create_app() -> FastAPI:

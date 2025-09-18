@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 # 全局单例
 _checkpointer: Union[AsyncPostgresSaver, AIOMySQLSaver, None] = None
 _exit_stack: Optional[AsyncExitStack] = None
+_initialized: bool = False  # 标记是否已初始化
 
 
 def _get_checkpoint_uri() -> Optional[str]:
@@ -36,18 +37,18 @@ def _get_checkpoint_uri() -> Optional[str]:
                 f"@{settings.CHECKPOINTER_HOST}:{settings.CHECKPOINTER_PORT}/{settings.CHECKPOINTER_DB}")
 
 
-def get_checkpointer() -> Union[AsyncPostgresSaver, AIOMySQLSaver]:
-    """获取 checkpointer 单例"""
-    if _checkpointer is None:
-        raise RuntimeError("Checkpointer 未初始化")
+async def get_checkpointer() -> Union[AsyncPostgresSaver, AIOMySQLSaver]:
+    """获取 checkpointer 单例（懒加载）"""
+    if not _initialized:
+        await init()
     return _checkpointer
 
 
 async def init():
     """初始化 checkpointer"""
-    global _checkpointer, _exit_stack
+    global _checkpointer, _exit_stack, _initialized
     
-    if _checkpointer is not None:
+    if _initialized:
         return
     
     checkpointer_type = settings.CHECKPOINTER_TYPE.lower()
@@ -74,6 +75,7 @@ async def init():
             raise ValueError(f"不支持的类型: {checkpointer_type}")
         
         await _checkpointer.setup()
+        _initialized = True  # 标记初始化成功
         logger.info(f"✅ {checkpointer_type} checkpointer 初始化成功")
         
     except Exception as e:
@@ -86,12 +88,13 @@ async def init():
 
 async def cleanup():
     """清理资源"""
-    global _checkpointer, _exit_stack
+    global _checkpointer, _exit_stack, _initialized
     
     if _exit_stack:
         await _exit_stack.aclose()
         _exit_stack = None
         _checkpointer = None
+        _initialized = False  # 重置初始化标记
         logger.info("✅ Checkpointer 已清理")
 
 
@@ -108,7 +111,7 @@ async def recover_thread_from_checkpoint(thread_id: str) -> Optional[dict]:
         RuntimeError: 如果checkpointer未初始化
     """
     try:
-        checkpointer = get_checkpointer()
+        checkpointer = await get_checkpointer()  # 改为 await 调用
         config = {"configurable": {"thread_id": thread_id}}
         history = [c async for c in checkpointer.alist(config, limit=1)]
         
@@ -127,3 +130,9 @@ async def recover_thread_from_checkpoint(thread_id: str) -> Optional[dict]:
     except Exception as e:
         logger.error(f"恢复线程 {thread_id} 失败: {e}")
         return None
+
+
+# 导出 _initialized 供外部使用（如 main.py）
+def is_initialized() -> bool:
+    """检查 checkpointer 是否已初始化"""
+    return _initialized

@@ -16,7 +16,7 @@ from src.shared.core.logging import get_logger
 logger = get_logger(__name__)
 
 
-def compile_graph():
+async def compile_graph():
     """编译敏感数据扫描图 - 细粒度流式版本"""
     from src.apps.agent.checkpoint_factory import get_checkpointer
     
@@ -59,7 +59,7 @@ def compile_graph():
     workflow.add_edge("generate_report", END)
     
     # 获取 checkpointer
-    checkpointer = get_checkpointer()
+    checkpointer = await get_checkpointer()
     
     # 编译图
     logger.info(f"[Agent创建] 编译敏感数据扫描图（细粒度流式版本）")
@@ -69,4 +69,4 @@ def compile_graph():
 @agent(**INIT_AGENT_CONFIG)
 async def create_sensitive_scanner_agent(config: RunnableConfig):
     """创建敏感数据扫描智能体"""
-    return compile_graph()
+    return await compile_graph()

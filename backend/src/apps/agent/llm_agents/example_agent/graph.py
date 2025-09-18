@@ -92,7 +92,7 @@ async def create_workflow(
     from src.apps.agent.checkpoint_factory import get_checkpointer
     
     # 获取 checkpointer
-    checkpointer = get_checkpointer()
+    checkpointer = await get_checkpointer()
     
     logger.info(f"[Agent创建] 编译自定义工作流图")
     compiled_graph = workflow.compile(

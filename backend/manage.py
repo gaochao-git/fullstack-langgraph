@@ -97,6 +97,7 @@ def stop():
         # 尝试通过进程名停止
         print("PID文件不存在，尝试通过进程名停止")
         subprocess.run(['pkill', '-f', 'gunicorn.*src.main:omind_app'])
+    
 
 def status():
     """查看服务状态"""
@@ -127,6 +128,17 @@ def restart():
     time.sleep(2)
     start()
 
+def sync_permissions():
+    """同步API权限到数据库"""
+    print("同步API权限...")
+    cmd = [sys.executable, '-m', 'src.scripts.sync_permissions']
+    result = subprocess.run(cmd)
+    if result.returncode == 0:
+        print("权限同步成功")
+    else:
+        print("权限同步失败")
+        sys.exit(1)
+
 def main():
     """主函数"""
     # 加载环境变量
@@ -134,7 +146,7 @@ def main():
     
     # 解析命令
     if len(sys.argv) < 2:
-        print("使用方法: python manage.py {start|stop|restart|status}")
+        print("使用方法: python manage.py {start|stop|restart|status|sync-permissions}")
         sys.exit(1)
     
     command = sys.argv[1]
@@ -147,9 +159,11 @@ def main():
         restart()
     elif command == 'status':
         status()
+    elif command == 'sync-permissions':
+        sync_permissions()
     else:
         print(f"未知命令: {command}")
-        print("使用方法: python manage.py {start|stop|restart|status}")
+        print("使用方法: python manage.py {start|stop|restart|status|sync-permissions}")
         sys.exit(1)
 
 if __name__ == '__main__':
