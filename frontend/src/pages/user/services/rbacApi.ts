@@ -148,6 +148,12 @@ export const permissionApi = {
     const result = await omind_del(`${API_PREFIX}/permissions/${permissionId}`);
     return handleUnifiedResponse<{ deleted_permission_id: number }>(result);
   },
+
+  // 扫描API权限
+  scanPermissions: async (): Promise<{ added: number; skipped: number; updated: number }> => {
+    const result = await omind_post(`${API_PREFIX}/permissions/scan`, {});
+    return handleUnifiedResponse<{ added: number; skipped: number; updated: number }>(result);
+  },
 };
 
 // ============ 菜单管理API ============

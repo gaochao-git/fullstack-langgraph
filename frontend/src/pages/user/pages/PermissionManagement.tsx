@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import { 
   PlusOutlined, EditOutlined, DeleteOutlined, 
-  KeyOutlined, ReloadOutlined, SearchOutlined
+  KeyOutlined, ReloadOutlined, SearchOutlined, ScanOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { permissionApi } from '@/pages/user/services/rbacApi';
@@ -19,6 +19,7 @@ const { Option } = Select;
 export function PermissionManagement() {
   const { modal } = App.useApp();
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [permissions, setPermissions] = useState<RbacPermission[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -356,6 +357,40 @@ export function PermissionManagement() {
     });
   };
 
+  // 扫描API权限
+  const handleScanPermissions = async () => {
+    modal.confirm({
+      title: '扫描API权限',
+      content: '此操作将扫描系统中所有API接口并同步到权限列表，是否继续？',
+      okText: '开始扫描',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          setScanning(true);
+          message.loading('正在扫描API权限，请稍候...', 0);
+          
+          const result = await permissionApi.scanPermissions();
+          
+          message.destroy();
+          message.success(
+            `扫描完成！新增 ${result.added} 个权限，跳过 ${result.skipped} 个已存在权限，更新 ${result.updated} 个权限。`,
+            5
+          );
+          
+          // 刷新权限列表
+          fetchPermissions();
+        } catch (error) {
+          message.destroy();
+          console.error('扫描权限失败:', error);
+          const errorMessage = error instanceof Error ? error.message : '扫描失败，请重试';
+          message.error(errorMessage);
+        } finally {
+          setScanning(false);
+        }
+      },
+    });
+  };
+
 
   return (
     <div>
@@ -390,6 +425,14 @@ export function PermissionManagement() {
               onClick={() => fetchPermissions()}
               title="刷新"
             />
+            <Button 
+              icon={<ScanOutlined />} 
+              onClick={handleScanPermissions}
+              loading={scanning}
+              disabled={scanning}
+            >
+              扫描API权限
+            </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
               新增权限
             </Button>

@@ -343,6 +343,18 @@ async def delete_permission(
     )
 
 
+@permission_router.post("/scan", response_model=UnifiedResponse)
+async def scan_api_permissions(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """扫描并同步API权限"""
+    result = await rbac_permission_service.scan_and_sync_permissions(db)
+    return success_response(
+        data=result,
+        msg="API权限扫描完成"
+    )
+
+
 # ============ 菜单管理接口 ============
 
 @menu_router.post("", response_model=UnifiedResponse)

@@ -675,6 +675,123 @@ class RbacPermissionService:
                 )
             )
             return True
+    
+    async def scan_and_sync_permissions(
+        self, 
+        db: AsyncSession
+    ) -> dict:
+        """扫描并同步API权限"""
+        from src.shared.core.api_permission_scanner import get_all_api_permissions
+        from src.main import create_app
+        
+        # 创建应用实例以扫描所有路由
+        app = create_app()
+        
+        # 扫描所有API权限
+        scanned_permissions = get_all_api_permissions(app)
+        
+        # 统计结果
+        result = {
+            'added': 0,
+            'updated': 0,
+            'skipped': 0,
+            'deleted': 0
+        }
+        
+        async with db.begin():
+            # 获取数据库中所有未删除的权限
+            db_result = await db.execute(
+                select(RbacPermission).where(RbacPermission.is_deleted == 0)
+            )
+            # 使用 (permission_name, http_method) 作为唯一键
+            db_permissions = {
+                (p.permission_name, p.http_method): p 
+                for p in db_result.scalars().all()
+            }
+            
+            # 用于跟踪代码中存在的权限组合
+            code_permission_keys = set()
+            
+            # 处理扫描到的权限
+            for perm in scanned_permissions:
+                permission_name = perm['permission_name']
+                http_method = perm['http_method']
+                permission_key = (permission_name, http_method)
+                code_permission_keys.add(permission_key)
+                
+                if permission_key in db_permissions:
+                    # 权限已存在，检查是否需要更新
+                    existing = db_permissions[permission_key]
+                    need_update = False
+                    
+                    # 检查需要更新的字段（主要是描述）
+                    if existing.permission_description != perm['permission_description']:
+                        need_update = True
+                    
+                    if need_update:
+                        await db.execute(
+                            update(RbacPermission)
+                            .where(
+                                and_(
+                                    RbacPermission.permission_name == permission_name,
+                                    RbacPermission.http_method == http_method
+                                )
+                            )
+                            .values(
+                                permission_description=perm['permission_description'],
+                                update_by='system-scan',
+                                update_time=now_shanghai()
+                            )
+                        )
+                        result['updated'] += 1
+                    else:
+                        result['skipped'] += 1
+                else:
+                    # 新权限，需要创建
+                    # 找到最大的permission_id
+                    max_id_result = await db.execute(
+                        select(func.max(RbacPermission.permission_id))
+                    )
+                    max_id = max_id_result.scalar() or 0
+                    
+                    new_permission = RbacPermission(
+                        permission_id=max_id + 1 + result['added'],  # 确保ID唯一
+                        permission_name=permission_name,
+                        permission_description=perm['permission_description'],
+                        http_method=perm['http_method'],
+                        release_disable='off',
+                        is_deleted=0,
+                        create_by='system-scan',
+                        update_by='system-scan',
+                        create_time=now_shanghai(),
+                        update_time=now_shanghai()
+                    )
+                    db.add(new_permission)
+                    result['added'] += 1
+            
+            # 将数据库中有但代码中没有的权限标记为已删除
+            for db_perm_key, db_perm in db_permissions.items():
+                if db_perm_key not in code_permission_keys:
+                    await db.execute(
+                        update(RbacPermission)
+                        .where(
+                            and_(
+                                RbacPermission.permission_name == db_perm.permission_name,
+                                RbacPermission.http_method == db_perm.http_method
+                            )
+                        )
+                        .values(
+                            is_deleted=1,
+                            update_by='system-scan',
+                            update_time=now_shanghai()
+                        )
+                    )
+                    result['deleted'] += 1
+        
+        logger.info(f"权限扫描完成: 新增={result['added']}, 更新={result['updated']}, "
+                   f"跳过={result['skipped']}, 标记删除={result['deleted']}")
+        
+        return result
 
 
 class RbacMenuService:
