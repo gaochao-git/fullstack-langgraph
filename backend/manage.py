@@ -24,6 +24,7 @@ def load_env():
 def get_config():
     """从环境变量中获取配置"""
     return {
+        'env': os.getenv('ENV', 'production'),
         'host': os.getenv('HOST', '0.0.0.0'),
         'port': os.getenv('PORT', '8000'),
         'workers': os.getenv('WORKERS', '2'),
@@ -54,7 +55,7 @@ def start():
             # PID文件存在但进程不存在，删除PID文件
             pid_file.unlink()
     
-    # 构建启动命令
+    # 使用 gunicorn 启动
     cmd = [
         sys.executable, '-m', 'gunicorn',
         'src.main:omind_app',
@@ -67,8 +68,14 @@ def start():
         '--error-logfile', config['log_file']
     ]
     
+    # 开发环境添加 reload
+    if config['env'].lower() == 'development':
+        cmd.insert(-2, '--reload')
+        print(f"启动开发服务器 (自动重载): {config['host']}:{config['port']}")
+    else:
+        print(f"启动生产服务器: {config['host']}:{config['port']}")
+    
     # 启动服务
-    print(f"启动服务: {config['host']}:{config['port']}")
     subprocess.run(cmd, check=True)
     print("服务已启动")
 
@@ -96,6 +103,8 @@ def status():
     config = get_config()
     pid_file = Path(config['pid_file'])
     
+    print(f"环境: {config['env']}")
+    
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
@@ -103,6 +112,8 @@ def status():
             print(f"服务运行中 (PID: {pid})")
             print(f"端口: {config['port']}")
             print(f"工作进程数: {config['workers']}")
+            if config['env'].lower() == 'development':
+                print("自动重载: 已启用")
         except (ValueError, ProcessLookupError):
             print("服务未运行 (PID文件存在但进程不存在)")
     else:
