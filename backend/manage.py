@@ -77,7 +77,39 @@ def start():
     
     # 启动服务
     subprocess.run(cmd, check=True)
-    print("服务已启动")
+    
+    # 等待服务完全启动
+    import time
+    try:
+        import requests
+    except ImportError:
+        print("服务已启动")
+        return
+    
+    max_wait = 30  # 最多等待30秒
+    check_interval = 1  # 每秒检查一次
+    health_url = f"http://127.0.0.1:{config['port']}/api/v1/mcp/gateway/configs/all"
+    
+    print("等待服务启动", end="", flush=True)
+    start_time = time.time()
+    
+    while time.time() - start_time < max_wait:
+        try:
+            # 尝试访问健康检查接口
+            response = requests.get(health_url, timeout=1)
+            if response.status_code == 200:
+                print()  # 换行
+                print(f"服务已成功启动 (耗时: {time.time() - start_time:.1f}秒)")
+                return
+        except:
+            # 连接失败，继续等待
+            pass
+        
+        print(".", end="", flush=True)
+        time.sleep(check_interval)
+    
+    print()  # 换行
+    print(f"警告: 服务启动超时 ({max_wait}秒)，请检查日志文件: {config['log_file']}")
 
 def stop():
     """停止服务"""
