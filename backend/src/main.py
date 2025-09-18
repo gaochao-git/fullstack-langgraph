@@ -3,8 +3,6 @@ FastAPI应用入口文件
 """
 
 import uvicorn
-import os
-from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -18,23 +16,6 @@ from .shared.core.logging import setup_logging, get_logger
 from .shared.core.middleware import setup_middlewares
 from .shared.core.exceptions import EXCEPTION_HANDLERS
 from .router import api_router
-
-
-
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """应用生命周期管理（极简版）"""
-    # 启动时仅打印日志
-    logger = get_logger(__name__)
-    logger.info(f"应用启动 (PID: {os.getpid()})")
-    
-    yield  # 应用运行期间
-    
-    # 关闭时仅打印日志
-    logger.info("应用关闭")
-
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
@@ -56,8 +37,7 @@ def create_app() -> FastAPI:
         description="智能诊断平台后端API",
         version=settings.APP_VERSION,
         docs_url="/docs",
-        redoc_url="/redoc",
-        lifespan=lifespan  # 使用新的lifespan事件处理
+        redoc_url="/redoc"
     )
     
     # 配置CORS中间件
