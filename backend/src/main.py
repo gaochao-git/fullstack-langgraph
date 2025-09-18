@@ -3,6 +3,7 @@ FastAPI应用入口文件
 """
 
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -16,6 +17,28 @@ from .shared.core.logging import setup_logging, get_logger
 from .shared.core.middleware import setup_middlewares
 from .shared.core.exceptions import EXCEPTION_HANDLERS
 from .router import api_router
+from .shared.db.config import init_db, close_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    logger = get_logger(__name__)
+    logger.info("=== 应用启动 ===")
+    
+    # 初始化数据库连接池
+    try:
+        await init_db()
+    except Exception as e:
+        logger.error(f"数据库初始化失败: {e}")
+        raise
+    
+    yield
+    
+    # 清理资源
+    logger.info("=== 应用关闭 ===")
+    await close_db()
+
 
 def create_app() -> FastAPI:
     """创建FastAPI应用实例"""
@@ -37,7 +60,8 @@ def create_app() -> FastAPI:
         description="智能诊断平台后端API",
         version=settings.APP_VERSION,
         docs_url="/docs",
-        redoc_url="/redoc"
+        redoc_url="/redoc",
+        lifespan=lifespan  # 添加生命周期管理
     )
     
     # 配置CORS中间件

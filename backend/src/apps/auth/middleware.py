@@ -9,7 +9,7 @@ from fastapi.security.utils import get_authorization_scheme_param
 from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.db.config import get_async_db, AsyncSessionLocal
+from src.shared.db.config import get_async_db, get_async_db_context
 from src.apps.auth.utils import JWTUtils, TokenBlacklist
 from src.apps.auth.service.rbac_service import RBACService
 from src.shared.core.exceptions import BusinessException
@@ -94,7 +94,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         logger.info(f"开始API密钥认证: {token[:20]}...")
         try:
-            async with AsyncSessionLocal() as db:
+            async with get_async_db_context() as db:
                 from sqlalchemy import select
                 from src.apps.auth.models import AuthApiKey
                 from src.apps.user.models import RbacUser
@@ -158,7 +158,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return None
         
         try:
-            async with AsyncSessionLocal() as db:
+            async with get_async_db_context() as db:
                 from sqlalchemy import select
                 from src.apps.agent.models import AgentConfig, AgentPermission
                 from src.apps.user.models import RbacUser
@@ -303,7 +303,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return None
         
         try:
-            async with AsyncSessionLocal() as db:
+            async with get_async_db_context() as db:
                 from sqlalchemy import select
                 from src.apps.auth.models import AuthSession
                 from datetime import datetime, timezone
@@ -458,7 +458,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
             method = request.method
             
             # 创建数据库会话
-            async with AsyncSessionLocal() as db:
+            async with get_async_db_context() as db:
                 service = RBACService(db)
                 
                 # 检查是否有访问权限

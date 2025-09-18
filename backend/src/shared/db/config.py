@@ -1,4 +1,5 @@
 """Database configuration and setup."""
+import os
 import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -17,77 +18,124 @@ DATABASE_USER = settings.DATABASE_USER
 DATABASE_PASSWORD = settings.DATABASE_PASSWORD
 
 # Build database URL
-if DATABASE_TYPE == "postgresql":
-    SYNC_DATABASE_URL = f"postgresql+psycopg://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-    ASYNC_DATABASE_URL = f"postgresql+asyncpg://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-elif DATABASE_TYPE == "mysql":
-    SYNC_DATABASE_URL = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-    ASYNC_DATABASE_URL = f"mysql+aiomysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
-else:
-    raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
+def get_sync_database_url():
+    if DATABASE_TYPE == "postgresql":
+        return f"postgresql+psycopg://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    elif DATABASE_TYPE == "mysql":
+        return f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    else:
+        raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
 
-# Create engines with connection pooling and reconnection
-if DATABASE_TYPE == "mysql":
-    # MySQL特定的连接池配置
-    sync_engine = create_engine(
-        SYNC_DATABASE_URL, 
-        echo=False,
-        # 连接池配置
-        pool_size=20,                   # 连接池大小
-        max_overflow=30,                # 超出连接池大小的最大连接数
-        pool_pre_ping=True,            # 连接前ping测试，自动重连
-        pool_recycle=3600,             # 连接回收时间(1小时)
-        # MySQL连接参数
-        connect_args={
-            "connect_timeout": 10,      # 连接超时10秒
-            "read_timeout": 30,         # 读取超时30秒  
-            "write_timeout": 30,        # 写入超时30秒
-            "charset": "utf8mb4"
-        }
+def get_async_database_url():
+    if DATABASE_TYPE == "postgresql":
+        return f"postgresql+asyncpg://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    elif DATABASE_TYPE == "mysql":
+        return f"mysql+aiomysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    else:
+        raise ValueError(f"Unsupported database type: {DATABASE_TYPE}")
+
+# 全局变量，将在应用启动时初始化
+async_engine = None
+sync_engine = None
+AsyncSessionLocal = None
+SessionLocal = None
+
+def create_sync_engine():
+    """创建同步数据库引擎"""
+    sync_database_url = get_sync_database_url()
+    
+    if DATABASE_TYPE == "mysql":
+        # MySQL特定的连接池配置
+        return create_engine(
+            sync_database_url, 
+            echo=False,
+            pool_size=20,
+            max_overflow=30,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            connect_args={
+                "connect_timeout": 10,
+                "read_timeout": 30,
+                "write_timeout": 30,
+                "charset": "utf8mb4"
+            }
+        )
+    else:
+        # PostgreSQL配置
+        return create_engine(
+            sync_database_url, 
+            echo=False,
+            pool_size=20,
+            max_overflow=30,
+            pool_pre_ping=True,
+            pool_recycle=3600
+        )
+
+def create_async_engine_instance():
+    """创建异步数据库引擎"""
+    async_database_url = get_async_database_url()
+    
+    if DATABASE_TYPE == "mysql":
+        # MySQL异步连接池配置
+        return create_async_engine(
+            async_database_url,
+            echo=False,
+            pool_size=20,
+            max_overflow=30,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            connect_args={
+                "connect_timeout": 10,
+                "charset": "utf8mb4"
+            }
+        )
+    else:
+        # PostgreSQL配置
+        return create_async_engine(
+            async_database_url,
+            echo=False,
+            pool_size=20,
+            max_overflow=30,
+            pool_pre_ping=True,
+            pool_recycle=3600
+        )
+
+async def init_db():
+    """初始化数据库连接池 - 应该在每个worker的事件循环中调用"""
+    global async_engine, sync_engine, AsyncSessionLocal, SessionLocal
+    
+    logger.info(f"初始化数据库连接池 (PID: {os.getpid()})")
+    
+    # 创建引擎
+    sync_engine = create_sync_engine()
+    async_engine = create_async_engine_instance()
+    
+    # 创建会话工厂
+    AsyncSessionLocal = sessionmaker(
+        async_engine, 
+        class_=AsyncSession, 
+        expire_on_commit=False,
+        autoflush=False
+    )
+    SessionLocal = sessionmaker(
+        autocommit=False, 
+        autoflush=False, 
+        bind=sync_engine
     )
     
-    async_engine = create_async_engine(
-        ASYNC_DATABASE_URL,
-        echo=False,
-        # 连接池配置
-        pool_size=20,
-        max_overflow=30,
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        # MySQL异步连接参数
-        connect_args={
-            "connect_timeout": 10,
-            "charset": "utf8mb4"
-        }
-    )
-else:
-    # PostgreSQL配置
-    sync_engine = create_engine(
-        SYNC_DATABASE_URL, 
-        echo=False,
-        pool_size=20,
-        max_overflow=30,
-        pool_pre_ping=True,
-        pool_recycle=3600
-    )
-    
-    async_engine = create_async_engine(
-        ASYNC_DATABASE_URL,
-        echo=False,
-        pool_size=20,
-        max_overflow=30,
-        pool_pre_ping=True,
-        pool_recycle=3600
-    )
+    logger.info("数据库连接池初始化成功")
 
-# Create session makers
-AsyncSessionLocal = sessionmaker(
-    async_engine, 
-    class_=AsyncSession, 
-    expire_on_commit=False,
-    autoflush=False
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
+async def close_db():
+    """关闭数据库连接池"""
+    global async_engine, sync_engine
+    
+    if async_engine:
+        await async_engine.dispose()
+        logger.info("异步数据库连接池已关闭")
+    
+    if sync_engine:
+        sync_engine.dispose()
+        logger.info("同步数据库连接池已关闭")
 
 # Create declarative base
 Base = declarative_base()
@@ -103,6 +151,9 @@ async def get_async_db():
         async def api_endpoint(db: AsyncSession = Depends(get_async_db)):
             return await service.method(db, ...)
     """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("数据库未初始化，请确保应用正确启动")
+        
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -119,6 +170,9 @@ def get_async_db_context():
         async with get_async_db_context() as db:
             result = await db.execute(...)
     """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("数据库未初始化，请确保应用正确启动")
+        
     return AsyncSessionLocal()
 
 
@@ -129,6 +183,9 @@ async def get_async_session():
     获取异步数据库会话 - 向后兼容
     @deprecated: 建议使用 get_async_db() 用于依赖注入，或 get_async_db_context() 用于上下文管理
     """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("数据库未初始化，请确保应用正确启动")
+        
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -139,6 +196,9 @@ async def get_async_session():
 
 async def get_async_session_context():
     """获取异步会话上下文管理器 - 用于手动管理"""
+    if AsyncSessionLocal is None:
+        raise RuntimeError("数据库未初始化，请确保应用正确启动")
+        
     return AsyncSessionLocal()
 
 
@@ -146,6 +206,9 @@ async def get_async_session_context():
 
 def get_sync_db():
     """获取同步数据库会话 - 统一接口，支持依赖注入和上下文管理"""
+    if SessionLocal is None:
+        raise RuntimeError("数据库未初始化，请确保应用正确启动")
+        
     session = SessionLocal()
     try:
         yield session
@@ -160,6 +223,8 @@ class SyncDBContext:
     """同步数据库会话上下文管理器 - 支持with语句"""
     
     def __init__(self):
+        if SessionLocal is None:
+            raise RuntimeError("数据库未初始化，请确保应用正确启动")
         self.session = None
     
     def __enter__(self):
