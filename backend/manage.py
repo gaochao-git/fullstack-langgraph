@@ -88,7 +88,7 @@ def start():
     
     max_wait = 30  # 最多等待30秒
     check_interval = 1  # 每秒检查一次
-    health_url = f"http://127.0.0.1:{config['port']}/api/v1/mcp/gateway/configs/all"
+    health_url = f"http://127.0.0.1:{config['port']}/api/health"
     
     print("等待服务启动", end="", flush=True)
     start_time = time.time()
@@ -100,6 +100,8 @@ def start():
             if response.status_code == 200:
                 print()  # 换行
                 print(f"服务已成功启动 (耗时: {time.time() - start_time:.1f}秒)")
+                print("等待服务稳定...")
+                time.sleep(2)  # 再等待2秒确保服务完全稳定
                 return
         except:
             # 连接失败，继续等待

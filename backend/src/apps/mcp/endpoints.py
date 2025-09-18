@@ -580,7 +580,7 @@ async def get_all_gateway_configs(
         
     except Exception as e:
         logger.error(f"获取MCP Gateway配置失败: {str(e)}", exc_info=True)
-        raise BusinessException(f"获取配置失败: {str(e)}", ResponseCode.INTERNAL_SERVER_ERROR)
+        raise BusinessException(f"获取配置失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
 # =============================================================================
