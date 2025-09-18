@@ -3,15 +3,9 @@ FastAPI应用入口文件
 """
 
 import uvicorn
-import pathlib
-import os
-from datetime import datetime
-from typing import Dict, Any, List, Optional
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -122,8 +116,8 @@ def create_app() -> FastAPI:
 
 
 # 创建应用实例
-app = create_app()
+omind_app = create_app()
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app",host=settings.HOST,port=settings.PORT,reload=settings.DEBUG,log_level="info")
+    uvicorn.run("main:omind_app",host=settings.HOST,port=settings.PORT,reload=settings.DEBUG,log_level="info")
