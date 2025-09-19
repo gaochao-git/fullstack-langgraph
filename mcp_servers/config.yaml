@@ -61,25 +61,6 @@ servers:
       password: "fffjjj"
       database: omind  # SOP数据库名称
       
-  document_server:
-    enabled: true
-    script: "servers/document_server/runserver.py"
-    display_name: "文档生成服务"
-    config:
-      port: 3006
-      document_dir: "/tmp/mcp_documents"
-      
-  sensitive_scan_server:
-    enabled: true
-    script: "servers/sensitive_scan_server/runserver.py"
-    display_name: "敏感数据扫描服务"
-    config:
-      port: 3008
-      # 后端API配置
-      api_base_url: "http://localhost:8000"  # 后端API地址
-      api_key: "ak-qy3akU2Z0wPvM-pvXu-WB9yNsvSNofx11EVycDE5YyE"
-      api_timeout: 10  # API调用超时时间（秒）
-      
   chart_server:
     enabled: true
     script: "servers/chart_server/runserver.py"

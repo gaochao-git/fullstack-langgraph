@@ -33,38 +33,94 @@ os.makedirs(CHART_DIR, exist_ok=True)
 # 加载配置
 config = MCPServerConfig('chart_server')
 
-# 设置中文字体支持
-# 根据操作系统选择合适的中文字体
-import platform
-system = platform.system()
-if system == 'Darwin':  # macOS
-    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'STHeiti', 'PingFang SC']
-elif system == 'Windows':
-    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'SimSun']
-else:  # Linux
-    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'WenQuanYi Micro Hei', 'Noto Sans CJK SC']
+# 全局配置
+class ChartConfig:
+    """图表全局配置"""
+    # 默认图表尺寸
+    DEFAULT_FIGSIZE = (8, 4)
+    MIN_SIZE = 4
+    MAX_SIZE = 20
+    
+    # DPI设置
+    DPI = 100
+    
+    # 字体设置
+    FONT_SIZE_TITLE = 16
+    FONT_SIZE_LABEL = 12
+    
+    @staticmethod
+    def check_available_fonts():
+        """检查系统可用的字体"""
+        from matplotlib import font_manager
+        available_fonts = [f.name for f in font_manager.fontManager.ttflist]
+        return available_fonts
+    
+    @staticmethod
+    def setup_chinese_font():
+        """配置中文字体支持"""
+        import platform
+        system = platform.system()
+        
+        # 获取可用字体列表
+        available_fonts = ChartConfig.check_available_fonts()
+        logger.info(f"Total available fonts: {len(available_fonts)}")
+        
+        # 设置字体列表
+        if system == 'Darwin':  # macOS
+            # 按优先级排序的字体列表
+            fonts = ['PingFang SC', 'Heiti SC', 'STHeiti', 'Arial Unicode MS', 'Hiragino Sans GB']
+        elif system == 'Windows':
+            fonts = ['Microsoft YaHei', 'SimHei', 'SimSun', 'Arial Unicode MS', 'Microsoft JhengHei']
+        else:  # Linux
+            fonts = ['WenQuanYi Micro Hei', 'Noto Sans CJK SC', 'DejaVu Sans', 'Liberation Sans']
+        
+        # 查找第一个可用的字体
+        selected_font = None
+        for font in fonts:
+            if font in available_fonts:
+                selected_font = font
+                break
+        
+        if not selected_font:
+            logger.warning("No Chinese font found, using default font")
+            selected_font = 'DejaVu Sans'
+        
+        # 设置matplotlib参数
+        plt.rcParams['font.sans-serif'] = [selected_font] + fonts
+        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+        
+        # 设置全局字体大小
+        plt.rcParams['font.size'] = 10
+        plt.rcParams['axes.titlesize'] = ChartConfig.FONT_SIZE_TITLE
+        plt.rcParams['axes.labelsize'] = ChartConfig.FONT_SIZE_LABEL
+        plt.rcParams['xtick.labelsize'] = 10
+        plt.rcParams['ytick.labelsize'] = 10
+        plt.rcParams['legend.fontsize'] = 10
+        
+        # 打印当前使用的字体
+        logger.info(f"Chart font configuration: {selected_font}")
 
-plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+# 初始化字体配置
+ChartConfig.setup_chinese_font()
 
-def validate_figsize(figsize: tuple, default: tuple = (10, 6)) -> tuple:
+def validate_figsize(figsize: tuple, default: tuple = None) -> tuple:
     """验证并限制图表大小
     
     Args:
         figsize: 用户指定的图表大小
-        default: 默认大小
+        default: 默认大小，如果为None则使用全局默认值
     
     Returns:
         验证后的图表大小
     """
-    # 定义最小和最大尺寸限制
-    MIN_SIZE = 4  # 最小4英寸
-    MAX_SIZE = 20  # 最大20英寸
+    if default is None:
+        default = ChartConfig.DEFAULT_FIGSIZE
     
     try:
         width, height = figsize
         # 限制在合理范围内
-        width = max(MIN_SIZE, min(MAX_SIZE, width))
-        height = max(MIN_SIZE, min(MAX_SIZE, height))
+        width = max(ChartConfig.MIN_SIZE, min(ChartConfig.MAX_SIZE, width))
+        height = max(ChartConfig.MIN_SIZE, min(ChartConfig.MAX_SIZE, height))
         return (width, height)
     except:
         # 如果格式不对，返回默认值
@@ -89,7 +145,7 @@ def save_and_return_url(fig, title: str, chart_type: str = "chart") -> str:
     filepath = os.path.join(CHART_DIR, filename)
     
     # 保存图片
-    fig.savefig(filepath, format='png', dpi=100)
+    fig.savefig(filepath, format='png', dpi=ChartConfig.DPI)
     plt.close(fig)
     
     # 返回可访问的URL（静态文件服务器端口）
@@ -110,7 +166,7 @@ async def create_line_chart(
     y_label: Optional[str] = None,
     style: str = "default",
     color: str = "blue",
-    figsize: tuple = (10, 6)
+    figsize: tuple = (8, 4)
 ) -> str:
     """创建折线图
     
@@ -137,16 +193,16 @@ async def create_line_chart(
         df = pd.DataFrame(data)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(10, 6))
+        validated_figsize = validate_figsize(figsize, default=(8, 4))
         
         # 创建图表
         fig, ax = plt.subplots(figsize=validated_figsize)
         ax.plot(df[x_field], df[y_field], color=color, linewidth=2, marker='o')
         
         # 设置标题和标签
-        ax.set_title(title, fontsize=16, fontweight='bold')
-        ax.set_xlabel(x_label or x_field, fontsize=12)
-        ax.set_ylabel(y_label or y_field, fontsize=12)
+        ax.set_title(title, fontweight='bold')
+        ax.set_xlabel(x_label or x_field)
+        ax.set_ylabel(y_label or y_field)
         
         # 添加网格
         ax.grid(True, alpha=0.3)
@@ -171,7 +227,7 @@ async def create_bar_chart(
     y_label: Optional[str] = None,
     style: str = "default",
     color: str = "steelblue",
-    figsize: tuple = (10, 6),
+    figsize: tuple = (8, 4),
     orientation: str = "vertical"
 ) -> str:
     """创建柱状图
@@ -197,20 +253,20 @@ async def create_bar_chart(
         df = pd.DataFrame(data)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(10, 6))
+        validated_figsize = validate_figsize(figsize, default=(8, 4))
         
         fig, ax = plt.subplots(figsize=validated_figsize)
         
         if orientation == "horizontal":
             ax.barh(df[x_field], df[y_field], color=color)
-            ax.set_xlabel(y_label or y_field, fontsize=12)
-            ax.set_ylabel(x_label or x_field, fontsize=12)
+            ax.set_xlabel(y_label or y_field)
+            ax.set_ylabel(x_label or x_field)
         else:
             ax.bar(df[x_field], df[y_field], color=color)
-            ax.set_xlabel(x_label or x_field, fontsize=12)
-            ax.set_ylabel(y_label or y_field, fontsize=12)
+            ax.set_xlabel(x_label or x_field)
+            ax.set_ylabel(y_label or y_field)
             
-        ax.set_title(title, fontsize=16, fontweight='bold')
+        ax.set_title(title, fontweight='bold')
         ax.grid(True, alpha=0.3, axis='y' if orientation == "vertical" else 'x')
         
         plt.tight_layout()
@@ -228,7 +284,7 @@ async def create_pie_chart(
     label_field: str,
     value_field: str,
     title: str = "Pie Chart",
-    figsize: tuple = (8, 8),
+    figsize: tuple = (8, 4),
     autopct: str = '%1.1f%%',
     startangle: int = 90,
     colors: Optional[List[str]] = None
@@ -252,7 +308,7 @@ async def create_pie_chart(
         df = pd.DataFrame(data)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(8, 8))
+        validated_figsize = validate_figsize(figsize, default=(8, 4))
         
         fig, ax = plt.subplots(figsize=validated_figsize)
         
@@ -263,7 +319,7 @@ async def create_pie_chart(
         ax.pie(df[value_field], labels=df[label_field], autopct=autopct,
                startangle=startangle, colors=colors)
         
-        ax.set_title(title, fontsize=16, fontweight='bold')
+        ax.set_title(title, fontweight='bold')
         
         plt.tight_layout()
         
@@ -286,7 +342,7 @@ async def create_scatter_plot(
     color: str = "blue",
     size: int = 50,
     alpha: float = 0.6,
-    figsize: tuple = (10, 6)
+    figsize: tuple = (8, 4)
 ) -> str:
     """创建散点图
     
@@ -312,14 +368,14 @@ async def create_scatter_plot(
         df = pd.DataFrame(data)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(10, 6))
+        validated_figsize = validate_figsize(figsize, default=(8, 4))
         
         fig, ax = plt.subplots(figsize=validated_figsize)
         ax.scatter(df[x_field], df[y_field], c=color, s=size, alpha=alpha)
         
-        ax.set_title(title, fontsize=16, fontweight='bold')
-        ax.set_xlabel(x_label or x_field, fontsize=12)
-        ax.set_ylabel(y_label or y_field, fontsize=12)
+        ax.set_title(title, fontweight='bold')
+        ax.set_xlabel(x_label or x_field)
+        ax.set_ylabel(y_label or y_field)
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
@@ -340,7 +396,7 @@ async def create_heatmap(
     cmap: str = "coolwarm",
     annot: bool = True,
     fmt: str = ".2f",
-    figsize: tuple = (10, 8)
+    figsize: tuple = (8, 4)
 ) -> str:
     """创建热力图
     
@@ -362,7 +418,7 @@ async def create_heatmap(
         data_array = np.array(data)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(10, 8))
+        validated_figsize = validate_figsize(figsize, default=(8, 4))
         
         fig, ax = plt.subplots(figsize=validated_figsize)
         
@@ -371,7 +427,7 @@ async def create_heatmap(
                     xticklabels=x_labels, yticklabels=y_labels,
                     cbar=True, ax=ax)
         
-        ax.set_title(title, fontsize=16, fontweight='bold')
+        ax.set_title(title, fontweight='bold')
         
         plt.tight_layout()
         
@@ -392,7 +448,7 @@ async def create_multi_series_chart(
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
     style: str = "default",
-    figsize: tuple = (12, 6),
+    figsize: tuple = (8, 4),
     legend_loc: str = "best"
 ) -> str:
     """创建多系列图表（支持多条线、多组柱等）
@@ -417,7 +473,7 @@ async def create_multi_series_chart(
             plt.style.use(style)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(12, 6))
+        validated_figsize = validate_figsize(figsize, default=(8, 4))
         
         fig, ax = plt.subplots(figsize=validated_figsize)
         
@@ -441,9 +497,9 @@ async def create_multi_series_chart(
                     ax.set_xticks(x_pos)
                     ax.set_xticklabels(df[x_field])
         
-        ax.set_title(title, fontsize=16, fontweight='bold')
-        ax.set_xlabel(x_label or x_field, fontsize=12)
-        ax.set_ylabel(y_label or y_field, fontsize=12)
+        ax.set_title(title, fontweight='bold')
+        ax.set_xlabel(x_label or x_field)
+        ax.set_ylabel(y_label or y_field)
         ax.legend(loc=legend_loc)
         ax.grid(True, alpha=0.3)
         

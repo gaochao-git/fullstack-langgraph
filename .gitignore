@@ -3,6 +3,7 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
+mcp_servers/servers/chart_server/generated_charts/
 .DS_Store
 *.local
 
