@@ -18,6 +18,7 @@ from .shared.core.middleware import setup_middlewares
 from .shared.core.exceptions import EXCEPTION_HANDLERS
 from .router import api_router
 from .shared.db.config import init_db, close_db
+from .apps.agent.checkpoint_factory import init as init_checkpoint, cleanup as cleanup_checkpoint
 
 
 @asynccontextmanager
@@ -29,15 +30,26 @@ async def lifespan(app: FastAPI):
     # 初始化数据库连接池
     try:
         await init_db()
+        logger.info("业务数据库初始化成功")
     except Exception as e:
-        logger.error(f"数据库初始化失败: {e}")
+        logger.error(f"业务数据库初始化失败: {e}")
         raise
+    
+    # 初始化checkpoint数据库
+    try:
+        await init_checkpoint()
+        logger.info("Checkpoint数据库初始化成功")
+    except Exception as e:
+        logger.error(f"Checkpoint数据库初始化失败: {e}")
+        # Checkpoint失败不应该阻止应用启动，只记录警告
+        logger.warning("应用将在没有checkpoint功能的情况下运行")
     
     yield
     
     # 清理资源
     logger.info("=== 应用关闭 ===")
     await close_db()
+    await cleanup_checkpoint()
 
 
 def create_app() -> FastAPI:
