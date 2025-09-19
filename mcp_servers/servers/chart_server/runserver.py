@@ -26,12 +26,46 @@ logger = logging.getLogger(__name__)
 # 创建MCP服务器实例
 mcp = FastMCP("Chart Visualization Server")
 
+# 设置生成图表的目录
+CHART_DIR = os.path.join(os.path.dirname(__file__), "generated_charts")
+os.makedirs(CHART_DIR, exist_ok=True)
+
 # 加载配置
 config = MCPServerConfig('chart_server')
 
 # 设置中文字体支持
 plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 如果需要中文，可以改为 'SimHei'
 plt.rcParams['axes.unicode_minus'] = False
+
+def save_and_return_url(fig, title: str, chart_type: str = "chart") -> str:
+    """保存图表并返回Markdown格式的URL
+    
+    Args:
+        fig: matplotlib figure对象
+        title: 图表标题
+        chart_type: 图表类型前缀
+    
+    Returns:
+        Markdown格式的图片链接
+    """
+    import uuid
+    from datetime import datetime
+    
+    # 生成唯一文件名
+    filename = f"{chart_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.png"
+    filepath = os.path.join(CHART_DIR, filename)
+    
+    # 保存图片
+    fig.savefig(filepath, format='png', dpi=100)
+    plt.close(fig)
+    
+    # 返回可访问的URL（静态文件服务器端口）
+    port = int(os.environ.get('MCP_SERVER_PORT', '3007'))
+    static_port = port + 1000  # 静态文件服务器端口
+    url = f"http://localhost:{static_port}/{filename}"
+    
+    # 返回Markdown格式
+    return f"![{title}]({url})"
 
 @mcp.tool()
 async def create_line_chart(
@@ -41,7 +75,7 @@ async def create_line_chart(
     title: str = "Line Chart",
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
-    style: str = "seaborn",
+    style: str = "default",
     color: str = "blue",
     figsize: tuple = (10, 6)
 ) -> str:
@@ -59,11 +93,12 @@ async def create_line_chart(
         figsize: 图表大小
     
     Returns:
-        Base64编码的PNG图片字符串
+        Markdown格式的图片链接
     """
     try:
         # 设置样式
-        plt.style.use(style)
+        if style != "default":
+            plt.style.use(style)
         
         # 创建DataFrame
         df = pd.DataFrame(data)
@@ -83,14 +118,8 @@ async def create_line_chart(
         # 调整布局
         plt.tight_layout()
         
-        # 保存为Base64
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close()
-        
-        return f"data:image/png;base64,{image_base64}"
+        # 保存并返回URL
+        return save_and_return_url(fig, title, "line_chart")
         
     except Exception as e:
         logger.error(f"创建折线图失败: {str(e)}")
@@ -104,7 +133,7 @@ async def create_bar_chart(
     title: str = "Bar Chart",
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
-    style: str = "seaborn",
+    style: str = "default",
     color: str = "steelblue",
     figsize: tuple = (10, 6),
     orientation: str = "vertical"
@@ -124,10 +153,11 @@ async def create_bar_chart(
         orientation: 方向（vertical或horizontal）
     
     Returns:
-        Base64编码的PNG图片字符串
+        Markdown格式的图片链接
     """
     try:
-        plt.style.use(style)
+        if style != "default":
+            plt.style.use(style)
         df = pd.DataFrame(data)
         
         fig, ax = plt.subplots(figsize=figsize)
@@ -146,13 +176,8 @@ async def create_bar_chart(
         
         plt.tight_layout()
         
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close()
-        
-        return f"data:image/png;base64,{image_base64}"
+        # 保存并返回URL
+        return save_and_return_url(fig, title, "bar_chart")
         
     except Exception as e:
         logger.error(f"创建柱状图失败: {str(e)}")
@@ -182,7 +207,7 @@ async def create_pie_chart(
         colors: 颜色列表
     
     Returns:
-        Base64编码的PNG图片字符串
+        Markdown格式的图片链接
     """
     try:
         df = pd.DataFrame(data)
@@ -200,13 +225,8 @@ async def create_pie_chart(
         
         plt.tight_layout()
         
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close()
-        
-        return f"data:image/png;base64,{image_base64}"
+        # 保存并返回URL
+        return save_and_return_url(fig, title, "pie_chart")
         
     except Exception as e:
         logger.error(f"创建饼图失败: {str(e)}")
@@ -220,7 +240,7 @@ async def create_scatter_plot(
     title: str = "Scatter Plot",
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
-    style: str = "seaborn",
+    style: str = "default",
     color: str = "blue",
     size: int = 50,
     alpha: float = 0.6,
@@ -242,10 +262,11 @@ async def create_scatter_plot(
         figsize: 图表大小
     
     Returns:
-        Base64编码的PNG图片字符串
+        Markdown格式的图片链接
     """
     try:
-        plt.style.use(style)
+        if style != "default":
+            plt.style.use(style)
         df = pd.DataFrame(data)
         
         fig, ax = plt.subplots(figsize=figsize)
@@ -258,13 +279,8 @@ async def create_scatter_plot(
         
         plt.tight_layout()
         
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close()
-        
-        return f"data:image/png;base64,{image_base64}"
+        # 保存并返回URL
+        return save_and_return_url(fig, title, "scatter_plot")
         
     except Exception as e:
         logger.error(f"创建散点图失败: {str(e)}")
@@ -294,7 +310,7 @@ async def create_heatmap(
         figsize: 图表大小
     
     Returns:
-        Base64编码的PNG图片字符串
+        Markdown格式的图片链接
     """
     try:
         # 转换为numpy数组
@@ -311,13 +327,8 @@ async def create_heatmap(
         
         plt.tight_layout()
         
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close()
-        
-        return f"data:image/png;base64,{image_base64}"
+        # 保存并返回URL
+        return save_and_return_url(fig, title, "heatmap")
         
     except Exception as e:
         logger.error(f"创建热力图失败: {str(e)}")
@@ -332,7 +343,7 @@ async def create_multi_series_chart(
     title: str = "Multi-Series Chart",
     x_label: Optional[str] = None,
     y_label: Optional[str] = None,
-    style: str = "seaborn",
+    style: str = "default",
     figsize: tuple = (12, 6),
     legend_loc: str = "best"
 ) -> str:
@@ -351,10 +362,11 @@ async def create_multi_series_chart(
         legend_loc: 图例位置
     
     Returns:
-        Base64编码的PNG图片字符串
+        Markdown格式的图片链接
     """
     try:
-        plt.style.use(style)
+        if style != "default":
+            plt.style.use(style)
         fig, ax = plt.subplots(figsize=figsize)
         
         # 颜色循环
@@ -385,22 +397,43 @@ async def create_multi_series_chart(
         
         plt.tight_layout()
         
-        buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', dpi=100)
-        buffer.seek(0)
-        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-        plt.close()
-        
-        return f"data:image/png;base64,{image_base64}"
+        # 保存并返回URL
+        return save_and_return_url(fig, title, "multi_series_chart")
         
     except Exception as e:
         logger.error(f"创建多系列图表失败: {str(e)}")
         return f"错误: {str(e)}"
 
+def start_static_server():
+    """启动静态文件服务器"""
+    import threading
+    import http.server
+    import socketserver
+    
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=CHART_DIR, **kwargs)
+        
+        def log_message(self, format, *args):
+            # 减少日志输出
+            pass
+    
+    port = int(os.environ.get('MCP_SERVER_PORT', '3007'))
+    static_port = port + 1000  # 使用 4007 端口提供静态文件
+    
+    with socketserver.TCPServer(("", static_port), Handler) as httpd:
+        logger.info(f"静态文件服务器运行在: http://localhost:{static_port}")
+        httpd.serve_forever()
+
 if __name__ == "__main__":
+    # 启动静态文件服务器（在后台线程）
+    import threading
+    static_thread = threading.Thread(target=start_static_server, daemon=True)
+    static_thread.start()
+    
     # 从环境变量获取端口
     import os
     port = int(os.environ.get('MCP_SERVER_PORT', '3007'))
     
-    # 运行服务器，使用HTTP模式
+    # 运行MCP服务器
     mcp.run(transport='streamable-http', host='0.0.0.0', port=port)
