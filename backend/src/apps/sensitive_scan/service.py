@@ -3,7 +3,8 @@
 import asyncio
 import uuid
 import json
-from typing import List, Dict, Optional, Any
+import difflib
+from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -226,6 +227,9 @@ class LangExtractScanTaskService:
                             "extractions": []
                         }
                         f.write(json.dumps(empty_result, ensure_ascii=False) + '\n')
+                
+                # 修复JSONL中的char_interval
+                await self._fix_jsonl_char_intervals(str(jsonl_path), content)
                 
                 # 生成可视化HTML
                 def generate_html_sync():
@@ -624,6 +628,70 @@ class LangExtractScanTaskService:
             content = f.read()
         
         return content
+    
+    async def _fix_jsonl_char_intervals(self, jsonl_path: str, original_text: str) -> None:
+        """
+        修复JSONL文件中缺失的char_interval
+        
+        Args:
+            jsonl_path: JSONL文件路径
+            original_text: 原始文本内容
+        """
+        try:
+            # 读取JSONL
+            documents = []
+            with open(jsonl_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        documents.append(json.loads(line))
+            
+            fixed_count = 0
+            
+            # 修复每个文档
+            for doc in documents:
+                text = doc.get('text', original_text)  # 使用原始文本
+                extractions = doc.get('extractions', [])
+                
+                for extraction in extractions:
+                    # 检查是否需要修复
+                    char_interval = extraction.get('char_interval')
+                    if char_interval is None or (isinstance(char_interval, dict) and char_interval.get('start_pos') is None):
+                        # 尝试找到位置
+                        extraction_text = extraction.get('extraction_text', '')
+                        position = self._find_text_position(text, extraction_text)
+                        
+                        if position:
+                            extraction['char_interval'] = {
+                                'start_pos': position[0],
+                                'end_pos': position[1]
+                            }
+                            extraction['alignment_status'] = 'match_fuzzy'
+                            fixed_count += 1
+            
+            # 保存修复后的JSONL
+            if fixed_count > 0:
+                with open(jsonl_path, 'w', encoding='utf-8') as f:
+                    for doc in documents:
+                        json.dump(doc, f, ensure_ascii=False)
+                        f.write('\n')
+                logger.info(f"修复了 {fixed_count} 个提取的位置信息")
+                
+        except Exception as e:
+            logger.warning(f"修复JSONL失败: {e}")
+    
+    def _find_text_position(self, text: str, extraction_text: str) -> Optional[Tuple[int, int]]:
+        """
+        尝试在文本中找到提取文本的位置
+        
+        Returns:
+            (start_pos, end_pos) 或 None
+        """
+        # 只进行精确匹配
+        pos = text.find(extraction_text)
+        if pos >= 0:
+            return (pos, pos + len(extraction_text))
+        
+        return None
 
 
 # 创建服务实例

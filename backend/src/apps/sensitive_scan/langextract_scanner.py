@@ -44,54 +44,22 @@ class LangExtractSensitiveScanner:
         """创建敏感信息的 few-shot examples"""
         examples = []
         
-        # 身份证号示例
+        # 四要素示例 - 标准格式
         examples.append(lx.data.ExampleData(
-            text="张三的身份证号码是110101199001011234，请妥善保管。",
+            text="客户信息：姓名：李明，身份证：320106198808156789，手机：13912345678，银行卡：6222021234567890123。",
             extractions=[
+                lx.data.Extraction(
+                    extraction_class="姓名",
+                    extraction_text="李明"
+                ),
                 lx.data.Extraction(
                     extraction_class="身份证号",
-                    extraction_text="110101199001011234"
-                )
-            ]
-        ))
-        
-        # 身份证号示例2 - 不同上下文
-        examples.append(lx.data.ExampleData(
-            text="按照152822198810154515标准进行身份验证。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="身份证号",
-                    extraction_text="152822198810154515"
-                )
-            ]
-        ))
-        
-        # 手机号示例
-        examples.append(lx.data.ExampleData(
-            text="请联系客服：13812345678，工作时间9:00-18:00。",
-            extractions=[
+                    extraction_text="320106198808156789"
+                ),
                 lx.data.Extraction(
                     extraction_class="手机号",
-                    extraction_text="13812345678"
-                )
-            ]
-        ))
-
-        # 手机号示例
-        examples.append(lx.data.ExampleData(
-            text="请联系客服：一八八三三四五六七五二，工作时间9:00-18:00。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="手机号",
-                    extraction_text="一八八三三四五六七五二"
-                )
-            ]
-        ))
-        
-        # 银行卡号示例
-        examples.append(lx.data.ExampleData(
-            text="请将款项转入银行账户：6222021234567890123，开户行：工商银行。",
-            extractions=[
+                    extraction_text="13912345678"
+                ),
                 lx.data.Extraction(
                     extraction_class="银行卡号",
                     extraction_text="6222021234567890123"
@@ -99,90 +67,25 @@ class LangExtractSensitiveScanner:
             ]
         ))
         
-        # 邮箱地址示例
+        # 非标准格式示例 - 包含空格、中文数字等
         examples.append(lx.data.ExampleData(
-            text="如有问题，请发送邮件至support@example.com咨询。",
+            text="联系人王 小 明，身份证 3301 0619 9012 3456 78，电话：一三九 八八八八 九九九九，银行账号6228 4800 1234 5678 901",
             extractions=[
                 lx.data.Extraction(
-                    extraction_class="邮箱地址",
-                    extraction_text="support@example.com"
-                )
-            ]
-        ))
-        
-        # API密钥示例
-        examples.append(lx.data.ExampleData(
-            text="配置文件中的API_KEY=sk-1234567890abcdef，请勿泄露。",
-            extractions=[
+                    extraction_class="姓名",
+                    extraction_text="王 小 明"
+                ),
                 lx.data.Extraction(
-                    extraction_class="API密钥",
-                    extraction_text="sk-1234567890abcdef"
-                )
-            ]
-        ))
-        
-        # 密码示例
-        examples.append(lx.data.ExampleData(
-            text="用户名：admin，密码：Admin@123，请及时修改。",
-            extractions=[
+                    extraction_class="身份证号",
+                    extraction_text="3301 0619 9012 3456 78"
+                ),
                 lx.data.Extraction(
-                    extraction_class="用户名密码",
-                    extraction_text="用户名：admin，密码：Admin@123"
-                )
-            ]
-        ))
-        
-        # IP地址示例
-        examples.append(lx.data.ExampleData(
-            text="内网服务器地址：192.168.1.100:8080，仅限内部访问。",
-            extractions=[
+                    extraction_class="手机号",
+                    extraction_text="一三九 八八八八 九九九九"
+                ),
                 lx.data.Extraction(
-                    extraction_class="内网IP",
-                    extraction_text="192.168.1.100:8080"
-                )
-            ]
-        ))
-        
-        # IP地址示例2 - 确保提取完整IP
-        examples.append(lx.data.ExampleData(
-            text="请登陆10.100.21.121进行系统配置。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="内网IP",
-                    extraction_text="10.100.21.121"
-                )
-            ]
-        ))
-        
-        # 车牌号示例
-        examples.append(lx.data.ExampleData(
-            text="车辆信息：京A12345，停放在B2层。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="车牌号",
-                    extraction_text="京A12345"
-                )
-            ]
-        ))
-        
-        # 社保号示例
-        examples.append(lx.data.ExampleData(
-            text="社保卡号：110101198001010001，请到人事部门领取。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="社保号",
-                    extraction_text="110101198001010001"
-                )
-            ]
-        ))
-        
-        # 护照号示例
-        examples.append(lx.data.ExampleData(
-            text="护照号码：E12345678，有效期至2030年。",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="护照号",
-                    extraction_text="E12345678"
+                    extraction_class="银行卡号",
+                    extraction_text="6228 4800 1234 5678 901"
                 )
             ]
         ))
@@ -208,16 +111,24 @@ class LangExtractSensitiveScanner:
                 model_id=self.model_id,
                 api_key=self.api_key,
                 base_url=self.base_url,
-                temperature=0.1,
+                temperature=0,
                 format_type=data.FormatType.JSON
             )
             
             # 提示词
-            prompt = """提取文本中的敏感信息，包括：身份证号、护照号、手机号、邮箱、银行卡号、用户名密码、API密钥、内网IP、社保号、车牌号等。
-注意：
-1. 单独用户名不算敏感，需要上下文判断
-2. 手机号和身份证号有可能不是用数字表示的也要识别
-"""
+            prompt = """识别并提取文本中的敏感信息。
+
+敏感信息类型包括：
+- 身份证号（18位数字，可能包含X）
+- 手机号（11位数字，可能用中文表示）
+- 银行卡号（16-19位数字）
+- 邮箱地址
+- 密码（通常跟在"密码"、"password"等词后面）
+- API密钥/Token（以sk-、ak-等开头的字符串）
+- 内网IP地址（10.x.x.x、192.168.x.x、172.16-31.x.x）
+- 护照号、社保号、车牌号等
+
+提取时请保持原文格式，包括空格、标点等。"""
             
             # 执行提取
             result = lx.extract(
@@ -242,7 +153,7 @@ class LangExtractSensitiveScanner:
                         {
                             "type": ext.extraction_class,
                             "text": ext.extraction_text,
-                            "position": ext.char_interval
+                            "position": (ext.char_interval.start_pos, ext.char_interval.end_pos) if ext.char_interval and ext.char_interval.start_pos is not None else None
                         }
                         for ext in annotated_doc.extractions
                     ]

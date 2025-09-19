@@ -70,9 +70,7 @@ async def list_scan_tasks(
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """查询扫描任务列表"""
-    # 如果未指定创建者，默认查询当前用户的任务
-    if not create_by and current_user:
-        create_by = current_user.get('username')
+    # 不再默认过滤当前用户，允许查看所有任务
     
     tasks, total = await scan_task_service.list_tasks(
         db=db,
