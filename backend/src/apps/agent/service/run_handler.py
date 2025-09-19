@@ -18,6 +18,7 @@ from .user_threads_db import (check_user_thread_exists,create_user_thread_mappin
 from ..llm_agents.agent_registry import AgentRegistry
 from .agent_service import agent_service
 from ..models import AgentDocumentSession
+from ..llm_agents.hooks import create_token_usage_hook
 logger = get_logger(__name__)
 
 # 定义运行请求体
@@ -204,16 +205,55 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
         
         event_id = 0
         has_interrupt = False
+        collected_messages = []  # 收集所有消息用于计算token
+        
+        # 获取LLM配置以计算token限制
+        llm_config = None
+        try:
+            from ..llm_agents.agent_utils import get_llm_config_from_db
+            llm_config = await get_llm_config_from_db(request_body.agent_id)
+        except Exception as e:
+            logger.warning(f"获取LLM配置失败: {e}")
+        
+        # 创建token使用监控器
+        token_usage_hook = create_token_usage_hook(llm_config)
+        
         async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
             try:
                 event_id += 1
                 sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id)
                 yield sse_data
                 if chunk_has_interrupt: has_interrupt = True
+                
+                # 收集消息用于token统计
+                if isinstance(chunk, tuple) and len(chunk) >= 2:
+                    event_type, data = chunk[-2:]  # 获取最后两个元素
+                    if event_type == "values" and isinstance(data, dict) and "messages" in data:
+                        collected_messages = data["messages"]
+                
             except Exception as e:
                 logger.error(f"Serialization error: {e}, chunk type: {type(chunk)}, chunk: {chunk}", exc_info=True)
                 event_id += 1
                 yield f"id: {event_id}\nevent: error\ndata: {json.dumps({'error': str(e), 'chunk_type': str(type(chunk)), 'chunk': str(chunk)}, ensure_ascii=False)}\n\n"
+        
+        # 在流结束时发送token使用情况
+        if collected_messages:
+            total_tokens = token_usage_hook.count_messages_tokens(collected_messages)
+            max_tokens = token_usage_hook.max_context_length
+            usage_ratio = total_tokens / max_tokens
+            
+            event_id += 1
+            token_usage_event = {
+                "thread_id": thread_id,
+                "token_usage": {
+                    "used": total_tokens,
+                    "total": max_tokens,
+                    "percentage": round(usage_ratio * 100, 1),
+                    "remaining": max_tokens - total_tokens
+                }
+            }
+            yield f"id: {event_id}\nevent: token_usage\ndata: {json.dumps(token_usage_event, ensure_ascii=False)}\n\n"
+            logger.info(f"📊 发送token使用情况: {total_tokens}/{max_tokens} ({usage_ratio*100:.1f}%)")
         
         # End event - only send if no interrupt occurred
         if not has_interrupt:

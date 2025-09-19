@@ -25,11 +25,20 @@ interface UseStreamOptions {
   onError?: (error: any) => void;
 }
 
+// Token使用情况类型
+export interface TokenUsageInfo {
+  used: number;
+  total: number;
+  percentage: number;
+  remaining: number;
+}
+
 // Hook 返回类型
 interface UseStreamReturn {
   messages: Message[];
   isLoading: boolean;
   interrupt: any;
+  tokenUsage: TokenUsageInfo | null;
   submit: (data: any, options?: any) => void;
   stop: () => void;
 }
@@ -39,6 +48,7 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [interrupt, setInterrupt] = useState<any>(null);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageInfo | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedMessagesRef = useRef<Message[]>([]);
   const streamingMessageRef = useRef<{ id?: string; content: string } | null>(null);
@@ -232,6 +242,13 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
           console.debug('SSE heartbeat received:', eventData.timestamp);
           break;
 
+        case 'token_usage':
+          // 处理token使用情况
+          if (eventData.token_usage) {
+            setTokenUsage(eventData.token_usage);
+          }
+          break;
+
         case 'end':
           // 流结束
           streamingMessageRef.current = null;
@@ -336,6 +353,7 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
     messages,
     isLoading,
     interrupt,
+    tokenUsage,
     submit,
     stop
   };

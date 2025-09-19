@@ -1,0 +1,1 @@
+"""Chart visualization MCP server"""

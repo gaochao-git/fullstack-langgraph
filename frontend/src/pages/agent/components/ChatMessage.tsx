@@ -19,6 +19,7 @@ import { exportToWordWithImages } from "@/services/documentExportApi";
 import type { Agent } from "@/services/agentApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
 import VoiceInput from "@/components/VoiceInput";
+import TokenUsageBar from "./TokenUsageBar";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -821,6 +822,7 @@ interface WelcomeComponentProps {
 interface ChatMessagesProps {
   messages: Message[];
   isLoading: boolean;
+  tokenUsage?: {used: number; total: number; percentage: number; remaining: number} | null; // 新增：token使用情况
   onSubmit: (input: string, fileIds?: string[]) => void;
   onCancel: () => void;
   interrupt?: any;
@@ -841,6 +843,7 @@ interface ChatMessagesProps {
 function ChatMessages({
   messages,
   isLoading,
+  tokenUsage,
   onSubmit,
   onCancel,
   interrupt,
@@ -1306,6 +1309,13 @@ function ChatMessages({
             {agent?.agent_name || null}
           </span>
         </div>
+        
+        {/* Token使用量显示 - 居中 */}
+        {tokenUsage && (
+          <div className="flex-1 mx-4 max-w-md">
+            <TokenUsageBar tokenUsage={tokenUsage} className="h-7" />
+          </div>
+        )}
         
         <div className="flex items-center gap-2">
           <Button

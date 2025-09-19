@@ -399,6 +399,7 @@ export default function ChatEngine({
           <ChatMessages
             messages={thread.messages}
             isLoading={thread.isLoading}
+            tokenUsage={thread.tokenUsage}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             interrupt={thread.interrupt}

@@ -111,6 +111,13 @@ class MessageMonitorHook:
             f"{total_tokens:,}/{max_context_length:,} tokens ({usage_ratio*100:.1f}%)"
         )
         
+        # 将token统计信息存储到状态中，供后续使用
+        state["token_usage"] = {
+            "used": total_tokens,
+            "total": max_context_length,
+            "percentage": usage_ratio * 100
+        }
+        
         # 检查最后一条消息是否是用户消息且过大
         if messages:
             last_msg = messages[-1]
