@@ -125,7 +125,7 @@ class LangExtractSensitiveScanner:
 - 邮箱地址
 - 密码（通常跟在"密码"、"password"等词后面）
 - API密钥/Token（以sk-、ak-等开头的字符串）
-- 内网IP地址（10.x.x.x、192.168.x.x、172.16-31.x.x）
+- IP地址（10.x.x.x、192.168.x.x、172.16-31.x.x）
 - 护照号、社保号、车牌号等
 
 提取时请保持原文格式，包括空格、标点等。"""
@@ -137,7 +137,9 @@ class LangExtractSensitiveScanner:
                 examples=self.sensitive_types,
                 model=model,
                 max_workers=1,
-                extraction_passes=1
+                extraction_passes=1,
+                max_char_buffer=10000,
+                debug=False
             )
             
             # 处理结果
