@@ -174,6 +174,12 @@ export const useStream = <T extends { messages: Message[] }>(options: UseStreamO
           } else {
             // 处理节点更新
             Object.entries(eventData).forEach(([nodeName, nodeData]: [string, any]) => {
+              // 跳过 null/undefined 值
+              if (!nodeData) {
+                return;
+              }
+              
+              // 检查是否包含消息
               if (nodeData.messages && Array.isArray(nodeData.messages)) {
                 // 处理消息
                 const processedMessages = nodeData.messages.map((msg: any) => {

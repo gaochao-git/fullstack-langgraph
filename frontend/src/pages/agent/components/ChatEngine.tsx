@@ -224,14 +224,23 @@ export default function ChatEngine({
       });
       
       const uniqueFileIds = Array.from(fileIds);
-      setThreadFileIds(uniqueFileIds);
-      if (uniqueFileIds.length > 0) {
-        console.log('✅ 从历史消息中提取文件ID:', uniqueFileIds);
-      }
+      
+      // 只在文件ID实际变化时才更新状态
+      setThreadFileIds(prevFileIds => {
+        // 比较新旧文件ID数组是否相同
+        if (prevFileIds.length === uniqueFileIds.length && 
+            prevFileIds.every((id, index) => id === uniqueFileIds[index])) {
+          return prevFileIds; // 返回原数组，不触发更新
+        }
+        if (uniqueFileIds.length > 0) {
+          console.log('✅ 从历史消息中提取文件ID:', uniqueFileIds);
+        }
+        return uniqueFileIds;
+      });
     } else {
-      setThreadFileIds([]);
+      setThreadFileIds(prev => prev.length === 0 ? prev : []);
     }
-  }, [thread.messages]);
+  }, [thread.messages?.length]); // 使用消息长度作为依赖，而不是整个数组
 
 
   const handleSubmit = useCallback(
