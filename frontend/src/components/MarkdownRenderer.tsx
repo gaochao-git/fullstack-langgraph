@@ -243,6 +243,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       color: ${token.colorTextSecondary};
       font-style: italic;
     }
+    .markdown-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 6px;
+      margin: 8px 0;
+      display: block;
+      box-shadow: 0 2px 8px ${token.colorShadow};
+    }
   `;
   
   // 处理工具调用和输出内容

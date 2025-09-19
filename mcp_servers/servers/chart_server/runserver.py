@@ -34,8 +34,41 @@ os.makedirs(CHART_DIR, exist_ok=True)
 config = MCPServerConfig('chart_server')
 
 # 设置中文字体支持
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans']  # 如果需要中文，可以改为 'SimHei'
-plt.rcParams['axes.unicode_minus'] = False
+# 根据操作系统选择合适的中文字体
+import platform
+system = platform.system()
+if system == 'Darwin':  # macOS
+    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Heiti SC', 'STHeiti', 'PingFang SC']
+elif system == 'Windows':
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'SimSun']
+else:  # Linux
+    plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'WenQuanYi Micro Hei', 'Noto Sans CJK SC']
+
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
+def validate_figsize(figsize: tuple, default: tuple = (10, 6)) -> tuple:
+    """验证并限制图表大小
+    
+    Args:
+        figsize: 用户指定的图表大小
+        default: 默认大小
+    
+    Returns:
+        验证后的图表大小
+    """
+    # 定义最小和最大尺寸限制
+    MIN_SIZE = 4  # 最小4英寸
+    MAX_SIZE = 20  # 最大20英寸
+    
+    try:
+        width, height = figsize
+        # 限制在合理范围内
+        width = max(MIN_SIZE, min(MAX_SIZE, width))
+        height = max(MIN_SIZE, min(MAX_SIZE, height))
+        return (width, height)
+    except:
+        # 如果格式不对，返回默认值
+        return default
 
 def save_and_return_url(fig, title: str, chart_type: str = "chart") -> str:
     """保存图表并返回Markdown格式的URL
@@ -103,8 +136,11 @@ async def create_line_chart(
         # 创建DataFrame
         df = pd.DataFrame(data)
         
+        # 验证图表大小
+        validated_figsize = validate_figsize(figsize, default=(10, 6))
+        
         # 创建图表
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=validated_figsize)
         ax.plot(df[x_field], df[y_field], color=color, linewidth=2, marker='o')
         
         # 设置标题和标签
@@ -160,7 +196,10 @@ async def create_bar_chart(
             plt.style.use(style)
         df = pd.DataFrame(data)
         
-        fig, ax = plt.subplots(figsize=figsize)
+        # 验证图表大小
+        validated_figsize = validate_figsize(figsize, default=(10, 6))
+        
+        fig, ax = plt.subplots(figsize=validated_figsize)
         
         if orientation == "horizontal":
             ax.barh(df[x_field], df[y_field], color=color)
@@ -212,7 +251,10 @@ async def create_pie_chart(
     try:
         df = pd.DataFrame(data)
         
-        fig, ax = plt.subplots(figsize=figsize)
+        # 验证图表大小
+        validated_figsize = validate_figsize(figsize, default=(8, 8))
+        
+        fig, ax = plt.subplots(figsize=validated_figsize)
         
         # 使用seaborn调色板如果没有指定颜色
         if colors is None:
@@ -269,7 +311,10 @@ async def create_scatter_plot(
             plt.style.use(style)
         df = pd.DataFrame(data)
         
-        fig, ax = plt.subplots(figsize=figsize)
+        # 验证图表大小
+        validated_figsize = validate_figsize(figsize, default=(10, 6))
+        
+        fig, ax = plt.subplots(figsize=validated_figsize)
         ax.scatter(df[x_field], df[y_field], c=color, s=size, alpha=alpha)
         
         ax.set_title(title, fontsize=16, fontweight='bold')
@@ -316,7 +361,10 @@ async def create_heatmap(
         # 转换为numpy数组
         data_array = np.array(data)
         
-        fig, ax = plt.subplots(figsize=figsize)
+        # 验证图表大小
+        validated_figsize = validate_figsize(figsize, default=(10, 8))
+        
+        fig, ax = plt.subplots(figsize=validated_figsize)
         
         # 创建热力图
         sns.heatmap(data_array, annot=annot, fmt=fmt, cmap=cmap,
@@ -367,7 +415,11 @@ async def create_multi_series_chart(
     try:
         if style != "default":
             plt.style.use(style)
-        fig, ax = plt.subplots(figsize=figsize)
+        
+        # 验证图表大小
+        validated_figsize = validate_figsize(figsize, default=(12, 6))
+        
+        fig, ax = plt.subplots(figsize=validated_figsize)
         
         # 颜色循环
         colors = sns.color_palette("husl", len(data))
