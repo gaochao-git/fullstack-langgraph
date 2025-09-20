@@ -13,7 +13,7 @@ import uuid
 
 from fastmcp import FastMCP
 from pyecharts import options as opts
-from pyecharts.charts import Line, Bar, Pie, Scatter, HeatMap
+from pyecharts.charts import Line, Bar, Pie, Scatter, HeatMap, Tree
 from pyecharts.globals import ThemeType
 
 from ..common.base_config import MCPServerConfig
@@ -640,6 +640,155 @@ async def create_interactive_heatmap_chart(
         
     except Exception as e:
         logger.error(f"创建交互式热力图失败: {str(e)}")
+        return f"错误: {str(e)}"
+
+@mcp.tool()
+async def create_interactive_tree_chart(
+    data: Dict[str, Any],
+    title: str = "Interactive Tree Chart",
+    subtitle: str = "",
+    orient: str = "TB",  # LR, RL, TB, BT
+    theme: str = "light",
+    layout: str = "orthogonal",  # orthogonal or radial
+    symbol: str = "emptyCircle",
+    symbol_size: int = 7,
+    enable_roam: bool = True,
+    initial_tree_depth: Optional[int] = None
+) -> str:
+    """创建交互式树图（展示层级关系）
+    
+    Args:
+        data: 树形数据，格式如下：
+            {
+                "name": "根节点",
+                "value": 100,  # 可选
+                "children": [
+                    {
+                        "name": "子节点1",
+                        "value": 50,
+                        "children": [...]
+                    },
+                    ...
+                ]
+            }
+        title: 图表标题
+        subtitle: 副标题
+        orient: 树图方向
+            - "LR": 从左到右
+            - "RL": 从右到左
+            - "TB": 从上到下（默认）
+            - "BT": 从下到上
+        theme: 主题 (light/dark)
+        layout: 布局方式
+            - "orthogonal": 正交布局（默认）
+            - "radial": 径向布局
+        symbol: 节点符号
+            - "emptyCircle": 空心圆（默认）
+            - "circle": 实心圆
+            - "rect": 矩形
+            - "roundRect": 圆角矩形
+            - "triangle": 三角形
+            - "diamond": 菱形
+        symbol_size: 节点大小
+        enable_roam: 是否开启拖拽漫游
+        initial_tree_depth: 初始展开层级（None表示全部展开）
+    
+    Returns:
+        HTML文件的URL
+    
+    示例:
+        data = {
+            "name": "公司架构",
+            "children": [
+                {
+                    "name": "技术部",
+                    "children": [
+                        {"name": "前端组", "value": 10},
+                        {"name": "后端组", "value": 15}
+                    ]
+                },
+                {
+                    "name": "市场部",
+                    "children": [
+                        {"name": "销售组", "value": 20},
+                        {"name": "推广组", "value": 12}
+                    ]
+                }
+            ]
+        }
+    """
+    try:
+        # 创建树图
+        tree = Tree(init_opts=opts.InitOpts(
+            theme=ThemeType.LIGHT if theme == "light" else ThemeType.DARK,
+            width="100%",
+            height="400px"
+        ))
+        
+        # 添加数据
+        tree.add(
+            series_name="",
+            data=[data],  # Tree 需要列表格式
+            orient=orient,
+            symbol=symbol,
+            symbol_size=symbol_size,
+            layout=layout,
+            is_roam=enable_roam,
+            initial_tree_depth=initial_tree_depth,
+            label_opts=opts.LabelOpts(
+                position="top" if orient in ["TB", "BT"] else "right",
+                vertical_align="middle",
+                font_size=12
+            ),
+            leaves_opts=opts.TreeLeavesOpts(
+                label_opts=opts.LabelOpts(
+                    position="bottom" if orient in ["TB", "BT"] else "right",
+                    vertical_align="middle",
+                    font_size=11
+                )
+            ),
+            itemstyle_opts=opts.ItemStyleOpts(
+                border_color="#c23531",
+                border_width=1
+            )
+        )
+        
+        # 设置全局选项
+        tree.set_global_opts(
+            title_opts=opts.TitleOpts(
+                title=title,
+                subtitle=subtitle,
+                pos_left="center"
+            ),
+            tooltip_opts=opts.TooltipOpts(
+                trigger="item",
+                trigger_on="mousemove",
+                formatter="{b}: {c}"  # 显示名称和值
+            ),
+            toolbox_opts=opts.ToolboxOpts(
+                is_show=True,
+                feature={
+                    "dataView": {"show": True, "title": "数据视图", "readOnly": False},
+                    "restore": {"show": True, "title": "还原"},
+                    "saveAsImage": {"show": True, "title": "保存为图片"}
+                }
+            )
+        )
+        
+        # 保存HTML文件
+        filename = f"tree_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.html"
+        filepath = os.path.join(CHART_DIR, filename)
+        tree.render(filepath)
+        
+        # 返回可访问的URL
+        port = int(os.environ.get('MCP_SERVER_PORT', '3008'))
+        static_port = port + 1000
+        url = f"http://localhost:{static_port}/{filename}"
+        
+        return f'<iframe src="{url}" width="100%" height="400" frameborder="0"></iframe>'
+        
+    except Exception as e:
+        logger.error(f"创建交互式树图失败: {str(e)}")
         return f"错误: {str(e)}"
 
 def start_static_server():
