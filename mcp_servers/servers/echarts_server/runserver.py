@@ -662,10 +662,19 @@ async def create_interactive_tree_chart(
             {
                 "name": "根节点",
                 "value": 100,  # 可选
+                "itemStyle": {  # 可选，自定义节点样式
+                    "color": "#ff0000",  # 节点颜色
+                    "borderColor": "#000",  # 边框颜色
+                    "borderWidth": 2,  # 边框宽度
+                    "borderType": "solid",  # 边框类型
+                    "shadowBlur": 10,  # 阴影模糊度
+                    "shadowColor": "rgba(0,0,0,0.3)"  # 阴影颜色
+                },
                 "children": [
                     {
                         "name": "子节点1",
                         "value": 50,
+                        "itemStyle": {"color": "#00ff00"},  # 子节点颜色
                         "children": [...]
                     },
                     ...
