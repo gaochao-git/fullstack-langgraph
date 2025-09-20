@@ -700,7 +700,12 @@ async def create_interactive_tree_chart(
             - "diamond": 菱形
         symbol_size: 节点大小
         enable_roam: 是否开启拖拽漫游
-        initial_tree_depth: 初始展开层级（None表示全部展开）
+        initial_tree_depth: 初始展开层级
+            - None: 全部展开（默认）
+            - 1: 只显示根节点
+            - 2: 展开到第二层
+            - n: 展开到第n层
+            注意：树图支持任意深度的层级，用户可以交互式展开/折叠
     
     Returns:
         HTML文件的URL
@@ -743,7 +748,7 @@ async def create_interactive_tree_chart(
             symbol_size=symbol_size,
             layout=layout,
             is_roam=enable_roam,
-            initial_tree_depth=initial_tree_depth,
+            initial_tree_depth=initial_tree_depth,  # None 表示全部展开
             label_opts=opts.LabelOpts(
                 position="top" if orient in ["TB", "BT"] else "right",
                 vertical_align="middle",
