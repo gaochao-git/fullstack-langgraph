@@ -97,6 +97,11 @@ class ChartConfig:
         plt.rcParams['ytick.labelsize'] = 10
         plt.rcParams['legend.fontsize'] = 10
         
+        # 增加图表边距，确保标签不被裁剪
+        plt.rcParams['figure.autolayout'] = False  # 关闭自动布局
+        plt.rcParams['figure.subplot.bottom'] = 0.15  # 增加底部边距
+        plt.rcParams['figure.subplot.left'] = 0.12  # 增加左侧边距
+        
         # 打印当前使用的字体
         logger.info(f"Chart font configuration: {selected_font}")
 
@@ -153,8 +158,8 @@ def save_and_return_url(fig, title: str, chart_type: str = "chart") -> str:
     static_port = port + 1000  # 静态文件服务器端口
     url = f"http://localhost:{static_port}/{filename}"
     
-    # 返回Markdown格式
-    return f"![{title}]({url})"
+    # 返回Markdown格式，不添加alt文本避免重复
+    return f"![]({url})"
 
 @mcp.tool()
 async def create_line_chart(
@@ -166,23 +171,27 @@ async def create_line_chart(
     y_label: Optional[str] = None,
     style: str = "default",
     color: str = "blue",
-    figsize: tuple = (8, 4)
+    figsize: tuple = (16, 4)
 ) -> str:
     """创建折线图
     
     Args:
-        data: 数据列表，每个元素是包含x和y字段的字典
-        x_field: x轴数据字段名
-        y_field: y轴数据字段名
+        data: 数据列表，每个元素是包含x和y字段的字典，如 [{"time": "00:00", "value": 25}, ...]
+        x_field: x轴数据字段名（data中的键名）
+        y_field: y轴数据字段名（data中的键名）
         title: 图表标题
-        x_label: x轴标签（如果不提供，使用字段名）
-        y_label: y轴标签（如果不提供，使用字段名）
-        style: matplotlib样式
-        color: 线条颜色
-        figsize: 图表大小
+        x_label: x轴显示标签文字（重要：建议明确指定，如"时间"、"日期"等）
+        y_label: y轴显示标签文字（重要：建议明确指定，如"CPU使用率(%)"、"温度(℃)"等）
+        style: matplotlib样式（默认"default"）
+        color: 线条颜色（默认"blue"）
+        figsize: 图表大小，格式为(宽度, 高度)，默认(16, 4)适合时间序列
     
     Returns:
-        Markdown格式的图片链接
+        Markdown格式的图片链接: ![]({url})
+        
+    示例:
+        data = [{"time": "00:00", "cpu": 25}, {"time": "01:00", "cpu": 28}]
+        create_line_chart(data, "time", "cpu", "CPU监控", "时间", "CPU使用率(%)")
     """
     try:
         # 设置样式
@@ -193,25 +202,53 @@ async def create_line_chart(
         df = pd.DataFrame(data)
         
         # 验证图表大小
-        validated_figsize = validate_figsize(figsize, default=(8, 4))
+        validated_figsize = validate_figsize(figsize, default=(16, 4))
         
         # 创建图表
         fig, ax = plt.subplots(figsize=validated_figsize)
         ax.plot(df[x_field], df[y_field], color=color, linewidth=2, marker='o')
         
         # 设置标题和标签
-        ax.set_title(title, fontweight='bold')
-        ax.set_xlabel(x_label or x_field)
-        ax.set_ylabel(y_label or y_field)
+        ax.set_title(title, fontweight='bold', pad=20)
+        ax.set_xlabel(x_label or x_field, fontsize=ChartConfig.FONT_SIZE_LABEL, fontweight='normal', labelpad=10)
+        ax.set_ylabel(y_label or y_field, fontsize=ChartConfig.FONT_SIZE_LABEL, fontweight='normal', labelpad=10)
         
         # 添加网格
         ax.grid(True, alpha=0.3)
         
-        # 调整布局
-        plt.tight_layout()
+        # 优化X轴标签显示（特别是时间戳）
+        from matplotlib.dates import DateFormatter, HourLocator
+        import matplotlib.dates as mdates
         
-        # 保存并返回URL
-        return save_and_return_url(fig, title, "line_chart")
+        # 尝试解析X轴数据是否为时间格式
+        try:
+            # 检查是否是时间数据
+            sample_x = str(df[x_field].iloc[0])
+            if ':' in sample_x and len(sample_x) > 4:
+                # 智能选择时间点
+                total_points = len(df)
+                if total_points > 20:
+                    # 每隔几个点显示一个标签
+                    step = max(1, total_points // 10)
+                    ax.set_xticks(range(0, total_points, step))
+                    ax.set_xticklabels([df[x_field].iloc[i] for i in range(0, total_points, step)], rotation=45, ha='right')
+                else:
+                    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            else:
+                # 非时间数据的处理
+                if len(ax.get_xticklabels()) > 10:
+                    plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        except:
+            # 如果处理失败，使用默认旋转
+            if len(ax.get_xticklabels()) > 10:
+                plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+        # 调整布局，增加底部和左侧边距以确保标签不被截断
+        plt.tight_layout(pad=2.5)
+        plt.subplots_adjust(bottom=0.18, left=0.15, right=0.95, top=0.90)  # 增加各方向空间
+        
+        # 保存并返回URL，不再传递标题避免重复
+        return save_and_return_url(fig, "", "line_chart")
         
     except Exception as e:
         logger.error(f"创建折线图失败: {str(e)}")
@@ -233,19 +270,19 @@ async def create_bar_chart(
     """创建柱状图
     
     Args:
-        data: 数据列表
+        data: 数据列表，如 [{"category": "A", "value": 10}, {"category": "B", "value": 20}]
         x_field: x轴数据字段名
         y_field: y轴数据字段名
         title: 图表标题
-        x_label: x轴标签
-        y_label: y轴标签
-        style: matplotlib样式
-        color: 柱子颜色
-        figsize: 图表大小
-        orientation: 方向（vertical或horizontal）
+        x_label: x轴标签文字（重要：建议明确指定）
+        y_label: y轴标签文字（重要：建议明确指定）
+        style: matplotlib样式（默认"default"）
+        color: 柱子颜色（默认"steelblue"）
+        figsize: 图表大小（默认(8, 4)）
+        orientation: 方向，"vertical"（默认）或"horizontal"
     
     Returns:
-        Markdown格式的图片链接
+        Markdown格式的图片链接: ![]({url})
     """
     try:
         if style != "default":
@@ -259,20 +296,30 @@ async def create_bar_chart(
         
         if orientation == "horizontal":
             ax.barh(df[x_field], df[y_field], color=color)
-            ax.set_xlabel(y_label or y_field)
-            ax.set_ylabel(x_label or x_field)
+            ax.set_xlabel(y_label or y_field, fontsize=ChartConfig.FONT_SIZE_LABEL, labelpad=10)
+            ax.set_ylabel(x_label or x_field, fontsize=ChartConfig.FONT_SIZE_LABEL, labelpad=10)
         else:
             ax.bar(df[x_field], df[y_field], color=color)
-            ax.set_xlabel(x_label or x_field)
-            ax.set_ylabel(y_label or y_field)
+            ax.set_xlabel(x_label or x_field, fontsize=ChartConfig.FONT_SIZE_LABEL, labelpad=10)
+            ax.set_ylabel(y_label or y_field, fontsize=ChartConfig.FONT_SIZE_LABEL, labelpad=10)
             
-        ax.set_title(title, fontweight='bold')
+        ax.set_title(title, fontweight='bold', pad=20)
         ax.grid(True, alpha=0.3, axis='y' if orientation == "vertical" else 'x')
         
-        plt.tight_layout()
+        # 优化X轴标签显示
+        labels = ax.get_xticklabels()
+        if len(labels) > 10:
+            plt.setp(labels, rotation=45, ha='right')
+            
+        # 调整布局，增加边距
+        plt.tight_layout(pad=2.0)
+        if orientation == "vertical":
+            plt.subplots_adjust(bottom=0.15)
+        else:
+            plt.subplots_adjust(left=0.15)
         
         # 保存并返回URL
-        return save_and_return_url(fig, title, "bar_chart")
+        return save_and_return_url(fig, "", "bar_chart")
         
     except Exception as e:
         logger.error(f"创建柱状图失败: {str(e)}")
@@ -321,10 +368,11 @@ async def create_pie_chart(
         
         ax.set_title(title, fontweight='bold')
         
-        plt.tight_layout()
+        # 调整布局
+        plt.tight_layout(pad=2.0)
         
         # 保存并返回URL
-        return save_and_return_url(fig, title, "pie_chart")
+        return save_and_return_url(fig, "", "pie_chart")
         
     except Exception as e:
         logger.error(f"创建饼图失败: {str(e)}")
@@ -378,10 +426,12 @@ async def create_scatter_plot(
         ax.set_ylabel(y_label or y_field)
         ax.grid(True, alpha=0.3)
         
-        plt.tight_layout()
+        # 调整布局
+        plt.tight_layout(pad=2.0)
+        plt.subplots_adjust(bottom=0.15, left=0.12)
         
         # 保存并返回URL
-        return save_and_return_url(fig, title, "scatter_plot")
+        return save_and_return_url(fig, "", "scatter_plot")
         
     except Exception as e:
         logger.error(f"创建散点图失败: {str(e)}")
@@ -429,10 +479,12 @@ async def create_heatmap(
         
         ax.set_title(title, fontweight='bold')
         
-        plt.tight_layout()
+        # 调整布局
+        plt.tight_layout(pad=2.0)
+        plt.subplots_adjust(bottom=0.15, left=0.12)
         
         # 保存并返回URL
-        return save_and_return_url(fig, title, "heatmap")
+        return save_and_return_url(fig, "", "heatmap")
         
     except Exception as e:
         logger.error(f"创建热力图失败: {str(e)}")
@@ -503,10 +555,17 @@ async def create_multi_series_chart(
         ax.legend(loc=legend_loc)
         ax.grid(True, alpha=0.3)
         
-        plt.tight_layout()
+        # 优化X轴标签显示
+        labels = ax.get_xticklabels()
+        if len(labels) > 10:
+            plt.setp(labels, rotation=45, ha='right')
+            
+        # 调整布局
+        plt.tight_layout(pad=2.0)
+        plt.subplots_adjust(bottom=0.15, left=0.12)
         
         # 保存并返回URL
-        return save_and_return_url(fig, title, "multi_series_chart")
+        return save_and_return_url(fig, "", "multi_series_chart")
         
     except Exception as e:
         logger.error(f"创建多系列图表失败: {str(e)}")

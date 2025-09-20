@@ -4,6 +4,7 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 mcp_servers/servers/chart_server/generated_charts/
+mcp_servers/servers/echarts_server/generated_charts/
 .DS_Store
 *.local
 

@@ -78,3 +78,10 @@ servers:
         - scatter
         - heatmap
         - multi_series
+        
+  echarts_server:
+    enabled: true
+    script: "servers/echarts_server/runserver.py"
+    display_name: "交互式图表服务"
+    config:
+      port: 3008

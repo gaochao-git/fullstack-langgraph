@@ -9,6 +9,8 @@ import { ExtractModal } from './ExtractModal';
 const md: MarkdownIt = new MarkdownIt({ 
   html: true, 
   breaks: true,
+  linkify: true,
+  typographer: true,
   // 配置代码高亮
   highlight: function (str: string, lang: string): string {
     // 如果是 mermaid 代码块，返回特殊标记
@@ -58,21 +60,23 @@ const isToolOutput = (content: string): boolean => {
   }
 };
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = React.memo(({ content }) => {
   const { token } = theme.useToken();
   const [reportVisible, setReportVisible] = useState(false);
   const [reportType, setReportType] = useState<string>('');
   const [reportPath, setReportPath] = useState<string>('');
   const [reportTitle, setReportTitle] = useState<string>('查看报告');
   
-  // 根据主题动态设置表格渲染规则
-  md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="markdown-table">';
-  md.renderer.rules.table_close = () => '</table></div>';
-  md.renderer.rules.th_open = () => '<th class="markdown-th">';
-  md.renderer.rules.td_open = () => '<td class="markdown-td">';
+  // 使用 useMemo 缓存表格渲染规则设置
+  useMemo(() => {
+    md.renderer.rules.table_open = () => '<div class="my-4 overflow-x-auto"><table class="markdown-table">';
+    md.renderer.rules.table_close = () => '</table></div>';
+    md.renderer.rules.th_open = () => '<th class="markdown-th">';
+    md.renderer.rules.td_open = () => '<td class="markdown-td">';
+  }, []);
   
-  // 动态生成 Markdown 样式
-  const markdownStyles = `
+  // 使用 useMemo 缓存样式，只有主题改变时才重新计算
+  const markdownStyles = useMemo(() => `
     .markdown-body {
       color: ${token.colorText};
       line-height: 1.5;
@@ -251,26 +255,43 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       display: block;
       box-shadow: 0 2px 8px ${token.colorShadow};
     }
-  `;
+    .markdown-body iframe {
+      max-width: 100%;
+      border: 1px solid ${token.colorBorder};
+      border-radius: 6px;
+      margin: 8px 0;
+      display: block;
+      box-shadow: 0 2px 8px ${token.colorShadow};
+    }
+  `, [token]);
   
-  // 处理工具调用和输出内容
-  let processedContent = content;
+  // 使用 useMemo 处理内容，避免重复计算
+  const processedContent = useMemo(() => {
+    let processed = content;
+    
+    // 如果内容包含工具调用标签，移除它们
+    if (content.includes('<function_calls>')) {
+      processed = content.split('<function_calls>')[0].trim();
+    }
+    if (processed.includes('<function_results>')) {
+      processed = processed.split('<function_results>')[0].trim();
+    }
+    
+    // 如果内容看起来像工具输出的 JSON，返回空
+    if (isToolOutput(processed)) {
+      return '';
+    }
+    
+    // 如果处理后的内容为空，返回空
+    if (!processed.trim()) {
+      return '';
+    }
+    
+    return processed;
+  }, [content]);
   
-  // 如果内容包含工具调用标签，移除它们
-  if (content.includes('<function_calls>')) {
-    processedContent = content.split('<function_calls>')[0].trim();
-  }
-  if (processedContent.includes('<function_results>')) {
-    processedContent = processedContent.split('<function_results>')[0].trim();
-  }
-  
-  // 如果内容看起来像工具输出的 JSON，不渲染
-  if (isToolOutput(processedContent)) {
-    return null;
-  }
-  
-  // 如果处理后的内容为空，不渲染
-  if (!processedContent.trim()) {
+  // 提前返回，避免渲染空内容
+  if (!processedContent) {
     return null;
   }
 
@@ -412,6 +433,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       />
     </Typography>
   );
-};
+}, (prevProps, nextProps) => {
+  // 只有当 content 真正改变时才重新渲染
+  return prevProps.content === nextProps.content;
+});
 
 export default MarkdownRenderer; 
