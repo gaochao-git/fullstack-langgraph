@@ -9,7 +9,6 @@ import {
   SaveOutlined,
   CloseOutlined,
   ThunderboltOutlined,
-  SyncOutlined,
   DownOutlined,
   RightOutlined
 } from '@ant-design/icons';
@@ -18,15 +17,17 @@ import { cn } from '@/utils/lib-utils';
 import { useTheme } from '@/hooks/ThemeContext';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import { estimateTokenCount } from '@/hooks/useMessageCompression';
-import { useTokenCount } from '@/hooks/useTokenCount';
 
 const { TextArea } = Input;
 const { confirm } = Modal;
 
+// 扩展 Message 类型以包含 token_count
+export type MessageWithTokenCount = Message & { token_count?: number };
+
 export interface MessageContextManagerProps {
-  messages: Message[];
-  onUpdateMessages: (messages: Message[]) => void;
-  onCompressMessages?: (messageIds: string[]) => Promise<Message[]>;
+  messages: MessageWithTokenCount[];
+  onUpdateMessages: (messages: MessageWithTokenCount[]) => void;
+  onCompressMessages?: (messageIds: string[]) => Promise<MessageWithTokenCount[]>;
   className?: string;
   disabled?: boolean;
   selectedMessages?: Set<string>;
@@ -34,7 +35,7 @@ export interface MessageContextManagerProps {
 }
 
 interface MessageItemProps {
-  message: Message;
+  message: MessageWithTokenCount;
   index: number;
   onEdit: (index: number, newContent: string) => void;
   onDelete: (index: number) => void;
@@ -53,58 +54,16 @@ const MessageItem: React.FC<MessageItemProps> = ({
 }) => {
   const { isDark } = useTheme();
   const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(message.content);
+  const [editContent, setEditContent] = useState(message.content || '');
   const [isExpanded, setIsExpanded] = useState(false);
-  const { getTokenCount, cachedTokenCount, estimateTokenCount: estimate } = useTokenCount();
   
-  // 使用准确的token计算
-  const [tokenCount, setTokenCount] = useState<number>(0);
-  const [isLoadingToken, setIsLoadingToken] = useState(false);
-  const [editTokenCount, setEditTokenCount] = useState<number>(0);
+  // 使用消息自带的 token_count
+  const tokenCount = message.token_count || estimateTokenCount(message.content || '');
   
-  // 获取消息的准确token数
-  useEffect(() => {
-    const cached = cachedTokenCount(message.content);
-    if (cached !== null) {
-      setTokenCount(cached);
-    } else {
-      // 先显示估算值
-      setTokenCount(estimate(message.content));
-      setIsLoadingToken(true);
-      
-      // 异步获取准确值
-      getTokenCount(message.content).then(result => {
-        if (result) {
-          setTokenCount(result.token_count);
-        }
-        setIsLoadingToken(false);
-      });
-    }
-  }, [message.content, getTokenCount, cachedTokenCount, estimate]);
-  
-  // 计算编辑内容的token数
-  useEffect(() => {
-    if (isEditing) {
-      const cached = cachedTokenCount(editContent);
-      if (cached !== null) {
-        setEditTokenCount(cached);
-      } else {
-        // 先显示估算值
-        setEditTokenCount(estimate(editContent));
-        
-        // 延迟获取准确值（避免频繁调用）
-        const timer = setTimeout(() => {
-          getTokenCount(editContent).then(result => {
-            if (result) {
-              setEditTokenCount(result.token_count);
-            }
-          });
-        }, 300);
-        
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [editContent, isEditing, getTokenCount, cachedTokenCount, estimate]);
+  // 编辑时的 token 计数 - 使用估算
+  const editTokenCount = useMemo(() => {
+    return isEditing ? estimateTokenCount(editContent) : tokenCount;
+  }, [editContent, isEditing, tokenCount]);
   
   // 根据token数量确定显示颜色
   const getTokenColor = (count: number) => {
@@ -120,7 +79,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   }, [index, editContent, onEdit]);
 
   const handleCancelEdit = useCallback(() => {
-    setEditContent(message.content);
+    setEditContent(message.content || '');
     setIsEditing(false);
   }, [message.content]);
 
@@ -206,20 +165,19 @@ const MessageItem: React.FC<MessageItemProps> = ({
           )}
           style={{ maxWidth: '600px' }} // 增加最大宽度以适应80个字符
           >
-            {getMessageSummary(message.content)}
+            {getMessageSummary(message.content || '')}
           </div>
         )}
 
         {/* 右侧固定宽度区域：Token信息和操作按钮 */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
-            <Tooltip title={`Token消耗: ${tokenCount} ${isLoadingToken ? '(计算中...)' : '(准确值)'}`}>
+            <Tooltip title={`Token消耗: ${tokenCount}`}>
               <Tag 
                 color={getTokenColor(tokenCount)}
-                icon={isLoadingToken ? <SyncOutlined spin /> : <ThunderboltOutlined />}
+                icon={<ThunderboltOutlined />}
                 className="cursor-help"
               >
                 {tokenCount} tokens
-                {isLoadingToken && <span className="text-xs ml-1">*</span>}
               </Tag>
             </Tooltip>
             {/* 如果消息被压缩过，显示压缩标记 */}
@@ -309,7 +267,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
               "prose max-w-none",
               isDark ? "prose-invert" : ""
             )}>
-              <MarkdownRenderer content={message.content} />
+              <MarkdownRenderer content={message.content || ''} />
             </div>
           )}
         </div>
@@ -333,8 +291,6 @@ const MessageContextManager: React.FC<MessageContextManagerProps> = ({
   const [isCompressing, setIsCompressing] = useState(false);
   const [sortBy, setSortBy] = useState<'default' | 'token-asc' | 'token-desc'>('default');
   const [filterBy, setFilterBy] = useState<'all' | 'high-token'>('all');
-  const { getBatchTokenCount, estimateTokenCount } = useTokenCount();
-  const [messageTokenCounts, setMessageTokenCounts] = useState<Map<string, number>>(new Map());
 
   // 使用外部传入的选择状态或内部状态
   const selectedMessages = externalSelectedMessages ? 
@@ -354,26 +310,10 @@ const MessageContextManager: React.FC<MessageContextManagerProps> = ({
     } : 
     setInternalSelectedMessages;
 
-  // 批量获取所有消息的token计数
-  useEffect(() => {
-    if (messages.length > 0) {
-      const texts = messages.map(m => m.content);
-      getBatchTokenCount(texts).then(results => {
-        const newCounts = new Map<string, number>();
-        messages.forEach((msg, index) => {
-          if (results[index]) {
-            newCounts.set(msg.content, results[index].token_count);
-          }
-        });
-        setMessageTokenCounts(newCounts);
-      });
-    }
-  }, [messages, getBatchTokenCount]);
-
-  // 获取消息的token数（优先使用准确值，否则估算）
-  const getMessageTokenCount = useCallback((content: string) => {
-    return messageTokenCounts.get(content) || estimateTokenCount(content);
-  }, [messageTokenCounts, estimateTokenCount]);
+  // 获取消息的 token 数（使用消息自带的 token_count 或估算）
+  const getMessageTokenCount = useCallback((message: MessageWithTokenCount) => {
+    return message.token_count || estimateTokenCount(message.content);
+  }, []);
 
   // 处理消息编辑
   const handleEditMessage = useCallback((index: number, newContent: string) => {

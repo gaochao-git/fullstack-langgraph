@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Modal, Button, Card, Statistic, Row, Col, Divider, Space, Tag, Tooltip, Checkbox, message as antMessage } from 'antd';
+import { Modal, Button, Card, Statistic, Row, Col, Divider, Space, Tag, Tooltip, Checkbox, message as antMessage, Spin, Alert } from 'antd';
 import { 
   DeleteOutlined, 
   EditOutlined, 
@@ -18,13 +18,13 @@ import { Message } from '@/hooks/useStream';
 import { useTheme } from '@/hooks/ThemeContext';
 import { cn } from '@/utils/lib-utils';
 import MessageContextManager from './MessageContextManager';
-import { useTokenCount } from '@/hooks/useTokenCount';
 import { useMessageCompression } from '@/hooks/useMessageCompression';
+import { useCheckpointMessages } from '@/hooks/useCheckpointMessages';
 
 export interface MessageManagerModalProps {
   visible: boolean;
   onClose: () => void;
-  messages: Message[];
+  messages?: Message[]; // 可选，仅用于类型兼容
   onUpdateMessages: (messages: Message[]) => void;
   threadId?: string;
   maxContextLength?: number;
@@ -33,32 +33,31 @@ export interface MessageManagerModalProps {
 const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
   visible,
   onClose,
-  messages,
+  messages, // 不再使用，仅为兼容
   onUpdateMessages,
   threadId,
   maxContextLength = 128000
 }) => {
   const { isDark } = useTheme();
-  const { getBatchTokenCount, estimateTokenCount } = useTokenCount();
   const { compressMessages, isCompressing } = useMessageCompression();
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
-  const [messageTokenCounts, setMessageTokenCounts] = useState<Map<string, number>>(new Map());
+  
+  // 获取 checkpoint 中的真实消息
+  const { 
+    messages: checkpointMessages, 
+    totalTokens: checkpointTotalTokens,
+    isLoading: isLoadingCheckpoint,
+    error: checkpointError,
+    refresh: refreshCheckpoint
+  } = useCheckpointMessages({
+    threadId: visible ? threadId : null, // 只在弹窗打开时传入 threadId
+    autoRefresh: false // 消息管理弹窗不需要自动刷新
+  });
+  
+  // 只使用 checkpoint 消息，不使用前端消息
+  const displayMessages = checkpointMessages;
 
-  // 批量获取所有消息的token计数
-  useEffect(() => {
-    if (visible && messages.length > 0) {
-      const texts = messages.map(m => m.content);
-      getBatchTokenCount(texts).then(results => {
-        const newCounts = new Map<string, number>();
-        messages.forEach((msg, index) => {
-          if (results[index]) {
-            newCounts.set(msg.content, results[index].token_count);
-          }
-        });
-        setMessageTokenCounts(newCounts);
-      });
-    }
-  }, [visible, messages, getBatchTokenCount]);
+  // 不再需要额外调用 count-tokens，因为 checkpoint messages API 已经包含了 token_count
 
   // 计算统计数据
   const statistics = useMemo(() => {
@@ -69,8 +68,10 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
       total: { count: 0, tokens: 0 }
     };
 
-    messages.forEach(msg => {
-      const tokenCount = messageTokenCounts.get(msg.content) || estimateTokenCount(msg.content);
+    // 使用 displayMessages 中的 token_count
+    displayMessages.forEach(msg => {
+      // checkpoint 消息已经包含了 token_count
+      const tokenCount = msg.token_count || 0;
       
       switch (msg.type) {
         case 'human':
@@ -92,19 +93,20 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
     });
 
     return stats;
-  }, [messages, messageTokenCounts, estimateTokenCount]);
+  }, [displayMessages]);
 
-  // 计算使用率
-  const usage = (statistics.total.tokens / maxContextLength) * 100;
+  // 计算使用率 - 如果有 checkpoint 的总 token 数，使用它
+  const totalTokens = checkpointTotalTokens > 0 ? checkpointTotalTokens : statistics.total.tokens;
+  const usage = (totalTokens / maxContextLength) * 100;
 
   // 一键智能压缩
   const handleAutoCompress = useCallback(async () => {
     // 找出最大的AI消息进行压缩
-    const aiMessages = messages
+    const aiMessages = displayMessages
       .filter(msg => msg.type === 'ai' && msg.id)
       .map(msg => ({
         message: msg,
-        tokens: messageTokenCounts.get(msg.content) || estimateTokenCount(msg.content)
+        tokens: msg.token_count || 0
       }))
       .sort((a, b) => b.tokens - a.tokens);
 
@@ -123,8 +125,8 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
         targetTokenRatio: 0.5
       });
 
-      // 更新消息列表
-      const newMessages = [...messages];
+      // 更新消息列表 - 基于 checkpoint 消息
+      const newMessages = [...displayMessages];
       const compressedMap = new Map(compressed.map(msg => [msg.id, msg]));
       
       newMessages.forEach((msg, index) => {
@@ -138,11 +140,11 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
     } catch (error) {
       antMessage.error('自动压缩失败');
     }
-  }, [messages, messageTokenCounts, estimateTokenCount, compressMessages, onUpdateMessages]);
+  }, [displayMessages, compressMessages, onUpdateMessages]);
 
   // 批量压缩选中的消息
   const handleBatchCompress = useCallback(async () => {
-    const selectedMsgs = messages.filter(msg => msg.id && selectedMessages.has(msg.id));
+    const selectedMsgs = displayMessages.filter(msg => msg.id && selectedMessages.has(msg.id));
     
     if (selectedMsgs.length === 0) {
       antMessage.warning('请先选择要压缩的消息');
@@ -152,8 +154,8 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
     try {
       const compressed = await compressMessages(selectedMsgs);
       
-      // 更新消息列表
-      const newMessages = [...messages];
+      // 更新消息列表 - 基于 checkpoint 消息
+      const newMessages = [...displayMessages];
       const compressedMap = new Map(compressed.map(msg => [msg.id, msg]));
       
       newMessages.forEach((msg, index) => {
@@ -168,7 +170,7 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
     } catch (error) {
       antMessage.error('批量压缩失败');
     }
-  }, [messages, selectedMessages, compressMessages, onUpdateMessages]);
+  }, [displayMessages, selectedMessages, compressMessages, onUpdateMessages]);
 
   return (
     <Modal
@@ -278,7 +280,7 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
               valueStyle={{ color: '#262626' }}
             />
             <div className="text-sm text-gray-500 mt-1 mb-3">
-              {statistics.total.tokens.toLocaleString()} tokens
+              {totalTokens.toLocaleString()} tokens
             </div>
           </Col>
         </Row>
@@ -303,19 +305,50 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
 
       <Divider className="my-4" />
 
-      {/* 使用原有的MessageContextManager组件，并传入选择状态 */}
-      <MessageContextManager
-        messages={messages}
-        onUpdateMessages={onUpdateMessages}
-        onCompressMessages={async (messageIds) => {
-          const messagesToCompress = messages.filter(m => m.id && messageIds.includes(m.id));
-          return await compressMessages(messagesToCompress);
-        }}
-        disabled={isCompressing}
-        // 传入选择状态管理
-        selectedMessages={selectedMessages}
-        onSelectionChange={setSelectedMessages}
-      />
+      {/* 显示加载状态和错误信息 */}
+      {isLoadingCheckpoint && (
+        <div className="flex justify-center py-4">
+          <Spin tip="正在加载消息..." />
+        </div>
+      )}
+      
+      {checkpointError && (
+        <Alert
+          message="加载消息失败"
+          description={checkpointError}
+          type="error"
+          closable
+          className="mb-4"
+        />
+      )}
+
+      {/* 使用原有的MessageContextManager组件，传入 checkpoint 消息 */}
+      {!isLoadingCheckpoint && displayMessages.length > 0 && (
+        <MessageContextManager
+          messages={displayMessages}
+          onUpdateMessages={onUpdateMessages}
+          onCompressMessages={async (messageIds) => {
+            const messagesToCompress = displayMessages.filter(m => m.id && messageIds.includes(m.id));
+            return await compressMessages(messagesToCompress);
+          }}
+          disabled={isCompressing}
+          // 传入选择状态管理
+          selectedMessages={selectedMessages}
+          onSelectionChange={setSelectedMessages}
+        />
+      )}
+      
+      {/* 当没有 checkpoint 消息时显示提示 */}
+      {!isLoadingCheckpoint && displayMessages.length === 0 && (
+        <div className="flex justify-center py-8">
+          <Alert
+            message="没有消息"
+            description="当前线程中没有找到任何消息。请确认线程 ID 是否正确。"
+            type="info"
+            showIcon
+          />
+        </div>
+      )}
     </Modal>
   );
 };

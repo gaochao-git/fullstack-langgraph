@@ -440,6 +440,87 @@ async def get_thread_detail(
     )
 
 
+@router.get("/v1/chat/threads/{thread_id}/messages", response_model=UnifiedResponse)
+async def get_thread_messages(
+    thread_id: str,
+    agent_id: Optional[str] = Query(None, description="智能体ID"),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """获取线程中的所有消息（从checkpoint）
+    
+    返回checkpoint中存储的实际消息历史，这是会发送给大模型的真实内容。
+    自动计算每条消息的token数。
+    """
+    try:
+        # 导入必要的模块
+        import tiktoken
+        from .checkpoint_factory import get_checkpointer
+        
+        # 初始化 tiktoken 编码器
+        encoder = tiktoken.get_encoding("cl100k_base")
+        
+        checkpointer = await get_checkpointer()
+        
+        # 获取最新的checkpoint
+        config = {"configurable": {"thread_id": thread_id}}
+        
+        # 使用 alist 获取checkpoint历史
+        history = [c async for c in checkpointer.alist(config, limit=1)]
+        
+        if not history:
+            return success_response(data={"messages": [], "total_tokens": 0}, msg="线程中没有消息")
+        
+        checkpoint_tuple = history[0]
+        
+        # 提取消息
+        if hasattr(checkpoint_tuple, 'checkpoint') and checkpoint_tuple.checkpoint:
+            messages = checkpoint_tuple.checkpoint.get("channel_values", {}).get("messages", [])
+        else:
+            # 如果是字典格式，尝试直接获取
+            messages = checkpoint_tuple.get("channel_values", {}).get("messages", []) if isinstance(checkpoint_tuple, dict) else []
+        
+        # 转换消息格式
+        formatted_messages = []
+        total_tokens = 0
+        
+        for msg in messages:
+            formatted_msg = {
+                "id": getattr(msg, "id", None),
+                "type": msg.__class__.__name__.lower().replace("message", ""),
+                "content": msg.content,
+                "additional_kwargs": getattr(msg, "additional_kwargs", {}),
+            }
+            
+            # 添加工具相关信息
+            if hasattr(msg, "tool_calls"):
+                formatted_msg["tool_calls"] = msg.tool_calls
+            if hasattr(msg, "name"):
+                formatted_msg["name"] = msg.name
+            if hasattr(msg, "tool_call_id"):
+                formatted_msg["tool_call_id"] = msg.tool_call_id
+                
+            # 始终计算token数
+            token_count = len(encoder.encode(msg.content))
+            formatted_msg["token_count"] = token_count
+            total_tokens += token_count
+                
+            formatted_messages.append(formatted_msg)
+        
+        return success_response(
+            data={
+                "messages": formatted_messages,
+                "total_tokens": total_tokens,
+                "message_count": len(formatted_messages),
+                "thread_id": thread_id
+            },
+            msg="获取消息成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"获取线程消息失败: {str(e)}", exc_info=True)
+        raise BusinessException(f"获取消息失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
 @router.post("/v1/chat/threads/{thread_id}/completion")
 async def completion_endpoint(
     thread_id: str,
@@ -1247,60 +1328,6 @@ async def compress_messages(
     except Exception as e:
         logger.error(f"批量压缩消息失败: {str(e)}", exc_info=True)
         raise BusinessException(ResponseCode.INTERNAL_ERROR, f"批量压缩失败: {str(e)}")
-
-
-@router.post("/v1/chat/count-tokens", response_model=UnifiedResponse, summary="计算文本的token数量")
-async def count_tokens(
-    request: dict = Body(...),
-    db: AsyncSession = Depends(get_async_db),
-    current_user: Optional[dict] = Depends(get_current_user_optional)
-):
-    """
-    使用tiktoken计算文本的准确token数量
-    
-    请求体格式:
-    {
-        "texts": ["文本1", "文本2", ...],  // 或者
-        "text": "单个文本"
-    }
-    """
-    try:
-        import tiktoken
-        
-        # 使用与GPT模型相同的编码器
-        encoder = tiktoken.get_encoding("cl100k_base")
-        
-        texts = request.get("texts", [])
-        single_text = request.get("text", "")
-        
-        if single_text:
-            texts = [single_text]
-        
-        results = []
-        for text in texts:
-            tokens = encoder.encode(text)
-            token_count = len(tokens)
-            
-            # 计算中英文字符数
-            chinese_chars = len([c for c in text if '\u4e00' <= c <= '\u9fff'])
-            english_chars = len(text) - chinese_chars
-            
-            results.append({
-                "text_length": len(text),
-                "token_count": token_count,
-                "chinese_chars": chinese_chars,
-                "english_chars": english_chars,
-                "avg_chars_per_token": len(text) / token_count if token_count > 0 else 0
-            })
-        
-        return success_response(data={
-            "results": results,
-            "encoding": "cl100k_base"
-        })
-        
-    except Exception as e:
-        logger.error(f"计算token数量失败: {str(e)}", exc_info=True)
-        raise BusinessException(ResponseCode.INTERNAL_ERROR, f"计算失败: {str(e)}")
 
 
 def _build_compression_prompt(

@@ -150,6 +150,9 @@ export const COMPRESSION_LEVEL_MAP = {
 
 // 辅助函数：估算消息的token数量（粗略估算）
 export const estimateTokenCount = (content: string): number => {
+  // 确保 content 不是 undefined 或 null
+  if (!content) return 0;
+  
   // 中文约1.5字符/token，英文约4字符/token
   const chineseChars = (content.match(/[\u4e00-\u9fff]/g) || []).length;
   const englishChars = content.length - chineseChars;
