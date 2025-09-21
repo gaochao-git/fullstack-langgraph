@@ -10,7 +10,8 @@ import {
   CloseOutlined,
   ThunderboltOutlined,
   DownOutlined,
-  RightOutlined
+  RightOutlined,
+  ToolOutlined
 } from '@ant-design/icons';
 import { Message } from '@/hooks/useStream';
 import { cn } from '@/utils/lib-utils';
@@ -117,6 +118,26 @@ const MessageItem: React.FC<MessageItemProps> = ({
         return `[工具: ${message.name}]`;
       }
       return '(空消息)';
+    }
+    
+    // 对于工具消息的特殊处理
+    if (message?.type === 'tool') {
+      // 尝试解析JSON内容
+      try {
+        const toolResult = JSON.parse(content);
+        // 生成简洁的工具结果摘要
+        if (message.name === 'get_current_time' && toolResult.current_time) {
+          return `[${message.name}] ${toolResult.current_time}`;
+        }
+        // 其他工具返回第一个有意义的值
+        const firstValue = Object.values(toolResult).find(v => v && typeof v !== 'object');
+        if (firstValue) {
+          return `[${message.name}] ${String(firstValue).substring(0, 50)}...`;
+        }
+      } catch {
+        // 如果不是JSON，按普通文本处理
+      }
+      return `[${message.name}] ${content.substring(0, 50)}...`;
     }
     
     // 移除多余的空白和换行
@@ -273,7 +294,86 @@ const MessageItem: React.FC<MessageItemProps> = ({
               "prose max-w-none",
               isDark ? "prose-invert" : ""
             )}>
-              <MarkdownRenderer content={message.content || ''} />
+              {/* 对于工具消息，特殊处理显示 */}
+              {message.type === 'tool' ? (
+                <div className={cn(
+                  "p-3 rounded-md space-y-3",
+                  isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200",
+                  "border"
+                )}>
+                  <div className="flex items-center gap-2">
+                    <ToolOutlined className="text-orange-500" />
+                    <span className="font-semibold">工具: {message.name || '未知工具'}</span>
+                  </div>
+                  
+                  {message.tool_call_id && (
+                    <div className="text-xs text-gray-500">
+                      <span className="font-medium">调用ID:</span> {message.tool_call_id}
+                    </div>
+                  )}
+                  
+                  {/* 尝试解析并美化显示工具输出 */}
+                  {message.content && message.content.trim() !== '' ? (
+                    <div>
+                      <div className="text-sm font-medium mb-1">输出结果:</div>
+                      <div className={cn(
+                        "p-3 rounded font-mono text-sm overflow-x-auto",
+                        isDark ? "bg-gray-900 text-gray-300" : "bg-white text-gray-700"
+                      )}>
+                        {(() => {
+                          try {
+                            // 尝试解析为JSON并格式化显示
+                            const parsed = JSON.parse(message.content);
+                            return (
+                              <pre className="whitespace-pre-wrap">
+                                {JSON.stringify(parsed, null, 2)}
+                              </pre>
+                            );
+                          } catch {
+                            // 如果不是JSON，直接显示文本
+                            return message.content;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm italic text-gray-500">（工具执行结果为空）</div>
+                  )}
+                </div>
+              ) : message.type === 'ai' && message.tool_calls && message.tool_calls.length > 0 ? (
+                // AI消息调用工具的情况
+                <div>
+                  <div className={cn(
+                    "mb-3 p-3 rounded-md",
+                    isDark ? "bg-blue-900/20 border-blue-700" : "bg-blue-50 border-blue-200",
+                    "border"
+                  )}>
+                    <div className="font-medium mb-2 flex items-center gap-2">
+                      <ToolOutlined className="text-blue-500" />
+                      <span>调用工具:</span>
+                    </div>
+                    {message.tool_calls.map((toolCall: any, index: number) => (
+                      <div key={toolCall.id || index} className="mb-2 last:mb-0">
+                        <div className="text-sm font-medium">{toolCall.name}</div>
+                        {toolCall.args && Object.keys(toolCall.args).length > 0 && (
+                          <div className={cn(
+                            "mt-1 p-2 rounded text-xs font-mono",
+                            isDark ? "bg-gray-800" : "bg-gray-100"
+                          )}>
+                            <div className="font-medium mb-1">参数:</div>
+                            <pre className="whitespace-pre-wrap">
+                              {JSON.stringify(toolCall.args, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {message.content && <MarkdownRenderer content={message.content} />}
+                </div>
+              ) : (
+                <MarkdownRenderer content={message.content || ''} />
+              )}
             </div>
           )}
         </div>
