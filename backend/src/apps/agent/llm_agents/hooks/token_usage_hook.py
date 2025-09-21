@@ -53,21 +53,17 @@ class TokenUsageHook:
             return int(chinese_chars / 1.5 + english_chars / 4)
     
     def count_messages_tokens(self, messages: list) -> int:
-        """计算消息列表的总token数"""
+        """计算消息列表的总token数 - 只计算内容，与checkpoint API保持一致"""
         total = 0
         for msg in messages:
             if isinstance(msg, BaseMessage):
-                # 消息类型
-                total += self.count_tokens(msg.__class__.__name__)
-                # 消息内容
-                total += self.count_tokens(str(msg.content))
-                # 消息格式的额外开销
-                total += 4
+                # 只计算消息内容的token
+                content = msg.content if msg.content else ""
+                total += self.count_tokens(str(content))
             elif isinstance(msg, dict):
-                # 处理字典格式的消息
-                total += self.count_tokens(msg.get('type', ''))
-                total += self.count_tokens(str(msg.get('content', '')))
-                total += 4
+                # 处理字典格式的消息 - 只计算内容
+                content = msg.get('content', '')
+                total += self.count_tokens(str(content))
         return total
     
     async def add_token_usage_to_stream(self, stream: AsyncIterator[Any], thread_id: str) -> AsyncIterator[Any]:
