@@ -269,9 +269,9 @@ const RunLogModal: React.FC<RunLogModalProps> = ({ visible, onClose, agentId, ag
                 <Card size="small">
                   <Statistic
                     title="平均耗时"
-                    value={stats.avg_duration_ms}
-                    precision={0}
-                    suffix="ms"
+                    value={stats.avg_duration_ms / 1000}
+                    precision={1}
+                    suffix="s"
                   />
                 </Card>
               </Col>
