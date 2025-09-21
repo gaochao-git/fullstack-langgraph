@@ -109,9 +109,15 @@ const MessageItem: React.FC<MessageItemProps> = ({
   ];
 
   // 生成消息摘要
-  const getMessageSummary = (content: string) => {
+  const getMessageSummary = (content: string, message?: MessageWithTokenCount) => {
     // 跳过空消息
-    if (!content || content.trim().length === 0) return '(空消息)';
+    if (!content || content.trim().length === 0) {
+      // 对于工具消息，显示工具名称
+      if (message?.type === 'tool' && message.name) {
+        return `[工具: ${message.name}]`;
+      }
+      return '(空消息)';
+    }
     
     // 移除多余的空白和换行
     const cleanContent = content.trim().replace(/\s+/g, ' ');
@@ -165,7 +171,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
           )}
           style={{ maxWidth: '600px' }} // 增加最大宽度以适应80个字符
           >
-            {getMessageSummary(message.content || '')}
+            {getMessageSummary(message.content || '', message)}
           </div>
         )}
 
@@ -312,7 +318,7 @@ const MessageContextManager: React.FC<MessageContextManagerProps> = ({
 
   // 获取消息的 token 数（使用消息自带的 token_count 或估算）
   const getMessageTokenCount = useCallback((message: MessageWithTokenCount) => {
-    return message.token_count || estimateTokenCount(message.content);
+    return message.token_count || estimateTokenCount(message.content || '');
   }, []);
 
   // 处理消息编辑
@@ -448,19 +454,24 @@ const MessageContextManager: React.FC<MessageContextManagerProps> = ({
 
   // 处理和排序消息
   const processedMessages = useMemo(() => {
-    // 首先过滤掉空消息
-    let result = messages.filter(msg => msg.content && msg.content.trim().length > 0);
+    // 不过滤工具消息，它们可能有空内容但仍然有用
+    let result = messages.filter(msg => {
+      // 工具消息即使内容为空也保留
+      if (msg.type === 'tool') return true;
+      // 其他消息需要有内容
+      return msg.content && msg.content.trim().length > 0;
+    });
     
     // 筛选
     if (filterBy === 'high-token') {
-      result = result.filter(msg => getMessageTokenCount(msg.content) > 1000);
+      result = result.filter(msg => getMessageTokenCount(msg) > 1000);
     }
     
     // 排序
     if (sortBy === 'token-asc') {
-      result.sort((a, b) => getMessageTokenCount(a.content) - getMessageTokenCount(b.content));
+      result.sort((a, b) => getMessageTokenCount(a) - getMessageTokenCount(b));
     } else if (sortBy === 'token-desc') {
-      result.sort((a, b) => getMessageTokenCount(b.content) - getMessageTokenCount(a.content));
+      result.sort((a, b) => getMessageTokenCount(b) - getMessageTokenCount(a));
     }
     
     return result;
@@ -477,7 +488,7 @@ const MessageContextManager: React.FC<MessageContextManagerProps> = ({
       .map((msg, index) => ({
         index,
         message: msg,
-        tokens: getMessageTokenCount(msg.content)
+        tokens: getMessageTokenCount(msg)
       }))
       .sort((a, b) => b.tokens - a.tokens)
       .slice(0, 5);
