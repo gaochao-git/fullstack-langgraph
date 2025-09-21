@@ -61,10 +61,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
   // 使用消息自带的 token_count
   const tokenCount = message.token_count || estimateTokenCount(message.content || '');
   
-  // 编辑时的 token 计数 - 使用估算
-  const editTokenCount = useMemo(() => {
-    return isEditing ? estimateTokenCount(editContent) : tokenCount;
-  }, [editContent, isEditing, tokenCount]);
   
   // 根据token数量确定显示颜色
   const getTokenColor = (count: number) => {
@@ -267,25 +263,6 @@ const MessageItem: React.FC<MessageItemProps> = ({
                   >
                     取消
                   </Button>
-                </div>
-                <div className="text-sm">
-                  <span className={cn(
-                    "mr-2",
-                    isDark ? "text-gray-400" : "text-gray-600"
-                  )}>
-                    Token变化:
-                  </span>
-                  <Tag color={getTokenColor(editTokenCount)}>
-                    {editTokenCount} tokens
-                  </Tag>
-                  {editTokenCount !== tokenCount && (
-                    <span className={cn(
-                      "ml-2",
-                      editTokenCount > tokenCount ? "text-red-500" : "text-green-500"
-                    )}>
-                      ({editTokenCount > tokenCount ? '+' : ''}{editTokenCount - tokenCount})
-                    </span>
-                  )}
                 </div>
               </div>
             </div>

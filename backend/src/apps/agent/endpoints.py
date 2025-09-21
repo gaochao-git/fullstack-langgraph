@@ -500,7 +500,8 @@ async def get_thread_messages(
                 formatted_msg["tool_call_id"] = msg.tool_call_id
                 
             # 始终计算token数
-            token_count = len(encoder.encode(msg.content))
+            # 注意：msg.content 可能为空字符串，特别是对于某些工具消息
+            token_count = len(encoder.encode(msg.content if msg.content else ""))
             formatted_msg["token_count"] = token_count
             total_tokens += token_count
                 
