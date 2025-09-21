@@ -26,10 +26,11 @@ import {
   GlobalOutlined,
   UserOutlined,
   SwapOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  BarChartOutlined
 } from '@ant-design/icons';
-import AgentDetailModal from './components/AgentDetailModal';
 import AgentEditModal from './components/AgentEditModal';
+import RunLogModal from './components/RunLogModal';
 import { agentApi, type Agent, type MCPServer, type CreateAgentRequest, type UpdateAgentRequest } from '@/services/agentApi';
 import { renderIcon, getIconBackgroundColor } from './components/AgentIconSystem';
 import { useAuth } from '@/hooks/useAuth';
@@ -140,9 +141,7 @@ const AgentManagement: React.FC = () => {
   const isMobile = useIsMobile();
   
   // 模态框状态
-  const [agentDetailModal, setAgentDetailModal] = useState(false);
   const [agentEditModal, setAgentEditModal] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<LocalAgent | null>(null);
   const [editingAgent, setEditingAgent] = useState<LocalAgent | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   
@@ -156,6 +155,10 @@ const AgentManagement: React.FC = () => {
   // 转移所有权相关状态
   const [transferModalVisible, setTransferModalVisible] = useState(false);
   const [agentToTransfer, setAgentToTransfer] = useState<LocalAgent | null>(null);
+  
+  // 运行日志相关状态
+  const [runLogModalVisible, setRunLogModalVisible] = useState(false);
+  const [runLogAgent, setRunLogAgent] = useState<LocalAgent | null>(null);
   const [transferForm] = Form.useForm();
   
   
@@ -334,11 +337,7 @@ const AgentManagement: React.FC = () => {
     }
   };
 
-  // 查看智能体详情
-  const handleViewAgent = (agent: LocalAgent) => {
-    setSelectedAgent(agent);
-    setAgentDetailModal(true);
-  };
+  // 查看智能体详情 - 已删除，改为统计功能
 
 
 
@@ -642,12 +641,15 @@ const AgentManagement: React.FC = () => {
                 className="h-full"
                 actions={[
                   <Button 
-                    key="detail"
+                    key="stats"
                     type="text" 
-                    icon={<EyeOutlined />}
-                    onClick={() => handleViewAgent(agent)}
+                    icon={<BarChartOutlined />}
+                    onClick={() => {
+                      setRunLogAgent(agent);
+                      setRunLogModalVisible(true);
+                    }}
                   >
-                    详情
+                    统计
                   </Button>,
                   ...(user && agent.agent_owner === user.username ? [
                     // 编辑按钮：只有所有者可以编辑
@@ -779,13 +781,6 @@ const AgentManagement: React.FC = () => {
         )}
       </Card>
 
-      {/* 智能体详情模态框 */}
-      <AgentDetailModal
-        visible={agentDetailModal}
-        onCancel={() => setAgentDetailModal(false)}
-        agent={selectedAgent}
-        mcpServers={mcpServers}
-      />
 
 
       {/* 智能体编辑模态框 */}
@@ -895,6 +890,19 @@ const AgentManagement: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* 运行日志弹窗 */}
+      {runLogAgent && (
+        <RunLogModal
+          visible={runLogModalVisible}
+          onClose={() => {
+            setRunLogModalVisible(false);
+            setRunLogAgent(null);
+          }}
+          agentId={runLogAgent.agent_id}
+          agentName={runLogAgent.agent_name}
+        />
+      )}
 
     </div>
   );
