@@ -23,6 +23,7 @@ const RunLogModal: React.FC<RunLogModalProps> = ({ visible, onClose, agentId, ag
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<any>(null);
   const [userStats, setUserStats] = useState<UserRunSummary[]>([]);
+  const [userStatsForFilter, setUserStatsForFilter] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedUser, setSelectedUser] = useState<string | undefined>(undefined);
@@ -45,6 +46,7 @@ const RunLogModal: React.FC<RunLogModalProps> = ({ visible, onClose, agentId, ag
         setLogs(response.data.logs);
         setTotal(response.data.total);
         setStats(response.data.stats);
+        setUserStatsForFilter(response.data.user_stats || []);
       }
     } catch (error) {
       message.error('加载运行日志失败');
@@ -302,10 +304,10 @@ const RunLogModal: React.FC<RunLogModalProps> = ({ visible, onClose, agentId, ag
               value={selectedUser}
               onChange={setSelectedUser}
               allowClear
-              options={stats?.user_stats?.map((u: any) => ({
-                label: `${u.user_display_name} (${u.run_count}次)`,
+              options={userStatsForFilter.map((u: any) => ({
+                label: `${u.user_display_name || u.user_name} (${u.run_count}次)`,
                 value: u.user_name,
-              })) || []}
+              }))}
             />
             <RangePicker
               value={dateRange}
