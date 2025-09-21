@@ -9,6 +9,7 @@ import { omind_get, getBaseUrl } from "@/utils/base_api";
 import { type Agent } from "@/services/agentApi";
 import { threadApi } from "@/services/threadApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
+import MessageManagerModal from "@/components/MessageContextManager/MessageManagerModal";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -57,6 +58,7 @@ export default function ChatEngine({
   const [currentOffset, setCurrentOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showMessageManager, setShowMessageManager] = useState(false); // 是否显示消息管理
   
   // 模型管理状态
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
@@ -303,6 +305,20 @@ export default function ChatEngine({
     } as any);
   }, [thread]);
 
+  // 处理消息更新（用于上下文管理）
+  const handleUpdateMessages = useCallback((updatedMessages: Message[]) => {
+    // 这里需要实现更新消息的逻辑
+    // 由于 useStream hook 不直接提供更新消息的方法，
+    // 我们需要通过某种方式来实现这个功能
+    console.log('更新消息列表:', updatedMessages);
+    // TODO: 实现消息更新逻辑
+  }, []);
+
+  // 处理消息管理按钮点击
+  const handleMessageManage = useCallback(() => {
+    setShowMessageManager(!showMessageManager);
+  }, [showMessageManager]);
+
   // 加载历史线程数据
   const loadHistoryThreads = useCallback(async (append = false) => {
     // 如果是追加加载，使用loadingMore状态
@@ -422,8 +438,22 @@ export default function ChatEngine({
             agent={agent}
             threadFileIds={threadFileIds}
             sendingUserMessage={sendingUserMessage}
+            onUpdateMessages={handleUpdateMessages}
+            threadId={currentThreadId}
+            maxContextLength={128000} // 可以从agent配置中获取
+            onMessageManage={handleMessageManage}
           />
         )}
+      
+      {/* 消息管理弹窗 */}
+      <MessageManagerModal
+        visible={showMessageManager}
+        onClose={() => setShowMessageManager(false)}
+        messages={thread.messages}
+        onUpdateMessages={handleUpdateMessages}
+        threadId={currentThreadId}
+        maxContextLength={128000}
+      />
       
       {/* 历史会话抽屉 */}
       <Drawer

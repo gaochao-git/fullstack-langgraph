@@ -1116,3 +1116,220 @@ async def get_extract_result(
         "total_sensitive": len(items),
         "files_with_sensitive": len(files_with_sensitive)
     })
+
+
+# ========== 消息压缩相关API ==========
+
+@router.post("/v1/chat/compress-message", response_model=UnifiedResponse, summary="压缩单条消息")
+async def compress_single_message(
+    request: dict = Body(...),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    使用AI模型压缩单条消息，保留关键信息
+    
+    请求体格式:
+    {
+        "message": {
+            "id": "msg_id",
+            "type": "ai",
+            "content": "长文本内容...",
+            "additional_kwargs": {}
+        },
+        "options": {
+            "compression_level": "medium",  // light/medium/heavy
+            "preserve_context": true,
+            "target_token_ratio": 0.5
+        }
+    }
+    """
+    try:
+        from src.apps.ai_model.service.ai_model_service import ai_model_service
+        
+        message = request.get("message", {})
+        options = request.get("options", {})
+        
+        # 获取默认的压缩模型
+        llm = await ai_model_service.get_default_llm(db)
+        
+        # 构建压缩提示词
+        compression_prompt = _build_compression_prompt(
+            message.get("content", ""),
+            options.get("compression_level", "medium"),
+            options.get("preserve_context", True),
+            options.get("target_token_ratio", 0.5)
+        )
+        
+        # 调用模型进行压缩
+        compressed_content = await llm.ainvoke(compression_prompt)
+        
+        # 构建压缩后的消息
+        compressed_message = {
+            "id": message.get("id"),
+            "type": message.get("type"),
+            "content": compressed_content.content,
+            "additional_kwargs": {
+                **message.get("additional_kwargs", {}),
+                "compressed": True,
+                "original_length": len(message.get("content", "")),
+                "compressed_length": len(compressed_content.content),
+                "compression_ratio": len(compressed_content.content) / len(message.get("content", "")) if message.get("content") else 0
+            }
+        }
+        
+        logger.info(
+            f"消息压缩成功: 原长度={len(message.get('content', ''))}, "
+            f"压缩后={len(compressed_content.content)}"
+        )
+        
+        return success_response(data={"compressed_message": compressed_message})
+        
+    except Exception as e:
+        logger.error(f"压缩消息失败: {str(e)}", exc_info=True)
+        raise BusinessException(ResponseCode.INTERNAL_ERROR, f"压缩失败: {str(e)}")
+
+
+@router.post("/v1/chat/compress-messages", response_model=UnifiedResponse, summary="批量压缩消息")
+async def compress_messages(
+    request: dict = Body(...),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """批量压缩多条消息"""
+    try:
+        from src.apps.ai_model.service.ai_model_service import ai_model_service
+        
+        messages = request.get("messages", [])
+        options = request.get("options", {})
+        
+        # 获取默认的压缩模型
+        llm = await ai_model_service.get_default_llm(db)
+        
+        compressed_messages = []
+        
+        for message in messages:
+            # 只压缩AI消息和较长的消息
+            if message.get("type") != "ai" or len(message.get("content", "")) < 100:
+                compressed_messages.append(message)
+                continue
+                
+            # 构建压缩提示词
+            compression_prompt = _build_compression_prompt(
+                message.get("content", ""),
+                options.get("compression_level", "medium"),
+                options.get("preserve_context", True),
+                options.get("target_token_ratio", 0.5)
+            )
+            
+            # 调用模型进行压缩
+            compressed_content = await llm.ainvoke(compression_prompt)
+            
+            # 构建压缩后的消息
+            compressed_message = {
+                "id": message.get("id"),
+                "type": message.get("type"),
+                "content": compressed_content.content,
+                "additional_kwargs": {
+                    **message.get("additional_kwargs", {}),
+                    "compressed": True,
+                    "original_length": len(message.get("content", "")),
+                    "compressed_length": len(compressed_content.content),
+                    "compression_ratio": len(compressed_content.content) / len(message.get("content", "")) if message.get("content") else 0
+                }
+            }
+            compressed_messages.append(compressed_message)
+        
+        logger.info(f"批量压缩完成: 处理了 {len(compressed_messages)} 条消息")
+        
+        return success_response(data={"compressed_messages": compressed_messages})
+        
+    except Exception as e:
+        logger.error(f"批量压缩消息失败: {str(e)}", exc_info=True)
+        raise BusinessException(ResponseCode.INTERNAL_ERROR, f"批量压缩失败: {str(e)}")
+
+
+@router.post("/v1/chat/count-tokens", response_model=UnifiedResponse, summary="计算文本的token数量")
+async def count_tokens(
+    request: dict = Body(...),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """
+    使用tiktoken计算文本的准确token数量
+    
+    请求体格式:
+    {
+        "texts": ["文本1", "文本2", ...],  // 或者
+        "text": "单个文本"
+    }
+    """
+    try:
+        import tiktoken
+        
+        # 使用与GPT模型相同的编码器
+        encoder = tiktoken.get_encoding("cl100k_base")
+        
+        texts = request.get("texts", [])
+        single_text = request.get("text", "")
+        
+        if single_text:
+            texts = [single_text]
+        
+        results = []
+        for text in texts:
+            tokens = encoder.encode(text)
+            token_count = len(tokens)
+            
+            # 计算中英文字符数
+            chinese_chars = len([c for c in text if '\u4e00' <= c <= '\u9fff'])
+            english_chars = len(text) - chinese_chars
+            
+            results.append({
+                "text_length": len(text),
+                "token_count": token_count,
+                "chinese_chars": chinese_chars,
+                "english_chars": english_chars,
+                "avg_chars_per_token": len(text) / token_count if token_count > 0 else 0
+            })
+        
+        return success_response(data={
+            "results": results,
+            "encoding": "cl100k_base"
+        })
+        
+    except Exception as e:
+        logger.error(f"计算token数量失败: {str(e)}", exc_info=True)
+        raise BusinessException(ResponseCode.INTERNAL_ERROR, f"计算失败: {str(e)}")
+
+
+def _build_compression_prompt(
+    content: str,
+    compression_level: str,
+    preserve_context: bool,
+    target_token_ratio: float
+) -> str:
+    """构建压缩提示词"""
+    
+    level_instructions = {
+        "light": "轻度压缩：去除冗余信息，保留大部分细节",
+        "medium": "中度压缩：保留关键信息和主要细节，去除次要内容",
+        "heavy": "重度压缩：只保留核心要点，大幅精简内容"
+    }
+    
+    context_instruction = "保持上下文的连贯性" if preserve_context else "独立压缩，不考虑上下文"
+    
+    prompt = f"""请对以下内容进行{level_instructions.get(compression_level, level_instructions['medium'])}。
+要求：
+1. {context_instruction}
+2. 目标压缩到原文的{int(target_token_ratio * 100)}%左右
+3. 保留关键信息、数据和结论
+4. 使用简洁清晰的语言
+5. 不要添加"总结："等前缀，直接输出压缩后的内容
+
+原文内容：
+{content}
+
+压缩后的内容："""
+    
+    return prompt

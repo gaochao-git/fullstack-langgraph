@@ -14,7 +14,7 @@ import { FileUploadManager, FileListDisplay, fileUploadUtils } from "./FileUploa
 import { FilePreviewModal } from "./FilePreviewModal";
 import { fileApi } from "@/services/fileApi";
 import { App } from "antd";
-import { LoadingOutlined } from "@ant-design/icons";
+import { LoadingOutlined, SettingOutlined } from "@ant-design/icons";
 import { exportToWordWithImages } from "@/services/documentExportApi";
 import type { Agent } from "@/services/agentApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
@@ -836,6 +836,7 @@ interface ChatMessagesProps {
   agent?: Agent | null; // 新增：智能体信息
   threadFileIds?: string[]; // 新增：会话关联的文件ID列表
   sendingUserMessage?: {content: string; fileIds?: string[]} | null; // 新增：正在发送的用户消息
+  onMessageManage?: () => void; // 新增：消息管理回调
 }
 
 
@@ -857,6 +858,7 @@ function ChatMessages({
   agent,
   threadFileIds = [],
   sendingUserMessage,
+  onMessageManage,
 }: ChatMessagesProps) {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
@@ -1346,6 +1348,22 @@ function ChatMessages({
             <History className="h-3 w-3 mr-1" />
             历史会话
           </Button>
+          {onMessageManage && messages.length > 0 && (
+            <Button
+              onClick={onMessageManage}
+              variant="outline"
+              size="sm"
+              className={cn(
+                "text-xs px-3 py-1.5 h-7 transition-colors duration-200",
+                isDark 
+                  ? "bg-green-600/20 hover:bg-green-600/40 border-green-500 text-green-200 hover:text-white" 
+                  : "bg-green-50 hover:bg-green-100 border-green-300 text-green-700 hover:text-green-800"
+              )}
+            >
+              <SettingOutlined className="mr-1" style={{ fontSize: '12px' }} />
+              消息管理
+            </Button>
+          )}
         </div>
       </div>
       
