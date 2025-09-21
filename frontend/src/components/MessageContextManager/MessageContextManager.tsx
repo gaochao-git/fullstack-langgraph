@@ -57,6 +57,7 @@ const MessageItem: React.FC<MessageItemProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(message.content || '');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedToolParams, setExpandedToolParams] = useState<Set<string>>(new Set());
   
   // 使用消息自带的 token_count
   const tokenCount = message.token_count || estimateTokenCount(message.content || '');
@@ -329,22 +330,47 @@ const MessageItem: React.FC<MessageItemProps> = ({
                       <ToolOutlined className="text-blue-500" />
                       <span>调用工具:</span>
                     </div>
-                    {message.tool_calls.map((toolCall: any, index: number) => (
-                      <div key={toolCall.id || index} className="mb-2 last:mb-0">
-                        <div className="text-sm font-medium">{toolCall.name}</div>
-                        {toolCall.args && Object.keys(toolCall.args).length > 0 && (
-                          <div className={cn(
-                            "mt-1 p-2 rounded text-xs font-mono",
-                            isDark ? "bg-gray-800" : "bg-gray-100"
-                          )}>
-                            <div className="font-medium mb-1">参数:</div>
-                            <pre className="whitespace-pre-wrap">
-                              {JSON.stringify(toolCall.args, null, 2)}
-                            </pre>
+                    {message.tool_calls.map((toolCall: any, index: number) => {
+                      const toolCallId = toolCall.id || `tool-${index}`;
+                      const isParamsExpanded = expandedToolParams.has(toolCallId);
+                      
+                      return (
+                        <div key={toolCallId} className="mb-2 last:mb-0">
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium flex-1">{toolCall.name}</div>
+                            {toolCall.args && Object.keys(toolCall.args).length > 0 && (
+                              <Button
+                                type="text"
+                                size="small"
+                                icon={isParamsExpanded ? <DownOutlined /> : <RightOutlined />}
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedToolParams);
+                                  if (isParamsExpanded) {
+                                    newExpanded.delete(toolCallId);
+                                  } else {
+                                    newExpanded.add(toolCallId);
+                                  }
+                                  setExpandedToolParams(newExpanded);
+                                }}
+                                className="text-xs"
+                              >
+                                参数
+                              </Button>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {toolCall.args && Object.keys(toolCall.args).length > 0 && isParamsExpanded && (
+                            <div className={cn(
+                              "mt-1 p-2 rounded text-xs font-mono",
+                              isDark ? "bg-gray-800" : "bg-gray-100"
+                            )}>
+                              <pre className="whitespace-pre-wrap">
+                                {JSON.stringify(toolCall.args, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   {message.content && <MarkdownRenderer content={message.content} />}
                 </div>
