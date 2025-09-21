@@ -11,9 +11,10 @@ interface TokenUsageInfo {
 interface TokenUsageBarProps {
   tokenUsage: TokenUsageInfo | null;
   className?: string;
+  onClick?: () => void;
 }
 
-export default function TokenUsageBar({ tokenUsage, className }: TokenUsageBarProps) {
+export default function TokenUsageBar({ tokenUsage, className, onClick }: TokenUsageBarProps) {
   if (!tokenUsage) {
     return null;
   }
@@ -44,7 +45,10 @@ export default function TokenUsageBar({ tokenUsage, className }: TokenUsageBarPr
   };
 
   return (
-    <div className={`token-usage-bar ${className || ""}`}>
+    <div 
+      className={`token-usage-bar ${className || ""} ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       <Tooltip 
         title={
           <div>
@@ -56,10 +60,16 @@ export default function TokenUsageBar({ tokenUsage, className }: TokenUsageBarPr
               <div>最大长度: {total.toLocaleString()} tokens</div>
               <div>剩余空间: {remaining.toLocaleString()} tokens</div>
             </div>
+            {onClick && (
+              <div className="mt-2 pt-1 border-t border-gray-600 text-xs">
+                点击管理上下文
+              </div>
+            )}
           </div>
         }
+        placement="bottom"
       >
-        <div className="flex items-center gap-2 h-full cursor-help">
+        <div className="flex items-center gap-2 h-full">
           <div className="flex-1 min-w-[200px] flex items-center">
             <Progress
               percent={percentage}
@@ -69,6 +79,7 @@ export default function TokenUsageBar({ tokenUsage, className }: TokenUsageBarPr
               status={percentage >= 95 ? "exception" : "active"}
               style={{ marginBottom: 0 }}
               showInfo={true}
+              trailColor="rgba(82, 196, 26, 0.2)"
             />
           </div>
         </div>

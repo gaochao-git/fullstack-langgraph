@@ -1312,30 +1312,18 @@ function ChatMessages({
           </span>
         </div>
         
-        {/* Token使用量显示 - 自适应宽度 */}
+        {/* Token使用量显示 - 自适应宽度，可点击 */}
         {tokenUsage && (
           <div className="flex-1 mx-4">
-            <TokenUsageBar tokenUsage={tokenUsage} className="h-7" />
+            <TokenUsageBar 
+              tokenUsage={tokenUsage} 
+              className="h-7" 
+              onClick={messages.length > 0 ? onMessageManage : undefined}
+            />
           </div>
         )}
         
         <div className="flex items-center gap-2">
-          {onMessageManage && messages.length > 0 && (
-            <Button
-              onClick={onMessageManage}
-              variant="outline"
-              size="sm"
-              className={cn(
-                "text-xs px-2 py-1.5 h-7 transition-colors duration-200",
-                isDark 
-                  ? "bg-green-600/20 hover:bg-green-600/40 border-green-500 text-green-200 hover:text-white" 
-                  : "bg-green-50 hover:bg-green-100 border-green-300 text-green-700 hover:text-green-800"
-              )}
-            >
-              <SettingOutlined className="mr-1" style={{ fontSize: '12px' }} />
-              上下文
-            </Button>
-          )}
           <Button
             onClick={onNewSession}
             variant="outline"
