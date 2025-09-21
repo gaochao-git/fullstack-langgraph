@@ -7,6 +7,7 @@ import { agentApi } from "@/services/agentApi";
 import { useTheme } from "@/hooks/ThemeContext";
 import { useAuth } from "@/hooks/useAuth";
 import { Agent as ApiAgent } from '@/services/agentApi';
+import RunLogModal from './components/RunLogModal';
 const { Text } = Typography;
 type Agent = ApiAgent;
 
@@ -41,6 +42,7 @@ const AgentMarketplace = () => {
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState<string>('');
   const [showFavorites, setShowFavorites] = useState<boolean>(false);
+  const [runLogModal, setRunLogModal] = useState<{ visible: boolean; agent?: Agent }>({ visible: false });
   
   // 根据类型、所有者和搜索关键词过滤智能体
   const filteredAgents = agents
@@ -302,10 +304,18 @@ const AgentMarketplace = () => {
                   return totalTools;
                 })()} 个工具
               </span>
-              <span>
-                <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
-                {agent.total_runs || 0}
-              </span>
+              <Tooltip title="查看运行记录">
+                <span 
+                  style={{ cursor: 'pointer', color: '#1890ff' }}
+                  onClick={(e) => {
+                    e.stopPropagation(); // 阻止卡片点击事件
+                    setRunLogModal({ visible: true, agent });
+                  }}
+                >
+                  <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
+                  {agent.total_runs || 0}
+                </span>
+              </Tooltip>
               {/* 满意度显示 */}
               {(() => {
                 const thumbsUp = agent.thumbs_up_count || 0;
@@ -356,6 +366,16 @@ const AgentMarketplace = () => {
 
   return (
     <div>
+      {/* 运行日志弹窗 */}
+      {runLogModal.agent && (
+        <RunLogModal
+          visible={runLogModal.visible}
+          onClose={() => setRunLogModal({ visible: false })}
+          agentId={runLogModal.agent.agent_id}
+          agentName={runLogModal.agent.agent_name}
+        />
+      )}
+      
       {/* 头部过滤卡片 */}
       <Card 
         style={{ 

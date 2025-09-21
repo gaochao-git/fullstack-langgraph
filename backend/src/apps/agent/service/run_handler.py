@@ -189,6 +189,34 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     # 准备运行（更新统计、确保线程映射）
     await prepare_run(thread_id, request_body, request)
     
+    # 创建运行日志
+    run_log_id = None
+    try:
+        from .run_log_service import run_log_service
+        from src.shared.db.config import get_async_db_context
+        
+        # 获取客户端信息
+        ip_address = None
+        user_agent = None
+        if request:
+            ip_address = request.client.host if hasattr(request, 'client') else None
+            user_agent = request.headers.get('user-agent', None)
+        
+        async with get_async_db_context() as db:
+            run_log = await run_log_service.create_run_log(
+                db=db,
+                agent_id=request_body.agent_id,
+                thread_id=thread_id,
+                user_name=request_body.user_name,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
+            run_log_id = run_log.id
+            logger.info(f"创建运行日志: {run_log_id}")
+    except Exception as e:
+        # 日志创建失败不影响主流程
+        logger.error(f"创建运行日志失败: {e}", exc_info=True)
+    
     # 准备配置（返回 config, stream_mode）
     config, stream_modes = prepare_config(request_body, thread_id)
     
@@ -304,8 +332,43 @@ async def stream_run_standard(thread_id: str, request_body: RunCreate, request=N
             # 使用通用执行函数，流式模式
             async for item in execute_graph_request(request_body, thread_id, request, is_streaming=True):
                 yield item
+            
+            # 更新运行日志为成功
+            try:
+                from .run_log_service import run_log_service
+                from src.shared.db.config import get_async_db_context
+                from src.shared.db.models import now_shanghai
+                
+                async with get_async_db_context() as db:
+                    await run_log_service.update_run_log(
+                        db=db,
+                        thread_id=thread_id,
+                        run_status='success',
+                        end_time=now_shanghai()
+                    )
+            except Exception as log_e:
+                logger.error(f"更新运行日志失败: {log_e}")
+                
         except Exception as e:
             logger.error(f"流式处理异常: {e}", exc_info=True)
+            
+            # 更新运行日志为失败
+            try:
+                from .run_log_service import run_log_service
+                from src.shared.db.config import get_async_db_context
+                from src.shared.db.models import now_shanghai
+                
+                async with get_async_db_context() as db:
+                    await run_log_service.update_run_log(
+                        db=db,
+                        thread_id=thread_id,
+                        run_status='failed',
+                        end_time=now_shanghai(),
+                        error_message=str(e)
+                    )
+            except Exception as log_e:
+                logger.error(f"更新运行日志失败: {log_e}")
+            
             yield f"event: error\n"
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
     
@@ -327,9 +390,43 @@ async def invoke_run_standard(thread_id: str, request_body: RunCreate, request=N
         # 使用通用执行函数，非流式模式
         async for final_response in execute_graph_request(request_body, thread_id, request, is_streaming=False):
             # 非流式模式只会yield一次结果
+            # 更新运行日志为成功
+            try:
+                from .run_log_service import run_log_service
+                from src.shared.db.config import get_async_db_context
+                from src.shared.db.models import now_shanghai
+                
+                async with get_async_db_context() as db:
+                    await run_log_service.update_run_log(
+                        db=db,
+                        thread_id=thread_id,
+                        run_status='success',
+                        end_time=now_shanghai()
+                    )
+            except Exception as log_e:
+                logger.error(f"更新运行日志失败: {log_e}")
+                
             return success_response(final_response)
     except Exception as e:
         logger.error(f"非流式调用失败: {e}", exc_info=True)
+        
+        # 更新运行日志为失败
+        try:
+            from .run_log_service import run_log_service
+            from src.shared.db.config import get_async_db_context
+            from src.shared.db.models import now_shanghai
+            
+            async with get_async_db_context() as db:
+                await run_log_service.update_run_log(
+                    db=db,
+                    thread_id=thread_id,
+                    run_status='failed',
+                    end_time=now_shanghai(),
+                    error_message=str(e)
+                )
+        except Exception as log_e:
+            logger.error(f"更新运行日志失败: {log_e}")
+            
         raise BusinessException(f"处理请求时出错: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 

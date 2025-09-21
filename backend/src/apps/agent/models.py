@@ -196,3 +196,29 @@ class AgentMessageFeedback(BaseModel):
         Index('idx_thread_id', 'thread_id'),
         {'comment': '智能体消息反馈记录表'}
     )
+
+
+class AgentRunLog(BaseModel):
+    """智能体运行日志表"""
+    __tablename__ = "agent_run_logs"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    agent_id = Column(String(100), nullable=False, comment="智能体ID", index=True)
+    thread_id = Column(String(255), nullable=False, comment="会话ID", index=True)
+    user_name = Column(String(100), nullable=False, comment="运行用户名", index=True)
+    run_status = Column(String(20), nullable=False, default='running', comment="运行状态: running, success, failed")
+    start_time = Column(DateTime, nullable=False, default=now_shanghai, comment="开始运行时间")
+    end_time = Column(DateTime, nullable=True, comment="结束运行时间")
+    duration_ms = Column(Integer, nullable=True, comment="运行时长(毫秒)")
+    error_message = Column(Text, nullable=True, comment="错误信息")
+    token_usage = Column(Integer, nullable=True, comment="Token使用量")
+    message_count = Column(Integer, nullable=False, default=0, comment="消息数量")
+    ip_address = Column(String(50), nullable=True, comment="用户IP地址")
+    user_agent = Column(Text, nullable=True, comment="用户浏览器信息")
+    create_time = Column(DateTime, default=now_shanghai, nullable=False, comment="创建时间")
+    
+    __table_args__ = (
+        Index('idx_agent_user_time', 'agent_id', 'user_name', 'start_time'),
+        Index('idx_run_status', 'run_status'),
+        {'comment': '智能体运行日志表'}
+    )

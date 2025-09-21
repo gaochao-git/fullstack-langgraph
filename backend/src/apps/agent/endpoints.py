@@ -1412,3 +1412,90 @@ async def submit_message_feedback(
     except Exception as e:
         logger.error(f"提交消息反馈失败: {str(e)}", exc_info=True)
         raise BusinessException("提交反馈失败", ResponseCode.INTERNAL_ERROR)
+
+
+# ==================== 运行日志API ====================
+
+@router.get("/v1/agents/{agent_id}/run-logs", response_model=UnifiedResponse)
+async def get_agent_run_logs(
+    agent_id: str,
+    limit: int = 20,
+    offset: int = 0,
+    user_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """
+    获取智能体运行日志
+    
+    - 支持分页查询
+    - 支持按用户筛选
+    - 支持按时间范围筛选
+    - 返回运行统计信息
+    """
+    try:
+        from .service.run_log_service import run_log_service
+        from datetime import datetime
+        
+        # 解析日期参数
+        start_datetime = datetime.fromisoformat(start_date) if start_date else None
+        end_datetime = datetime.fromisoformat(end_date) if end_date else None
+        
+        # 获取运行日志和统计
+        result = await run_log_service.get_agent_run_logs(
+            db=db,
+            agent_id=agent_id,
+            limit=limit,
+            offset=offset,
+            user_name=user_name,
+            start_date=start_datetime,
+            end_date=end_datetime
+        )
+        
+        return success_response(
+            data=result,
+            msg="获取运行日志成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"获取运行日志失败: {str(e)}", exc_info=True)
+        raise BusinessException("获取运行日志失败", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/agents/{agent_id}/run-summary", response_model=UnifiedResponse)
+async def get_agent_run_summary(
+    agent_id: str,
+    days: int = 7,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """
+    获取智能体运行统计摘要
+    
+    - 返回最近N天的用户运行统计
+    - 包含每个用户的运行次数、成功率等
+    """
+    try:
+        from .service.run_log_service import run_log_service
+        
+        # 获取用户运行统计
+        summary = await run_log_service.get_user_run_summary(
+            db=db,
+            agent_id=agent_id,
+            days=days
+        )
+        
+        return success_response(
+            data={
+                "agent_id": agent_id,
+                "days": days,
+                "user_stats": summary
+            },
+            msg="获取运行统计成功"
+        )
+        
+    except Exception as e:
+        logger.error(f"获取运行统计失败: {str(e)}", exc_info=True)
+        raise BusinessException("获取运行统计失败", ResponseCode.INTERNAL_ERROR)
