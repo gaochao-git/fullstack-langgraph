@@ -1390,7 +1390,7 @@ async def submit_message_feedback(
         # 获取用户名
         user_name = current_user.get("username")
         if not user_name:
-            raise BusinessException("无法获取用户名", ResponseCode.PARAM_ERROR)
+            raise BusinessException("无法获取用户名", ResponseCode.BAD_REQUEST)
         
         # 提交反馈
         result = await feedback_service.submit_feedback(
