@@ -1,6 +1,6 @@
 import type React from "react";
 import type { Message } from "@/hooks/useStream";
-import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image, FileSpreadsheet } from "lucide-react";
+import { Loader2, Copy, CopyCheck, ChevronDown, ChevronRight, Wrench, User, Bot, Plus, History, Send, FileText, Eye, Download, RefreshCw, Image, FileSpreadsheet, ThumbsUp, ThumbsDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState, ReactNode, useEffect, useRef, useCallback } from "react";
@@ -20,6 +20,7 @@ import type { Agent } from "@/services/agentApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
 import VoiceInput from "@/components/VoiceInput";
 import TokenUsageBar from "./TokenUsageBar";
+import { feedbackApi } from "@/services/feedbackApi";
 
 // 黑名单：不显示这些工具调用，便于用户发现和维护
 const HIDDEN_TOOLS = [
@@ -837,6 +838,7 @@ interface ChatMessagesProps {
   threadFileIds?: string[]; // 新增：会话关联的文件ID列表
   sendingUserMessage?: {content: string; fileIds?: string[]} | null; // 新增：正在发送的用户消息
   onMessageManage?: () => void; // 新增：消息管理回调
+  threadId?: string | null; // 新增：当前会话ID
 }
 
 
@@ -859,6 +861,7 @@ function ChatMessages({
   threadFileIds = [],
   sendingUserMessage,
   onMessageManage,
+  threadId,
 }: ChatMessagesProps) {
   const { isDark } = useTheme();
   const { token } = theme.useToken();
@@ -869,6 +872,7 @@ function ChatMessages({
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState<boolean>(true);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef<boolean>(false);
+  const [messageFeedbacks, setMessageFeedbacks] = useState<Record<string, 'thumbs_up' | 'thumbs_down'>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ 
     file: File; 
     fileId: string; 
@@ -886,6 +890,39 @@ function ChatMessages({
       setCopiedMessageId(messageId);
       setTimeout(() => setCopiedMessageId(null), 1500);
     } catch {}
+  };
+
+  const handleFeedback = async (messageId: string, feedbackType: 'thumbs_up' | 'thumbs_down') => {
+    if (!threadId) {
+      message.warning('无法提交反馈：缺少会话信息');
+      return;
+    }
+
+    try {
+      const response = await feedbackApi.submitFeedback(threadId, messageId, {
+        feedback_type: feedbackType,
+      });
+
+      if (response.status === 'ok') {
+        setMessageFeedbacks(prev => ({
+          ...prev,
+          [messageId]: feedbackType
+        }));
+        
+        // 显示智能体满意度更新
+        const stats = response.data?.agent_stats;
+        if (stats) {
+          message.success(
+            `反馈已记录，当前满意度：${stats.satisfaction_rate}%`
+          );
+        }
+      } else {
+        message.error(response.msg || '提交反馈失败');
+      }
+    } catch (error) {
+      console.error('提交反馈失败:', error);
+      message.error('提交反馈失败');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1585,6 +1622,37 @@ function ChatMessages({
                               <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
                             </Button>
                           )}
+                          {/* 分隔线 */}
+                          <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
+                          {/* 点赞点踩按钮 */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "p-1 transition-colors",
+                              messageFeedbacks[lastAiMsg.id!] === 'thumbs_up'
+                                ? "text-green-500 hover:text-green-600"
+                                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            )}
+                            onClick={() => handleFeedback(lastAiMsg.id!, 'thumbs_up')}
+                            title="有帮助"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" fill={messageFeedbacks[lastAiMsg.id!] === 'thumbs_up' ? "currentColor" : "none"} />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              "p-1 transition-colors",
+                              messageFeedbacks[lastAiMsg.id!] === 'thumbs_down'
+                                ? "text-red-500 hover:text-red-600"
+                                : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                            )}
+                            onClick={() => handleFeedback(lastAiMsg.id!, 'thumbs_down')}
+                            title="没帮助"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5" fill={messageFeedbacks[lastAiMsg.id!] === 'thumbs_down' ? "currentColor" : "none"} />
+                          </Button>
                         </div>
                         {/* AI生成标识 - GB45438合规要求 */}
                         <div className={cn(

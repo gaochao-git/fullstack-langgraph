@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Card, Row, Col, Typography, Tag,  message, Select, Input, Button } from "antd";
-import { RobotOutlined, ToolOutlined,SearchOutlined,StarOutlined,StarFilled,PlayCircleOutlined} from "@ant-design/icons";
+import { Card, Row, Col, Typography, Tag,  message, Select, Input, Button, Tooltip } from "antd";
+import { RobotOutlined, ToolOutlined,SearchOutlined,StarOutlined,StarFilled,PlayCircleOutlined,LikeOutlined} from "@ant-design/icons";
 import { categoryColors,renderIcon,getIconBackgroundColor} from './components/AgentIconSystem';
 import { useNavigate } from "react-router-dom";
 import { agentApi } from "@/services/agentApi";
@@ -306,6 +306,35 @@ const AgentMarketplace = () => {
                 <PlayCircleOutlined style={{ fontSize: 11, marginRight: 2 }} />
                 {agent.total_runs || 0}
               </span>
+              {/* 满意度显示 */}
+              {(() => {
+                const thumbsUp = agent.thumbs_up_count || 0;
+                const thumbsDown = agent.thumbs_down_count || 0;
+                const totalFeedback = thumbsUp + thumbsDown;
+                if (totalFeedback > 0) {
+                  const satisfactionRate = (thumbsUp / totalFeedback) * 100;
+                  return (
+                    <Tooltip 
+                      title={
+                        <div style={{ fontSize: 12 }}>
+                          <div>满意度: {satisfactionRate.toFixed(1)}%</div>
+                          <div>👍 {thumbsUp} / 👎 {thumbsDown}</div>
+                          <div>总反馈: {totalFeedback}</div>
+                        </div>
+                      }
+                    >
+                      <span style={{ 
+                        color: satisfactionRate >= 80 ? '#52c41a' : satisfactionRate >= 60 ? '#faad14' : '#ff4d4f',
+                        cursor: 'help' 
+                      }}>
+                        <LikeOutlined style={{ fontSize: 11, marginRight: 2 }} />
+                        {satisfactionRate.toFixed(0)}%
+                      </span>
+                    </Tooltip>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             {/* 能力标签 */}

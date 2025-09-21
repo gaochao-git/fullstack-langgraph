@@ -2,7 +2,7 @@
 Agent Schema - 数据验证和序列化
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 
@@ -250,3 +250,24 @@ class FileProcessStatus(BaseModel):
     progress: Optional[float] = None
     message: Optional[str] = None
     processed_at: Optional[str] = None
+
+
+class MessageFeedbackCreate(BaseModel):
+    """创建消息反馈的请求模型"""
+    feedback_type: Literal["thumbs_up", "thumbs_down"] = Field(..., description="反馈类型")
+    feedback_content: Optional[str] = Field(None, description="反馈内容(预留)")
+
+
+class MessageFeedbackResponse(BaseModel):
+    """消息反馈响应模型"""
+    id: int
+    thread_id: str
+    message_id: str
+    agent_id: str
+    user_name: str
+    feedback_type: str
+    feedback_content: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    # 智能体最新统计数据
+    agent_stats: Optional[Dict[str, Any]] = None

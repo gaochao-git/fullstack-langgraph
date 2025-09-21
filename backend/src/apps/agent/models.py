@@ -30,6 +30,9 @@ class AgentConfig(BaseModel):
     success_rate = Column(Float, default=0.0, nullable=False)
     avg_response_time = Column(Float, default=0.0, nullable=False)
     last_used = Column(DateTime, nullable=True)
+    # 反馈统计
+    thumbs_up_count = Column(Integer, default=0, nullable=False, comment="点赞数")
+    thumbs_down_count = Column(Integer, default=0, nullable=False, comment="点踩数")
     # 系统字段
     config_version = Column(String(20), default='1.0', nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -168,4 +171,28 @@ class AgentPermission(BaseModel):
         UniqueConstraint('agent_id', 'user_name', name='agent_id_user'),
         Index('idx_permission_agent', 'agent_id'),
         Index('idx_permission_user', 'user_name'),
+    )
+
+
+class AgentMessageFeedback(BaseModel):
+    """智能体消息反馈记录表"""
+    __tablename__ = "agent_message_feedbacks"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键id")
+    thread_id = Column(String(255), nullable=False, comment="会话ID", index=True)
+    message_id = Column(String(255), nullable=False, comment="消息ID")
+    agent_id = Column(String(100), nullable=False, comment="智能体ID", index=True)
+    user_name = Column(String(100), nullable=False, comment="用户名")
+    feedback_type = Column(String(20), nullable=False, comment="反馈类型: thumbs_up 或 thumbs_down")
+    feedback_content = Column(Text, nullable=True, comment="反馈内容(预留)")
+    create_by = Column(String(100), nullable=False, default='system', comment="创建人用户名")
+    update_by = Column(String(100), nullable=True, comment="最后更新人用户名")
+    create_time = Column(DateTime, default=now_shanghai, nullable=False, comment="创建时间")
+    update_time = Column(DateTime, default=now_shanghai, onupdate=now_shanghai, nullable=False, comment="更新时间")
+    
+    __table_args__ = (
+        UniqueConstraint('user_name', 'message_id', name='unique_user_message_feedback'),
+        Index('idx_agent_id', 'agent_id'),
+        Index('idx_thread_id', 'thread_id'),
+        {'comment': '智能体消息反馈记录表'}
     )

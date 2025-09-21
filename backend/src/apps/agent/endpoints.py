@@ -12,7 +12,8 @@ import os
 from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
     AgentCreate, AgentUpdate, MCPConfigUpdate,AgentStatusUpdate, AgentStatisticsUpdate,
-    AgentOwnerTransfer, FileUploadResponse, DocumentContent, FileProcessStatus
+    AgentOwnerTransfer, FileUploadResponse, DocumentContent, FileProcessStatus,
+    MessageFeedbackCreate, MessageFeedbackResponse
 )
 from src.apps.agent.service.agent_service import agent_service
 from src.apps.agent.service.agent_permission_service import agent_permission_service
@@ -1361,3 +1362,53 @@ def _build_compression_prompt(
 压缩后的内容："""
     
     return prompt
+
+
+# ==================== 消息反馈API ====================
+
+@router.post("/v1/chat/threads/{thread_id}/messages/{message_id}/feedback", response_model=UnifiedResponse)
+async def submit_message_feedback(
+    thread_id: str,
+    message_id: str,
+    feedback: MessageFeedbackCreate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """
+    提交消息反馈（点赞/点踩）
+    
+    - 每个用户对每条消息只能有一个反馈
+    - 如果已有反馈，会更新反馈类型
+    - 反馈会汇总到智能体维度的统计数据
+    """
+    if not current_user:
+        raise BusinessException("需要登录才能提交反馈", ResponseCode.UNAUTHORIZED)
+    
+    try:
+        from .service.feedback_service import feedback_service
+        
+        # 获取用户名
+        user_name = current_user.get("username")
+        if not user_name:
+            raise BusinessException("无法获取用户名", ResponseCode.PARAM_ERROR)
+        
+        # 提交反馈
+        result = await feedback_service.submit_feedback(
+            db=db,
+            thread_id=thread_id,
+            message_id=message_id,
+            user_name=user_name,
+            feedback_type=feedback.feedback_type,
+            feedback_content=feedback.feedback_content
+        )
+        
+        return success_response(
+            data=result,
+            msg="反馈提交成功"
+        )
+        
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"提交消息反馈失败: {str(e)}", exc_info=True)
+        raise BusinessException("提交反馈失败", ResponseCode.INTERNAL_ERROR)

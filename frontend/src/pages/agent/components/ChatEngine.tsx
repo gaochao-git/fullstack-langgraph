@@ -432,6 +432,7 @@ export default function ChatEngine({
             onNewSession={onNewSession}
             onHistoryToggle={handleToggleHistoryDrawer}
             availableModels={availableModels}
+            threadId={currentThreadId}
             currentModel={currentModel}
             onModelChange={handleModelChange}
             WelcomeComponent={WelcomeComponent}

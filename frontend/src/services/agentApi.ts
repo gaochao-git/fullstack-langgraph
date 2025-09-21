@@ -71,6 +71,10 @@ export interface Agent {
   total_runs?: number;
   success_rate?: number;
   avg_response_time?: number;
+  // 反馈统计字段
+  thumbs_up_count?: number;
+  thumbs_down_count?: number;
+  satisfaction_rate?: number;
   // 权限相关字段
   agent_owner?: string;
   visibility_type?: string;
