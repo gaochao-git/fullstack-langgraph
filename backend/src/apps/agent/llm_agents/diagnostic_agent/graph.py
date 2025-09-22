@@ -11,6 +11,7 @@ from .tools import get_diagnostic_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
 from src.apps.agent.llm_agents.decorators import agent
 from src.shared.core.logging import get_logger
+from ..state_schemas import DiagnosticAgentState  # 导入自定义状态
 
 logger = get_logger(__name__)
 
@@ -53,6 +54,7 @@ async def create_diagnostic_agent(config: RunnableConfig):
         prompt=system_prompt,
         pre_model_hook=monitor_hook,
         checkpointer=checkpointer,
+        state_schema=DiagnosticAgentState,  # 使用自定义状态
         name=f"{agent_id}-agent"
     )
 
