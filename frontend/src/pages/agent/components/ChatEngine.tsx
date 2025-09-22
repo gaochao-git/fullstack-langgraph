@@ -205,31 +205,40 @@ export default function ChatEngine({
       }
       
       // 获取模型的详细信息（包括config_data）
-      fetchModelsConfig(availableModelNames);
+      // 传入完整的llm_info配置，而不仅仅是模型名称
+      fetchModelsConfig(agent.llm_info);
     } catch (error) {
       console.error('处理agent配置信息失败:', error);
     }
   }, [agent]); // 移除 currentModel 依赖，避免循环更新
 
   // 获取模型配置信息
-  const fetchModelsConfig = async (modelNames: string[]) => {
+  const fetchModelsConfig = async (llmConfigs: any[]) => {
     try {
       const configMap: Record<string, any> = {};
       
-      // 批量获取模型信息
-      for (const modelName of modelNames) {
-        try {
-          const response = await AIModelApi.getAIModels({ search: modelName });
-          if (response.status === 'ok' && response.data?.items?.length > 0) {
-            const modelData = response.data.items[0];
-            if (modelData.config_data) {
-              configMap[modelName] = typeof modelData.config_data === 'string' 
-                ? JSON.parse(modelData.config_data) 
-                : modelData.config_data;
-            }
+      // 先获取所有模型列表
+      const allModelsResponse = await AIModelApi.getAIModels({ size: 100 });
+      if (allModelsResponse.status === 'ok' && allModelsResponse.data?.items) {
+        const allModels = allModelsResponse.data.items;
+        
+        // 为每个配置的模型查找匹配
+        for (const llmConfig of llmConfigs) {
+          const modelName = llmConfig.model_name;
+          
+          // 在所有模型中查找匹配的模型
+          // model_name 可能是 model_type (如 "Qwen/Qwen3-30B-A3B-Instruct-2507")
+          const modelData = allModels.find((m: any) => 
+            m.model === modelName || // model字段对应数据库的model_type
+            m.name === modelName     // name字段对应数据库的model_name
+          );
+          
+          if (modelData && modelData.config) {
+            configMap[modelName] = modelData.config;
+            console.log(`找到模型 ${modelName} 的配置:`, modelData.config);
+          } else {
+            console.warn(`未找到模型 ${modelName} 的配置`);
           }
-        } catch (error) {
-          console.warn(`获取模型 ${modelName} 配置失败:`, error);
         }
       }
       
