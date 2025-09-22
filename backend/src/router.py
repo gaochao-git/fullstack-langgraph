@@ -7,7 +7,7 @@ from fastapi import APIRouter
 
 # 导入所有业务模块路由
 from .apps.sop import router as sop_router
-from .apps.agent import router as agents_router  
+from .apps.agent import router as agents_router
 from .apps.mcp import router as mcp_router
 from .apps.ai_model import router as ai_models_router
 from .apps.scheduled_task import router as scheduled_tasks_router
@@ -17,6 +17,7 @@ from .apps.kb import router as kb_router
 from .shared.core.endpoints import router as common_router
 from .apps.speech import router as speech_router
 from .apps.sensitive_scan import router as scan_router
+from .apps.idc_research import router as idc_research_router
 
 # 创建主API路由器
 api_router = APIRouter()
@@ -33,6 +34,7 @@ api_router.include_router(rbac_router, tags=["rbac"])
 api_router.include_router(kb_router, tags=["knowledge-base"])
 api_router.include_router(speech_router, tags=["speech"])
 api_router.include_router(scan_router, tags=["scan"])
+api_router.include_router(idc_research_router, prefix="/api/v1/idc-reports", tags=["idc-research"])
 
 @api_router.get("/health")
 async def health_check():

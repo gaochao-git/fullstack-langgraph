@@ -34,6 +34,11 @@ export const componentRegistry = {
   'SensitiveScanManagement': lazy(() => import('../pages/sensitive_scan').then(m => ({ default: m.SensitiveScanManagement }))),
   'ScanTaskDetail': lazy(() => import('../pages/sensitive_scan').then(m => ({ default: m.ScanTaskDetail }))),
   
+  // IDC运维报告
+  'IDCReportManagement': lazy(() => import('../pages/idc_research').then(m => ({ default: m.IDCAnalysisPage }))),
+  'IDCAnalysisPage': lazy(() => import('../pages/idc_research').then(m => ({ default: m.IDCAnalysisPage }))),
+  'IDCReportManagementOld': lazy(() => import('../pages/idc_research').then(m => ({ default: m.IDCReportManagement }))),
+  
   // 待开发的页面
   'HomePage': lazy(() => Promise.resolve({ 
     default: () => React.createElement('div', { style: { padding: '20px', textAlign: 'center' } }, '首页 - 待开发')
