@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, Query, File, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.shared.core.auth import get_current_user
-from src.shared.core.response import success_response, paginated_response
+from src.apps.auth.dependencies import get_current_user
+from src.shared.schemas.response import success_response, paginated_response
 from src.shared.core.logging import get_logger
 from src.shared.db.config import get_async_db
 
@@ -79,7 +79,8 @@ async def get_report(
     """获取单个报告详情"""
     report = await IDCReportService.get_report_by_id(db, report_id)
     if not report:
-        from src.shared.core.response import BusinessException, ResponseCode
+        from src.shared.core.exceptions import BusinessException
+        from src.shared.schemas.response import ResponseCode
         raise BusinessException(ResponseCode.NOT_FOUND, "报告不存在")
 
     return success_response(IDCReportResponse.model_validate(report))
@@ -137,17 +138,20 @@ async def download_report(
     """下载报告文件"""
     report = await IDCReportService.get_report_by_id(db, report_id)
     if not report:
-        from src.shared.core.response import BusinessException, ResponseCode
+        from src.shared.core.exceptions import BusinessException
+        from src.shared.schemas.response import ResponseCode
         raise BusinessException(ResponseCode.NOT_FOUND, "报告不存在")
 
     if not report.file_path or not report.file_name:
-        from src.shared.core.response import BusinessException, ResponseCode
+        from src.shared.core.exceptions import BusinessException
+        from src.shared.schemas.response import ResponseCode
         raise BusinessException(ResponseCode.BUSINESS_ERROR, "报告文件不存在")
 
     # 检查文件是否存在
     import os
     if not os.path.exists(report.file_path):
-        from src.shared.core.response import BusinessException, ResponseCode
+        from src.shared.core.exceptions import BusinessException
+        from src.shared.schemas.response import ResponseCode
         raise BusinessException(ResponseCode.BUSINESS_ERROR, "报告文件已丢失")
 
     return FileResponse(

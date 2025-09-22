@@ -8,7 +8,7 @@ from sqlalchemy.sql import func
 import uuid
 import enum
 
-from src.shared.db.base_model import BaseModel
+from src.shared.db.models import BaseModel
 
 
 class ReportStatus(str, enum.Enum):
