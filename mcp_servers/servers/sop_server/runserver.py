@@ -29,17 +29,18 @@ def _create_mysql_connection():
     """创建新的MySQL连接，每次调用都重新连接"""
     try:
         connection_config = {
-            'host': config.get('host'),
-            'port': config.get('port'),
-            'user': config.get('username'),
-            'password': config.get('password'),
+            'host': config.get('db_host', config.get('host')),  # 兼容旧配置
+            'port': config.get('db_port', 3306),
+            'user': config.get('db_username', config.get('username')),  # 兼容旧配置
+            'password': config.get('db_password', config.get('password')),  # 兼容旧配置
             'charset': 'utf8mb4',
             'autocommit': True,
-            'database': config.get('database', 'omind')
+            'database': config.get('db_database', config.get('database', 'omind')),  # 兼容旧配置
+            'connect_timeout': 20  # 增加连接超时时间
         }
         
         connection = pymysql.connect(**connection_config)
-        logger.info(f"MySQL连接成功，主机: {config.get('host')}, 数据库: {config.get('database')}")
+        logger.info(f"MySQL连接成功，主机: {connection_config['host']}, 数据库: {connection_config['database']}")
         return connection
         
     except Exception as e:
@@ -220,7 +221,7 @@ async def list_sops(category: str = "") -> str:
     """列出所有可用的SOP
     
     Args:
-        category: SOP分类，如system、mysql
+        category: SOP分类，如system、database、network
     
     Returns:
         JSON格式的SOP列表
@@ -231,37 +232,24 @@ async def list_sops(category: str = "") -> str:
             SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
             FROM sop_prompt_templates
             WHERE sop_category = %s
-            LIMIT 50
             """
             results = _execute_query(query, (category,))
         else:
             query = """
             SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
             FROM sop_prompt_templates
-            LIMIT 50
             """
             results = _execute_query(query)
-        
-        sop_list = []
-        for sop in results:
-            sop_list.append({
-                "key": sop.get("sop_id", ""),
-                "id": sop.get("sop_id", ""),
-                "title": sop.get("sop_title", ""),
-                "category": sop.get("sop_category", ""),
-                "description": sop.get("sop_description", ""),
-                "severity": sop.get("sop_severity", "")
-            })
-        
+        logger.info(f"Query results: {len(results) if results else 0} rows found")
         return json.dumps({
-            "success": True,
-            "sops": sop_list,
-            "total": len(sop_list)
+            "status": "ok",
+            "sops": results,
+            "total": len(results)
         }, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({
-            "success": False,
-            "error": str(e)
+            "status": "error",
+            "msg": str(e)
         }, ensure_ascii=False)
 
 @mcp.tool()

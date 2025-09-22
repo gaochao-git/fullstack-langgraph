@@ -55,11 +55,11 @@ servers:
     display_name: "SOP标准操作程序服务"
     config:
       port: 3005
-      host: 82.156.146.51
+      db_host: 82.156.146.51
       db_port: 3306
-      username: gaochao
-      password: "fffjjj"
-      database: omind  # SOP数据库名称
+      db_username: gaochao
+      db_password: "fffjjj"
+      db_database: omind  # SOP数据库名称
       
   chart_server:
     enabled: true
