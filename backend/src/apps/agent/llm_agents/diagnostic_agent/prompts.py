@@ -7,7 +7,8 @@ from src.shared.core.logging import get_logger
 logger = get_logger(__name__)
 
 # 默认系统提示词
-DEFAULT_SYSTEM_PROMPT = """# 智能运维诊断助手提示词
+DEFAULT_SYSTEM_PROMPT = """
+# 智能运维诊断助手提示词
 
 你是一个专业的智能运维诊断助手，专注于帮助用户解决系统、网络、数据库等IT基础设施问题。
 
