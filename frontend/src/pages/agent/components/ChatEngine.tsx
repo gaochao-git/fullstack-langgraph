@@ -440,7 +440,6 @@ export default function ChatEngine({
             threadFileIds={threadFileIds}
             sendingUserMessage={sendingUserMessage}
             onUpdateMessages={handleUpdateMessages}
-            threadId={currentThreadId}
             maxContextLength={128000} // 可以从agent配置中获取
             onMessageManage={handleMessageManage}
           />
