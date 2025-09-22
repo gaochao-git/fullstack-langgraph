@@ -9,10 +9,17 @@ from langgraph.types import Command
 from langgraph.prebuilt import InjectedState
 from datetime import datetime
 from src.shared.db.models import now_shanghai
+from pydantic import BaseModel, Field
 
 
-# Todo 项的类型定义
-TodoItem = Dict[str, any]  # content, status, findings
+# Todo 项的类型定义 - 使用 Pydantic 进行严格校验
+class TodoItem(BaseModel):
+    """Todo 任务项，与 DeepAgents 保持一致"""
+    content: str = Field(..., description="任务内容")
+    status: Literal["pending", "in_progress", "completed"] = Field(
+        default="pending", 
+        description="任务状态"
+    )
 
 WRITE_TODOS_DESCRIPTION = """Use this tool to create and manage a structured task list for your current work session. This helps you track progress, organize complex tasks, and demonstrate thoroughness to the user.
 It also helps the user understand the progress of the task and overall progress of their requests.
@@ -272,11 +279,21 @@ When in doubt, use this tool. Being proactive with task management demonstrates 
 
 @tool(description=WRITE_TODOS_DESCRIPTION)
 def write_todos(
-    todos: List[Dict[str, any]],
+    todos: List[TodoItem],
     tool_call_id: Annotated[str, InjectedToolCallId]
 ) -> Command:
     if not todos:
-        return "任务列表为空"
+        return Command(
+            update={
+                "todos": [],
+                "messages": [
+                    ToolMessage(
+                        content="任务列表为空",
+                        tool_call_id=tool_call_id
+                    )
+                ]
+            }
+        )
     
     # 统计任务状态
     status_count = {
@@ -290,28 +307,20 @@ def write_todos(
     
     # 显示任务列表
     for i, todo in enumerate(todos, 1):
-        # 确保必要字段
-        if "content" not in todo:
-            continue
-            
-        # 设置默认值
-        status = todo.get("status", "pending")
+        # Pydantic 已经验证了数据，直接使用属性
+        status = todo.status
         
         # 统计状态
-        if status in status_count:
-            status_count[status] += 1
+        status_count[status] += 1
         
         # 创建任务显示项
         status_emoji = {
             "pending": "[待处理]",
             "in_progress": "[进行中]",
             "completed": "[已完成]"
-        }.get(status, "[未知]")
+        }[status]  # 不需要 get，因为 Pydantic 保证了值的有效性
         
-        task_line = f"{i}. {status_emoji} {todo['content']}"
-        if "findings" in todo and todo["findings"]:
-            task_line += f"\n   发现: {todo['findings']}"
-        
+        task_line = f"{i}. {status_emoji} {todo.content}"
         output_lines.append(task_line)
     
     # 添加统计信息
@@ -326,9 +335,12 @@ def write_todos(
         output_lines.append(f"   - 完成率: {completion_rate:.1f}%")
     
     # 返回 Command 对象，同时更新状态和消息
+    # 将 Pydantic 模型转换为字典列表
+    todos_dict = [todo.model_dump() for todo in todos]
+    
     return Command(
         update={
-            "todos": todos,
+            "todos": todos_dict,
             "messages": [
                 ToolMessage(
                     content="\n".join(output_lines),
