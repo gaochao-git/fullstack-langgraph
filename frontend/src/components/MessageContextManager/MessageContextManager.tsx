@@ -671,7 +671,7 @@ const MessageContextManager: React.FC<MessageContextManagerProps> = ({
                   type={filterBy === 'high-token' ? 'primary' : 'default'}
                   onClick={() => setFilterBy('high-token')}
                 >
-                  高Token (>1000)
+                  高Token (&gt;1000)
                 </Button>
               </Button.Group>
             </div>
