@@ -42,6 +42,8 @@ CREATE TABLE `agent_configs` (
   `llm_info` json DEFAULT NULL COMMENT '大语言模型配置信息',
   `prompt_info` json DEFAULT NULL COMMENT '提示词配置信息',
   `total_runs` int(11) NOT NULL DEFAULT '0' COMMENT '总运行次数统计',
+  `thumbs_up_count` int(11) DEFAULT '0' COMMENT '点赞',
+  `thumbs_down_count` int(11) DEFAULT '0' COMMENT '点踩',
   `success_rate` float NOT NULL DEFAULT '0' COMMENT '成功率（0.0-1.0）',
   `avg_response_time` float NOT NULL DEFAULT '0' COMMENT '平均响应时间（毫秒）',
   `last_used` datetime DEFAULT NULL COMMENT '最后使用时间',
@@ -62,6 +64,29 @@ CREATE TABLE `agent_configs` (
   KEY `idx_create_by` (`create_by`)
 ) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COMMENT='智能体配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+CREATE TABLE `agent_run_logs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `agent_id` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '智能体ID',
+  `thread_id` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '会话ID',
+  `user_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '运行用户名',
+  `run_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'running' COMMENT '运行状态: running, success, failed',
+  `start_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '开始运行时间',
+  `end_time` datetime DEFAULT NULL COMMENT '结束运行时间',
+  `duration_ms` int(11) DEFAULT NULL COMMENT '运行时长(毫秒)',
+  `error_message` text COLLATE utf8mb4_unicode_ci COMMENT '错误信息',
+  `token_usage` int(11) DEFAULT NULL COMMENT 'Token使用量',
+  `message_count` int(11) DEFAULT '0' COMMENT '消息数量',
+  `ip_address` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '用户IP地址',
+  `user_agent` text COLLATE utf8mb4_unicode_ci COMMENT '用户浏览器信息',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_agent_id` (`agent_id`),
+  KEY `idx_user_name` (`user_name`),
+  KEY `idx_thread_id` (`thread_id`),
+  KEY `idx_start_time` (`start_time`),
+  KEY `idx_run_status` (`run_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能体运行日志表';
 
 --
 -- Table structure for table `agent_document_session`
