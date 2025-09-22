@@ -309,11 +309,114 @@ async def get_system_prompt_from_db_async(agent_name: str) -> str:
         raise ValueError(error_msg)
 
 
+async def get_llm_config_from_db(agent_id: str) -> Optional[Dict[str, Any]]:
+    """
+    异步获取智能体的LLM配置信息，包括context_length等参数
+    
+    Args:
+        agent_id: 智能体ID
+        
+    Returns:
+        包含LLM配置的字典，如果获取失败返回None
+    """
+    try:
+        async with get_async_db_context() as db:
+            from sqlalchemy import select
+            from src.apps.agent.models import AgentConfig
+            from src.apps.ai_model.models import AIModelConfig
+            
+            # 获取智能体配置
+            result = await db.execute(
+                select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+            )
+            agent = result.scalar_one_or_none()
+            
+            if not agent:
+                logger.warning(f"未找到智能体 '{agent_id}'")
+                return None
+            
+            # 获取LLM配置
+            llm_info = agent.llm_info if agent.llm_info else []
+            
+            # 处理 llm_info 可能是字符串的情况
+            if isinstance(llm_info, str):
+                try:
+                    llm_info = json.loads(llm_info)
+                except (json.JSONDecodeError, ValueError):
+                    llm_info = []
+            
+            # llm_info 应该是一个列表
+            if not isinstance(llm_info, list):
+                logger.warning(f"智能体 '{agent_id}' 的llm_info格式错误，期望列表，实际类型: {type(llm_info)}")
+                llm_info = []
+            
+            # 检查是否有配置的模型
+            if not llm_info:
+                logger.warning(f"智能体 '{agent_id}' 没有配置模型")
+                return None
+                
+            # 获取第一个模型的配置
+            first_model_config = llm_info[0]
+            if not isinstance(first_model_config, dict):
+                logger.warning(f"智能体 '{agent_id}' 的模型配置格式错误")
+                return None
+                
+            first_model = first_model_config.get('model_name')
+            if not first_model:
+                logger.warning(f"智能体 '{agent_id}' 的第一个模型配置缺少model_name")
+                return None
+            
+            # 从AI模型表查询详细信息
+            # 注意：在llm_info中存储的model_name实际对应数据库中的model_type字段
+            model_result = await db.execute(
+                select(AIModelConfig).where(
+                    AIModelConfig.model_type == first_model,
+                    AIModelConfig.model_status == 'active'
+                )
+            )
+            model_config = model_result.scalar_one_or_none()
+            
+            if not model_config:
+                logger.warning(f"未找到模型 '{first_model}' 的配置")
+                return None
+            
+            # 构建返回的配置
+            llm_config = {
+                'model_name': first_model,
+                'endpoint_url': model_config.endpoint_url,
+                'provider': model_config.model_provider
+            }
+            
+            # 添加API密钥（如果有）
+            if model_config.api_key_value:
+                llm_config['api_key'] = model_config.api_key_value
+            
+            # 解析config_data获取context_length等参数
+            if model_config.config_data:
+                try:
+                    config_data = model_config.config_data if isinstance(model_config.config_data, dict) else json.loads(model_config.config_data)
+                    if 'context_length' in config_data:
+                        llm_config['context_length'] = config_data['context_length']
+                    # 添加其他可能的配置参数
+                    for key in ['max_tokens', 'temperature', 'top_p']:
+                        if key in config_data:
+                            llm_config[key] = config_data[key]
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"解析模型config_data失败: {e}")
+            
+            return llm_config
+            
+    except Exception as e:
+        logger.error(f"获取智能体 '{agent_id}' 的LLM配置失败: {e}")
+        return None
+
+
 # 导出函数
 __all__ = [
     "get_llm_config_for_agent",
     "get_system_prompt_from_db_async",
     "get_tools_config_from_db",
     "get_system_tools_map",
-    "validate_system_prompt"
+    "validate_system_prompt",
+    "get_llm_config_from_db"
 ]

@@ -60,11 +60,6 @@ export default function TokenUsageBar({ tokenUsage, className, onClick }: TokenU
               <div>最大长度: {total.toLocaleString()} tokens</div>
               <div>剩余空间: {remaining.toLocaleString()} tokens</div>
             </div>
-            {onClick && (
-              <div className="mt-2 pt-1 border-t border-gray-600 text-xs">
-                点击管理上下文
-              </div>
-            )}
           </div>
         }
         placement="bottom"
