@@ -50,7 +50,7 @@ servers:
       password: "zabbix"
       
   sop_server:
-    enabled: false
+    enabled: true
     script: "servers/sop_server/runserver.py"
     display_name: "SOP标准操作程序服务"
     config:
