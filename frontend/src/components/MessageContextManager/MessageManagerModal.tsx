@@ -184,7 +184,7 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
       onCancel={onClose}
       width={1200}
       style={{ top: 20 }}
-      bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}
+      styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflow: 'auto' } }}
       footer={[
         <Button key="close" onClick={onClose}>
           关闭
@@ -307,9 +307,11 @@ const MessageManagerModal: React.FC<MessageManagerModalProps> = ({
 
       {/* 显示加载状态和错误信息 */}
       {isLoadingCheckpoint && (
-        <div className="flex justify-center py-4">
-          <Spin tip="正在加载消息..." />
-        </div>
+        <Spin spinning={true}>
+          <div className="flex justify-center items-center py-8">
+            <span>正在加载消息...</span>
+          </div>
+        </Spin>
       )}
       
       {checkpointError && (

@@ -313,7 +313,7 @@ const ScanResultViewer: React.FC<ScanResultViewerProps> = ({
         }
       }}
       width={1000}
-      bodyStyle={{ padding: 0, height: '70vh' }}
+      styles={{ body: { padding: 0, height: '70vh' } }}
       footer={[
         <Button key="close" onClick={() => {
           setHtmlModalVisible(false);

@@ -364,7 +364,7 @@ const TreeMenuManagement: React.FC = () => {
             新增根菜单
           </Button>
         }
-        bodyStyle={{ height: 'calc(100% - 56px)', overflow: 'auto' }}
+        styles={{ body: { height: 'calc(100% - 56px)', overflow: 'auto' } }}
       >
         <Spin spinning={loading}>
           {treeData.length > 0 ? (
@@ -407,7 +407,7 @@ const TreeMenuManagement: React.FC = () => {
             </Button>
           )
         }
-        bodyStyle={{ height: 'calc(100% - 56px)', overflow: 'auto' }}
+        styles={{ body: { height: 'calc(100% - 56px)', overflow: 'auto' } }}
       >
         {selectedMenu || editMode ? (
           <Form

@@ -1,5 +1,5 @@
 import { useStream, type Message } from "@/hooks/useStream";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import ChatMessages from "./ChatMessage";
 import { Drawer, App } from "antd";
@@ -10,6 +10,7 @@ import { type Agent } from "@/services/agentApi";
 import { threadApi } from "@/services/threadApi";
 import { getCurrentUsername } from "@/utils/authInterceptor";
 import MessageManagerModal from "@/components/MessageContextManager/MessageManagerModal";
+import { AIModelApi } from "@/services/aiModelApi";
 
 // 历史会话类型定义
 interface HistoryThread {
@@ -63,6 +64,7 @@ export default function ChatEngine({
   // 模型管理状态
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   const [currentModel, setCurrentModel] = useState<string>('');
+  const [modelConfigMap, setModelConfigMap] = useState<Record<string, any>>({});
   
   // 用于跟踪当前线程ID的状态 - 先不初始化，稍后在定义getThreadIdFromUrl后再设置
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
@@ -201,10 +203,52 @@ export default function ChatEngine({
           setCurrentModel(defaultModelName);
         }
       }
+      
+      // 获取模型的详细信息（包括config_data）
+      fetchModelsConfig(availableModelNames);
     } catch (error) {
       console.error('处理agent配置信息失败:', error);
     }
   }, [agent]); // 移除 currentModel 依赖，避免循环更新
+
+  // 获取模型配置信息
+  const fetchModelsConfig = async (modelNames: string[]) => {
+    try {
+      const configMap: Record<string, any> = {};
+      
+      // 批量获取模型信息
+      for (const modelName of modelNames) {
+        try {
+          const response = await AIModelApi.getAIModels({ search: modelName });
+          if (response.status === 'ok' && response.data?.items?.length > 0) {
+            const modelData = response.data.items[0];
+            if (modelData.config_data) {
+              configMap[modelName] = typeof modelData.config_data === 'string' 
+                ? JSON.parse(modelData.config_data) 
+                : modelData.config_data;
+            }
+          }
+        } catch (error) {
+          console.warn(`获取模型 ${modelName} 配置失败:`, error);
+        }
+      }
+      
+      setModelConfigMap(configMap);
+    } catch (error) {
+      console.error('获取模型配置信息失败:', error);
+    }
+  };
+
+  // 计算当前模型的context length
+  const currentModelContextLength = useMemo(() => {
+    if (!currentModel || !modelConfigMap[currentModel]) {
+      return 128000; // 默认值
+    }
+    
+    const configData = modelConfigMap[currentModel];
+    // 从数据库配置中获取context_length
+    return configData.context_length || 128000;
+  }, [currentModel, modelConfigMap]);
 
 
   // 从历史消息中提取文件信息
@@ -440,7 +484,7 @@ export default function ChatEngine({
             threadFileIds={threadFileIds}
             sendingUserMessage={sendingUserMessage}
             onUpdateMessages={handleUpdateMessages}
-            maxContextLength={128000} // 可以从agent配置中获取
+            maxContextLength={currentModelContextLength}
             onMessageManage={handleMessageManage}
           />
         )}
@@ -452,7 +496,7 @@ export default function ChatEngine({
         messages={thread.messages}
         onUpdateMessages={handleUpdateMessages}
         threadId={currentThreadId}
-        maxContextLength={128000}
+        maxContextLength={currentModelContextLength}
       />
       
       {/* 历史会话抽屉 */}

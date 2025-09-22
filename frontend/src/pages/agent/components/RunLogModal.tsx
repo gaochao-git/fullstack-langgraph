@@ -225,10 +225,12 @@ const RunLogModal: React.FC<RunLogModalProps> = ({ visible, onClose, agentId, ag
       onCancel={onClose}
       footer={null}
       width={1200}
-      bodyStyle={{
-        padding: '16px 24px',
-        maxHeight: '80vh',
-        overflow: 'auto',
+      styles={{
+        body: {
+          padding: '16px 24px',
+          maxHeight: '80vh',
+          overflow: 'auto',
+        }
       }}
     >
       <Tabs activeKey={activeTab} onChange={setActiveTab}>

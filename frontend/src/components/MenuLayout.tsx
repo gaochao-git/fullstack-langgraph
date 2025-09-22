@@ -386,7 +386,7 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
           closable={false}
           onClose={() => setMobileMenuVisible(false)}
           open={mobileMenuVisible}
-          bodyStyle={{ padding: 0 }}
+          styles={{ body: { padding: 0 } }}
           width={Math.min(280, window.innerWidth * 0.85)}
         >
           <div style={{
