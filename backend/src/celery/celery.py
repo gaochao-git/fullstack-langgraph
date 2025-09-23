@@ -19,7 +19,9 @@ app.autodiscover_tasks(['src.celery', 'src.apps'])
 def init_worker(**kwargs):
     """Worker准备就绪时初始化数据库连接"""
     from .db_utils import init_celery_db
-    init_celery_db()
+    success = init_celery_db()
+    if not success:
+        logger.warning("数据库初始化失败，但Worker将继续运行。某些功能可能受限。")
 
 # 确保导入任务模块以注册信号处理器
 from . import tasks

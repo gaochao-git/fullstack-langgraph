@@ -3,17 +3,20 @@ Agent 模块的 Celery 任务
 包括智能体定时任务执行和健康检查
 """
 import json
-import asyncio
 from datetime import datetime
 from src.celery.celery import app
 from src.celery.db_utils import get_db_session
+from src.celery.sync_db_helpers import (
+    test_database_connection_sync,
+    count_registered_agents_sync
+)
 from src.apps.scheduled_task.celery_models import (
     CeleryPeriodicTaskRun as PeriodicTaskRun, 
     CeleryPeriodicTaskConfig as PeriodicTask
 )
 from src.shared.core.logging import get_logger
 from src.shared.db.models import now_shanghai
-from .service.agent_celery_caller import execute_agent_for_celery
+from .service.agent_sync_executor import execute_agent_sync
 
 logger = get_logger(__name__)
 
@@ -59,18 +62,12 @@ def periodic_agent_health_check(self):
     logger.info("执行智能体健康检查任务")
     
     try:
-        # 直接检查Agent注册表和数据库连接
-        from .llm_agents.agent_registry import AgentRegistry
-        from src.shared.db.config import test_database_connection
-        
-        # 检查Agent注册表
-        agent_count = len(AgentRegistry._agents)
+        # 使用同步方法检查Agent和数据库
+        # 检查Agent数量（从数据库获取，避免依赖内存中的注册表）
+        agent_count = count_registered_agents_sync()
         
         # 检查数据库连接
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        db_ok = loop.run_until_complete(test_database_connection())
-        loop.close()
+        db_ok = test_database_connection_sync()
         
         health_data = {
             "status": "ok" if db_ok and agent_count > 0 else "error",
@@ -211,8 +208,8 @@ def execute_agent_periodic_task(self, task_config_id):
             
             logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
             
-            # 调用智能体执行函数
-            agent_result = execute_agent_for_celery(
+            # 调用智能体执行函数（使用优化的同步执行器）
+            agent_result = execute_agent_sync(
                 agent_id=agent_id,
                 message=message,
                 user_name=user_name,

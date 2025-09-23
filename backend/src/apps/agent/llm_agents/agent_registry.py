@@ -4,11 +4,11 @@ Agent 注册中心
 """
 
 import importlib
-import asyncio
 from typing import Dict, Any, Optional
 from pathlib import Path
 from src.shared.core.logging import get_logger
 from .generic_agent.graph import create_generic_agent
+from .agent_registry_sync import sync_agents_to_database
 logger = get_logger(__name__)
 
 
@@ -23,12 +23,13 @@ class AgentRegistry:
         """初始化注册表 - 自动发现所有使用装饰器的 Agent"""
         cls.auto_discover_agents()
         
-        # 同步到数据库
+        # 同步到数据库（使用同步版本）
         try:
-            asyncio.create_task(cls._sync_to_database())
-        except RuntimeError:
-            # 如果没有事件循环，创建一个新的
-            asyncio.run(cls._sync_to_database())
+            success = sync_agents_to_database(cls._agents)
+            if not success:
+                logger.warning("Agent信息同步到数据库失败，但不影响内存中的注册表")
+        except Exception as e:
+            logger.error(f"同步Agent到数据库时发生错误: {e}")
         
         logger.info(f"Agent 注册表初始化完成，共 {len(cls._agents)} 个 Agent")
     
@@ -108,59 +109,8 @@ class AgentRegistry:
         agent_info = cls._agents.get(agent_id, {})
         return agent_info.get('builtin', False)
     
-    @classmethod
-    async def _sync_to_database(cls):
-        """将注册的 Agent 同步到数据库"""
-        try:
-            from src.shared.db.config import get_async_db_context
-            from src.apps.agent.models import AgentConfig
-            from sqlalchemy import select
-            
-            async with get_async_db_context() as db:
-                for agent_id, agent_info in cls._agents.items():
-                    try:
-                        # 检查是否已存在
-                        result = await db.execute(
-                            select(AgentConfig).where(AgentConfig.agent_id == agent_id)
-                        )
-                        existing = result.scalar_one_or_none()
-                        
-                        if not existing:
-                            # 创建新记录
-                            agent_config = AgentConfig(
-                                agent_id=agent_id,
-                                agent_name=agent_info.get('description', agent_id),
-                                agent_type=agent_info.get('agent_type', '自定义'),
-                                agent_description=agent_info.get('description', ''),
-                                agent_capabilities=agent_info.get('capabilities', []),
-                                agent_version=agent_info.get('version', '1.0.0'),
-                                agent_status='active',
-                                agent_enabled='yes',
-                                agent_icon=agent_info.get('icon', 'Bot'),
-                                is_builtin='yes' if agent_info.get('builtin', False) else 'no',
-                                tools_info={},
-                                llm_info={},
-                                prompt_info={},
-                                agent_owner=agent_info.get('owner', 'system'),
-                                visibility_type='public',
-                                create_by=agent_info.get('owner', 'system')
-                            )
-                            db.add(agent_config)
-                            logger.info(f"同步 Agent 到数据库: {agent_id}")
-                        else:
-                            # 更新现有记录的基本信息（保留用户自定义的配置）
-                            existing.agent_name = agent_info.get('description', existing.agent_name)
-                            existing.is_builtin = 'yes' if agent_info.get('builtin', False) else 'no'
-                            logger.debug(f"Agent {agent_id} 已存在，更新基本信息")
-                        
-                        await db.commit()
-                        
-                    except Exception as e:
-                        logger.error(f"同步 Agent {agent_id} 到数据库失败: {e}")
-                        await db.rollback()
-                        
-        except Exception as e:
-            logger.error(f"数据库同步失败: {e}")
+    # 原来的异步 _sync_to_database 方法已移至 agent_registry_sync.py 作为同步版本
+    # 避免在模块导入时创建事件循环的问题
 
 
 # 初始化注册表

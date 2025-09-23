@@ -13,7 +13,8 @@
       "Bash(export:*)",
       "Bash(/Users/gaochao/gaochao-git/gaochao_repo/fullstack-langgraph/venv/bin/celery -A src.celery.celery inspect registered)",
       "Bash(/Users/gaochao/gaochao-git/gaochao_repo/fullstack-langgraph/venv/bin/python -m celery -A src.celery.celery inspect registered)",
-      "Bash(./celery_manage.sh:*)"
+      "Bash(./celery_manage.sh:*)",
+      "Bash(/Users/gaochao/gaochao-git/gaochao_repo/fullstack-langgraph/venv/bin/python test_celery_improvements.py)"
     ],
     "deny": [],
     "ask": []

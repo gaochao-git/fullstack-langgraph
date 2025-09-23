@@ -57,16 +57,24 @@ check_service() {
     local service_name=$1
     local pid_file="$PID_DIR/celery_${service_name}.pid"
     
-    if [ -f "$pid_file" ]; then
-        local pid=$(cat "$pid_file")
-        if ps -p $pid > /dev/null 2>&1; then
-            print_message $GREEN "✓ Celery $service_name 正在运行 (PID: $pid)"
-            return 0
-        else
-            print_message $YELLOW "! Celery $service_name PID文件存在但进程未运行"
-            rm -f "$pid_file"
-            return 1
-        fi
+    # 首先通过进程名检查
+    local actual_pid=""
+    if [ "$service_name" = "worker" ]; then
+        actual_pid=$(pgrep -f "celery.*$CELERY_APP.*worker" | head -1)
+    elif [ "$service_name" = "beat" ]; then
+        actual_pid=$(pgrep -f "celery.*$CELERY_APP.*beat" | head -1)
+    fi
+    
+    if [ -n "$actual_pid" ]; then
+        print_message $GREEN "✓ Celery $service_name 正在运行 (PID: $actual_pid)"
+        # 更新PID文件
+        echo $actual_pid > "$pid_file"
+        return 0
+    elif [ -f "$pid_file" ]; then
+        # 如果进程不存在但PID文件存在，清理PID文件
+        print_message $YELLOW "! Celery $service_name PID文件存在但进程未运行"
+        rm -f "$pid_file"
+        return 1
     else
         print_message $RED "✗ Celery $service_name 未运行"
         return 1
@@ -94,16 +102,29 @@ start_worker() {
         -Q system,priority_high,priority_low,celery \
         > "$LOG_DIR/worker_startup.log" 2>&1 &
     
-    sleep 3
+    # 等待启动并检查
+    local max_wait=10
+    local wait_time=0
     
-    if check_service "worker" > /dev/null 2>&1; then
-        print_message $GREEN "✓ Celery Worker 启动成功"
-        return 0
-    else
-        print_message $RED "✗ Celery Worker 启动失败"
-        cat "$LOG_DIR/worker_startup.log"
-        return 1
-    fi
+    while [ $wait_time -lt $max_wait ]; do
+        sleep 1
+        wait_time=$((wait_time + 1))
+        
+        # 检查进程是否存在（不依赖PID文件）
+        if pgrep -f "celery.*$CELERY_APP.*worker" > /dev/null; then
+            print_message $GREEN "✓ Celery Worker 启动成功"
+            # 尝试获取PID并保存
+            local actual_pid=$(pgrep -f "celery.*$CELERY_APP.*worker" | head -1)
+            if [ -n "$actual_pid" ]; then
+                echo $actual_pid > "$pid_file"
+            fi
+            return 0
+        fi
+    done
+    
+    print_message $RED "✗ Celery Worker 启动失败（等待${max_wait}秒后）"
+    cat "$LOG_DIR/worker_startup.log"
+    return 1
 }
 
 # 函数：启动Beat
@@ -127,16 +148,29 @@ start_beat() {
         --schedule="$schedule_file" \
         > "$LOG_DIR/beat_startup.log" 2>&1 &
     
-    sleep 3
+    # 等待启动并检查
+    local max_wait=10
+    local wait_time=0
     
-    if check_service "beat" > /dev/null 2>&1; then
-        print_message $GREEN "✓ Celery Beat 启动成功"
-        return 0
-    else
-        print_message $RED "✗ Celery Beat 启动失败"
-        cat "$LOG_DIR/beat_startup.log"
-        return 1
-    fi
+    while [ $wait_time -lt $max_wait ]; do
+        sleep 1
+        wait_time=$((wait_time + 1))
+        
+        # 检查进程是否存在（不依赖PID文件）
+        if pgrep -f "celery.*$CELERY_APP.*beat" > /dev/null; then
+            print_message $GREEN "✓ Celery Beat 启动成功"
+            # 尝试获取PID并保存
+            local actual_pid=$(pgrep -f "celery.*$CELERY_APP.*beat" | head -1)
+            if [ -n "$actual_pid" ]; then
+                echo $actual_pid > "$pid_file"
+            fi
+            return 0
+        fi
+    done
+    
+    print_message $RED "✗ Celery Beat 启动失败（等待${max_wait}秒后）"
+    cat "$LOG_DIR/beat_startup.log"
+    return 1
 }
 
 # 函数：停止服务
