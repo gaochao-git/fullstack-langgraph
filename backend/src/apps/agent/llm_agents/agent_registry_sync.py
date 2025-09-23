@@ -3,7 +3,9 @@ Agent注册表的同步辅助函数
 用于在同步上下文（如模块导入时）中操作数据库
 """
 from typing import Dict, Any
-from src.celery.db_utils import get_db_session
+from contextlib import contextmanager
+from sqlalchemy.orm import Session
+from src.shared.db.config import get_sync_db
 from src.shared.core.logging import get_logger
 from src.apps.agent.models import AgentConfig
 from src.shared.db.models import now_shanghai
@@ -23,7 +25,7 @@ def sync_agents_to_database(agents: Dict[str, Dict[str, Any]]) -> bool:
         是否成功
     """
     try:
-        with get_db_session() as db:
+        for db in get_sync_db():
             for agent_id, agent_info in agents.items():
                 try:
                     # 检查是否已存在

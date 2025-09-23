@@ -67,8 +67,7 @@ check_service() {
     
     if [ -n "$actual_pid" ]; then
         print_message $GREEN "✓ Celery $service_name 正在运行 (PID: $actual_pid)"
-        # 更新PID文件
-        echo $actual_pid > "$pid_file"
+        # 不要在这里写入PID文件，让Celery自己管理
         return 0
     elif [ -f "$pid_file" ]; then
         # 如果进程不存在但PID文件存在，清理PID文件
@@ -113,11 +112,7 @@ start_worker() {
         # 检查进程是否存在（不依赖PID文件）
         if pgrep -f "celery.*$CELERY_APP.*worker" > /dev/null; then
             print_message $GREEN "✓ Celery Worker 启动成功"
-            # 尝试获取PID并保存
-            local actual_pid=$(pgrep -f "celery.*$CELERY_APP.*worker" | head -1)
-            if [ -n "$actual_pid" ]; then
-                echo $actual_pid > "$pid_file"
-            fi
+            # 让Celery自己管理PID文件，不要干预
             return 0
         fi
     done
@@ -159,11 +154,7 @@ start_beat() {
         # 检查进程是否存在（不依赖PID文件）
         if pgrep -f "celery.*$CELERY_APP.*beat" > /dev/null; then
             print_message $GREEN "✓ Celery Beat 启动成功"
-            # 尝试获取PID并保存
-            local actual_pid=$(pgrep -f "celery.*$CELERY_APP.*beat" | head -1)
-            if [ -n "$actual_pid" ]; then
-                echo $actual_pid > "$pid_file"
-            fi
+            # 让Celery自己管理PID文件，不要干预
             return 0
         fi
     done

@@ -16,7 +16,8 @@
       "Bash(./celery_manage.sh:*)",
       "Bash(/Users/gaochao/gaochao-git/gaochao_repo/fullstack-langgraph/venv/bin/python test_celery_improvements.py)",
       "Bash(cat:*)",
-      "Bash(celery:*)"
+      "Bash(celery:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []
