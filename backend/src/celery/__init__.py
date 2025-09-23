@@ -7,6 +7,7 @@ logger.info('Celery App 初始化')
 
 # 导入任务模块以注册任务
 import src.apps.agent.tasks  # Agent模块的任务
+import src.apps.sensitive_scan.tasks  # 敏感数据扫描任务
 import src.celery.tasks  # Celery系统任务
 
 __all__ = ['celery_app', 'get_logger'] 

@@ -5,6 +5,10 @@ from kombu import Queue
 broker_url = settings.CELERY_BROKER_URL
 
 # Backend 设置 - 使用 MySQL 存储任务结果
+# 使用 pymysql 替代 mysqldb
+import pymysql
+pymysql.install_as_MySQLdb()
+
 result_backend = settings.CELERY_RESULT_BACKEND
 
 # 序列化设置
