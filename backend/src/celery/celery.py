@@ -22,7 +22,7 @@ def init_worker(**kwargs):
     init_celery_db()
 
 # 确保导入任务模块以注册信号处理器
-from . import tasks, agent_tasks
+from . import tasks
 
 # 动态调度功能由 scheduler.py 中的 DatabaseScheduler 提供
 

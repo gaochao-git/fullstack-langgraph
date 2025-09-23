@@ -1,7 +1,7 @@
 """
 Celery相关的数据库模型
 """
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -11,7 +11,9 @@ from src.shared.db.models import BaseModel, now_shanghai
 class CeleryTaskRecord(BaseModel):
     """Celery任务执行记录"""
     __tablename__ = 'celery_task_records'
+    __table_args__ = {'extend_existing': True}
     
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID')
     task_id = Column(String(255), unique=True, nullable=False, index=True)
     task_name = Column(String(255), nullable=False)
     task_status = Column(String(50), default='PENDING')
@@ -29,7 +31,9 @@ class CeleryTaskRecord(BaseModel):
 class CeleryPeriodicTaskConfig(BaseModel):
     """Celery定时任务配置"""
     __tablename__ = 'celery_periodic_task_configs'
+    __table_args__ = {'extend_existing': True}
     
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID')
     task_name = Column(String(255), nullable=False, unique=True, index=True)
     task_path = Column(String(255), nullable=False)
     task_enabled = Column(Boolean, default=True)
@@ -61,7 +65,9 @@ class CeleryPeriodicTaskConfig(BaseModel):
 class CeleryPeriodicTaskRun(BaseModel):
     """定时任务执行记录"""
     __tablename__ = 'celery_periodic_task_runs'
+    __table_args__ = {'extend_existing': True}
     
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID')
     task_config_id = Column(Integer, ForeignKey('celery_periodic_task_configs.id'), nullable=False)
     run_time = Column(DateTime, nullable=False, default=now_shanghai)
     status = Column(String(50), nullable=False)  # SUCCESS, FAILURE, RETRY
