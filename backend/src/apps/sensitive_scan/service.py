@@ -78,8 +78,9 @@ class LangExtractScanTaskService:
             await db.flush()
             await db.refresh(task)
             
-            # 启动后台扫描任务
-            asyncio.create_task(self._process_scan_task(task_id, file_ids))
+            # 使用 Celery 启动后台扫描任务
+            from .tasks import scan_files_task
+            scan_files_task.delay(task_id, file_ids)
             
             return {
                 "task_id": task.task_id,
