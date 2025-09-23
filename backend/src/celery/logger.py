@@ -7,8 +7,12 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 # 日志配置
+from src.shared.core.config import settings
+
 LOG_LEVEL = os.getenv('CELERY_LOG_LEVEL', 'INFO')
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+# 使用项目统一的日志目录
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+LOG_DIR = os.path.join(BASE_DIR, settings.LOG_DIR, 'celery')
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
