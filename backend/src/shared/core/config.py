@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
+    REDIS_PASSWORD: Optional[str] = None
     REDIS_DB: int = 0
     # API配置
     API_V1_STR: str = "/api/v1"
@@ -144,6 +145,10 @@ class Settings(BaseSettings):
     # 消息监控配置
     MULTI_TURN_CONTEXT_THRESHOLD: float = 0.8  # 当总消息量超过模型上下文长度的多少比例时触发警告（默认 0.8 = 80%）
     MULTIMODAL_SERVICE_API_KEY: Optional[str] = None
+    
+    # Celery配置
+    CELERY_BROKER_URL: Optional[str] = None  # Celery broker URL
+    CELERY_RESULT_BACKEND: Optional[str] = None  # Celery result backend
     
     class Config:
         env_file = ".env"
