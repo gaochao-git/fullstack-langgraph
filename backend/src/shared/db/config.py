@@ -238,12 +238,6 @@ class SyncDBContext:
             self.session.commit()
         self.session.close()
 
-
-# 统一接口：既可以用于依赖注入，也可以用于上下文管理
-# 1. 依赖注入：db: Session = Depends(get_sync_db)  
-# 2. 上下文管理：with get_sync_db() as db:
-
-
 # ==================== 便捷函数 ====================
 
 async def execute_async(func, *args, **kwargs):
@@ -272,12 +266,6 @@ def execute_sync(func, *args, **kwargs):
         raise
     finally:
         session.close()
-
-
-# Legacy compatibility (deprecated, use get_sync_db instead)
-def get_db():
-    """@deprecated: Use get_sync_db() instead"""
-    return get_sync_db()
 
 
 async def init_database():
