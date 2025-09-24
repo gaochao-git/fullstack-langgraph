@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from .config import settings
-from src.shared.db.config import get_async_db, get_sync_db
+from src.shared.db.config import get_async_db
 
 # 设置日志
 logger = logging.getLogger(__name__)
