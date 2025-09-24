@@ -84,13 +84,13 @@ const RunLogModal: React.FC<RunLogModalProps> = ({ visible, onClose, agentId, ag
   const logColumns: ColumnsType<RunLog> = [
     {
       title: '用户',
-      dataIndex: 'user_display_name',
+      dataIndex: 'user_name',
       key: 'user',
       width: 120,
-      render: (text, record) => (
+      render: (text) => (
         <Space>
           <UserOutlined />
-          <span>{text || record.user_name}</span>
+          <span>{text}</span>
         </Space>
       ),
     },
