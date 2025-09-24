@@ -175,33 +175,6 @@ def get_async_db_context():
         
     return AsyncSessionLocal()
 
-
-# ==================== 向后兼容性 ====================
-
-async def get_async_session():
-    """
-    获取异步数据库会话 - 向后兼容
-    @deprecated: 建议使用 get_async_db() 用于依赖注入，或 get_async_db_context() 用于上下文管理
-    """
-    if AsyncSessionLocal is None:
-        raise RuntimeError("数据库未初始化，请确保应用正确启动")
-        
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        except Exception:
-            await session.rollback()
-            raise
-
-
-async def get_async_session_context():
-    """获取异步会话上下文管理器 - 用于手动管理"""
-    if AsyncSessionLocal is None:
-        raise RuntimeError("数据库未初始化，请确保应用正确启动")
-        
-    return AsyncSessionLocal()
-
-
 # ==================== 同步数据库会话 ====================
 
 def get_sync_db():
@@ -239,41 +212,6 @@ class SyncDBContext:
         self.session.close()
 
 # ==================== 便捷函数 ====================
-
-async def execute_async(func, *args, **kwargs):
-    """在异步会话中执行函数"""
-    async with AsyncSessionLocal() as session:
-        try:
-            kwargs['db'] = session
-            result = await func(*args, **kwargs)
-            await session.commit()
-            return result
-        except Exception:
-            await session.rollback()
-            raise
-
-
-def execute_sync(func, *args, **kwargs):
-    """在同步会话中执行函数"""
-    session = SessionLocal()
-    try:
-        kwargs['db'] = session
-        result = func(*args, **kwargs)
-        session.commit()
-        return result
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-async def init_database():
-    """Initialize database tables."""
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
 async def test_database_connection():
     """Test database connection."""
     try:
