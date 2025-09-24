@@ -424,58 +424,6 @@ class DocumentService:
             "message": doc_upload.error_message,
             "processed_at": doc_upload.process_end_time.isoformat() if doc_upload.process_end_time else None
         }
-    
-    def get_documents_info(self, file_ids: List[str]) -> List[Dict[str, Any]]:
-        """
-        获取文档的元信息（不包含内容）
-        
-        Args:
-            file_ids: 文件ID列表
-            
-        Returns:
-            文档信息列表，每个元素包含 file_id, file_name, file_size 等
-        """
-        from src.shared.db.config import get_sync_db
-        from ..models import AgentDocumentUpload
-        
-        docs_info = []
-        
-        db_gen = get_sync_db()
-        db = next(db_gen)
-        try:
-            for file_id in file_ids:
-                try:
-                    # 查询文档
-                    result = db.execute(
-                        select(AgentDocumentUpload).where(
-                            AgentDocumentUpload.file_id == file_id
-                        )
-                    )
-                    document = result.scalar_one_or_none()
-                    
-                    if document and document.process_status == 2:  # READY
-                        doc_info = {
-                            "file_id": document.file_id,
-                            "file_name": document.file_name,
-                            "file_size": document.file_size,
-                            "file_type": document.file_type,
-                            "upload_time": str(document.upload_time)
-                        }
-                        docs_info.append(doc_info)
-                        logger.debug(f"获取文档元信息: {doc_info['file_name']}")
-                    else:
-                        logger.warning(f"文档 {file_id} 不存在或未就绪")
-                        
-                except Exception as e:
-                    logger.error(f"获取文档 {file_id} 元信息失败: {e}")
-                    
-            return docs_info
-            
-        finally:
-            try:
-                next(db_gen)
-            except StopIteration:
-                pass
 
     async def get_documents_info_async(self, db: AsyncSession, file_ids: List[str]) -> List[Dict[str, Any]]:
         """
