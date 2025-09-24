@@ -11,7 +11,6 @@ from src.celery.sync_db_helpers import (
     count_registered_agents_sync
 )
 from src.apps.scheduled_task.celery_models import (
-    CeleryPeriodicTaskRun as PeriodicTaskRun, 
     CeleryPeriodicTaskConfig as PeriodicTask
 )
 from src.shared.core.logging import get_logger
@@ -24,33 +23,11 @@ DB_RETRY_MAX = 3  # 数据库重试次数
 
 
 def record_periodic_task_result(task_name, execution_time, status, result_data):
-    """记录定时任务执行结果到数据库"""
-    retry_count = 0
-    
-    while retry_count < DB_RETRY_MAX:
-        try:
-            with get_db_session() as db:
-                # 查找任务配置
-                task_config = db.query(PeriodicTask).filter_by(task_name=task_name).first()
-                if not task_config:
-                    logger.warning(f"找不到任务配置: {task_name}")
-                    return
-                    
-                task_run = PeriodicTaskRun(
-                    task_config_id=task_config.id,
-                    run_time=execution_time,
-                    status=status,
-                    result=json.dumps(result_data, ensure_ascii=False) if result_data else None,
-                    execution_time=int((datetime.now() - execution_time).total_seconds())
-                )
-                db.add(task_run)
-                logger.info(f"成功记录定时任务结果: {task_name}")
-                break
-        except Exception as e:
-            retry_count += 1
-            logger.error(f"记录任务结果失败 (尝试 {retry_count}/{DB_RETRY_MAX}): {str(e)}")
-            if retry_count >= DB_RETRY_MAX:
-                logger.error(f"记录任务结果最终失败: {str(e)}")
+    """记录定时任务执行结果到日志（原数据库记录功能已禁用）"""
+    # 改为只记录日志，不写数据库
+    logger.info(f"任务执行完成 - 任务: {task_name}, 状态: {status}, 时间: {execution_time}")
+    if result_data:
+        logger.debug(f"任务结果详情: {json.dumps(result_data, ensure_ascii=False)}")
 
 
 @app.task(bind=True, soft_time_limit=60, time_limit=120)

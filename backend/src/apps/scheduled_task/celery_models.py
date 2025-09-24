@@ -58,23 +58,23 @@ class CeleryPeriodicTaskConfig(BaseModel):
     # 额外配置（JSON格式）
     task_extra_config = Column(Text, nullable=True)
     
-    # 关联运行记录
-    runs = relationship("CeleryPeriodicTaskRun", back_populates="task", cascade="all, delete-orphan")
+    # 关联运行记录（已禁用）
+    # runs = relationship("CeleryPeriodicTaskRun", back_populates="task", cascade="all, delete-orphan")
 
 
-class CeleryPeriodicTaskRun(BaseModel):
-    """定时任务执行记录"""
-    __tablename__ = 'celery_periodic_task_runs'
-    __table_args__ = {'extend_existing': True}
-    
-    id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID')
-    task_config_id = Column(Integer, ForeignKey('celery_periodic_task_configs.id'), nullable=False)
-    run_time = Column(DateTime, nullable=False, default=now_shanghai)
-    status = Column(String(50), nullable=False)  # SUCCESS, FAILURE, RETRY
-    result = Column(Text, nullable=True)
-    error = Column(Text, nullable=True)
-    traceback = Column(Text, nullable=True)
-    execution_time = Column(Integer, nullable=True)  # 执行时长（秒）
-    
-    # 关联任务配置
-    task = relationship("CeleryPeriodicTaskConfig", back_populates="runs")
+# class CeleryPeriodicTaskRun(BaseModel):
+#     """定时任务执行记录（已禁用，改为通过日志记录）"""
+#     __tablename__ = 'celery_periodic_task_runs'
+#     __table_args__ = {'extend_existing': True}
+#     
+#     id = Column(BigInteger, primary_key=True, autoincrement=True, comment='主键ID')
+#     task_config_id = Column(Integer, ForeignKey('celery_periodic_task_configs.id'), nullable=False)
+#     run_time = Column(DateTime, nullable=False, default=now_shanghai)
+#     status = Column(String(50), nullable=False)  # SUCCESS, FAILURE, RETRY
+#     result = Column(Text, nullable=True)
+#     error = Column(Text, nullable=True)
+#     traceback = Column(Text, nullable=True)
+#     execution_time = Column(Integer, nullable=True)  # 执行时长（秒）
+#     
+#     # 关联任务配置
+#     # task = relationship("CeleryPeriodicTaskConfig", back_populates="runs")

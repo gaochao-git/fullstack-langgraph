@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from src.celery.celery import app
 from src.celery.db_utils import get_db_session
-from src.apps.scheduled_task.celery_models import CeleryTaskRecord as Task, CeleryPeriodicTaskRun as PeriodicTaskRun
+from src.apps.scheduled_task.celery_models import CeleryTaskRecord as Task
 from celery.signals import task_prerun, task_postrun, task_failure
 from src.celery.logger import get_logger
 from src.shared.db.models import now_shanghai
