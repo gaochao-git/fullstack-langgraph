@@ -26,7 +26,12 @@ PID_DIR="$SCRIPT_DIR/pids"
 mkdir -p "$PID_DIR"
 
 # 虚拟环境路径
-VENV_PATH="$PROJECT_ROOT/venv"
+# 优先使用已激活的虚拟环境
+if [ -n "$VIRTUAL_ENV" ]; then
+    VENV_PATH="$VIRTUAL_ENV"
+else
+    VENV_PATH="$PROJECT_ROOT/venv"
+fi
 
 # Celery配置
 CELERY_APP="src.celery"
