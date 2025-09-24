@@ -207,9 +207,9 @@ main() {
             fi
             ;;
         restart)
-            $0 stop $2
+            "$SCRIPT_DIR/$(basename $0)" stop $2
             sleep 2
-            $0 start $2
+            "$SCRIPT_DIR/$(basename $0)" start $2
             ;;
         status)
             check_service "worker"

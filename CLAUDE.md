@@ -392,17 +392,6 @@ async with get_async_db_context() as session:
         # 自动提交或回滚
 ```
 
-#### 2. 同步数据库用法（仅限智能体langgraph直接查询数据库场景，如获取提示词、工具等）
-
-```python
-from src.shared.db.config import get_sync_db
-
-# 方式1：生成器模式（用于依赖注入）
-def some_sync_function(db: Session = Depends(get_sync_db)):
-    agent = db.query(AgentConfig).filter(...).first()
-    # 需要手动管理事务
-```
-
 #### 4. 数据库使用最佳实践
 
 1. **新代码一律使用异步**
