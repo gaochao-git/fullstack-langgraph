@@ -32,6 +32,24 @@ class ScheduledTaskCreate(BaseModel):
                 raise ValueError('必须是有效的JSON格式')
         return v
     
+    @validator('task_extra_config')
+    def validate_agent_task_config(cls, v, values):
+        """验证智能体任务的额外配置"""
+        if v is not None:
+            try:
+                config = json.loads(v)
+                # 如果是智能体任务，验证必需的字段
+                if config.get('task_type') == 'agent':
+                    if not config.get('agent_url'):
+                        raise ValueError('智能体任务必须提供agent_url')
+                    if not config.get('agent_key'):
+                        raise ValueError('智能体任务必须提供agent_key')
+                    if not config.get('agent_id'):
+                        raise ValueError('智能体任务必须提供agent_id')
+            except json.JSONDecodeError:
+                pass  # 前面已经验证过JSON格式
+        return v
+    
     @validator('task_path')
     def validate_task_path(cls, v):
         """验证任务路径格式"""

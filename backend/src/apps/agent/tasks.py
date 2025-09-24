@@ -3,6 +3,7 @@ Agent 模块的 Celery 任务
 包括智能体定时任务执行和健康检查
 """
 import json
+import requests
 from datetime import datetime
 from src.celery.celery import app
 from src.celery.db_utils import get_db_session
@@ -15,7 +16,6 @@ from src.apps.scheduled_task.celery_models import (
 )
 from src.shared.core.logging import get_logger
 from src.shared.db.models import now_shanghai
-from .service.agent_sync_executor import execute_agent_sync
 
 logger = get_logger(__name__)
 
@@ -91,6 +91,108 @@ def periodic_agent_health_check(self):
         return error_result
 
 
+def execute_agent_via_http(agent_url: str, agent_key: str, agent_id: str, message: str, user_name: str, task_timeout: int, thread_id: str = None):
+    """
+    通过HTTP请求执行智能体任务
+    
+    Args:
+        agent_url: 智能体API地址
+        agent_key: 智能体API密钥
+        agent_id: 智能体ID
+        message: 要发送的消息
+        user_name: 用户名
+        task_timeout: 任务超时时间
+        thread_id: 会话ID（可选），如果提供则使用已有会话，否则创建新会话
+    
+    Returns:
+        dict: 执行结果
+    """
+    try:
+        # 1. 如果没有提供thread_id，则创建新会话
+        if not thread_id:
+            create_thread_url = f"{agent_url.rstrip('/')}/api/v1/chat/threads"
+            thread_response = requests.post(
+                create_thread_url,
+                json={"agent_id": agent_id},
+                headers={
+                    "Authorization": f"Bearer {agent_key}",
+                    "Content-Type": "application/json"
+                },
+                timeout=30
+            )
+            
+            if thread_response.status_code != 200:
+                return {
+                    'status': 'FAILED',
+                    'error': f'创建会话失败: HTTP {thread_response.status_code}'
+                }
+            
+            thread_data = thread_response.json()
+            if thread_data.get('status') != 'ok':
+                return {
+                    'status': 'FAILED',
+                    'error': f"创建会话失败: {thread_data.get('msg', '未知错误')}"
+                }
+            
+            thread_id = thread_data['data']['thread_id']
+            logger.info(f"创建新会话成功，thread_id: {thread_id}")
+        else:
+            logger.info(f"使用已有会话，thread_id: {thread_id}")
+        
+        # 2. 发送消息
+        completion_url = f"{agent_url.rstrip('/')}/api/v1/chat/threads/{thread_id}/completion"
+        completion_response = requests.post(
+            completion_url,
+            json={
+                "agent_id": agent_id,
+                "user_name": user_name,
+                "query": message,
+                "config": {"selected_model": "deepseek-chat"},
+                "chat_mode": "blocking"
+            },
+            headers={
+                "Authorization": f"Bearer {agent_key}",
+                "Content-Type": "application/json"
+            },
+            timeout=task_timeout
+        )
+        
+        if completion_response.status_code != 200:
+            return {
+                'status': 'FAILED',
+                'error': f'发送消息失败: HTTP {completion_response.status_code}'
+            }
+        
+        completion_data = completion_response.json()
+        if completion_data.get('status') != 'ok':
+            return {
+                'status': 'FAILED',
+                'error': f"发送消息失败: {completion_data.get('msg', '未知错误')}"
+            }
+        
+        logger.info(f"智能体任务执行成功，thread_id: {thread_id}")
+        return {
+            'status': 'SUCCESS',
+            'thread_id': thread_id,
+            'response': completion_data
+        }
+        
+    except requests.RequestException as e:
+        error_msg = f"HTTP请求失败: {str(e)}"
+        logger.error(error_msg)
+        return {
+            'status': 'FAILED',
+            'error': error_msg
+        }
+    except Exception as e:
+        error_msg = f"执行智能体任务异常: {str(e)}"
+        logger.error(error_msg)
+        return {
+            'status': 'FAILED',
+            'error': error_msg
+        }
+
+
 @app.task(bind=True, soft_time_limit=300, time_limit=360)
 def execute_agent_periodic_task(self, task_config_id):
     """
@@ -103,7 +205,7 @@ def execute_agent_periodic_task(self, task_config_id):
     execution_time = now_shanghai()
     
     # 默认值，避免except块中变量未定义
-    max_retries = 3
+    max_retries = 1
     task_config_id_str = str(task_config_id)
     
     try:
@@ -163,8 +265,11 @@ def execute_agent_periodic_task(self, task_config_id):
             
             # 获取智能体配置
             agent_id = extra_config.get('agent_id')
-            if not agent_id:
-                error_msg = "缺少智能体ID配置"
+            agent_url = extra_config.get('agent_url')
+            agent_key = extra_config.get('agent_key')
+            
+            if not all([agent_id, agent_url, agent_key]):
+                error_msg = f"缺少必要的智能体配置: agent_id={agent_id}, agent_url={agent_url}, agent_key={'***' if agent_key else None}"
                 logger.error(error_msg)
                 record_periodic_task_result(f'execute_agent_{task_config_id}', execution_time, 'FAILED', {
                     'error': error_msg,
@@ -178,20 +283,27 @@ def execute_agent_periodic_task(self, task_config_id):
                 }
             
             message = extra_config.get('message', '执行定时任务')
-            user_name = extra_config.get('user', 'system')
-            conversation_id = extra_config.get('conversation_id')
-            task_timeout = extra_config.get('task_timeout', 300)
-            max_retries = extra_config.get('max_retries', 3)
+            # 使用create_by作为用户名，如果没有则默认system
+            user_name = task_config.create_by if task_config.create_by else 'system'
+            task_timeout = int(extra_config.get('task_timeout', 300))
+            # 确保max_retries是整数
+            try:
+                max_retries = int(extra_config.get('max_retries', 1))
+            except (TypeError, ValueError):
+                max_retries = 1
+            thread_id = extra_config.get('thread_id')  # 获取配置的会话ID
             
-            logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}")
+            logger.info(f"开始执行智能体定时任务: {task_config.task_name}, agent_id={agent_id}, agent_url={agent_url}, thread_id={thread_id}")
             
-            # 调用智能体执行函数（使用优化的同步执行器）
-            agent_result = execute_agent_sync(
+            # 通过HTTP请求执行智能体任务
+            agent_result = execute_agent_via_http(
+                agent_url=agent_url,
+                agent_key=agent_key,
                 agent_id=agent_id,
                 message=message,
                 user_name=user_name,
-                conversation_id=conversation_id,
-                timeout=task_timeout
+                task_timeout=task_timeout,
+                thread_id=thread_id  # 传递会话ID
             )
             
             if agent_result and agent_result.get('status') == 'SUCCESS':

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks';
 import { getBaseUrl } from '@/utils/base_api';
+import { threadApi } from '@/services/threadApi';
 import {
   Table,
   Button,
@@ -42,6 +43,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
   const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [selectedTaskMessages, setSelectedTaskMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [threadGenerating, setThreadGenerating] = useState(false);
   const isMobile = useIsMobile();
   
   const [createForm] = Form.useForm();
@@ -100,10 +102,12 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         task_type: 'agent',
         agent_id: agentId,
         message: values.task_message || '执行定时任务',
-        user: 'zhangsan123',
         task_timeout: values.task_timeout || 300,
-        max_retries: values.max_retries || 3,
-        queue: 'priority_low'  // 可选，默认 priority_low
+        max_retries: values.max_retries || 1,
+        queue: 'priority_low',  // 可选，默认 priority_low
+        agent_url: values.agent_url,
+        agent_key: values.agent_key,
+        thread_id: values.thread_id || null  // 会话ID，可选
       };
       
       const taskData = {
@@ -117,9 +121,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         task_crontab_day_of_week: values.schedule_type === 'crontab' ? values.task_crontab_day_of_week : null,
         task_crontab_day_of_month: values.schedule_type === 'crontab' ? values.task_crontab_day_of_month : null,
         task_crontab_month_of_year: values.schedule_type === 'crontab' ? values.task_crontab_month_of_year : null,
-        task_enabled: true,
-        create_by: 'zhangsan123',
-        update_by: 'zhangsan123'
+        task_enabled: true
       };
       
       const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks`, {
@@ -162,7 +164,10 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
       task_description: task.task_description,
       task_message: extraConfig.message || '执行定时任务',
       task_timeout: extraConfig.task_timeout || 300,
-      max_retries: extraConfig.max_retries || 3,
+      max_retries: extraConfig.max_retries || 1,
+      agent_url: extraConfig.agent_url || 'http://localhost:8000',
+      agent_key: extraConfig.agent_key || '',
+      thread_id: extraConfig.thread_id || '',
       schedule_type: task.task_interval ? 'interval' : 'crontab',
       task_interval: task.task_interval,
       task_crontab_minute: task.task_crontab_minute,
@@ -186,10 +191,12 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         task_type: 'agent',
         agent_id: agentId,
         message: values.task_message || '执行定时任务',
-        user: 'zhangsan123',
         task_timeout: values.task_timeout || 300,
-        max_retries: values.max_retries || 3,
-        queue: 'priority_low'  // 可选，默认 priority_low
+        max_retries: values.max_retries || 1,
+        queue: 'priority_low',  // 可选，默认 priority_low
+        agent_url: values.agent_url,
+        agent_key: values.agent_key,
+        thread_id: values.thread_id || null  // 会话ID，可选
       };
       
       const taskData = {
@@ -201,8 +208,7 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         task_crontab_hour: values.schedule_type === 'crontab' ? values.task_crontab_hour : null,
         task_crontab_day_of_week: values.schedule_type === 'crontab' ? values.task_crontab_day_of_week : null,
         task_crontab_day_of_month: values.schedule_type === 'crontab' ? values.task_crontab_day_of_month : null,
-        task_crontab_month_of_year: values.schedule_type === 'crontab' ? values.task_crontab_month_of_year : null,
-        update_by: 'zhangsan123'
+        task_crontab_month_of_year: values.schedule_type === 'crontab' ? values.task_crontab_month_of_year : null
       };
       
       const response = await fetch(`${API_BASE_URL}/api/v1/scheduled-tasks/${editingTask.id}`, {
@@ -455,11 +461,70 @@ const ScheduledTaskManager: React.FC<ScheduledTaskManagerProps> = ({ agentId, vi
         <Form.Item
           label="最大重试次数"
           name="max_retries"
-          initialValue={3}
+          initialValue={1}
           rules={[{ required: true, message: '请输入最大重试次数' }]}
           tooltip="任务失败后的最大重试次数"
         >
-          <Input type="number" min={0} max={10} placeholder="3" />
+          <Input type="number" min={0} max={10} placeholder="1" />
+        </Form.Item>
+
+        <Form.Item
+          label="智能体URL"
+          name="agent_url"
+          rules={[
+            { required: true, message: '请输入智能体URL' },
+            { type: 'url', message: '请输入有效的URL地址' }
+          ]}
+          tooltip="智能体API的访问地址，如 http://localhost:8000"
+        >
+          <Input placeholder="http://localhost:8000" />
+        </Form.Item>
+
+        <Form.Item
+          label="智能体API密钥"
+          name="agent_key"
+          rules={[{ required: true, message: '请输入智能体API密钥' }]}
+          tooltip="用于访问智能体API的认证密钥"
+        >
+          <Input.Password placeholder="输入API密钥" />
+        </Form.Item>
+
+        <Form.Item
+          label="会话ID（可选）"
+          name="thread_id"
+          tooltip="固定的会话ID用于保持长期记忆，留空则每次生成新会话"
+        >
+          <Input.Group compact>
+            <Form.Item
+              name="thread_id"
+              noStyle
+            >
+              <Input style={{ width: 'calc(100% - 80px)' }} placeholder="留空则每次创建新会话" />
+            </Form.Item>
+            <Button 
+              type="default"
+              loading={threadGenerating}
+              onClick={async () => {
+                setThreadGenerating(true);
+                try {
+                  // 调用标准接口创建会话
+                  // 注意：实际用户名会在后端使用create_by
+                  const thread = await threadApi.create({
+                    agent_id: agentId,
+                    user_name: 'system'  // 这里只是占位，后端会使用create_by
+                  });
+                  form.setFieldsValue({ thread_id: thread.thread_id });
+                  message.success('会话ID生成成功');
+                } catch (error) {
+                  message.error('生成会话ID失败');
+                } finally {
+                  setThreadGenerating(false);
+                }
+              }}
+            >
+              生成ID
+            </Button>
+          </Input.Group>
         </Form.Item>
 
         <Row gutter={16}>
