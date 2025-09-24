@@ -85,7 +85,7 @@ start_worker() {
     print_message $BLUE "正在启动 Celery Worker..."
     
     local pid_file="$PID_DIR/celery_worker.pid"
-    local log_file="$LOG_DIR/worker.log"
+    local log_file="$LOG_DIR/celery_worker.log"
     
     if check_service "worker" > /dev/null 2>&1; then
         print_message $YELLOW "! Celery Worker 已在运行"
@@ -93,7 +93,7 @@ start_worker() {
     fi
     
     # 启动worker，指定队列优先级
-    nohup celery -A $CELERY_APP worker --loglevel=$WORKER_LOGLEVEL --concurrency=$WORKER_CONCURRENCY --pidfile="$pid_file" --logfile="$log_file" -Q system,priority_high,priority_low,celery > "$LOG_DIR/worker_startup.log" 2>&1 &
+    nohup celery -A $CELERY_APP worker --loglevel=$WORKER_LOGLEVEL --concurrency=$WORKER_CONCURRENCY --pidfile="$pid_file" --logfile="$log_file" -Q system,priority_high,priority_low,celery > "$LOG_DIR/celery_worker_startup.log" 2>&1 &
     # 等待启动并检查
     local max_wait=10
     local wait_time=0
@@ -120,7 +120,7 @@ start_beat() {
     print_message $BLUE "正在启动 Celery Beat..."
     
     local pid_file="$PID_DIR/celery_beat.pid"
-    local log_file="$LOG_DIR/beat.log"
+    local log_file="$LOG_DIR/celery_beat.log"
     local schedule_file="$SCRIPT_DIR/celerybeat-schedule"
     
     if check_service "beat" > /dev/null 2>&1; then
@@ -129,7 +129,7 @@ start_beat() {
     fi
     
     # 启动beat
-    nohup celery -A $CELERY_APP beat --loglevel=$BEAT_LOGLEVEL --pidfile="$pid_file" --logfile="$log_file" --schedule="$schedule_file"> "$LOG_DIR/beat_startup.log" 2>&1 &
+    nohup celery -A $CELERY_APP beat --loglevel=$BEAT_LOGLEVEL --pidfile="$pid_file" --logfile="$log_file" --schedule="$schedule_file" > "$LOG_DIR/celery_beat_startup.log" 2>&1 &
     
     # 等待启动并检查
     local max_wait=10
