@@ -182,24 +182,6 @@ stop_service() {
     fi
 }
 
-# 函数：查看日志
-view_logs() {
-    local service=$1
-    local lines=${2:-50}
-    
-    case $service in
-        worker)
-            tail -n $lines -f "$LOG_DIR/worker.log"
-            ;;
-        beat)
-            tail -n $lines -f "$LOG_DIR/beat.log"
-            ;;
-        *)
-            print_message $YELLOW "查看最近的日志文件..."
-            ls -la "$LOG_DIR/"
-            ;;
-    esac
-}
 
 # 主函数
 main() {
@@ -233,10 +215,6 @@ main() {
             check_service "worker"
             check_service "beat"
             ;;
-        logs)
-            activate_venv
-            view_logs $2 $3
-            ;;
         purge)
             activate_venv
             print_message $BLUE "正在清理所有任务队列..."
@@ -261,14 +239,13 @@ main() {
             esac
             ;;
         *)
-            print_message $YELLOW "用法: $0 {start|stop|restart|status|logs|purge|inspect} [worker|beat]"
+            print_message $YELLOW "用法: $0 {start|stop|restart|status|purge|inspect} [worker|beat]"
             print_message $YELLOW ""
             print_message $YELLOW "命令说明:"
             print_message $YELLOW "  start [worker|beat]  - 启动服务（默认启动所有）"
             print_message $YELLOW "  stop [worker|beat]   - 停止服务（默认停止所有）"
             print_message $YELLOW "  restart [worker|beat] - 重启服务"
             print_message $YELLOW "  status              - 查看服务状态"
-            print_message $YELLOW "  logs [worker|beat] [lines] - 查看日志"
             print_message $YELLOW "  purge               - 清理所有任务队列"
             print_message $YELLOW "  inspect {active|scheduled|stats} - 检查任务状态"
             exit 1
