@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
-import { Card, Badge, Tabs, Button, Space } from 'antd';
-import { DatabaseOutlined, DesktopOutlined, ReloadOutlined } from '@ant-design/icons';
+import '../../globals_xgq.css';
+import { EnhancedChatPanel } from './components/EnhancedChatPanel';
 import { IDCOverviewCard } from './components/IDCOverviewCard';
+import { IDCOverviewDashboard } from './components/IDCOverviewDashboard';
 import { PerformanceComparison } from './components/PerformanceComparison';
 import { RealTimeStatus } from './components/RealTimeStatus';
 import { ApplicationMonitoring } from './components/ApplicationMonitoring';
-import { ChatDialog } from './components/ChatDialog';
+import { DomesticSubstitutionMonitoring } from './components/DomesticSubstitutionMonitoring';
+import { Button } from './components/ui/button';
+import { Badge } from './components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
 import { mockIDCData } from './data/mockData';
 import { IDCData } from './types/idc';
-
+import { BarChart3, Activity, Database, TrendingUp } from 'lucide-react';
 
 const IDCAnalysisPage: React.FC = () => {
   const [selectedIDCs, setSelectedIDCs] = useState<IDCData[]>([]);
-  const [currentView, setCurrentView] = useState<'overview' | 'comparison' | 'applications'>('overview');
+  const [currentView, setCurrentView] = useState<'overview' | 'comparison' | 'applications' | 'substitution'>('overview');
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
 
   const handleIDCSelect = (idc: IDCData) => {
     setSelectedIDCs(prev => {
@@ -31,6 +37,8 @@ const IDCAnalysisPage: React.FC = () => {
       setCurrentView('comparison');
     } else if (lowerQuery.includes('应用') || lowerQuery.includes('业务') || lowerQuery.includes('服务')) {
       setCurrentView('applications');
+    } else if (lowerQuery.includes('替换') || lowerQuery.includes('替代') || lowerQuery.includes('国产')) {
+      setCurrentView('substitution');
     } else {
       setCurrentView('overview');
     }
@@ -38,6 +46,10 @@ const IDCAnalysisPage: React.FC = () => {
 
   const clearSelection = () => {
     setSelectedIDCs([]);
+  };
+
+  const handleToggleChatMinimize = () => {
+    setIsChatMinimized(!isChatMinimized);
   };
 
   const getTotalStats = () => {
@@ -52,178 +64,199 @@ const IDCAnalysisPage: React.FC = () => {
   const stats = getTotalStats();
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f0f2f5' }}>
+    <div className="min-h-screen bg-background flex flex-col">
       {/* 头部 */}
-      <Card style={{ marginBottom: 24, borderRadius: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <DatabaseOutlined style={{ fontSize: 32, color: '#1890ff' }} />
-            <div>
-              <h1 style={{ margin: 0, fontSize: 24, fontWeight: 'bold' }}>IDC运行状况监控平台</h1>
-              <p style={{ margin: 0, color: '#666', marginTop: 4 }}>多数据中心性能分析与比对系统</p>
-            </div>
-          </div>
-          <ChatDialog onQuerySubmit={handleQuerySubmit} />
-        </div>
-
-        {/* 统计概览 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginTop: 16, fontSize: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <DesktopOutlined style={{ color: '#666' }} />
-            <span>总服务器: {stats.totalServers.toLocaleString()}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <DesktopOutlined style={{ color: '#666' }} />
-            <span>平均CPU: {stats.avgCpuUsage}%</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <DesktopOutlined style={{ color: '#666' }} />
-            <span>平均稳定性: {stats.avgStability}</span>
-          </div>
-          <Badge
-            status={stats.healthyCount === mockIDCData.length ? 'success' : 'warning'}
-            text={`${stats.healthyCount}/${mockIDCData.length} 数据中心正常运行`}
-          />
-        </div>
-      </Card>
-
-      {/* 主内容区域 */}
-      <div style={{ padding: '0 24px' }}>
-        <Card>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <Tabs
-              activeKey={currentView}
-              onChange={(key) => setCurrentView(key as 'overview' | 'comparison' | 'applications')}
-              type="card"
-              items={[
-                {
-                  label: '数据中心概览',
-                  key: 'overview',
-                },
-                {
-                  label: '性能比对分析',
-                  key: 'comparison',
-                },
-                {
-                  label: '应用程序监控',
-                  key: 'applications',
-                },
-              ]}
-            />
-
-            <Space>
-              {selectedIDCs.length > 0 && (
-                <>
-                  <span style={{ color: '#666', fontSize: 14 }}>
-                    已选择 {selectedIDCs.length} 个数据中心
-                  </span>
-                  <Button size="small" onClick={clearSelection}>
-                    清除选择
-                  </Button>
-                </>
-              )}
-              <Button icon={<ReloadOutlined />} onClick={() => window.location.reload()}>
-                刷新
-              </Button>
-            </Space>
-          </div>
-
-          {currentView === 'overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {/* 实时状态监控 */}
-              <RealTimeStatus />
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-                gap: 24
-              }}>
-                {mockIDCData.map(idc => (
-                  <IDCOverviewCard
-                    key={idc.id}
-                    idc={idc}
-                    isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
-                    onSelect={() => handleIDCSelect(idc)}
-                  />
-                ))}
-              </div>
-
-              {selectedIDCs.length > 0 && (
-                <div>
-                  <h3 style={{ marginBottom: 16 }}>已选择数据中心快速比对</h3>
-                  <PerformanceComparison selectedIDCs={selectedIDCs} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentView === 'comparison' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <header className="border-b bg-card flex-shrink-0">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Database className="h-8 w-8 text-primary" />
               <div>
-                <h3 style={{ marginBottom: 8 }}>选择要比对的数据中心</h3>
-                <p style={{ color: '#666', marginBottom: 16 }}>
-                  点击数据中心卡片来选择或取消选择，最多可同时比对5个数据中心
-                </p>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 16
-                }}>
-                  {mockIDCData.map(idc => (
-                    <IDCOverviewCard
-                      key={idc.id}
-                      idc={idc}
-                      isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
-                      onSelect={() => handleIDCSelect(idc)}
+                <h1 className="text-2xl font-bold">IDC运行状况监控平台</h1>
+                <p className="text-muted-foreground">智能AI驱动的多数据中心分析系统</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              {/* 统计概览 */}
+              <div className="flex items-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                  <span>总服务器: {stats.totalServers.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  <span>平均CPU: {stats.avgCpuUsage}%</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <span>平均稳定性: {stats.avgStability}</span>
+                </div>
+                <Badge variant="secondary">
+                  {stats.healthyCount}/{mockIDCData.length} 数据中心正常运行
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* 主内容区域 - 使用可调整大小的面板 */}
+      <div className="flex-1 container mx-auto px-6 py-6">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          {/* 左侧主内容面板 */}
+          <ResizablePanel defaultSize={isChatMinimized ? 100 : 70} minSize={50}>
+            <div className="h-full pr-3">
+              <Tabs value={currentView} onValueChange={(value) => setCurrentView(value as 'overview' | 'comparison' | 'applications' | 'substitution')}>
+                <div className="flex items-center justify-between mb-6">
+                  <TabsList>
+                    <TabsTrigger value="overview">数据中心概览</TabsTrigger>
+                    <TabsTrigger value="comparison">性能比对分析</TabsTrigger>
+                    <TabsTrigger value="applications">应用程序监控</TabsTrigger>
+                    <TabsTrigger value="substitution">国产替代监控</TabsTrigger>
+                  </TabsList>
+
+                  {selectedIDCs.length > 0 && (
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm text-muted-foreground">
+                        已选择 {selectedIDCs.length} 个数据中心
+                      </span>
+                      <Button variant="outline" size="sm" onClick={clearSelection}>
+                        清除选择
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-[calc(100vh-200px)] overflow-auto">
+                  <TabsContent value="overview" className="space-y-6 mt-0">
+                    {/* 实时状态监控 */}
+                    <RealTimeStatus />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {mockIDCData.map(idc => (
+                        <IDCOverviewCard
+                          key={idc.id}
+                          idc={idc}
+                          isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
+                          onSelect={() => handleIDCSelect(idc)}
+                        />
+                      ))}
+                    </div>
+
+                    {/* IDC综合概览仪表板 */}
+                    <IDCOverviewDashboard />
+                  </TabsContent>
+
+                  <TabsContent value="comparison" className="space-y-6 mt-0">
+                    <div className="mb-6">
+                      <h2 className="text-xl font-semibold mb-2">选择要比对的数据中心</h2>
+                      <p className="text-muted-foreground mb-4">
+                        点击数据中心卡片来选择或取消选择，最多可同时比对5个数据中心
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {mockIDCData.map(idc => (
+                          <IDCOverviewCard
+                            key={idc.id}
+                            idc={idc}
+                            isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
+                            onSelect={() => handleIDCSelect(idc)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <PerformanceComparison selectedIDCs={selectedIDCs} />
+                  </TabsContent>
+
+                  <TabsContent value="applications" className="space-y-6 mt-0">
+                    <div className="mb-6">
+                      <h2 className="text-xl font-semibold mb-2">应用程序运行状况监控</h2>
+                      <p className="text-muted-foreground mb-4">
+                        监控和比较不同数据中心中的应用程序运行情况，包括跨数据中心业务和独有业务的性能分析
+                      </p>
+                      {selectedIDCs.length === 0 && (
+                        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            💡 提示：选择数据中心可以查看特定数据中心的应用运行情况，或查看所有数据中心的应用概览
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {mockIDCData.map(idc => (
+                          <IDCOverviewCard
+                            key={idc.id}
+                            idc={idc}
+                            isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
+                            onSelect={() => handleIDCSelect(idc)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <ApplicationMonitoring selectedIDCs={selectedIDCs} />
+                  </TabsContent>
+
+                  <TabsContent value="substitution" className="space-y-6 mt-0">
+                    <div className="mb-6">
+                      <h2 className="text-xl font-semibold mb-2">国产替代监控</h2>
+                      <p className="text-muted-foreground mb-4">
+                        监控各数据中心的国产硬件软件替代情况，包括服务器、网络、存储、操作系统、数据库等产品的替代率、品牌分布和故障率分析
+                      </p>
+                      {selectedIDCs.length === 0 && (
+                        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                          <p className="text-sm text-blue-700 dark:text-blue-300">
+                            💡 提示：选择数据中心可以查看特定数据中心的国产替代情况，或查看所有数据中心的替代概览
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {mockIDCData.map(idc => (
+                          <IDCOverviewCard
+                            key={idc.id}
+                            idc={idc}
+                            isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
+                            onSelect={() => handleIDCSelect(idc)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <DomesticSubstitutionMonitoring selectedIDCs={selectedIDCs} />
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </div>
+          </ResizablePanel>
+
+          {/* 可调整大小的分隔符 */}
+          {!isChatMinimized && (
+            <>
+              <ResizableHandle withHandle />
+
+              {/* 右侧AI对话面板 */}
+              <ResizablePanel defaultSize={30} minSize={25} maxSize={50}>
+                <div className="h-full pl-3">
+                  <div className="h-[calc(100vh-140px)]">
+                    <EnhancedChatPanel
+                      onQuerySubmit={handleQuerySubmit}
+                      isMinimized={false}
+                      onToggleMinimize={handleToggleChatMinimize}
                     />
-                  ))}
-                </div>
-              </div>
-
-              <PerformanceComparison selectedIDCs={selectedIDCs} />
-            </div>
-          )}
-
-          {currentView === 'applications' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              <div>
-                <h3 style={{ marginBottom: 8 }}>应用程序运行状况监控</h3>
-                <p style={{ color: '#666', marginBottom: 16 }}>
-                  监控和比较不同数据中心中的应用程序运行情况，包括跨数据中心业务和独有业务的性能分析
-                </p>
-                {selectedIDCs.length === 0 && (
-                  <div style={{
-                    marginBottom: 16,
-                    padding: 16,
-                    backgroundColor: '#e6f7ff',
-                    borderRadius: 6,
-                    border: '1px solid #91d5ff'
-                  }}>
-                    <p style={{ margin: 0, color: '#0050b3', fontSize: 14 }}>
-                      💡 提示：选择数据中心可以查看特定数据中心的应用运行情况，或查看所有数据中心的应用概览
-                    </p>
                   </div>
-                )}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 16
-                }}>
-                  {mockIDCData.map(idc => (
-                    <IDCOverviewCard
-                      key={idc.id}
-                      idc={idc}
-                      isSelected={selectedIDCs.some(selected => selected.id === idc.id)}
-                      onSelect={() => handleIDCSelect(idc)}
-                    />
-                  ))}
                 </div>
-              </div>
-
-              <ApplicationMonitoring selectedIDCs={selectedIDCs} />
-            </div>
+              </ResizablePanel>
+            </>
           )}
-        </Card>
+        </ResizablePanelGroup>
+
+        {/* 最小化的AI助手 */}
+        {isChatMinimized && (
+          <EnhancedChatPanel
+            onQuerySubmit={handleQuerySubmit}
+            isMinimized={true}
+            onToggleMinimize={handleToggleChatMinimize}
+          />
+        )}
       </div>
     </div>
   );

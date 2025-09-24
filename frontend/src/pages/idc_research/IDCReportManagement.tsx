@@ -169,7 +169,7 @@ const IDCReportManagement: React.FC = () => {
       key: 'energyEfficiency',
       width: 80,
       render: (value: number) => (
-        <span style={{ color: value < 1.5 ? '#52c41a' : value < 2.0 ? '#faad14' : '#ff4d4f' }}>
+        <span style={{ color: value < 1.5 ? 'var(--color-success)' : value < 2.0 ? 'var(--color-warning)' : 'var(--color-destructive)' }}>
           {value}
         </span>
       ),
@@ -184,7 +184,8 @@ const IDCReportManagement: React.FC = () => {
           <Progress 
             percent={value} 
             size="small" 
-            strokeColor={value >= 99.9 ? '#52c41a' : value >= 99.5 ? '#faad14' : '#ff4d4f'}
+            strokeColor={value >= 99.9 ? 'var(--color-success, #22c55e)' : value >= 99.5 ? 'var(--color-warning, #f59e0b)' : 'var(--color-destructive, #ef4444)'}
+            trailColor={'var(--color-input-background, var(--input-background))'}
             showInfo={false}
           />
           <span style={{ fontSize: '12px' }}>{value}%</span>
@@ -197,7 +198,7 @@ const IDCReportManagement: React.FC = () => {
       key: 'alertCount',
       width: 80,
       render: (count: number) => (
-        <span style={{ color: count === 0 ? '#52c41a' : count < 5 ? '#faad14' : '#ff4d4f' }}>
+        <span style={{ color: count === 0 ? 'var(--color-success)' : count < 5 ? 'var(--color-warning)' : 'var(--color-destructive)' }}>
           {count}
         </span>
       ),
@@ -232,10 +233,10 @@ const IDCReportManagement: React.FC = () => {
   ];
 
   const statCards = [
-    { title: '总报告数', value: mockReports.length, color: '#1890ff' },
-    { title: '本月报告', value: 2, color: '#52c41a' },
-    { title: '平均PUE', value: '1.42', color: '#faad14' },
-    { title: '平均可用性', value: '99.95%', color: '#722ed1' },
+    { title: '总报告数', value: mockReports.length, color: 'var(--color-primary)' },
+    { title: '本月报告', value: 2, color: 'var(--color-success)' },
+    { title: '平均PUE', value: '1.42', color: 'var(--color-warning)' },
+    { title: '平均可用性', value: '99.95%', color: 'var(--color-accent)' },
   ];
 
   useEffect(() => {

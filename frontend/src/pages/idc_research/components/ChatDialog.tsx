@@ -130,8 +130,8 @@ export function ChatDialog({ onQuerySubmit }: ChatDialogProps) {
                   size="small"
                   style={{
                     maxWidth: '80%',
-                    backgroundColor: message.type === 'user' ? '#1890ff' : '#f6f6f6',
-                    color: message.type === 'user' ? 'white' : '#000',
+                    backgroundColor: message.type === 'user' ? 'var(--color-primary)' : 'var(--color-muted)',
+                    color: message.type === 'user' ? 'var(--color-primary-foreground)' : 'var(--color-foreground)',
                     border: 'none'
                   }}
                   styles={{ body: { padding: '8px 12px' } }}
@@ -157,14 +157,14 @@ export function ChatDialog({ onQuerySubmit }: ChatDialogProps) {
           display: 'flex',
           gap: 8,
           paddingTop: 16,
-          borderTop: '1px solid #f0f0f0'
+          borderTop: '1px solid var(--color-border)'
         }}>
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="请输入您的查询需求..."
             onPressEnter={handleSendMessage}
-            style={{ flex: 1 }}
+            style={{ flex: 1, backgroundColor: 'var(--color-input-background)', borderColor: 'var(--color-border)' }}
           />
           <Button
             type="primary"
