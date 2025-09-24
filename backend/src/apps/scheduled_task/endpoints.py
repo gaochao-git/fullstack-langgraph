@@ -1,9 +1,10 @@
 """定时任务管理路由 - 使用统一响应格式"""
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
+import json
 from src.shared.db.models import now_shanghai
 
 from src.shared.db.config import get_async_db
@@ -18,6 +19,7 @@ from src.shared.schemas.response import (
 )
 from src.shared.core.exceptions import BusinessException
 from src.shared.core.logging import get_logger
+from src.apps.auth.dependencies import get_current_user_optional
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["Scheduled Task Management"])
@@ -97,10 +99,31 @@ async def list_scheduled_tasks(
 @router.post("/v1/scheduled-tasks", response_model=UnifiedResponse)
 async def create_scheduled_task(
     task_data: ScheduledTaskCreate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """创建定时任务"""
-    task = await scheduled_task_service.create_task(db, task_data.dict())
+    task_dict = task_data.dict()
+    
+    # 设置创建者
+    creator_username = 'system'
+    if current_user:
+        creator_username = current_user.get('username', 'system')
+    task_dict['create_by'] = creator_username
+    
+    # 如果是智能体任务，自动设置执行用户为创建者
+    if task_dict.get('task_extra_config'):
+        try:
+            extra_config = json.loads(task_dict['task_extra_config'])
+            if extra_config.get('task_type') == 'agent':
+                # 将执行用户设置为创建者，便于审计
+                extra_config['user'] = creator_username
+                task_dict['task_extra_config'] = json.dumps(extra_config, ensure_ascii=False)
+                logger.info(f"智能体定时任务的执行用户已自动设置为创建者: {creator_username}")
+        except (json.JSONDecodeError, TypeError) as e:
+            logger.warning(f"解析 task_extra_config 失败: {e}")
+    
+    task = await scheduled_task_service.create_task(db, task_dict)
     return success_response(
         data=task,
         msg="定时任务创建成功",
@@ -224,10 +247,18 @@ async def get_scheduled_task(
 async def update_scheduled_task(
     task_id: int,
     task_data: ScheduledTaskUpdate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
     """更新定时任务"""
-    updated_task = await scheduled_task_service.update_task(db, task_id, task_data.dict(exclude_unset=True))
+    update_dict = task_data.dict(exclude_unset=True)
+    # 设置更新者
+    if current_user:
+        update_dict['update_by'] = current_user.get('username', 'system')
+    else:
+        update_dict['update_by'] = 'system'
+    
+    updated_task = await scheduled_task_service.update_task(db, task_id, update_dict)
     if not updated_task:
         raise BusinessException(f"定时任务 {task_id} 不存在", ResponseCode.NOT_FOUND)
     
