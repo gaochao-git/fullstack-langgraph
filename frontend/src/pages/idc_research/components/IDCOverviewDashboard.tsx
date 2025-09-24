@@ -1,12 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { mockIDCData } from '../data/mockData';
-import { mockApplications, businessTypes } from '../data/applicationData';
-import { mockServerFailureData, idcMapping, brandCategories } from '../data/serverFailureData';
+import IDCResearchApi from '@/services/idcResearchApi';
 import { Server, Target, TrendingUp, DollarSign, Activity, AlertTriangle, Wrench, RotateCcw } from 'lucide-react';
 
 export function IDCOverviewDashboard() {
@@ -14,10 +12,33 @@ export function IDCOverviewDashboard() {
   const IDC_CODES = useMemo(() => ["BJ1", "BJ2", "SH1", "SH2", "SZ1", "SZ2"] as const, []);
 
   // 排序后的故障数据（按月份升序）
+  const [failureData, setFailureData] = useState<any>({ data: [], idcMapping: {}, brandCategories: {} });
   const sortedFailureData = useMemo(
-    () => [...mockServerFailureData.data].sort((a, b) => a.month - b.month),
-    [],
+    () => [...(failureData.data || [])].sort((a, b) => a.month - b.month),
+    [failureData],
   );
+
+  const [idcs, setIdcs] = useState<any[]>([]);
+  const [applications, setApplications] = useState<any[]>([]);
+  const idcMapping = failureData.idcMapping || {};
+  const brandCategories = failureData.brandCategories || {};
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [failResp, idcResp, appResp] = await Promise.all([
+          IDCResearchApi.getServerFailures({ months: 12 }),
+          IDCResearchApi.getIDCs(),
+          IDCResearchApi.getApplications(),
+        ]);
+        setFailureData(failResp?.data || { data: [], idcMapping: {}, brandCategories: {} });
+        setIdcs(idcResp?.data || []);
+        setApplications(appResp?.data || []);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   // 构造折线图数据
   const monthlyFailureTrendData = useMemo(() => {
@@ -50,17 +71,23 @@ export function IDCOverviewDashboard() {
 
   // 当前选中月份的原始数据
   const selectedMonthData = useMemo(() => {
-    const numeric = Number((selectedMonth || defaultMonthStr).replace('-', ''));
+    if (!sortedFailureData || sortedFailureData.length === 0) {
+      return {} as any;
+    }
+    const base = (selectedMonth || defaultMonthStr) || '';
+    const numeric = base ? Number(base.replace('-', '')) : NaN;
     return (
       sortedFailureData.find((d) => d.month === numeric) ||
-      sortedFailureData[sortedFailureData.length - 1]
+      sortedFailureData[sortedFailureData.length - 1] ||
+      ({} as any)
     );
   }, [selectedMonth, defaultMonthStr, sortedFailureData]);
 
   // 机房故障详情（随月份切换）
   const failureOverviewData = useMemo(() => {
     return IDC_CODES.map((code) => {
-      const arr = ((selectedMonthData as any)[code] || []) as any[];
+      const codeData = (selectedMonthData as any) ? (selectedMonthData as any)[code] : undefined;
+      const arr = Array.isArray(codeData) ? (codeData as any[]) : [];
       const totalServers = arr.reduce((sum, server) => sum + (server?.count || 0), 0);
       const totalTroubles = arr.reduce((sum, server) => sum + (server?.trouble || 0), 0);
       const failureRate = totalServers > 0 ? (totalTroubles / totalServers) * 100 : 0;
@@ -99,7 +126,8 @@ export function IDCOverviewDashboard() {
   // 故障类型统计（随月份切换）
   const failureTypeStats = useMemo(() => {
     const typeMap: Record<string, number> = {};
-    Object.values(selectedMonthData).forEach((servers) => {
+    const values = selectedMonthData ? Object.values(selectedMonthData) : [];
+    values.forEach((servers) => {
       if (Array.isArray(servers)) {
         servers.forEach((server) => {
           server.tb_detail.forEach((detail: any) => {
@@ -116,7 +144,8 @@ export function IDCOverviewDashboard() {
   // 品牌故障率对比（随月份切换）
   const brandFailureComparison = useMemo(() => {
     const brandMap: Record<string, { count: number; trouble: number }> = {};
-    Object.values(selectedMonthData).forEach((servers) => {
+    const values = selectedMonthData ? Object.values(selectedMonthData) : [];
+    values.forEach((servers) => {
       if (Array.isArray(servers)) {
         servers.forEach((server) => {
           if (!brandMap[server.brand]) {
@@ -140,25 +169,25 @@ export function IDCOverviewDashboard() {
 
   // 整体容量概览数据
   const capacityData = {
-    totalServers: mockIDCData.reduce((sum, idc) => sum + idc.serverCount, 0),
-    totalCpuUsage: Math.round(
-      mockIDCData.reduce((sum, idc) => sum + idc.cpuUsage * idc.serverCount, 0) /
-        mockIDCData.reduce((sum, idc) => sum + idc.serverCount, 0)
-    ),
-    totalMemoryUsage: Math.round(
-      mockIDCData.reduce((sum, idc) => sum + idc.memoryUsage * idc.serverCount, 0) /
-        mockIDCData.reduce((sum, idc) => sum + idc.serverCount, 0)
-    ),
-    avgNetworkLoad: Math.round(
-      mockIDCData.reduce((sum, idc) => sum + idc.networkLoad, 0) / mockIDCData.length
-    ),
-    avgPowerUsage: Math.round(
-      mockIDCData.reduce((sum, idc) => sum + idc.powerUsage, 0) / mockIDCData.length
-    ),
+    totalServers: idcs.reduce((sum, idc) => sum + (idc.serverCount || 0), 0),
+    totalCpuUsage: idcs.length ? Math.round(
+      idcs.reduce((sum, idc) => sum + (idc.cpuUsage || 0) * (idc.serverCount || 0), 0) /
+        idcs.reduce((sum, idc) => sum + (idc.serverCount || 0), 0)
+    ) : 0,
+    totalMemoryUsage: idcs.length ? Math.round(
+      idcs.reduce((sum, idc) => sum + (idc.memoryUsage || 0) * (idc.serverCount || 0), 0) /
+        idcs.reduce((sum, idc) => sum + (idc.serverCount || 0), 0)
+    ) : 0,
+    avgNetworkLoad: idcs.length ? Math.round(
+      idcs.reduce((sum, idc) => sum + (idc.networkLoad || 0), 0) / idcs.length
+    ) : 0,
+    avgPowerUsage: idcs.length ? Math.round(
+      idcs.reduce((sum, idc) => sum + (idc.powerUsage || 0), 0) / idcs.length
+    ) : 0,
   };
 
   // SLA达成情况数据
-  const slaData = mockIDCData.map(idc => ({
+  const slaData = idcs.map((idc: any) => ({
     name: idc.name.replace('数据中心', ''),
     sla: idc.uptime,
     target: 99.9,
@@ -166,7 +195,7 @@ export function IDCOverviewDashboard() {
   }));
 
   // 成本效率分析数据
-  const costEfficiencyData = mockIDCData.map(idc => ({
+  const costEfficiencyData = idcs.map((idc: any) => ({
     name: idc.name.replace('数据中心', ''),
     powerCost: Math.round(idc.powerUsage * 0.8 * 24 * 30),
     costPerServer: Math.round((idc.powerUsage * 0.8 * 24 * 30) / idc.serverCount),
@@ -187,8 +216,9 @@ export function IDCOverviewDashboard() {
   });
 
   // 业务分布数据
-  const businessDistribution = businessTypes.map(businessType => {
-    const apps = mockApplications.filter(app => app.businessType === businessType);
+  const businessTypesLocal = useMemo(() => Array.from(new Set((applications || []).map((a: any) => a.businessType))), [applications]);
+  const businessDistribution = businessTypesLocal.map(businessType => {
+    const apps = applications.filter((app: any) => app.businessType === businessType);
     const totalInstances = apps.reduce(
       (sum, app) => sum + app.services.reduce((serviceSum, service) => serviceSum + service.instances, 0),
       0
@@ -442,7 +472,7 @@ export function IDCOverviewDashboard() {
                 <p className="text-sm text-muted-foreground">总服务器数</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold">{mockIDCData.length}</p>
+                <p className="text-2xl font-bold">{idcs.length}</p>
                 <p className="text-sm text-muted-foreground">数据中心数</p>
               </div>
             </div>

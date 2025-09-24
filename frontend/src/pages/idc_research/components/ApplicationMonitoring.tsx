@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Tabs, Select, Badge, Row, Col, Alert } from 'antd';
 import { Badge as UIBadge } from './ui/badge';
 import { CloudServerOutlined, DatabaseOutlined, CloudOutlined, ApiOutlined, GlobalOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { IDCData, Application, ApplicationService } from '../types/idc';
-import { mockApplications, businessTypes, idcNameMap } from '../data/applicationData';
+import IDCResearchApi from '@/services/idcResearchApi';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -16,6 +16,31 @@ interface ApplicationMonitoringProps {
 export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringProps) {
   const [selectedBusiness, setSelectedBusiness] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'business' | 'idc'>('business');
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [businessTypesState, setBusinessTypesState] = useState<string[]>([]);
+  const [idcNameMapState, setIdcNameMapState] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [appsResp, typesResp, idcsResp] = await Promise.all([
+          IDCResearchApi.getApplications(),
+          IDCResearchApi.getBusinessTypes(),
+          IDCResearchApi.getIDCs(),
+        ]);
+        setApplications(appsResp?.data || []);
+        const typesData = Array.isArray(typesResp?.data)
+          ? typesResp?.data
+          : (typesResp?.data?.items || []);
+        setBusinessTypesState(typesData);
+        const map: Record<string, string> = {};
+        (idcsResp?.data || []).forEach((i: any) => { map[i.id] = i.name; });
+        setIdcNameMapState(map);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   // 读取 CSS 变量的工具与调色板（放在组件内部，避免 hooks 报错）
   const getCssVar = (name: string, fallback: string) => {
@@ -83,12 +108,12 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
 
   // 过滤应用程序
   const filteredApplications = selectedBusiness === 'all'
-    ? mockApplications
-    : mockApplications.filter(app => app.businessType === selectedBusiness);
+    ? applications
+    : applications.filter(app => app.businessType === selectedBusiness);
 
   // 按业务类型分组的数据
-  const businessData = businessTypes.map(businessType => {
-    const apps = mockApplications.filter(app => app.businessType === businessType);
+  const businessData = businessTypesState.map(businessType => {
+    const apps = applications.filter(app => app.businessType === businessType);
     const allServices = apps.flatMap(app => app.services);
 
     if (allServices.length === 0) return null;
@@ -111,7 +136,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
 
   // 按数据中心分组的数据
   const idcData = selectedIDCs.length > 0 ? selectedIDCs.map(idc => {
-    const services = mockApplications.flatMap(app =>
+    const services = applications.flatMap(app =>
       app.services.filter(service => service.idcId === idc.id)
     );
 
@@ -134,7 +159,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
   }).filter(Boolean) : [];
 
   // 服务类型分布数据
-  const serviceTypeData = mockApplications.flatMap(app => app.services)
+  const serviceTypeData = applications.flatMap(app => app.services)
     .reduce((acc, service) => {
       acc[service.type] = (acc[service.type] || 0) + service.instances;
       return acc;
@@ -147,7 +172,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
   }));
 
   // 跨数据中心业务健康度数据
-  const crossIDCHealthData = mockApplications
+  const crossIDCHealthData = applications
     .filter(app => app.isShared && app.deployedIDCs.length > 1)
     .map(app => {
       const servicesByIDC = app.deployedIDCs.map(idcId => {
@@ -156,7 +181,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
           ? services.reduce((sum, s) => sum + s.metrics.availability, 0) / services.length
           : 0;
         return {
-          idc: idcNameMap[idcId]?.replace('数据中心', '') || idcId,
+          idc: idcNameMapState[idcId]?.replace('数据中心', '') || idcId,
           availability: avgAvailability,
         };
       });
@@ -447,7 +472,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
               style={{ width: 150 }}
             >
               <Option value="all">全部业务</Option>
-              {businessTypes.map(type => (
+              {businessTypesState.map(type => (
                 <Option key={type} value={type}>{type}</Option>
               ))}
             </Select>
@@ -624,7 +649,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
                         {getServiceIcon(service.type)}
                         <span className="font-medium text-sm">{service.name}</span>
                         <UIBadge variant="outline" className="text-xs">
-                          {idcNameMap[service.idcId]?.replace('数据中心', '') || service.idcId}
+                          {idcNameMapState[service.idcId]?.replace('数据中心', '') || service.idcId}
                         </UIBadge>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs">

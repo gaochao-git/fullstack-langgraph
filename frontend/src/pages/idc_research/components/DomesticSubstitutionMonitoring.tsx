@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Badge, Progress, Tabs, Select, Alert, Row, Col, Statistic } from 'antd';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { mockHardwareProducts, domesticSubstitutionMetrics, substitutionPlans, hardwareIdcNameMap, categoryNames } from '../data/hardwareData';
 import { IDCData } from '../types/idc';
 import { FlagOutlined, AimOutlined, RiseOutlined, WarningOutlined, CheckCircleOutlined, CloseCircleOutlined, ThunderboltOutlined, SafetyOutlined, DatabaseOutlined, CloudServerOutlined } from '@ant-design/icons';
+import IDCResearchApi from '@/services/idcResearchApi';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -36,6 +36,41 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
   }), []);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'overview' | 'detailed' | 'planning'>('overview');
+  const [products, setProducts] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [idcNameMap, setIdcNameMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [prodsResp, metricsResp, plansResp, idcsResp] = await Promise.all([
+          IDCResearchApi.getHardwareProducts(),
+          IDCResearchApi.getHardwareMetrics(),
+          IDCResearchApi.getHardwarePlans(),
+          IDCResearchApi.getIDCs(),
+        ]);
+        setProducts(prodsResp?.data || []);
+        setMetrics(metricsResp?.data || []);
+        setPlans(plansResp?.data || []);
+        const map: Record<string, string> = {};
+        (idcsResp?.data || []).forEach((i: any) => { map[i.id] = i.name; });
+        setIdcNameMap(map);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
+
+  const categoryNames: Record<string, string> = {
+    server: '服务器',
+    network: '网络设备',
+    storage: '存储设备',
+    os: '操作系统',
+    database: '数据库',
+    middleware: '中间件',
+    security: '安全设备',
+  };
 
   // 获取产品类别图标
   const getCategoryIcon = (category: string) => {
@@ -69,18 +104,18 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
 
   // 过滤数据
   const filteredProducts = selectedCategory === 'all'
-    ? mockHardwareProducts
-    : mockHardwareProducts.filter(product => product.category === selectedCategory);
+    ? products
+    : products.filter(product => product.category === selectedCategory);
 
   const filteredMetrics = selectedCategory === 'all'
-    ? domesticSubstitutionMetrics
-    : domesticSubstitutionMetrics.filter(metric =>
+    ? metrics
+    : metrics.filter(metric =>
       Object.keys(categoryNames).find(key => categoryNames[key] === metric.category) === selectedCategory
     );
 
   // 按IDC分组的替代率数据
   const idcSubstitutionData = selectedIDCs.length > 0 ? selectedIDCs.map(idc => {
-    const idcProducts = mockHardwareProducts.filter(product => product.idcId === idc.id);
+    const idcProducts = products.filter(product => product.idcId === idc.id);
     const categories = Object.keys(categoryNames);
 
     const categoryData = categories.reduce((acc, category) => {
@@ -101,7 +136,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
 
   // 品牌分布数据（仅显示前8个品牌）
   const brandData = filteredMetrics.length > 0
-    ? [...filteredMetrics[0].brands]
+    ? [...(filteredMetrics[0].brands || [])]
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
       .map(brand => ({
@@ -114,7 +149,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
     : [];
 
   // 故障率比较数据
-  const failureRateData = domesticSubstitutionMetrics.map(metric => ({
+  const failureRateData = metrics.map(metric => ({
     category: metric.category,
     domestic: metric.domesticFailureRate,
     imported: metric.importedFailureRate,
@@ -122,7 +157,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
   }));
 
   // 雷达图数据（替代率概览）
-  const radarData = domesticSubstitutionMetrics.map(metric => ({
+  const radarData = metrics.map(metric => ({
     category: metric.category,
     substitutionRate: metric.substitutionRate,
     target: 70, // 目标替代率
@@ -130,10 +165,10 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
 
   // 计算总体统计
   const totalStats = {
-    totalProducts: mockHardwareProducts.reduce((sum, p) => sum + p.quantity, 0),
-    domesticProducts: mockHardwareProducts.filter(p => p.isDomestic).reduce((sum, p) => sum + p.quantity, 0),
+    totalProducts: products.reduce((sum, p) => sum + (p.quantity || 0), 0),
+    domesticProducts: products.filter(p => p.isDomestic).reduce((sum, p) => sum + (p.quantity || 0), 0),
     categories: Object.keys(categoryNames).length,
-    avgSubstitutionRate: Math.round(domesticSubstitutionMetrics.reduce((sum, m) => sum + m.substitutionRate, 0) / domesticSubstitutionMetrics.length * 10) / 10,
+    avgSubstitutionRate: Math.round((metrics.reduce((sum, m) => sum + (m.substitutionRate || 0), 0) / Math.max(metrics.length, 1)) * 10) / 10,
   };
 
   return (
@@ -166,9 +201,9 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
       <Row gutter={[16, 16]}>
         <Col lg={6} md={12} xs={24}>
           <Card>
-            <Statistic
+              <Statistic
               title="总产品数量"
-              value={totalStats.totalProducts}
+              value={filteredProducts.length}
               formatter={(value) => value?.toLocaleString()}
               prefix={<FlagOutlined style={{ color: 'var(--color-primary, var(--primary, #1890ff))' }} />}
             />
@@ -177,9 +212,9 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
 
         <Col lg={6} md={12} xs={24}>
           <Card>
-            <Statistic
+              <Statistic
               title="国产产品数量"
-              value={totalStats.domesticProducts}
+              value={filteredProducts.filter(p => p.isDomestic).length}
               formatter={(value) => value?.toLocaleString()}
               prefix={<CheckCircleOutlined style={{ color: 'var(--color-success, var(--success, #22c55e))' }} />}
             />
@@ -188,9 +223,9 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
 
         <Col lg={6} md={12} xs={24}>
           <Card>
-            <Statistic
+              <Statistic
               title="平均替代率"
-              value={totalStats.avgSubstitutionRate}
+              value={Math.round(((metrics.reduce((sum, m) => sum + (m.substitutionRate || 0), 0) / Math.max(metrics.length,1)) || 0) * 10) / 10}
               suffix="%"
               prefix={<AimOutlined style={{ color: 'var(--color-warning, var(--warning, #f59e0b))' }} />}
             />
@@ -199,9 +234,9 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
 
         <Col lg={6} md={12} xs={24}>
           <Card>
-            <Statistic
+              <Statistic
               title="产品类别"
-              value={totalStats.categories}
+              value={Object.keys(categoryNames).length}
               prefix={<RiseOutlined style={{ color: 'var(--color-accent, #722ed1)' }} />}
             />
           </Card>
@@ -243,7 +278,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
             <Col lg={12} xs={24}>
               <Card title="各类别国产替代率">
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={domesticSubstitutionMetrics}>
+                  <BarChart data={metrics}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="category" angle={-45} textAnchor="end" height={80} />
                     <YAxis domain={[0, 100]} />
@@ -393,7 +428,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
         <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* 替代规划概览 */}
           <Row gutter={[16, 16]}>
-            {substitutionPlans.map((plan) => {
+            {plans.map((plan) => {
               const priorityProps = getPriorityProps(plan.priority);
               return (
                 <Col lg={8} md={12} xs={24} key={plan.category}>
@@ -457,7 +492,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
           {/* 替代时间线 */}
           <Card title="国产替代时间线">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-              {substitutionPlans
+              {plans
                 .sort((a, b) => new Date(a.timeline.replace('年', '/').replace('月', '/').replace('底', '').replace('中', '')).getTime() -
                   new Date(b.timeline.replace('年', '/').replace('月', '/').replace('底', '').replace('中', '')).getTime())
                 .map((plan, index) => {
@@ -472,7 +507,7 @@ export function DomesticSubstitutionMonitoring({ selectedIDCs }: DomesticSubstit
                           border: `2px solid ${priorityProps.style.color}`,
                           backgroundColor: priorityProps.style.color
                         }} />
-                        {index < substitutionPlans.length - 1 && (
+                        {index < plans.length - 1 && (
                           <div style={{ width: 2, height: 64, backgroundColor: 'var(--color-border)', marginTop: 8 }} />
                         )}
                       </div>

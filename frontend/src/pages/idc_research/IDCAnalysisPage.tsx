@@ -11,12 +11,14 @@ import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './components/ui/resizable';
-import { mockIDCData } from './data/mockData';
+import IDCResearchApi from '@/services/idcResearchApi';
 import { IDCData } from './types/idc';
 import { BarChart3, Activity, Database, TrendingUp } from 'lucide-react';
 
 const IDCAnalysisPage: React.FC = () => {
+  const [allIDCs, setAllIDCs] = useState<IDCData[]>([]);
   const [selectedIDCs, setSelectedIDCs] = useState<IDCData[]>([]);
+  const [headerStats, setHeaderStats] = useState({ totalServers: 0, avgCpuUsage: 0, avgStability: 0, healthyCount: 0 });
   const [currentView, setCurrentView] = useState<'overview' | 'comparison' | 'applications' | 'substitution'>('overview');
   const [isChatMinimized, setIsChatMinimized] = useState(false);
 
@@ -52,16 +54,41 @@ const IDCAnalysisPage: React.FC = () => {
     setIsChatMinimized(!isChatMinimized);
   };
 
-  const getTotalStats = () => {
-    return {
-      totalServers: mockIDCData.reduce((sum, idc) => sum + idc.serverCount, 0),
-      avgCpuUsage: Math.round(mockIDCData.reduce((sum, idc) => sum + idc.cpuUsage, 0) / mockIDCData.length),
-      avgStability: Math.round(mockIDCData.reduce((sum, idc) => sum + idc.stabilityScore, 0) / mockIDCData.length * 10) / 10,
-      healthyCount: mockIDCData.filter(idc => idc.status === 'healthy').length,
-    };
-  };
-
-  const stats = getTotalStats();
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const [idcsResp, statsResp] = await Promise.all([
+          IDCResearchApi.getIDCs(),
+          IDCResearchApi.getOverviewStats(),
+        ]);
+        const idcsData: IDCData[] = (idcsResp?.data || []).map((i: any) => ({
+          id: i.id,
+          name: i.name,
+          location: i.location,
+          serverCount: i.serverCount,
+          cpuUsage: i.cpuUsage,
+          memoryUsage: i.memoryUsage,
+          networkLoad: i.networkLoad,
+          stabilityScore: i.stabilityScore,
+          powerUsage: i.powerUsage,
+          temperature: i.temperature,
+          uptime: i.uptime,
+          status: i.status,
+          lastUpdated: i.lastUpdated,
+          performanceHistory: i.performanceHistory || [],
+        }));
+        setAllIDCs(idcsData);
+        setHeaderStats({
+          totalServers: statsResp?.data?.totalServers || 0,
+          avgCpuUsage: statsResp?.data?.avgCpuUsage || 0,
+          avgStability: statsResp?.data?.avgStability || 0,
+          healthyCount: statsResp?.data?.healthyCount || 0,
+        });
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -81,18 +108,18 @@ const IDCAnalysisPage: React.FC = () => {
               <div className="flex items-center gap-6 text-sm">
                 <div className="flex items-center gap-2">
                   <Activity className="h-4 w-4 text-muted-foreground" />
-                  <span>总服务器: {stats.totalServers.toLocaleString()}</span>
+                  <span>总服务器: {headerStats.totalServers.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                  <span>平均CPU: {stats.avgCpuUsage}%</span>
+                  <span>平均CPU: {headerStats.avgCpuUsage}%</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  <span>平均稳定性: {stats.avgStability}</span>
+                  <span>平均稳定性: {headerStats.avgStability}</span>
                 </div>
                 <Badge variant="secondary">
-                  {stats.healthyCount}/{mockIDCData.length} 数据中心正常运行
+                  {headerStats.healthyCount}/{allIDCs.length} 数据中心正常运行
                 </Badge>
               </div>
             </div>
@@ -133,7 +160,7 @@ const IDCAnalysisPage: React.FC = () => {
                     <RealTimeStatus />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {mockIDCData.map(idc => (
+                      {allIDCs.map(idc => (
                         <IDCOverviewCard
                           key={idc.id}
                           idc={idc}
@@ -154,7 +181,7 @@ const IDCAnalysisPage: React.FC = () => {
                         点击数据中心卡片来选择或取消选择，最多可同时比对5个数据中心
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {mockIDCData.map(idc => (
+                        {allIDCs.map(idc => (
                           <IDCOverviewCard
                             key={idc.id}
                             idc={idc}
@@ -182,7 +209,7 @@ const IDCAnalysisPage: React.FC = () => {
                         </div>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {mockIDCData.map(idc => (
+                        {allIDCs.map(idc => (
                           <IDCOverviewCard
                             key={idc.id}
                             idc={idc}
@@ -210,7 +237,7 @@ const IDCAnalysisPage: React.FC = () => {
                         </div>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {mockIDCData.map(idc => (
+                        {allIDCs.map(idc => (
                           <IDCOverviewCard
                             key={idc.id}
                             idc={idc}
