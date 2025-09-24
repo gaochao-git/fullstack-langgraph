@@ -24,8 +24,6 @@ class CeleryTaskRecord(BaseModel):
     task_retry_count = Column(Integer, default=0)
     task_args = Column(Text, nullable=True)
     task_kwargs = Column(Text, nullable=True)
-    task_queue = Column(String(100), nullable=True)
-    task_extra_info = Column(Text, nullable=True)
 
 
 class CeleryPeriodicTaskConfig(BaseModel):
