@@ -36,19 +36,6 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         )
 
 
-# 直接使用数据库配置中的函数
-# get_sync_db 已经从 src.shared.db.config 导入
-
-
-# 向后兼容的别名
-def get_database() -> Generator[Session, None, None]:
-    """
-    获取数据库会话（向后兼容）
-    建议使用 get_db() 或 get_sync_db()
-    """
-    return get_sync_db()
-
-
 # ==================== 用户认证依赖 ====================
 
 def get_current_user():
