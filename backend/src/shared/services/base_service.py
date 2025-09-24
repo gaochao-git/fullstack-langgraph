@@ -5,14 +5,8 @@
 
 from typing import Type, Optional, List, Dict, Any, Generic, TypeVar
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
-from sqlalchemy import select, update, delete, and_, or_, func
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, delete, and_,  func
 from datetime import datetime
-
-from src.shared.db.config import get_async_db, get_sync_db
-from src.shared.db.models import now_shanghai
-
 # 泛型类型变量
 ModelType = TypeVar('ModelType')
 
