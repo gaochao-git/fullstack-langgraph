@@ -56,17 +56,6 @@ def get_current_user_optional():
         return None
 
 
-def verify_admin_permission(current_user=Depends(get_current_user)):
-    """验证管理员权限"""
-    # TODO: 实现管理员权限验证
-    # if not current_user or not current_user.is_admin:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="Admin permission required"
-    #     )
-    return current_user
-
-
 # ==================== 服务层依赖注入 ====================
 
 def get_sop_service():
