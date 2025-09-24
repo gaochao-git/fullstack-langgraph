@@ -137,8 +137,9 @@ class LangExtractSensitiveScanner:
                 examples=self.sensitive_types,
                 model=model,
                 max_workers=10,
+                batch_length=10,
                 extraction_passes=1,
-                max_char_buffer=5000,
+                max_char_buffer=2000,
                 debug=False
             )
             

@@ -19,7 +19,8 @@
       "Bash(celery:*)",
       "Bash(python:*)",
       "Bash(git rm:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
