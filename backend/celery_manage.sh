@@ -18,7 +18,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 日志目录
-LOG_DIR="$SCRIPT_DIR/logs/celery"
+LOG_DIR="$SCRIPT_DIR/logs"
 mkdir -p "$LOG_DIR"
 
 # PID文件目录
@@ -93,14 +93,7 @@ start_worker() {
     fi
     
     # 启动worker，指定队列优先级
-    nohup celery -A $CELERY_APP worker \
-        --loglevel=$WORKER_LOGLEVEL \
-        --concurrency=$WORKER_CONCURRENCY \
-        --pidfile="$pid_file" \
-        --logfile="$log_file" \
-        -Q system,priority_high,priority_low,celery \
-        > "$LOG_DIR/worker_startup.log" 2>&1 &
-    
+    nohup celery -A $CELERY_APP worker --loglevel=$WORKER_LOGLEVEL --concurrency=$WORKER_CONCURRENCY --pidfile="$pid_file" --logfile="$log_file" -Q system,priority_high,priority_low,celery > "$LOG_DIR/worker_startup.log" 2>&1 &
     # 等待启动并检查
     local max_wait=10
     local wait_time=0
@@ -136,12 +129,7 @@ start_beat() {
     fi
     
     # 启动beat
-    nohup celery -A $CELERY_APP beat \
-        --loglevel=$BEAT_LOGLEVEL \
-        --pidfile="$pid_file" \
-        --logfile="$log_file" \
-        --schedule="$schedule_file" \
-        > "$LOG_DIR/beat_startup.log" 2>&1 &
+    nohup celery -A $CELERY_APP beat --loglevel=$BEAT_LOGLEVEL --pidfile="$pid_file" --logfile="$log_file" --schedule="$schedule_file"> "$LOG_DIR/beat_startup.log" 2>&1 &
     
     # 等待启动并检查
     local max_wait=10
