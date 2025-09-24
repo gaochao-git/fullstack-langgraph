@@ -6,7 +6,7 @@ import asyncio
 import json
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
-from src.shared.core.dependencies import get_sync_db
+from src.shared.db.config import get_sync_db
 from src.apps.agent.models import AgentConfig
 from src.shared.core.logging import get_logger
 
