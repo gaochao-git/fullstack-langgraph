@@ -31,23 +31,7 @@ async def get_current_user(
     """
     获取当前用户（必需）
     如果未认证则抛出401错误
-    
-    🔧 开发模式：临时返回mock admin用户
     """
-    # 🔧 临时Mock：开发模式下返回gaochao用户，跳过认证
-    if os.getenv("AUTH_MOCK", "").lower() == "true":
-        print("🔧 开发模式：使用Mock gaochao用户")
-        return {
-            "sub": "gaochao",
-            "username": "gaochao", 
-            "email": "gaochao@example.com",
-            "display_name": "高超",
-            "auth_type": "mock",
-            "roles": ["admin"],  # 管理员权限
-            "permissions": ["*"]  # 所有权限
-        }
-    
-    # 原有的认证逻辑
     if not user:
         raise BusinessException(
             "未认证",

@@ -122,7 +122,6 @@ class Settings(BaseSettings):
     CAS_SERVICE_URL: str = "http://localhost:3000/sso/callback"
     CAS_SINGLE_LOGOUT_ENABLED: bool = True
 
-    AUTH_MOCK: str = False
     NO_PROXY: str = ""  # 结局claude 本地开proxy影响httpx调用其他接口
     
     # AI 视觉模型配置
