@@ -171,10 +171,11 @@ def execute_agent_via_http(agent_url: str, agent_key: str, agent_id: str, messag
             }
         
         logger.info(f"智能体任务执行成功，thread_id: {thread_id}")
+        # 只返回必要的信息，避免结果太大
         return {
             'status': 'SUCCESS',
             'thread_id': thread_id,
-            'response': completion_data
+            'message': '任务执行成功'
         }
         
     except requests.RequestException as e:
@@ -307,12 +308,13 @@ def execute_agent_periodic_task(self, task_config_id):
             )
             
             if agent_result and agent_result.get('status') == 'SUCCESS':
+                # 简化返回结果，避免数据太大
                 success_result = {
                     'task_id': task_id,
                     'task_config_id': task_config_id,
                     'task_name': task_config.task_name,
                     'agent_id': agent_id,
-                    'agent_result': agent_result,
+                    'thread_id': agent_result.get('thread_id'),
                     'status': 'SUCCESS',
                     'execution_time': execution_time.isoformat()
                 }
