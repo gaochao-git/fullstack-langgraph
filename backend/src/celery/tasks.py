@@ -57,7 +57,15 @@ def task_postrun_handler(task_id=None, task=None, state=None, retval=None, **kw)
             if task_record:
                 task_record.task_status = state
                 task_record.task_complete_time = now_shanghai()
-                task_record.task_result = json.dumps(retval) if retval is not None else None
+                # 处理结果序列化，跳过不能序列化的对象（如Retry）
+                if retval is not None:
+                    try:
+                        task_record.task_result = json.dumps(retval)
+                    except (TypeError, ValueError):
+                        # 如果不能序列化，存储简单的字符串表示
+                        task_record.task_result = str(retval)
+                else:
+                    task_record.task_result = None
                 task_record.update_by = 'system'
                 task_record.update_time = now_shanghai()
                 logger.info(f"任务后处理完成: {task_id}")

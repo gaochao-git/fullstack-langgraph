@@ -33,6 +33,7 @@ class DatabaseScheduler(Scheduler):
                     self._schedule = {}
                     
                     logger.info(f"数据库调度器: 加载了 {len(db_tasks)} 个启用的任务")
+                    logger.info(f"当前时间: {datetime.now()}")
                     
                     for task in db_tasks:
                         # 解析参数
@@ -191,8 +192,11 @@ class DatabaseScheduler(Scheduler):
     def _should_reload_schedule(self):
         """检查是否需要重新加载调度配置"""
         # 每30秒检查一次数据库变化
-        if datetime.now() - self._last_timestamp < timedelta(seconds=30):
+        time_since_last_check = datetime.now() - self._last_timestamp
+        if time_since_last_check < timedelta(seconds=30):
+            logger.debug(f"距离上次检查只有 {time_since_last_check.seconds} 秒，跳过检查")
             return False
+        logger.info(f"开始检查任务配置更新（距上次检查 {time_since_last_check.seconds} 秒）")
         
         try:
             with get_db_session() as db:
@@ -204,7 +208,9 @@ class DatabaseScheduler(Scheduler):
                 if latest_update:
                     # 将数据库时间转换为UTC进行比较
                     db_time_utc = latest_update[0] - timedelta(hours=8)
+                    logger.info(f"检查任务更新 - 数据库时间: {latest_update[0]}, UTC时间: {db_time_utc}, 上次检查: {self._last_timestamp}")
                     if db_time_utc > self._last_timestamp:
+                        logger.info("检测到任务配置更新，准备重新加载...")
                         return True
                 
                 return False
