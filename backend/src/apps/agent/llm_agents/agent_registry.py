@@ -8,7 +8,9 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 from src.shared.core.logging import get_logger
 from .generic_agent.graph import create_generic_agent
-from .agent_registry_sync import sync_agents_to_database
+from sqlalchemy.ext.asyncio import AsyncSession
+from src.apps.agent.models import AgentConfig
+from sqlalchemy import select
 logger = get_logger(__name__)
 
 
@@ -19,17 +21,17 @@ class AgentRegistry:
     _agents: Dict[str, Dict[str, Any]] = {}
     
     @classmethod
-    def initialize(cls):
+    async def initialize(cls, db: AsyncSession):
         """初始化注册表 - 自动发现所有使用装饰器的 Agent"""
         cls.auto_discover_agents()
         
-        # 同步到数据库（使用同步版本）
+        # 同步到数据库（使用异步版本）
         try:
-            success = sync_agents_to_database(cls._agents)
-            if not success:
-                logger.warning("Agent信息同步到数据库失败，但不影响内存中的注册表")
+            await cls._sync_to_database(db)
+            logger.info("Agent信息同步到数据库成功")
         except Exception as e:
             logger.error(f"同步Agent到数据库时发生错误: {e}")
+            logger.warning("Agent信息同步到数据库失败，但不影响内存中的注册表")
         
         logger.info(f"Agent 注册表初始化完成，共 {len(cls._agents)} 个 Agent")
     
@@ -109,9 +111,68 @@ class AgentRegistry:
         agent_info = cls._agents.get(agent_id, {})
         return agent_info.get('builtin', False)
     
-    # 原来的异步 _sync_to_database 方法已移至 agent_registry_sync.py 作为同步版本
-    # 避免在模块导入时创建事件循环的问题
+    @classmethod
+    async def _sync_to_database(cls, db: AsyncSession) -> bool:
+        """
+        同步Agent信息到数据库（异步版本）
+        
+        Args:
+            db: 数据库会话
+            
+        Returns:
+            是否成功
+        """
+        try:
+            async with db.begin():
+                for agent_id, agent_info in cls._agents.items():
+                    try:
+                        # 检查是否已存在
+                        result = await db.execute(
+                            select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+                        )
+                        existing = result.scalar_one_or_none()
+                        
+                        if not existing:
+                            # 创建新记录
+                            agent_config = AgentConfig(
+                                agent_id=agent_id,
+                                agent_name=agent_info.get('description', agent_id),
+                                agent_type=agent_info.get('agent_type', '自定义'),
+                                agent_description=agent_info.get('description', ''),
+                                agent_capabilities=agent_info.get('capabilities', []),
+                                agent_version=agent_info.get('version', '1.0.0'),
+                                agent_status='active',
+                                agent_enabled='yes',
+                                agent_icon=agent_info.get('icon', 'Bot'),
+                                is_builtin='yes' if agent_info.get('builtin', False) else 'no',
+                                tools_info={},
+                                llm_info={},
+                                prompt_info={},
+                                agent_owner=agent_info.get('owner', 'system'),
+                                visibility_type='public',
+                                create_by=agent_info.get('owner', 'system')
+                            )
+                            db.add(agent_config)
+                            logger.info(f"注册新Agent到数据库: {agent_id}")
+                        else:
+                            # 更新现有记录的基本信息（保留用户自定义的配置）
+                            existing.agent_name = agent_info.get('description', existing.agent_name)
+                            existing.is_builtin = 'yes' if agent_info.get('builtin', False) else 'no'
+                            existing.update_by = 'system'
+                            logger.debug(f"Agent {agent_id} 已存在，更新基本信息")
+                            
+                    except Exception as e:
+                        logger.error(f"同步Agent {agent_id} 失败: {str(e)}")
+                        continue
+                        
+                await db.flush()
+                logger.info(f"成功同步 {len(cls._agents)} 个Agent到数据库")
+                return True
+                
+        except Exception as e:
+            logger.error(f"同步Agent到数据库失败: {str(e)}")
+            return False
 
 
-# 初始化注册表
-AgentRegistry.initialize()
+# 注意：初始化将在 FastAPI 的 lifespan 中进行，而不是在模块导入时
+# 这样可以确保数据库已经初始化，并且使用异步操作

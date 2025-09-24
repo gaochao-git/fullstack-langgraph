@@ -19,6 +19,8 @@ from .shared.core.exceptions import EXCEPTION_HANDLERS
 from .router import api_router
 from .shared.db.config import init_db, close_db
 from .apps.agent.checkpoint_factory import init as init_checkpoint, cleanup as cleanup_checkpoint
+from .apps.agent.llm_agents.agent_registry import AgentRegistry
+from .shared.db.config import get_async_db_context
 
 
 @asynccontextmanager
@@ -43,6 +45,16 @@ async def lifespan(app: FastAPI):
         logger.error(f"Checkpoint数据库初始化失败: {e}")
         # Checkpoint失败不应该阻止应用启动，只记录警告
         logger.warning("应用将在没有checkpoint功能的情况下运行")
+    
+    # 初始化Agent注册表
+    try:
+        async with get_async_db_context() as db:
+            await AgentRegistry.initialize(db)
+        logger.info("Agent注册表初始化成功")
+    except Exception as e:
+        logger.error(f"Agent注册表初始化失败: {e}")
+        # 非关键功能，失败不影响应用启动
+        logger.warning("应用将在没有预注册Agent的情况下运行")
     
     yield
     
