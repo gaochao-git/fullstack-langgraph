@@ -136,9 +136,9 @@ class LangExtractSensitiveScanner:
                 prompt_description=prompt,
                 examples=self.sensitive_types,
                 model=model,
-                max_workers=1,
+                max_workers=10,
                 extraction_passes=1,
-                max_char_buffer=10000,
+                max_char_buffer=5000,
                 debug=False
             )
             
