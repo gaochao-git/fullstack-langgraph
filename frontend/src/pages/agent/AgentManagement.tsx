@@ -31,6 +31,8 @@ import {
 } from '@ant-design/icons';
 import AgentEditModal from './components/AgentEditModal';
 import RunLogModal from './components/RunLogModal';
+import ScheduledTaskManager from './components/ScheduledTaskManager';
+import AgentPermissionManager from './components/AgentPermissionManager';
 import { agentApi, type Agent, type MCPServer, type CreateAgentRequest, type UpdateAgentRequest } from '@/services/agentApi';
 import { renderIcon, getIconBackgroundColor } from './components/AgentIconSystem';
 import { useAuth } from '@/hooks/useAuth';
@@ -160,6 +162,14 @@ const AgentManagement: React.FC = () => {
   const [runLogModalVisible, setRunLogModalVisible] = useState(false);
   const [runLogAgent, setRunLogAgent] = useState<LocalAgent | null>(null);
   const [transferForm] = Form.useForm();
+  
+  // 定时任务相关状态
+  const [scheduledTaskModalVisible, setScheduledTaskModalVisible] = useState(false);
+  const [scheduledTaskAgent, setScheduledTaskAgent] = useState<LocalAgent | null>(null);
+  
+  // 接口权限相关状态
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [permissionAgent, setPermissionAgent] = useState<LocalAgent | null>(null);
   
   
   
@@ -642,8 +652,7 @@ const AgentManagement: React.FC = () => {
                 actions={[
                   <Button 
                     key="stats"
-                    type="text" 
-                    icon={<BarChartOutlined />}
+                    type="text"
                     onClick={() => {
                       setRunLogAgent(agent);
                       setRunLogModalVisible(true);
@@ -655,17 +664,37 @@ const AgentManagement: React.FC = () => {
                     // 编辑按钮：只有所有者可以编辑
                     <Button 
                       key="edit"
-                      type="text" 
-                      icon={<SettingOutlined />}
+                      type="text"
                       onClick={() => handleEditAgent(agent)}
                     >
                       编辑
                     </Button>,
+                    // 定时任务按钮：只有所有者可以配置
+                    <Button 
+                      key="scheduled"
+                      type="text"
+                      onClick={() => {
+                        setScheduledTaskAgent(agent);
+                        setScheduledTaskModalVisible(true);
+                      }}
+                    >
+                      任务
+                    </Button>,
+                    // 接口权限按钮：只有所有者可以配置
+                    <Button 
+                      key="permissions"
+                      type="text"
+                      onClick={() => {
+                        setPermissionAgent(agent);
+                        setPermissionModalVisible(true);
+                      }}
+                    >
+                      密钥
+                    </Button>,
                     // 转移按钮：只有所有者可以转移
                     <Button 
                       key="transfer"
-                      type="text" 
-                      icon={<SwapOutlined />}
+                      type="text"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -679,7 +708,6 @@ const AgentManagement: React.FC = () => {
                       key="delete"
                       type="text" 
                       danger
-                      icon={<DeleteOutlined />}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -903,6 +931,56 @@ const AgentManagement: React.FC = () => {
           agentName={runLogAgent.agent_name}
         />
       )}
+
+      {/* 定时任务模态框 */}
+      <Modal
+        title="定时任务管理"
+        open={scheduledTaskModalVisible}
+        onCancel={() => {
+          setScheduledTaskModalVisible(false);
+          setScheduledTaskAgent(null);
+        }}
+        footer={null}
+        width={900}
+      >
+        {scheduledTaskAgent && (
+          <ScheduledTaskManager 
+            agentId={scheduledTaskAgent.agent_id}
+          />
+        )}
+      </Modal>
+
+      {/* 接口权限模态框 */}
+      <Modal
+        title="接口权限管理"
+        open={permissionModalVisible}
+        onCancel={() => {
+          setPermissionModalVisible(false);
+          setPermissionAgent(null);
+        }}
+        footer={null}
+        width={900}
+      >
+        {permissionAgent && (
+          <div>
+            <div className="mb-3 p-3 bg-blue-50 rounded">
+              <div className="text-sm text-blue-600">
+                <div className="font-medium mb-1">接口权限说明：</div>
+                <ul className="list-disc list-inside space-y-1 text-xs">
+                  <li>为用户分配独立的 API 密钥，用于调用智能体接口</li>
+                  <li>每个用户可以有多个 API 密钥，支持不同场景使用</li>
+                  <li>可以随时禁用或删除 API 密钥，确保安全性</li>
+                  <li>API 密钥仅显示一次，请妥善保管</li>
+                </ul>
+              </div>
+            </div>
+            <AgentPermissionManager 
+              agentId={permissionAgent.agent_id}
+              isEditable={true}
+            />
+          </div>
+        )}
+      </Modal>
 
     </div>
   );

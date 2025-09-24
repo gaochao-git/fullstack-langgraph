@@ -32,8 +32,6 @@ import {
   iconConfig,
   renderIcon
 } from './AgentIconSystem';
-import ScheduledTaskManager from './ScheduledTaskManager';
-import AgentPermissionManager from './AgentPermissionManager';
 import type { DataNode } from 'antd/es/tree';
 import { agentApi } from '@/services/agentApi';
 
@@ -1122,67 +1120,14 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
               rules={[{ required: true, message: '请输入系统提示词' }]}
             >
               <TextArea 
-                rows={4}
+                rows={10}
                 placeholder="定义智能体的角色、行为准则和回答风格..."
                 maxLength={2000}
                 showCount
               />
             </Form.Item>
 
-            <Form.Item
-              label="用户提示词模板"
-              name="user_prompt_template"
-              extra="可选，用于格式化用户输入"
-            >
-              <TextArea 
-                rows={3}
-                placeholder="例如: 用户问题：{user_input}\n请详细回答上述问题。"
-                maxLength={1000}
-                showCount
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="助手回复模板"
-              name="assistant_prompt_template"
-              extra="可选，用于格式化助手回复"
-            >
-              <TextArea 
-                rows={3}
-                placeholder="例如: 基于以上分析，我的建议是：{assistant_response}"
-                maxLength={1000}
-                showCount
-              />
-            </Form.Item>
           </TabPane>
-
-          {/* 定时任务配置 */}
-          <TabPane tab={<span><ClockCircleOutlined />定时任务</span>} key="scheduled-tasks">
-            <ScheduledTaskManager 
-              agentId={agent?.agent_id || ''}
-            />
-          </TabPane>
-
-          {/* 接口权限配置 - 只在编辑模式且是所有者时显示 */}
-          {!isCreating && agent && currentUser && agent.agent_owner === currentUser.username && (
-            <TabPane tab={<span><SafetyOutlined />接口权限</span>} key="permissions">
-              <div className="mb-3 p-3 bg-blue-50 rounded">
-                <div className="text-sm text-blue-600">
-                  <div className="font-medium mb-1">接口权限说明：</div>
-                  <ul className="list-disc list-inside space-y-1 text-xs">
-                    <li>为用户分配独立的 API 密钥，用于调用智能体接口</li>
-                    <li>每个用户使用独立密钥，便于权限管理和审计</li>
-                    <li>可以随时撤销或重新生成密钥</li>
-                    <li>工单号用于记录授权原因，便于追溯</li>
-                  </ul>
-                </div>
-              </div>
-              <AgentPermissionManager 
-                agentId={agent?.agent_id || ''}
-                isEditable={true}
-              />
-            </TabPane>
-          )}
         </Tabs>
 
         <div className="flex justify-end space-x-2 mt-4 pt-4 border-t">
