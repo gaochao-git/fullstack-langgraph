@@ -697,6 +697,8 @@ const MCPManagement: React.FC = () => {
     {
       title: '操作',
       key: 'actions',
+      fixed: 'right',
+      width: 200,
       render: (_, record: MCPServer) => (
         <Space size="small">
           <Button 
