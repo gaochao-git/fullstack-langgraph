@@ -12,6 +12,7 @@ import {
   Popconfirm,
   Typography,
   Tooltip,
+  Select,
   message as antdMessage
 } from 'antd';
 import {
@@ -22,6 +23,8 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { omind_get, omind_post, omind_put, omind_del } from '@/utils/base_api';
+import { userApi } from '@/pages/user/services/rbacApi';
+import type { RbacUser } from '@/pages/user/types/rbac';
 
 const { Text } = Typography;
 
@@ -52,6 +55,8 @@ const MCPPermissionModal: React.FC<Props> = ({ visible, server, onClose }) => {
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [users, setUsers] = useState<RbacUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [form] = Form.useForm();
   const { message } = App.useApp();
 
@@ -165,11 +170,37 @@ const MCPPermissionModal: React.FC<Props> = ({ visible, server, onClose }) => {
     }
   };
 
+  // 加载用户列表
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const response = await userApi.listUsers({ 
+        page: 1, 
+        size: 200 // 获取较多用户
+      });
+      if (response?.items) {
+        setUsers(response.items);
+      }
+    } catch (error) {
+      console.error('加载用户列表失败:', error);
+      message.error('加载用户列表失败');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
     if (visible && server) {
       fetchPermissions();
     }
   }, [visible, server]);
+
+  // 当打开添加权限弹窗时加载用户列表
+  useEffect(() => {
+    if (addModalVisible) {
+      loadUsers();
+    }
+  }, [addModalVisible]);
 
   const columns: ColumnsType<Permission> = [
     {
@@ -316,9 +347,29 @@ const MCPPermissionModal: React.FC<Props> = ({ visible, server, onClose }) => {
           <Form.Item
             name="user_name"
             label="用户名"
-            rules={[{ required: true, message: '请输入用户名' }]}
+            rules={[{ required: true, message: '请选择用户' }]}
           >
-            <Input placeholder="请输入要授权的用户名" />
+            <Select
+              showSearch
+              loading={loadingUsers}
+              placeholder="请选择要授权的用户"
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={users.map(user => ({
+                value: user.user_name,
+                label: (
+                  <div>
+                    <span>{user.display_name || user.user_name}</span>
+                    <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
+                      ({user.user_name})
+                    </span>
+                  </div>
+                )
+              }))}
+            />
           </Form.Item>
 
           <Form.Item
