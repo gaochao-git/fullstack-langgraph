@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import '../../globals_xgq.css';
-import { EnhancedChatPanel } from './components/EnhancedChatPanel';
+// Use embeddable Agent Chat Widget instead of the local mock panel
+import { AgentChatWidget } from '@/lib/agent-widget';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select';
+import { agentApi, type Agent } from '@/services/agentApi';
 import { IDCOverviewCard } from './components/IDCOverviewCard';
 import { IDCOverviewDashboard } from './components/IDCOverviewDashboard';
 import { PerformanceComparison } from './components/PerformanceComparison';
@@ -21,6 +24,10 @@ const IDCAnalysisPage: React.FC = () => {
   const [headerStats, setHeaderStats] = useState({ totalServers: 0, avgCpuUsage: 0, avgStability: 0, healthyCount: 0 });
   const [currentView, setCurrentView] = useState<'overview' | 'comparison' | 'applications' | 'substitution'>('overview');
   const [isChatMinimized, setIsChatMinimized] = useState(false);
+  // 智能体选择相关状态
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('diagnostic_agent');
+  const [chatKey, setChatKey] = useState<number>(0);
 
   const handleIDCSelect = (idc: IDCData) => {
     setSelectedIDCs(prev => {
@@ -33,6 +40,7 @@ const IDCAnalysisPage: React.FC = () => {
     });
   };
 
+  // 保留：根据用户提问联动主区域标签切换
   const handleQuerySubmit = (query: string) => {
     const lowerQuery = query.toLowerCase();
     if (lowerQuery.includes('比对') || lowerQuery.includes('对比')) {
@@ -45,6 +53,27 @@ const IDCAnalysisPage: React.FC = () => {
       setCurrentView('overview');
     }
   };
+
+  // 加载可选智能体列表
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await agentApi.getAgents({ size: 100, enabled_only: true });
+        const items = resp?.data?.items || [];
+        setAgents(items);
+        // 如果默认的 diagnostic_agent 不存在，则选第一个
+        const hasDefault = items.some((a: Agent) => a.agent_id === 'diagnostic_agent');
+        if (!hasDefault && items.length > 0) {
+          setSelectedAgentId(items[0].agent_id);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // 选择器选项
+  const agentOptions = useMemo(() => {
+    return agents.map(a => ({ value: a.agent_id, label: a.agent_name || a.agent_id }));
+  }, [agents]);
 
   const clearSelection = () => {
     setSelectedIDCs([]);
@@ -260,14 +289,41 @@ const IDCAnalysisPage: React.FC = () => {
             <>
               <ResizableHandle withHandle />
 
-              {/* 右侧AI对话面板 */}
+              {/* 右侧AI对话面板（基于可复用的 Agent Chat Widget） */}
               <ResizablePanel defaultSize={30} minSize={25} maxSize={50}>
                 <div className="h-full pl-3">
-                  <div className="h-[calc(100vh-140px)]">
-                    <EnhancedChatPanel
-                      onQuerySubmit={handleQuerySubmit}
-                      isMinimized={false}
-                      onToggleMinimize={handleToggleChatMinimize}
+                  {/* 顶部选择器栏 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">聊天智能体</span>
+                      <div className="min-w-[220px]">
+                        <Select value={selectedAgentId} onValueChange={(v) => {
+                          // 切换智能体时清理当前线程并重置聊天实例
+                          const url = new URL(window.location.href);
+                          url.searchParams.delete('thread_id');
+                          window.history.replaceState({}, '', url.toString());
+                          setSelectedAgentId(v);
+                          setChatKey(prev => prev + 1);
+                        }}>
+                          <SelectTrigger className="w-[220px]">
+                            <SelectValue placeholder="选择智能体" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {agentOptions.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-[calc(100vh-172px)]">
+                    <AgentChatWidget 
+                      key={chatKey}
+                      agentId={selectedAgentId}
+                      height="100%"
+                      onUserMessage={(msg) => handleQuerySubmit(msg)}
                     />
                   </div>
                 </div>
@@ -276,13 +332,13 @@ const IDCAnalysisPage: React.FC = () => {
           )}
         </ResizablePanelGroup>
 
-        {/* 最小化的AI助手 */}
+        {/* 最小化时显示一个恢复按钮（替代原本的最小化面板） */}
         {isChatMinimized && (
-          <EnhancedChatPanel
-            onQuerySubmit={handleQuerySubmit}
-            isMinimized={true}
-            onToggleMinimize={handleToggleChatMinimize}
-          />
+          <div className="fixed bottom-6 right-6 z-40">
+            <Button variant="default" onClick={handleToggleChatMinimize}>
+              打开AI助手
+            </Button>
+          </div>
         )}
       </div>
     </div>
