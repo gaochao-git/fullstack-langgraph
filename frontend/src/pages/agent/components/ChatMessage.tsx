@@ -1834,13 +1834,28 @@ function ChatMessages({
               }}
               onPaste={handlePaste}
               onKeyDown={(e) => {
-                // Shift+Enter 换行，Enter 提交
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e as any);
+                // Ctrl+Enter 或 Cmd+Enter 换行，单独 Enter 提交
+                if (e.key === 'Enter') {
+                  if (e.ctrlKey || e.metaKey) {
+                    // 手动插入换行符
+                    e.preventDefault();
+                    const textarea = e.target as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const newValue = inputValue.substring(0, start) + '\n' + inputValue.substring(end);
+                    setInputValue(newValue);
+                    // 将光标移到换行符后面
+                    setTimeout(() => {
+                      textarea.selectionStart = textarea.selectionEnd = start + 1;
+                    }, 0);
+                  } else {
+                    // 单独按 Enter 时提交
+                    e.preventDefault();
+                    handleSubmit(e as any);
+                  }
                 }
               }}
-              placeholder={interrupt ? "请先确认或取消..." : "请描述问题..."}
+              placeholder={interrupt ? "请先确认或取消..." : "请描述问题... (Ctrl+Enter 换行)"}
               className={cn(
                 "flex-1 min-w-0 px-2 sm:px-3 py-2 sm:py-2.5 bg-transparent focus:outline-none text-sm sm:text-base resize-none",
                 "min-h-[40px] max-h-[120px]", // 设置最小和最大高度
