@@ -13,7 +13,8 @@ import {
   Typography,
   Empty,
   Spin,
-  Switch
+  Switch,
+  Select
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -25,7 +26,9 @@ import {
   EyeInvisibleOutlined
 } from '@ant-design/icons';
 import { agentApi } from '@/services/agentApi';
+import { userApi } from '@/pages/user/services/rbacApi';
 import type { ColumnsType } from 'antd/es/table';
+import type { RbacUser } from '@/pages/user/types/rbac';
 
 const { Text } = Typography;
 
@@ -55,6 +58,8 @@ const AgentPermissionManager: React.FC<AgentPermissionManagerProps> = ({
   const [regeneratingKeys, setRegeneratingKeys] = useState<Set<number>>(new Set());
   const [togglingStatus, setTogglingStatus] = useState<Set<number>>(new Set());
   const [visibleKeys, setVisibleKeys] = useState<Set<number>>(new Set());
+  const [users, setUsers] = useState<RbacUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [form] = Form.useForm();
 
   // 加载权限列表
@@ -74,11 +79,37 @@ const AgentPermissionManager: React.FC<AgentPermissionManagerProps> = ({
     }
   };
 
+  // 加载用户列表
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const response = await userApi.listUsers({ 
+        page: 1, 
+        size: 200 // 获取较多用户
+      });
+      if (response?.items) {
+        setUsers(response.items);
+      }
+    } catch (error) {
+      console.error('加载用户列表失败:', error);
+      message.error('加载用户列表失败');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
     if (agentId) {
       loadPermissions();
     }
   }, [agentId]);
+
+  // 当打开创建权限弹窗时加载用户列表
+  useEffect(() => {
+    if (createModalVisible) {
+      loadUsers();
+    }
+  }, [createModalVisible]);
 
   // 创建权限
   const handleCreatePermission = async (values: any) => {
@@ -367,11 +398,28 @@ const AgentPermissionManager: React.FC<AgentPermissionManagerProps> = ({
           <Form.Item
             label="授权用户名"
             name="user_name"
-            rules={[{ required: true, message: '请输入用户名' }]}
+            rules={[{ required: true, message: '请选择用户' }]}
           >
-            <Input 
-              prefix={<UserOutlined />} 
-              placeholder="请输入要授权的用户名" 
+            <Select
+              showSearch
+              loading={loadingUsers}
+              placeholder="请选择要授权的用户"
+              optionFilterProp="children"
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase()) ||
+                (option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={users.map(user => ({
+                value: user.user_name,
+                label: (
+                  <div>
+                    <span>{user.display_name || user.user_name}</span>
+                    <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
+                      ({user.user_name})
+                    </span>
+                  </div>
+                )
+              }))}
             />
           </Form.Item>
 
