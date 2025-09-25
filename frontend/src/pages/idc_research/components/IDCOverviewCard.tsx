@@ -1,7 +1,9 @@
 import React from 'react';
-import { Card, Badge, Progress } from 'antd';
-import { CloudServerOutlined, ExperimentOutlined, ThunderboltOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Progress } from './ui/progress';
 import { IDCData } from '../types/idc';
+import { Server, Thermometer, Zap, Clock } from 'lucide-react';
 
 interface IDCOverviewCardProps {
   idc: IDCData;
@@ -10,16 +12,17 @@ interface IDCOverviewCardProps {
 }
 
 export function IDCOverviewCard({ idc, isSelected, onSelect }: IDCOverviewCardProps) {
+  // 使用与 idc_prj 相同的可见背景色类，确保状态底色明显
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
-        return 'success';
+        return 'bg-green-500 text-white';
       case 'warning':
-        return 'warning';
+        return 'bg-yellow-500 text-white';
       case 'critical':
-        return 'error';
+        return 'bg-red-500 text-white';
       default:
-        return 'default';
+        return 'bg-gray-500 text-white';
     }
   };
 
@@ -36,112 +39,76 @@ export function IDCOverviewCard({ idc, isSelected, onSelect }: IDCOverviewCardPr
     }
   };
 
-  const getProgressColor = (value: number) => {
-    if (value >= 80) return '#ff4d4f';
-    if (value >= 60) return '#faad14';
-    return '#52c41a';
-  };
-
   return (
     <Card
-      hoverable
+      className={`cursor-pointer transition-all hover:shadow-lg ${
+        isSelected ? 'ring-2 ring-primary' : ''
+      }`}
       onClick={onSelect}
-      style={{
-        cursor: 'pointer',
-        border: isSelected ? '2px solid #1890ff' : '1px solid #d9d9d9',
-        boxShadow: isSelected ? '0 4px 12px rgba(24, 144, 255, 0.15)' : undefined,
-      }}
     >
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{idc.name}</h3>
-          <Badge
-            status={getStatusColor(idc.status) as any}
-            text={getStatusText(idc.status)}
-          />
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{idc.name}</CardTitle>
+          <Badge className={getStatusColor(idc.status)}>
+            {getStatusText(idc.status)}
+          </Badge>
         </div>
-        <p style={{ margin: 0, color: '#666', fontSize: 14 }}>{idc.location}</p>
-      </div>
+        <p className="text-sm text-muted-foreground">{idc.location}</p>
+      </CardHeader>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 16,
-        marginBottom: 16,
-        fontSize: 14
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CloudServerOutlined style={{ color: '#666' }} />
-          <span>{idc.serverCount} 台服务器</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ClockCircleOutlined style={{ color: '#666' }} />
-          <span>{idc.uptime}% 可用性</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ExperimentOutlined style={{ color: '#666' }} />
-          <span>{idc.temperature}°C</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ThunderboltOutlined style={{ color: '#666' }} />
-          <span>{idc.powerUsage}kW</span>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
-            <span>CPU使用率</span>
-            <span>{idc.cpuUsage}%</span>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <Server className="h-4 w-4 text-muted-foreground" />
+            <span>{idc.serverCount} 台服务器</span>
           </div>
-          <Progress
-            percent={idc.cpuUsage}
-            strokeColor={getProgressColor(idc.cpuUsage)}
-            showInfo={false}
-            size="small"
-          />
-        </div>
-
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
-            <span>内存使用率</span>
-            <span>{idc.memoryUsage}%</span>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span>{idc.uptime}% 可用性</span>
           </div>
-          <Progress
-            percent={idc.memoryUsage}
-            strokeColor={getProgressColor(idc.memoryUsage)}
-            showInfo={false}
-            size="small"
-          />
-        </div>
-
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
-            <span>网络负载</span>
-            <span>{idc.networkLoad}%</span>
+          <div className="flex items-center gap-2">
+            <Thermometer className="h-4 w-4 text-muted-foreground" />
+            <span>{idc.temperature}°C</span>
           </div>
-          <Progress
-            percent={idc.networkLoad}
-            strokeColor={getProgressColor(idc.networkLoad)}
-            showInfo={false}
-            size="small"
-          />
+          <div className="flex items-center gap-2">
+            <Zap className="h-4 w-4 text-muted-foreground" />
+            <span>{idc.powerUsage}kW</span>
+          </div>
         </div>
-      </div>
 
-      <div style={{
-        paddingTop: 16,
-        marginTop: 16,
-        borderTop: '1px solid #f0f0f0',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <span style={{ fontSize: 14 }}>稳定性评分</span>
-        <span style={{ fontWeight: 600, color: idc.stabilityScore >= 95 ? '#52c41a' : '#faad14' }}>
-          {idc.stabilityScore}
-        </span>
-      </div>
+        <div className="space-y-3">
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span>CPU使用率</span>
+              <span>{idc.cpuUsage}%</span>
+            </div>
+            <Progress value={idc.cpuUsage} className="h-2" />
+          </div>
+
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span>内存使用率</span>
+              <span>{idc.memoryUsage}%</span>
+            </div>
+            <Progress value={idc.memoryUsage} className="h-2" />
+          </div>
+
+          <div>
+            <div className="flex justify-between text-sm mb-1">
+              <span>网络负载</span>
+              <span>{idc.networkLoad}%</span>
+            </div>
+            <Progress value={idc.networkLoad} className="h-2" />
+          </div>
+        </div>
+
+        <div className="pt-2 border-t">
+          <div className="flex justify-between items-center">
+            <span className="text-sm">稳定性评分</span>
+            <span className="font-medium">{idc.stabilityScore}</span>
+          </div>
+        </div>
+      </CardContent>
     </Card>
   );
 }

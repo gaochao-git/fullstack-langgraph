@@ -17,7 +17,8 @@ from .apps.kb import router as kb_router
 from .shared.core.endpoints import router as common_router
 from .apps.speech import router as speech_router
 from .apps.sensitive_scan import router as scan_router
-from .apps.idc_research import router as idc_research_router
+from .apps.idc_research import reports_router as idc_reports_router
+from .apps.idc_research import analysis_router as idc_analysis_router
 
 # 创建主API路由器
 api_router = APIRouter()
@@ -34,7 +35,10 @@ api_router.include_router(rbac_router, tags=["rbac"])
 api_router.include_router(kb_router, tags=["knowledge-base"])
 api_router.include_router(speech_router, tags=["speech"])
 api_router.include_router(scan_router, tags=["scan"])
-api_router.include_router(idc_research_router, prefix="/api/v1/idc-reports", tags=["idc-research"])
+# 注意：全局在 main.py 中已挂载前缀 "/api"，
+# 这里仅加版本前缀，避免出现 "/api/api/..." 的重复。
+api_router.include_router(idc_reports_router, prefix="/v1/idc-reports", tags=["idc-reports"])
+api_router.include_router(idc_analysis_router, prefix="/v1/idc-research", tags=["idc-research"])
 
 @api_router.get("/health")
 async def health_check():

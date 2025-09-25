@@ -66,11 +66,11 @@ export function RealTimeStatus() {
   const getAlertIcon = (level: string) => {
     switch (level) {
       case 'critical':
-        return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />;
+        return <CloseCircleOutlined style={{ color: 'var(--color-destructive)' }} />;
       case 'warning':
-        return <ExclamationCircleOutlined style={{ color: '#faad14' }} />;
+        return <ExclamationCircleOutlined style={{ color: 'var(--color-warning)' }} />;
       case 'info':
-        return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
+        return <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />;
       default:
         return <ClockCircleOutlined />;
     }
@@ -94,7 +94,7 @@ export function RealTimeStatus() {
     <Card>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>实时状态监控</h3>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#666', fontSize: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-muted-foreground)', fontSize: 14 }}>
           <ClockCircleOutlined />
           <span>
             {currentTime.toLocaleString('zh-CN', {
@@ -112,9 +112,9 @@ export function RealTimeStatus() {
       <div style={{ marginBottom: 24 }}>
         <Row gutter={16}>
           <Col span={8}>
-            <Card size="small" style={{ backgroundColor: '#f6ffed', border: '1px solid #b7eb8f' }}>
+            <Card size="small" style={{ backgroundColor: 'var(--success-soft-bg)', border: '1px solid var(--success-soft-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <CheckCircleOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+                <CheckCircleOutlined style={{ fontSize: 20, color: 'var(--color-success)' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>正常运行</p>
                   <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>3 个数据中心</p>
@@ -123,9 +123,9 @@ export function RealTimeStatus() {
             </Card>
           </Col>
           <Col span={8}>
-            <Card size="small" style={{ backgroundColor: '#fffbe6', border: '1px solid #ffe58f' }}>
+            <Card size="small" style={{ backgroundColor: 'var(--warning-soft-bg)', border: '1px solid var(--warning-soft-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <ExclamationCircleOutlined style={{ fontSize: 20, color: '#faad14' }} />
+                <ExclamationCircleOutlined style={{ fontSize: 20, color: 'var(--color-warning)' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>警告状态</p>
                   <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>1 个数据中心</p>
@@ -134,9 +134,9 @@ export function RealTimeStatus() {
             </Card>
           </Col>
           <Col span={8}>
-            <Card size="small" style={{ backgroundColor: '#fff2f0', border: '1px solid #ffccc7' }}>
+            <Card size="small" style={{ backgroundColor: 'var(--destructive-soft-bg)', border: '1px solid var(--destructive-soft-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <CloseCircleOutlined style={{ fontSize: 20, color: '#ff4d4f' }} />
+                <CloseCircleOutlined style={{ fontSize: 20, color: 'var(--color-destructive)' }} />
                 <div>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>严重警告</p>
                   <p style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>1 个数据中心</p>
@@ -161,7 +161,7 @@ export function RealTimeStatus() {
                       color={alert.level === 'critical' ? 'red' : alert.level === 'warning' ? 'orange' : 'green'}
                       text={alert.idcName}
                     />
-                    <span style={{ fontSize: 12, color: '#666' }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-muted-foreground)' }}>
                       {formatRelativeTime(alert.timestamp)}
                     </span>
                   </div>

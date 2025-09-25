@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(npm run dev:*)",
+<<<<<<< HEAD
       "Bash(mkdir:*)",
       "Bash(cp:*)",
       "Bash(find:*)",
@@ -21,6 +22,9 @@
       "Bash(git rm:*)",
       "Bash(git commit:*)",
       "WebFetch(domain:github.com)"
+=======
+      "Bash(npm install:*)"
+>>>>>>> xu
     ],
     "deny": [],
     "ask": []

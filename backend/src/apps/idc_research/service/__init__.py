@@ -1,1 +1,0 @@
-# IDC Research Service Module

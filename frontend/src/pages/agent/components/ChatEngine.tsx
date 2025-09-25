@@ -40,13 +40,15 @@ interface ChatEngineProps {
   agent: Agent | null;
   WelcomeComponent?: React.ComponentType<WelcomeComponentProps>;
   onNewSession: () => void;
+  onUserMessage?: (message: string, fileIds?: string[]) => void;
 }
 
 export default function ChatEngine({ 
   agentId, 
   agent, 
   WelcomeComponent,
-  onNewSession 
+  onNewSession,
+  onUserMessage,
 }: ChatEngineProps) {
   const { isDark } = useTheme();
   const { message } = App.useApp();
@@ -338,8 +340,16 @@ export default function ChatEngine({
       
       // 最终提交
       thread.submit(submitData as any, submitOptions as any);
+
+      // 通知外部有用户消息提交（用于页面联动等场景）
+      try {
+        onUserMessage?.(submittedInputValue, fileIds);
+      } catch (e) {
+        // 忽略外部回调异常，避免影响聊天流程
+        console.warn('onUserMessage callback error:', e);
+      }
     },
-    [thread, currentModel, agentId]
+    [thread, currentModel, agentId, onUserMessage]
   );
 
   const handleCancel = useCallback(() => {

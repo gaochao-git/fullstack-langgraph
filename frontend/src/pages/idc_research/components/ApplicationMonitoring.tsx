@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, Tabs, Select, Badge, Row, Col, Alert } from 'antd';
+import { Badge as UIBadge } from './ui/badge';
 import { CloudServerOutlined, DatabaseOutlined, CloudOutlined, ApiOutlined, GlobalOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import { IDCData, Application, ApplicationService } from '../types/idc';
-import { mockApplications, businessTypes, idcNameMap } from '../data/applicationData';
+import IDCResearchApi from '@/services/idcResearchApi';
 
 const { TabPane } = Tabs;
 const { Option } = Select;
@@ -15,59 +16,104 @@ interface ApplicationMonitoringProps {
 export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringProps) {
   const [selectedBusiness, setSelectedBusiness] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'business' | 'idc'>('business');
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [businessTypesState, setBusinessTypesState] = useState<string[]>([]);
+  const [idcNameMapState, setIdcNameMapState] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [appsResp, typesResp, idcsResp] = await Promise.all([
+          IDCResearchApi.getApplications(),
+          IDCResearchApi.getBusinessTypes(),
+          IDCResearchApi.getIDCs(),
+        ]);
+        setApplications(appsResp?.data || []);
+        const typesData = Array.isArray(typesResp?.data)
+          ? typesResp?.data
+          : (typesResp?.data?.items || []);
+        setBusinessTypesState(typesData);
+        const map: Record<string, string> = {};
+        (idcsResp?.data || []).forEach((i: any) => { map[i.id] = i.name; });
+        setIdcNameMapState(map);
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
+
+  // 读取 CSS 变量的工具与调色板（放在组件内部，避免 hooks 报错）
+  const getCssVar = (name: string, fallback: string) => {
+    if (typeof window === 'undefined') return fallback;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  };
+
+  const palette = useMemo(() => ({
+    app: getCssVar('--color-primary', '#1890ff'),
+    database: getCssVar('--color-success', '#22c55e'),
+    cache: getCssVar('--color-warning', '#f59e0b'),
+    mq: getCssVar('--color-destructive', '#ef4444'),
+    gateway: getCssVar('--color-accent', '#722ed1'),
+  }), []);
 
   // 获取服务类型图标
   const getServiceIcon = (type: string) => {
     switch (type) {
       case 'app':
-        return <CloudServerOutlined style={{ color: '#1890ff' }} />;
+        return <CloudServerOutlined style={{ color: 'var(--color-primary, #1890ff)' }} />;
       case 'database':
-        return <DatabaseOutlined style={{ color: '#52c41a' }} />;
+        return <DatabaseOutlined style={{ color: 'var(--color-success, #22c55e)' }} />;
       case 'cache':
-        return <CloudOutlined style={{ color: '#faad14' }} />;
+        return <CloudOutlined style={{ color: 'var(--color-warning, #f59e0b)' }} />;
       case 'mq':
-        return <ApiOutlined style={{ color: '#f5222d' }} />;
+        return <ApiOutlined style={{ color: 'var(--color-destructive, #ef4444)' }} />;
       case 'gateway':
-        return <GlobalOutlined style={{ color: '#722ed1' }} />;
+        return <GlobalOutlined style={{ color: 'var(--color-accent, #722ed1)' }} />;
       default:
         return <CloudServerOutlined />;
     }
   };
 
   // 获取服务类型颜色
-  const getServiceColor = (type: string) => {
-    const colors = {
-      app: '#1890ff',
-      database: '#52c41a',
-      cache: '#faad14',
-      mq: '#f5222d',
-      gateway: '#722ed1',
-    };
-    return colors[type as keyof typeof colors] || '#1890ff';
-  };
+  const getServiceColor = (type: string) => (palette as any)[type] || palette.app;
 
   // 获取状态颜色
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
-        return '#52c41a';
+        return 'var(--color-success, #22c55e)';
       case 'warning':
-        return '#faad14';
+        return 'var(--color-warning, #f59e0b)';
       case 'critical':
-        return '#f5222d';
+        return 'var(--color-destructive, #ef4444)';
       default:
-        return '#d9d9d9';
+        return 'var(--color-border, #e5e7eb)';
+    }
+  };
+
+  // 文本颜色类（用于状态行与图标），对齐 idc_prj 显示风格
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case 'healthy':
+        return 'text-green-500';
+      case 'warning':
+        return 'text-yellow-500';
+      case 'critical':
+        return 'text-red-500';
+      default:
+        return 'text-gray-500';
     }
   };
 
   // 过滤应用程序
   const filteredApplications = selectedBusiness === 'all'
-    ? mockApplications
-    : mockApplications.filter(app => app.businessType === selectedBusiness);
+    ? applications
+    : applications.filter(app => app.businessType === selectedBusiness);
 
   // 按业务类型分组的数据
-  const businessData = businessTypes.map(businessType => {
-    const apps = mockApplications.filter(app => app.businessType === businessType);
+  const businessData = businessTypesState.map(businessType => {
+    const apps = applications.filter(app => app.businessType === businessType);
     const allServices = apps.flatMap(app => app.services);
 
     if (allServices.length === 0) return null;
@@ -90,7 +136,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
 
   // 按数据中心分组的数据
   const idcData = selectedIDCs.length > 0 ? selectedIDCs.map(idc => {
-    const services = mockApplications.flatMap(app =>
+    const services = applications.flatMap(app =>
       app.services.filter(service => service.idcId === idc.id)
     );
 
@@ -113,7 +159,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
   }).filter(Boolean) : [];
 
   // 服务类型分布数据
-  const serviceTypeData = mockApplications.flatMap(app => app.services)
+  const serviceTypeData = applications.flatMap(app => app.services)
     .reduce((acc, service) => {
       acc[service.type] = (acc[service.type] || 0) + service.instances;
       return acc;
@@ -126,7 +172,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
   }));
 
   // 跨数据中心业务健康度数据
-  const crossIDCHealthData = mockApplications
+  const crossIDCHealthData = applications
     .filter(app => app.isShared && app.deployedIDCs.length > 1)
     .map(app => {
       const servicesByIDC = app.deployedIDCs.map(idcId => {
@@ -135,7 +181,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
           ? services.reduce((sum, s) => sum + s.metrics.availability, 0) / services.length
           : 0;
         return {
-          idc: idcNameMap[idcId]?.replace('数据中心', '') || idcId,
+          idc: idcNameMapState[idcId]?.replace('数据中心', '') || idcId,
           availability: avgAvailability,
         };
       });
@@ -190,13 +236,13 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         name: 'CPU使用率',
         type: 'bar',
         data: businessData.map(d => d?.cpuUsage || 0),
-        itemStyle: { color: '#1890ff' }
+        itemStyle: { color: palette.app }
       },
       {
         name: '内存使用率',
         type: 'bar',
         data: businessData.map(d => d?.memoryUsage || 0),
-        itemStyle: { color: '#52c41a' }
+        itemStyle: { color: palette.database }
       }
     ]
   };
@@ -323,31 +369,31 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         name: '北京',
         type: 'bar',
         data: crossIDCHealthData.map(d => d['北京'] || null),
-        itemStyle: { color: '#1890ff' }
+        itemStyle: { color: palette.app }
       },
       {
         name: '上海',
         type: 'bar',
         data: crossIDCHealthData.map(d => d['上海'] || null),
-        itemStyle: { color: '#52c41a' }
+        itemStyle: { color: palette.database }
       },
       {
         name: '广州',
         type: 'bar',
         data: crossIDCHealthData.map(d => d['广州'] || null),
-        itemStyle: { color: '#faad14' }
+        itemStyle: { color: palette.cache }
       },
       {
         name: '深圳',
         type: 'bar',
         data: crossIDCHealthData.map(d => d['深圳'] || null),
-        itemStyle: { color: '#f5222d' }
+        itemStyle: { color: palette.mq }
       },
       {
         name: '成都',
         type: 'bar',
         data: crossIDCHealthData.map(d => d['成都'] || null),
-        itemStyle: { color: '#722ed1' }
+        itemStyle: { color: palette.gateway }
       }
     ]
   };
@@ -390,13 +436,13 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         name: 'CPU使用率',
         type: 'bar',
         data: idcData.map(d => d?.cpuUsage || 0),
-        itemStyle: { color: '#1890ff' }
+        itemStyle: { color: palette.app }
       },
       {
         name: '内存使用率',
         type: 'bar',
         data: idcData.map(d => d?.memoryUsage || 0),
-        itemStyle: { color: '#52c41a' }
+        itemStyle: { color: palette.database }
       }
     ]
   };
@@ -426,7 +472,7 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
               style={{ width: 150 }}
             >
               <Option value="all">全部业务</Option>
-              {businessTypes.map(type => (
+              {businessTypesState.map(type => (
                 <Option key={type} value={type}>{type}</Option>
               ))}
             </Select>
@@ -439,9 +485,9 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         <Col span={6}>
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <CloudServerOutlined style={{ fontSize: 20, color: '#1890ff' }} />
+              <CloudServerOutlined style={{ fontSize: 20, color: 'var(--color-primary, #1890ff)' }} />
               <div>
-                <p style={{ margin: 0, fontSize: 14, color: '#666' }}>总应用数</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-muted-foreground)' }}>总应用数</p>
                 <p style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>{filteredApplications.length}</p>
               </div>
             </div>
@@ -450,9 +496,9 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         <Col span={6}>
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <DatabaseOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+              <DatabaseOutlined style={{ fontSize: 20, color: 'var(--color-success, #22c55e)' }} />
               <div>
-                <p style={{ margin: 0, fontSize: 14, color: '#666' }}>总服务实例</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-muted-foreground)' }}>总服务实例</p>
                 <p style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>
                   {filteredApplications.flatMap(app => app.services).reduce((sum, s) => sum + s.instances, 0)}
                 </p>
@@ -463,9 +509,9 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         <Col span={6}>
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <CheckCircleOutlined style={{ fontSize: 20, color: '#52c41a' }} />
+              <CheckCircleOutlined style={{ fontSize: 20, color: 'var(--color-success, #22c55e)' }} />
               <div>
-                <p style={{ margin: 0, fontSize: 14, color: '#666' }}>健康应用</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-muted-foreground)' }}>健康应用</p>
                 <p style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>
                   {filteredApplications.filter(app => app.status === 'healthy').length}
                 </p>
@@ -476,9 +522,9 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
         <Col span={6}>
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <ExclamationCircleOutlined style={{ fontSize: 20, color: '#f5222d' }} />
+              <ExclamationCircleOutlined style={{ fontSize: 20, color: 'var(--color-destructive, #ef4444)' }} />
               <div>
-                <p style={{ margin: 0, fontSize: 14, color: '#666' }}>异常应用</p>
+                <p style={{ margin: 0, fontSize: 14, color: 'var(--color-muted-foreground)' }}>异常应用</p>
                 <p style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>
                   {filteredApplications.filter(app => app.status !== 'healthy').length}
                 </p>
@@ -542,10 +588,10 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
                       <Card size="small">
                         <div style={{ textAlign: 'center' }}>
                           <h4 style={{ margin: '0 0 8px 0' }}>{idc?.name}</h4>
-                          <div style={{ fontSize: 24, fontWeight: 600, color: (idc?.availability || 0) >= 99 ? '#52c41a' : '#faad14' }}>
+                          <div style={{ fontSize: 24, fontWeight: 600, color: (idc?.availability || 0) >= 99 ? 'var(--color-success)' : 'var(--color-warning)' }}>
                             {idc?.availability?.toFixed(2)}%
                           </div>
-                          <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-muted-foreground)', marginTop: 4 }}>
                             {idc?.totalServices} 个服务 | {idc?.totalInstances} 个实例
                           </div>
                         </div>
@@ -561,45 +607,52 @@ export function ApplicationMonitoring({ selectedIDCs }: ApplicationMonitoringPro
 
       {/* 应用详细信息 */}
       <Card title="应用详细信息">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="space-y-4">
           {filteredApplications.map(app => (
-            <div key={app.id} style={{ border: '1px solid #d9d9d9', borderRadius: 6, padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <h4 style={{ margin: 0, fontWeight: 600 }}>{app.name}</h4>
-                  <Badge color="blue" text={app.businessType} />
-                  <Badge color="green" text={`v${app.version}`} />
-                  <Badge color={app.isShared ? 'blue' : 'gray'} text={app.isShared ? '跨数据中心' : '单数据中心'} />
+            <div
+              key={app.id}
+              className="border rounded-lg p-4"
+              style={{ borderColor: 'var(--color-border, #e5e7eb)' }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <h4 className="font-medium m-0">{app.name}</h4>
+                  <UIBadge variant="outline">{app.businessType}</UIBadge>
+                  <UIBadge variant="secondary">v{app.version}</UIBadge>
+                  <UIBadge className={app.isShared ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}>
+                    {app.isShared ? '跨数据中心' : '单数据中心'}
+                  </UIBadge>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: getStatusColor(app.status) }}></div>
-                  <span style={{ fontSize: 14, textTransform: 'capitalize' }}>{app.status}</span>
+                <div className={`flex items-center gap-1 ${getStatusClass(app.status)}`}>
+                  {app.status === 'healthy' ? (
+                    <CheckCircleOutlined style={{ fontSize: 16 }} />
+                  ) : (
+                    <ExclamationCircleOutlined style={{ fontSize: 16 }} />
+                  )}
+                  <span className="text-sm capitalize">{app.status}</span>
                 </div>
               </div>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-                gap: 12
-              }}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {app.services
                   .filter(service => selectedIDCs.length === 0 || selectedIDCs.some(idc => idc.id === service.idcId))
                   .map(service => (
-                    <div key={service.id} style={{ padding: 12, backgroundColor: '#f6f6f6', borderRadius: 4 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div
+                      key={service.id}
+                      className="p-3 rounded-lg"
+                      style={{
+                        backgroundColor: 'var(--color-muted, var(--muted, #f6f6f6))',
+                        border: '1px solid var(--color-border, #e5e7eb)'
+                      }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
                         {getServiceIcon(service.type)}
-                        <span style={{ fontWeight: 500, fontSize: 14 }}>{service.name}</span>
-                        <Badge
-                          color="orange"
-                          text={idcNameMap[service.idcId]?.replace('数据中心', '') || service.idcId}
-                        />
+                        <span className="font-medium text-sm">{service.name}</span>
+                        <UIBadge variant="outline" className="text-xs">
+                          {idcNameMapState[service.idcId]?.replace('数据中心', '') || service.idcId}
+                        </UIBadge>
                       </div>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 4,
-                        fontSize: 12
-                      }}>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>实例: {service.instances}</div>
                         <div>CPU: {service.metrics.cpuUsage}%</div>
                         <div>内存: {service.metrics.memoryUsage}%</div>
