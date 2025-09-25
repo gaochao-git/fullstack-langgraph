@@ -952,7 +952,7 @@ function ChatMessages({
   };
 
   // 处理粘贴事件，支持文件粘贴
-  const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -1267,10 +1267,11 @@ function ChatMessages({
   // 创建textarea的ref
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 当inputValue清空时重置textarea高度
+  // 当inputValue变化时调整textarea高度
   useEffect(() => {
-    if (!inputValue && textareaRef.current) {
+    if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
     }
   }, [inputValue]);
 
@@ -1868,6 +1869,11 @@ function ChatMessages({
                 <VoiceInput
                   onTranscript={(text) => {
                     setInputValue(inputValue + text);
+                    // 调整textarea高度
+                    if (textareaRef.current) {
+                      textareaRef.current.style.height = 'auto';
+                      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
+                    }
                   }}
                   disabled={isLoading || !!interrupt}
                 />
