@@ -305,10 +305,10 @@ const IDCAnalysisPage: React.FC = () => {
                           setSelectedAgentId(v);
                           setChatKey(prev => prev + 1);
                         }}>
-                          <SelectTrigger className="w-[220px]">
+                          <SelectTrigger className="w-[240px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                             <SelectValue placeholder="选择智能体" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                             {agentOptions.map(opt => (
                               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                             ))}
