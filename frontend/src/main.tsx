@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { configureAuthInterceptor } from "./utils/authInterceptor";
 import "./global.css";
+//import "./pages/idc_research/idc_prj/styles/globals.css";
 import App from "./App.tsx";
 
 // Configure auth interceptor

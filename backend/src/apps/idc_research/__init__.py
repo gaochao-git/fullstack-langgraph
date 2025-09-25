@@ -1,6 +1,7 @@
-"""
-IDC Research Module
-IDC运行报告模块
-"""
+"""IDC Research package routers exports"""
 
-from .endpoints import router
+from .reports_endpoints import router as reports_router
+from .analysis_endpoints import router as analysis_router
+
+__all__ = ["reports_router", "analysis_router"]
+

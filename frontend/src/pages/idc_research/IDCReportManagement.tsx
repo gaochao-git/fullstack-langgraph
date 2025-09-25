@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import IDCReportApi from '@/services/idcReportApi';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -65,48 +66,13 @@ const IDCReportManagement: React.FC = () => {
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [form] = Form.useForm();
 
-  // 模拟数据
-  const mockReports: IDCReport[] = [
-    {
-      id: '1',
-      reportName: '2024年12月机房A运行报告',
-      idcLocation: '北京机房A',
-      reportType: '月度报告',
-      generateTime: '2024-12-01 08:00:00',
-      status: '已完成',
-      powerUsage: 1250.5,
-      energyEfficiency: 1.42,
-      availabilityRate: 99.95,
-      alertCount: 3,
-      fileSize: '2.5MB'
-    },
-    {
-      id: '2',
-      reportName: '2024年12月机房B运行报告',
-      idcLocation: '上海机房B',
-      reportType: '月度报告',
-      generateTime: '2024-12-01 08:30:00',
-      status: '生成中',
-      powerUsage: 980.2,
-      energyEfficiency: 1.38,
-      availabilityRate: 99.98,
-      alertCount: 1,
-      fileSize: '1.8MB'
-    },
-    {
-      id: '3',
-      reportName: '2024年第4季度综合报告',
-      idcLocation: '全部机房',
-      reportType: '季度报告',
-      generateTime: '2024-12-15 10:00:00',
-      status: '已完成',
-      powerUsage: 3250.8,
-      energyEfficiency: 1.45,
-      availabilityRate: 99.92,
-      alertCount: 8,
-      fileSize: '5.2MB'
-    }
-  ];
+  // 统计卡片
+  const [stats, setStats] = useState({
+    total: 0,
+    monthly: 0,
+    avgPue: 0,
+    avgAvailability: 0,
+  });
 
   const columns: ColumnsType<IDCReport> = [
     {
@@ -169,7 +135,7 @@ const IDCReportManagement: React.FC = () => {
       key: 'energyEfficiency',
       width: 80,
       render: (value: number) => (
-        <span style={{ color: value < 1.5 ? '#52c41a' : value < 2.0 ? '#faad14' : '#ff4d4f' }}>
+        <span style={{ color: value < 1.5 ? 'var(--color-success)' : value < 2.0 ? 'var(--color-warning)' : 'var(--color-destructive)' }}>
           {value}
         </span>
       ),
@@ -184,7 +150,8 @@ const IDCReportManagement: React.FC = () => {
           <Progress 
             percent={value} 
             size="small" 
-            strokeColor={value >= 99.9 ? '#52c41a' : value >= 99.5 ? '#faad14' : '#ff4d4f'}
+            strokeColor={value >= 99.9 ? 'var(--color-success, #22c55e)' : value >= 99.5 ? 'var(--color-warning, #f59e0b)' : 'var(--color-destructive, #ef4444)'}
+            trailColor={'var(--color-input-background, var(--input-background))'}
             showInfo={false}
           />
           <span style={{ fontSize: '12px' }}>{value}%</span>
@@ -197,7 +164,7 @@ const IDCReportManagement: React.FC = () => {
       key: 'alertCount',
       width: 80,
       render: (count: number) => (
-        <span style={{ color: count === 0 ? '#52c41a' : count < 5 ? '#faad14' : '#ff4d4f' }}>
+        <span style={{ color: count === 0 ? 'var(--color-success)' : count < 5 ? 'var(--color-warning)' : 'var(--color-destructive)' }}>
           {count}
         </span>
       ),
@@ -232,62 +199,77 @@ const IDCReportManagement: React.FC = () => {
   ];
 
   const statCards = [
-    { title: '总报告数', value: mockReports.length, color: '#1890ff' },
-    { title: '本月报告', value: 2, color: '#52c41a' },
-    { title: '平均PUE', value: '1.42', color: '#faad14' },
-    { title: '平均可用性', value: '99.95%', color: '#722ed1' },
+    { title: '总报告数', value: stats.total, color: 'var(--color-primary)' },
+    { title: '本月报告', value: stats.monthly, color: 'var(--color-success)' },
+    { title: '平均PUE', value: stats.avgPue?.toString(), color: 'var(--color-warning)' },
+    { title: '平均可用性', value: `${stats.avgAvailability}%`, color: 'var(--color-accent)' },
   ];
 
   useEffect(() => {
     fetchReports();
   }, [pagination.current, pagination.pageSize, filters]);
 
+  const mapTypeToCN = (t?: string) => ({ monthly: '月度报告', quarterly: '季度报告', yearly: '年度报告', custom: '自定义报告' } as any)[t || ''] || '自定义报告';
+  const mapStatusToCN = (s?: string) => ({ completed: '已完成', generating: '生成中', pending: '生成中', failed: '失败' } as any)[s || ''] || '生成中';
+  const toMB = (bytes?: number) => bytes ? `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)}MB` : '';
+
   const fetchReports = async () => {
     setLoading(true);
     try {
-      // 这里将来需要调用实际的API
-      // const response = await idcReportApi.getReports({
-      //   page: pagination.current,
-      //   pageSize: pagination.pageSize,
-      //   ...filters
-      // });
-      
-      // 模拟API延迟
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // 模拟筛选逻辑
-      let filteredReports = [...mockReports];
-      
-      if (filters.keyword) {
-        filteredReports = filteredReports.filter(report => 
-          report.reportName.includes(filters.keyword) ||
-          report.idcLocation.includes(filters.keyword)
-        );
-      }
-      
-      if (filters.idcLocation) {
-        filteredReports = filteredReports.filter(report => 
-          report.idcLocation === filters.idcLocation
-        );
-      }
-      
+      // 拉取统计
+      try {
+        const statResp = await IDCReportApi.getReportStats();
+        const d = statResp?.data || {};
+        const recent = Array.isArray(d.recent_reports) ? d.recent_reports : [];
+        // 粗略估计平均PUE、可用性
+        const pueVals = recent.map((r: any) => r.pue_value).filter((x: any) => typeof x === 'number');
+        const availVals = recent.map((r: any) => r.availability_rate).filter((x: any) => typeof x === 'number');
+        setStats({
+          total: d.total_reports || 0,
+          monthly: d.this_month_reports || 0,
+          avgPue: pueVals.length ? Number((pueVals.reduce((a: number, b: number) => a + b, 0) / pueVals.length).toFixed(2)) : 0,
+          avgAvailability: availVals.length ? Number((availVals.reduce((a: number, b: number) => a + b, 0) / availVals.length).toFixed(2)) : 0,
+        });
+      } catch {}
+
+      const params: any = {
+        page: pagination.current,
+        pageSize: pagination.pageSize,
+      };
+      if (filters.keyword) params.keyword = filters.keyword;
+      if (filters.idcLocation) params.idcLocation = filters.idcLocation;
       if (filters.reportType) {
-        filteredReports = filteredReports.filter(report => 
-          report.reportType === filters.reportType
-        );
+        const map: any = { '日报告': 'daily', '周报告': 'weekly', '月度报告': 'monthly', '季度报告': 'quarterly', '年度报告': 'yearly' };
+        params.reportType = map[filters.reportType] || 'custom';
       }
-      
       if (filters.status) {
-        filteredReports = filteredReports.filter(report => 
-          report.status === filters.status
-        );
+        const map: any = { '已完成': 'completed', '生成中': 'generating', '失败': 'failed' };
+        params.status = map[filters.status] || '';
       }
-      
-      setReports(filteredReports);
-      setPagination(prev => ({
-        ...prev,
-        total: filteredReports.length,
+      if (filters.dateRange && Array.isArray(filters.dateRange)) {
+        params.dateRange = [filters.dateRange[0]?.toISOString(), filters.dateRange[1]?.toISOString()];
+      }
+
+      const resp = await IDCReportApi.getReports(params);
+      const items: any[] = resp?.data?.items || [];
+      const total: number = resp?.data?.pagination?.total || items.length;
+
+      const mapped: IDCReport[] = items.map((it: any) => ({
+        id: it.report_id,
+        reportName: it.report_name,
+        idcLocation: it.idc_location,
+        reportType: mapTypeToCN(it.report_type),
+        generateTime: (it.generation_time || it.updated_at || it.created_at || '').toString().replace('T', ' ').slice(0, 19),
+        status: mapStatusToCN(it.status),
+        powerUsage: Number(it.total_power_consumption || 0),
+        energyEfficiency: Number(it.pue_value || 0),
+        availabilityRate: Number(it.availability_rate || 0),
+        alertCount: Number(it.incident_count || 0),
+        fileSize: toMB(it.file_size),
       }));
+
+      setReports(mapped);
+      setPagination(prev => ({ ...prev, total }));
     } catch (error) {
       message.error('获取报告列表失败');
     } finally {
@@ -311,7 +293,17 @@ const IDCReportManagement: React.FC = () => {
 
   const handleCreateSubmit = async (values: any) => {
     try {
-      // 这里将来调用创建报告的API
+      const mapType: any = { '日报告': 'daily', '周报告': 'weekly', '月度报告': 'monthly', '季度报告': 'quarterly', '年度报告': 'yearly' };
+      const dateRange: [string, string] = [
+        values.dateRange?.[0]?.toISOString?.() || dayjs().startOf('month').toISOString(),
+        values.dateRange?.[1]?.toISOString?.() || dayjs().toISOString(),
+      ];
+      await IDCReportApi.createReport({
+        reportName: values.reportName,
+        idcLocation: values.idcLocation,
+        reportType: mapType[values.reportType] || 'custom',
+        dateRange,
+      });
       message.success('报告生成任务已提交');
       setCreateModalVisible(false);
       form.resetFields();

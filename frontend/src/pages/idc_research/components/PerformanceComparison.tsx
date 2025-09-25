@@ -1,5 +1,5 @@
-import React from 'react';
-import { Card, Row, Col, Empty } from 'antd';
+import React, { useMemo } from 'react';
+import { Card, Row, Col, Empty, Progress } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import { IDCData } from '../types/idc';
 
@@ -8,6 +8,23 @@ interface PerformanceComparisonProps {
 }
 
 export function PerformanceComparison({ selectedIDCs }: PerformanceComparisonProps) {
+  const getCssVar = (name: string, fallback: string) => {
+    if (typeof window === 'undefined') return fallback;
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  };
+
+  const chartColors = useMemo(() => ({
+    c1: getCssVar('--color-chart-1', '#5470c6'),
+    c2: getCssVar('--color-chart-2', '#91cc75'),
+    c3: getCssVar('--color-chart-3', '#fac858'),
+    c4: getCssVar('--color-chart-4', '#ee6666'),
+    c5: getCssVar('--color-chart-5', '#73c0de'),
+    success: getCssVar('--color-success', '#22c55e'),
+    warning: getCssVar('--color-warning', '#f59e0b'),
+    destructive: getCssVar('--color-destructive', '#ef4444'),
+    border: getCssVar('--color-border', '#e5e7eb'),
+  }), []);
   if (selectedIDCs.length === 0) {
     return (
       <Card>
@@ -61,19 +78,19 @@ export function PerformanceComparison({ selectedIDCs }: PerformanceComparisonPro
         name: 'CPU使用率',
         type: 'bar',
         data: selectedIDCs.map(idc => idc.cpuUsage),
-        itemStyle: { color: '#5470c6' }
+        itemStyle: { color: chartColors.c1 }
       },
       {
         name: '内存使用率',
         type: 'bar',
         data: selectedIDCs.map(idc => idc.memoryUsage),
-        itemStyle: { color: '#91cc75' }
+        itemStyle: { color: chartColors.c2 }
       },
       {
         name: '网络负载',
         type: 'bar',
         data: selectedIDCs.map(idc => idc.networkLoad),
-        itemStyle: { color: '#fac858' }
+        itemStyle: { color: chartColors.c3 }
       }
     ]
   };
@@ -114,7 +131,7 @@ export function PerformanceComparison({ selectedIDCs }: PerformanceComparisonPro
           ],
           name: idc.name.replace('数据中心', ''),
           itemStyle: {
-            color: `hsl(${index * 60}, 70%, 50%)`
+            color: [chartColors.c1, chartColors.c2, chartColors.c3, chartColors.c4, chartColors.c5][index % 5]
           }
         }))
       }
@@ -166,7 +183,7 @@ export function PerformanceComparison({ selectedIDCs }: PerformanceComparisonPro
       data: idc.performanceHistory.slice(-6).map(point => point.cpu),
       smooth: true,
       itemStyle: {
-        color: `hsl(${index * 60}, 70%, 50%)`
+        color: [chartColors.c1, chartColors.c2, chartColors.c3, chartColors.c4, chartColors.c5][index % 5]
       }
     }))
   };
@@ -218,32 +235,32 @@ export function PerformanceComparison({ selectedIDCs }: PerformanceComparisonPro
               <Card size="small" style={{ textAlign: 'center' }}>
                 <h4 style={{ margin: '0 0 16px 0' }}>{score.name}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                    <span>CPU性能:</span>
-                    <span style={{ color: score.cpuScore >= 60 ? '#52c41a' : '#faad14' }}>
-                      {score.cpuScore}分
-                    </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 48px', alignItems: 'center', fontSize: 14, gap: 8 }}>
+                    <span>CPU性能</span>
+                    <Progress percent={score.cpuScore} size="small" strokeColor={score.cpuScore >= 60 ? 'var(--color-success, #22c55e)' : 'var(--color-warning, #f59e0b)'} trailColor={'var(--color-input-background, var(--input-background))'} showInfo={false} />
+                    <span style={{ textAlign: 'right' }}>{score.cpuScore}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                    <span>内存性能:</span>
-                    <span style={{ color: score.memoryScore >= 60 ? '#52c41a' : '#faad14' }}>
-                      {score.memoryScore}分
-                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 48px', alignItems: 'center', width: '100%', gap: 8 }}>
+                      <span>内存性能</span>
+                      <Progress percent={score.memoryScore} size="small" strokeColor={score.memoryScore >= 60 ? 'var(--color-success, #22c55e)' : 'var(--color-warning, #f59e0b)'} trailColor={'var(--color-input-background, var(--input-background))'} showInfo={false} />
+                      <span style={{ textAlign: 'right' }}>{score.memoryScore}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 48px', alignItems: 'center', fontSize: 14, gap: 8 }}>
+                    <span>网络性能</span>
+                    <Progress percent={score.networkScore} size="small" strokeColor={score.networkScore >= 60 ? 'var(--color-success, #22c55e)' : 'var(--color-warning, #f59e0b)'} trailColor={'var(--color-input-background, var(--input-background))'} showInfo={false} />
+                    <span style={{ textAlign: 'right' }}>{score.networkScore}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                    <span>网络性能:</span>
-                    <span style={{ color: score.networkScore >= 60 ? '#52c41a' : '#faad14' }}>
-                      {score.networkScore}分
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                    <span>稳定性:</span>
-                    <span style={{ color: score.stabilityScore >= 95 ? '#52c41a' : '#faad14' }}>
-                      {score.stabilityScore}分
-                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 48px', alignItems: 'center', width: '100%', gap: 8 }}>
+                      <span>稳定性</span>
+                      <Progress percent={Math.min(100, Math.max(0, Math.round(score.stabilityScore)))} size="small" strokeColor={score.stabilityScore >= 95 ? 'var(--color-success, #22c55e)' : 'var(--color-warning, #f59e0b)'} trailColor={'var(--color-input-background, var(--input-background))'} showInfo={false} />
+                      <span style={{ textAlign: 'right' }}>{score.stabilityScore}</span>
+                    </div>
                   </div>
                   <div style={{
-                    borderTop: '1px solid #f0f0f0',
+                    borderTop: '1px solid var(--color-border)',
                     paddingTop: 8,
                     marginTop: 8,
                     display: 'flex',
@@ -251,12 +268,10 @@ export function PerformanceComparison({ selectedIDCs }: PerformanceComparisonPro
                     fontWeight: 600
                   }}>
                     <span>综合评分:</span>
-                    <span style={{
-                      color: score.overallScore >= 80 ? '#52c41a' :
-                             score.overallScore >= 60 ? '#faad14' : '#ff4d4f'
-                    }}>
-                      {score.overallScore}分
-                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px', alignItems: 'center', gap: 8, width: 200 }}>
+                      <Progress percent={score.overallScore} size="small" strokeColor={score.overallScore >= 80 ? 'var(--color-success, #22c55e)' : score.overallScore >= 60 ? 'var(--color-warning, #f59e0b)' : 'var(--color-destructive, #ef4444)'} trailColor={'var(--color-input-background, var(--input-background))'} showInfo={false} />
+                      <span style={{ textAlign: 'right' }}>{score.overallScore}</span>
+                    </div>
                   </div>
                 </div>
               </Card>
