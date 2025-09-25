@@ -1264,6 +1264,16 @@ function ChatMessages({
     }
   }, [isLoading, isAutoScrollEnabled, scrollToBottom]);
 
+  // 创建textarea的ref
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 当inputValue清空时重置textarea高度
+  useEffect(() => {
+    if (!inputValue && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [inputValue]);
+
   // 分组：每个人类消息+其后的所有助手消息为一轮
   const dialogRounds: DialogRound[] = [];
   let currentRound: DialogRound | null = null;
@@ -1768,14 +1778,14 @@ function ChatMessages({
         <form onSubmit={handleSubmit} style={{ paddingLeft: '5px', paddingRight: '5px', paddingTop: '5px', paddingBottom: '5px' }}>
           {/* 地址栏样式的输入容器 */}
           <div className={cn(
-            "flex items-center border-2 rounded-md overflow-hidden shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-400",
+            "flex items-start border-2 rounded-md overflow-hidden shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-cyan-400",
             isDark 
               ? "bg-gray-800 border-gray-600" 
               : "bg-white border-gray-300"
           )}>
             {/* 模型选择器 - 作为地址栏的协议部分 */}
             <div className={cn(
-              "flex items-center border-r px-1 sm:px-3 py-2 sm:py-2.5 flex-shrink-0",
+              "flex items-center border-r px-1 sm:px-3 py-2 sm:py-2.5 flex-shrink-0 self-stretch",
               isDark 
                 ? "border-gray-600" 
                 : "border-gray-300"
@@ -1812,24 +1822,43 @@ function ChatMessages({
             </div>
             
             {/* 输入框 - 作为地址栏的主体部分 */}
-            <input
-              type="text"
+            <textarea
+              ref={textareaRef}
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                // 自动调整高度
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
               onPaste={handlePaste}
+              onKeyDown={(e) => {
+                // Shift+Enter 换行，Enter 提交
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e as any);
+                }
+              }}
               placeholder={interrupt ? "请先确认或取消..." : "请描述问题..."}
               className={cn(
-                "flex-1 min-w-0 px-2 sm:px-3 py-2 sm:py-2.5 bg-transparent focus:outline-none text-sm sm:text-base",
+                "flex-1 min-w-0 px-2 sm:px-3 py-2 sm:py-2.5 bg-transparent focus:outline-none text-sm sm:text-base resize-none",
+                "min-h-[40px] max-h-[120px]", // 设置最小和最大高度
                 isDark 
                   ? "text-gray-100 placeholder-gray-400" 
                   : "text-gray-900 placeholder-gray-500"
               )}
+              style={{
+                // 自适应高度
+                height: 'auto',
+                overflowY: 'auto'
+              }}
               disabled={false}
+              rows={1}
             />
             
             {/* 操作按钮区域 - 包含上传文件和发送按钮 */}
             <div className={cn(
-              "flex items-center border-l flex-shrink-0",
+              "flex items-center border-l flex-shrink-0 self-stretch",
               isDark 
                 ? "border-gray-600" 
                 : "border-gray-300"
@@ -1859,13 +1888,6 @@ function ChatMessages({
                 />
               )}
               
-              {/* 分隔线 - 手机端隐藏 */}
-              {!(isLoading || interrupt) && (
-                <div className={cn(
-                  "hidden sm:block h-6 w-px mx-1",
-                  isDark ? "bg-gray-600" : "bg-gray-300"
-                )} />
-              )}
               
               {/* 发送/取消按钮 */}
               {(isLoading || interrupt) ? (
