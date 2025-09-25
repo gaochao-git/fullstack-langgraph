@@ -141,7 +141,6 @@ class AgentRegistry:
                                 agent_description=agent_info.get('description', ''),
                                 agent_capabilities=agent_info.get('capabilities', []),
                                 agent_version=agent_info.get('version', '1.0.0'),
-                                agent_status='active',
                                 agent_enabled='yes',
                                 agent_icon=agent_info.get('icon', 'Bot'),
                                 is_builtin='yes' if agent_info.get('builtin', False) else 'no',

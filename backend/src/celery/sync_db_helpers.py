@@ -50,8 +50,7 @@ def get_agent_config_sync(agent_id: str) -> Optional[Dict[str, Any]]:
                     "agent_type": agent.agent_type,
                     "agent_prompt": agent.agent_prompt,
                     "agent_config": agent.agent_config,
-                    "agent_tools": agent.agent_tools,
-                    "agent_status": agent.agent_status
+                    "agent_tools": agent.agent_tools
                 }
             return None
             
@@ -72,7 +71,7 @@ def count_registered_agents_sync() -> int:
         
         with get_db_session() as db:
             count = db.query(AgentConfig).filter(
-                AgentConfig.agent_status == 'active'
+                AgentConfig.agent_enabled == 'yes'
             ).count()
             return count
             
@@ -128,7 +127,7 @@ def get_all_agent_configs_sync() -> list:
         
         with get_db_session() as db:
             agents = db.query(AgentConfig).filter(
-                AgentConfig.agent_status == 'active'
+                AgentConfig.agent_enabled == 'yes'
             ).all()
             
             return [{

@@ -18,7 +18,6 @@ class AgentConfig(BaseModel):
     agent_description = Column(Text, nullable=True)                      # 智能体描述
     agent_capabilities = Column(JSONType, nullable=True, default=list)   # 能力列表
     agent_version = Column(String(20), default='1.0.0', nullable=False) # 智能体版本
-    agent_status = Column(String(20), default='stopped', nullable=False) # 运行状态
     agent_enabled = Column(String(10), default='yes', nullable=False)        # 是否启用
     agent_icon = Column(String(50), nullable=True, default='Bot') # 智能体图标
     is_builtin = Column(String(10), default='no', nullable=False)    # 是否为内置智能体
@@ -35,7 +34,6 @@ class AgentConfig(BaseModel):
     thumbs_down_count = Column(Integer, default=0, nullable=False, comment="点踩数")
     # 系统字段
     config_version = Column(String(20), default='1.0', nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
     # 权限相关字段
     agent_owner = Column(String(100), nullable=False, default='system')  # 智能体所有者
     visibility_type = Column(String(100), nullable=False, default='public')  # 可见权限级别

@@ -43,7 +43,6 @@ class AgentBase(BaseModel):
     agent_type: Optional[str] = Field(default="故障诊断", max_length=32, description="智能体分类")
     agent_description: Optional[str] = Field(None, max_length=500, description="智能体描述")
     agent_capabilities: Optional[List[str]] = Field(default_factory=list, description="智能体能力列表")
-    agent_status: Optional[str] = Field(default="stopped", pattern=r'^(running|stopped|error)$', description="智能体状态")
     agent_enabled: Optional[str] = Field(default="yes", pattern=r'^(yes|no)$', description="是否启用")
     agent_icon: Optional[str] = Field(default="Bot", max_length=50, description="智能体图标")
     
@@ -82,7 +81,6 @@ class AgentUpdate(BaseModel):
     agent_type: Optional[str] = Field(None, max_length=32, description="智能体分类")
     agent_description: Optional[str] = Field(None, max_length=500, description="智能体描述")
     agent_capabilities: Optional[List[str]] = Field(None, description="智能体能力列表")
-    agent_status: Optional[str] = Field(None, pattern=r'^(running|stopped|error)$', description="智能体状态")
     agent_enabled: Optional[str] = Field(None, pattern=r'^(yes|no)$', description="是否启用")
     agent_icon: Optional[str] = Field(None, max_length=50, description="智能体图标")
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具配置信息")
@@ -113,7 +111,6 @@ class AgentUpdate(BaseModel):
 class AgentQueryParams(BaseModel):
     """Agent查询参数模型"""
     search: Optional[str] = Field(None, max_length=200, description="搜索关键词")
-    status: Optional[str] = Field(None, pattern=r'^(running|stopped|error)$', description="状态过滤")
     enabled_only: Optional[bool] = Field(False, description="仅显示启用的智能体")
     include_builtin: Optional[bool] = Field(True, description="包含内置智能体")
     limit: Optional[int] = Field(10, ge=1, le=100, description="限制数量")
@@ -142,12 +139,6 @@ class MCPConfigUpdate(BaseModel):
             raise ValueError("选择的工具不能超过50个")
         return v
 
-
-
-
-class AgentStatusUpdate(BaseModel):
-    """Agent状态更新模型"""
-    status: str = Field(..., pattern=r'^(running|stopped|error)$', description="新状态")
 
 
 class AgentStatisticsUpdate(BaseModel):
@@ -195,7 +186,6 @@ class AgentResponse(BaseModel):
     agent_type: Optional[str] = Field(default="故障诊断", description="智能体分类")
     display_name: Optional[str] = Field(None, description="显示名称")
     description: Optional[str] = Field(None, description="描述")
-    status: str = Field(..., description="状态")
     enabled: str = Field(..., description="是否启用")
     agent_icon: Optional[str] = Field(default="Bot", description="智能体图标")
     version: Optional[str] = Field(None, description="版本")

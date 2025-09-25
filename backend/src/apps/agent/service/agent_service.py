@@ -42,7 +42,6 @@ class AgentService:
             
             
             # 设置默认值
-            agent_data.setdefault('agent_status', 'stopped')
             agent_data.setdefault('agent_enabled', 'yes')
             agent_data.setdefault('agent_icon', 'Bot')
             agent_data.setdefault('is_builtin', 'no')
@@ -111,7 +110,6 @@ class AgentService:
         page: int = 1,
         size: int = 10,
         search: Optional[str] = None,
-        status: Optional[str] = None,
         enabled_only: bool = False,
         create_by: Optional[str] = None,
         current_user: Optional[str] = None,
@@ -124,9 +122,6 @@ class AgentService:
         filters = {}
         if enabled_only:
             filters['agent_enabled'] = 'yes'
-            filters['is_active'] = True
-        if status:
-            filters['agent_status'] = status
         if create_by:
             filters['create_by'] = create_by
         
@@ -456,18 +451,6 @@ class AgentService:
                     
         return tools_list
     
-    async def update_agent_status(
-        self,
-        db: AsyncSession,
-        agent_id: str,
-        status: str
-    ) -> Optional[AgentConfig]:
-        """更新智能体状态"""
-        async with db.begin():
-            update_data = {'agent_status': status,'update_time': now_shanghai()}
-            await db.execute(update(AgentConfig).where(AgentConfig.agent_id == agent_id).values(**update_data))
-            result = await db.execute(select(AgentConfig).where(AgentConfig.agent_id == agent_id))
-            return result.scalar_one_or_none()
     
     async def update_statistics(
         self,
@@ -511,11 +494,8 @@ class AgentService:
             select(
                 func.count(AgentConfig.id).label('total'),
                 func.sum(
-                    case((and_(AgentConfig.agent_enabled == 'yes', AgentConfig.is_active == True), 1),else_=0)
+                    case((AgentConfig.agent_enabled == 'yes', 1), else_=0)
                 ).label('enabled'),
-                func.sum(
-                    case((AgentConfig.agent_status == 'running', 1), else_=0)
-                ).label('running'),
                 func.sum(
                     case((AgentConfig.is_builtin == 'yes', 1), else_=0)
                 ).label('builtin')
@@ -528,6 +508,7 @@ class AgentService:
             stats_dict = dict(stats_row)
             # 添加业务逻辑计算
             stats_dict['custom'] = stats_dict['total'] - stats_dict['builtin']
+            stats_dict['running'] = 0  # 默认运行中为0
             return stats_dict
         
         # 如果没有数据，返回默认统计
@@ -545,7 +526,7 @@ class AgentService:
         
         # 搜索数据库中的智能体
         query = select(AgentConfig).where(AgentConfig.agent_name.contains(keyword)
-        ).where(and_(AgentConfig.agent_enabled == 'yes',AgentConfig.is_active == True)
+        ).where(AgentConfig.agent_enabled == 'yes'
         ).offset(offset).limit(size)
         
         result = await db.execute(query)

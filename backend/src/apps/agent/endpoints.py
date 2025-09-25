@@ -11,7 +11,7 @@ import os
 
 from src.shared.db.config import get_async_db
 from src.apps.agent.schema import (
-    AgentCreate, AgentUpdate, MCPConfigUpdate,AgentStatusUpdate, AgentStatisticsUpdate,
+    AgentCreate, AgentUpdate, MCPConfigUpdate, AgentStatisticsUpdate,
     AgentOwnerTransfer, FileUploadResponse, DocumentContent, FileProcessStatus,
     MessageFeedbackCreate, MessageFeedbackResponse
 )
@@ -55,7 +55,6 @@ async def list_agents(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(10, ge=1, le=100, description="每页数量"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
-    status: Optional[str] = Query(None, description="状态过滤"),
     enabled_only: bool = Query(False, description="仅显示启用的智能体"),
     create_by: Optional[str] = Query(None, description="创建者过滤"),
     owner_filter: Optional[str] = Query(None, description="归属过滤：mine/team/department"),
@@ -67,7 +66,7 @@ async def list_agents(
     current_username = current_user.get('username') if current_user else None
     
     agents, total = await agent_service.list_agents(
-        db, page, size, search, status, enabled_only, create_by,
+        db, page, size, search, enabled_only, create_by,
         current_user=current_username, owner_filter=owner_filter
     )
     return paginated_response(items=agents,total=total,page=page,size=size,msg="查询智能体列表成功")
@@ -150,15 +149,6 @@ async def update_mcp_config(agent_id: str,mcp_config: MCPConfigUpdate,db: AsyncS
     if not updated_agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
     return success_response(data=updated_agent,msg="MCP配置更新成功")
 
-
-
-
-@router.put("/v1/agents/{agent_id}/status", response_model=UnifiedResponse)
-async def update_agent_status(agent_id: str,status_update: AgentStatusUpdate,db: AsyncSession = Depends(get_async_db)):
-    """更新智能体状态"""
-    updated_agent = await agent_service.update_agent_status(db, agent_id, status_update.status)
-    if not updated_agent: raise BusinessException(f"智能体 {agent_id} 不存在", ResponseCode.NOT_FOUND)
-    return success_response(data=updated_agent,msg="智能体状态更新成功")
 
 
 @router.put("/v1/agents/{agent_id}/statistics", response_model=UnifiedResponse)
