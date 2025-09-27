@@ -910,25 +910,72 @@ class DocumentService:
         try:
             workbook = openpyxl.load_workbook(str(file_path), data_only=True)
             content_parts = []
+            content_parts.append(f"[Excel文件: {file_name}]")
+            content_parts.append(f"工作表数量: {len(workbook.sheetnames)}")
+            content_parts.append("")
             
-            for sheet_name in workbook.sheetnames:
+            for sheet_index, sheet_name in enumerate(workbook.sheetnames):
                 sheet = workbook[sheet_name]
-                content_parts.append(f"[工作表: {sheet_name}]")
                 
-                # 获取表格内容
-                table_data = []
-                for row in sheet.iter_rows(values_only=True):
-                    # 过滤空行
-                    if any(cell is not None for cell in row):
-                        row_text = " | ".join([str(cell) if cell is not None else "" for cell in row])
-                        table_data.append(row_text)
+                # 添加工作表标题
+                content_parts.append(f"【工作表{sheet_index + 1}: {sheet_name}】")
                 
-                if table_data:
-                    content_parts.append("\n".join(table_data))
-                else:
+                # 获取实际使用的行列范围
+                max_row = sheet.max_row
+                max_col = sheet.max_column
+                
+                if max_row == 0 or max_col == 0:
                     content_parts.append("(空表)")
+                    content_parts.append("")
+                    continue
                 
-                content_parts.append("")  # 添加空行分隔
+                # 处理合并单元格 - 创建一个字典存储合并单元格的值
+                merged_cells_values = {}
+                for merged_range in sheet.merged_cells.ranges:
+                    # 获取合并区域的值（左上角单元格的值）
+                    min_row = merged_range.min_row
+                    min_col = merged_range.min_col
+                    cell_value = sheet.cell(row=min_row, column=min_col).value
+                    
+                    # 将该值填充到合并区域的所有单元格
+                    for row in range(merged_range.min_row, merged_range.max_row + 1):
+                        for col in range(merged_range.min_col, merged_range.max_col + 1):
+                            merged_cells_values[(row, col)] = cell_value
+                
+                # 获取数据，使用更简洁的格式
+                row_count = 0
+                for row_idx in range(1, max_row + 1):
+                    # 获取行数据
+                    cells = []
+                    has_content = False
+                    
+                    for col_idx in range(1, max_col + 1):
+                        # 先检查是否是合并单元格
+                        if (row_idx, col_idx) in merged_cells_values:
+                            cell_value = merged_cells_values[(row_idx, col_idx)]
+                        else:
+                            cell = sheet.cell(row=row_idx, column=col_idx)
+                            cell_value = cell.value
+                        
+                        if cell_value is None:
+                            cells.append("")
+                        else:
+                            has_content = True
+                            # 将单元格内容转为字符串，处理换行符
+                            cell_str = str(cell_value).replace('\n', ' ').strip()
+                            cells.append(cell_str)
+                    
+                    # 过滤完全空的行
+                    if not has_content:
+                        continue
+                    
+                    row_count += 1
+                    # 使用制表符分隔，更紧凑
+                    row_text = "\t".join(cells)
+                    content_parts.append(f"行{row_idx}: {row_text}")
+                
+                content_parts.append(f"(共 {row_count} 行数据)")
+                content_parts.append("")  # 工作表之间添加空行
             
             full_text = "\n".join(content_parts)
             logger.info(f"Excel文件解析成功: {file_name}, 工作表数: {len(workbook.sheetnames)}")
