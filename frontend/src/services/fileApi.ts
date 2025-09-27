@@ -126,8 +126,12 @@ export const fileApi = {
         
         // 固定等待2秒后重试
         await new Promise(resolve => setTimeout(resolve, interval));
-      } catch (error) {
-        // 如果获取状态失败，继续重试
+      } catch (error: any) {
+        // 如果是文件处理失败错误，直接抛出
+        if (error.message?.includes('文件处理失败') || error.message?.includes('文件解析失败')) {
+          throw error;
+        }
+        // 其他错误（如网络错误），继续重试
         console.error('获取文件状态失败:', error);
         await new Promise(resolve => setTimeout(resolve, interval));
       }
