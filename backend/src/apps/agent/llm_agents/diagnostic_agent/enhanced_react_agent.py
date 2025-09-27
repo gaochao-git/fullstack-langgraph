@@ -134,6 +134,11 @@ TODO列表：
 - 如果没有相应的工具，明确告诉用户需要什么工具
 - 永远不要假装执行或返回模拟数据
 
+**并行执行优化：**
+- 识别可以并行执行的诊断任务
+- 在一次响应中同时调用多个工具
+- 例如：同时查询CPU、内存、磁盘、网络状态
+
 示例回复：
 "我需要检查数据库连接数，但目前没有数据库查询工具。您需要：
 1. 手动登录数据库执行：show processlist;
@@ -199,6 +204,7 @@ TODO列表：
     ])
     
     # 使用标准的 create_react_agent，确保完全兼容
+    # 使用 v2 版本实现分布式工具执行
     agent = create_react_agent(
         model=llm_model,
         tools=tools,
@@ -206,7 +212,8 @@ TODO列表：
         pre_model_hook=monitor_hook,
         checkpointer=checkpointer,
         state_schema=DiagnosticAgentState,
-        name="enhanced-diagnostic-agent"
+        name="enhanced-diagnostic-agent",
+        version="v2"  # 使用 v2 版本，每个工具调用都会分布到独立的 ToolNode 实例
     )
     
     logger.info("创建增强的诊断智能体 - 基于 create_react_agent")
