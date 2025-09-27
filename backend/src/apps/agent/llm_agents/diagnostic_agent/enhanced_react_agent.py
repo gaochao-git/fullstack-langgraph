@@ -6,7 +6,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 
 from src.shared.core.logging import get_logger
-from ..state_schemas import DiagnosticAgentState
+from src.apps.agent.llm_agents.state_schemas import DiagnosticAgentState
+from .sub_agents.task_tool import create_diagnostic_task_tool, DIAGNOSTIC_SUBAGENTS
 
 logger = get_logger(__name__)
 
@@ -14,9 +15,8 @@ logger = get_logger(__name__)
 def create_enhanced_react_agent(llm_model, tools, checkpointer=None, monitor_hook=None):
     """创建增强的 React Agent，保持与原系统的完全兼容性"""
     
-    # 增强的系统提示词 - 包含多智能体诊断能力
-    enhanced_prompt = ChatPromptTemplate.from_messages([
-        ("system", """你是一个世界级的智能运维诊断系统。请始终使用中文回答。
+    # 创建诊断任务工具（用于调度子智能体）
+    enhanced_prompt_content = """你是一个世界级的智能运维诊断系统。请始终使用中文回答。
 
 ## 核心原则：四要素诊断法
 
@@ -199,15 +199,53 @@ TODO列表：
 
 请按此TODO列表执行，每完成一项告诉我结果，我会根据结果指导下一步。"
 
-记住：四要素齐全才能精准诊断！"""),
+记住：四要素齐全才能精准诊断！
+
+## 多智能体协作
+
+当遇到复杂问题时，你可以调用专业的子智能体来深入分析：
+
+1. **日志分析**: 使用 diagnostic_task 工具调用 log-analyzer 子智能体
+2. **报警关联**: 使用 diagnostic_task 工具调用 alert-correlator 子智能体  
+3. **监控分析**: 使用 diagnostic_task 工具调用 monitor-analyzer 子智能体
+4. **变更分析**: 使用 diagnostic_task 工具调用 change-analyzer 子智能体
+
+示例用法：
+- 当需要深入分析日志时: diagnostic_task(description="分析MySQL错误日志，找出连接失败的原因", subagent_type="log-analyzer")
+- 当有多个报警时: diagnostic_task(description="分析最近30分钟的所有报警，找出根因", subagent_type="alert-correlator")
+
+你可以并行调用多个子智能体，然后综合他们的分析结果做出最终诊断。"""
+    
+    # 增强的系统提示词
+    enhanced_prompt = ChatPromptTemplate.from_messages([
+        ("system", enhanced_prompt_content),
         ("placeholder", "{messages}")
     ])
+    
+    # 创建诊断任务工具
+    task_tool = create_diagnostic_task_tool(
+        tools=tools,
+        main_prompt=enhanced_prompt_content,
+        model=llm_model,
+        subagents=DIAGNOSTIC_SUBAGENTS
+    )
+    
+    # 将任务工具添加到工具列表
+    enhanced_tools = list(tools) + [task_tool]
+    
+    logger.info("🎯 创建增强的诊断智能体")
+    logger.info(f"📊 配置信息:")
+    logger.info(f"   - 子智能体数量: {len(DIAGNOSTIC_SUBAGENTS)}")
+    logger.info(f"   - 工具总数: {len(enhanced_tools)}")
+    logger.info(f"   - 子智能体类型:")
+    for sub in DIAGNOSTIC_SUBAGENTS:
+        logger.info(f"     • {sub['name']}: {sub['description'][:50]}...")
     
     # 使用标准的 create_react_agent，确保完全兼容
     # 使用 v2 版本实现分布式工具执行
     agent = create_react_agent(
         model=llm_model,
-        tools=tools,
+        tools=enhanced_tools,
         prompt=enhanced_prompt,
         pre_model_hook=monitor_hook,
         checkpointer=checkpointer,
