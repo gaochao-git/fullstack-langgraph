@@ -3,7 +3,7 @@
 
 servers:
   db_query:
-    enabled: false
+    enabled: true
     script: "servers/db_query/runserver.py"
     display_name: "数据库查询服务"
     config:
