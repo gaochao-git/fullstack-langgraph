@@ -246,7 +246,7 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
         # 创建token使用监控器
         token_usage_hook = create_token_usage_hook(llm_config)
         
-        async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=True):
+        async for chunk in graph.astream(graph_input, config=config, stream_mode=stream_modes, subgraphs=False):
             try:
                 event_id += 1
                 sse_data, chunk_has_interrupt = await process_stream_chunk(chunk, event_id)
