@@ -12,7 +12,7 @@ servers:
       api_token: "app-tbCzKza1riIJ6M3Grn4nWSQa"
       
   ssh_exec:
-    enabled: false
+    enabled: true
     script: "servers/ssh_exec/runserver.py"
     display_name: "SSH远程连接服务"
     config:

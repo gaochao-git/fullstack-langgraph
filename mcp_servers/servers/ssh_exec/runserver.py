@@ -13,6 +13,13 @@ from io import StringIO
 import os
 from fastmcp import FastMCP
 from ..common.base_config import MCPServerConfig
+from .flexible_commands import (
+    UNRESTRICTED_COMMANDS,
+    PARAMETERIZED_COMMANDS,
+    build_parameterized_command,
+    is_command_safe,
+    get_available_commands
+)
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -378,42 +385,55 @@ async def analyze_system_logs(
             client.close()
 
 @mcp.tool()
-async def execute_system_command(
-    connection_name: str = "default",
+async def execute_command(
     command: str = "",
-    timeout: int = 300
+    timeout: int = 30
 ) -> str:
-    """执行系统命令。用于执行系统诊断和维护命令。
+    """执行不限制参数的安全命令。支持 ls、ps、grep、pgrep、df、free、uptime 等常用运维命令。
     
     Args:
-        connection_name: SSH连接名称
         command: 要执行的命令
-        timeout: 超时时间(秒，默认5分钟)
+        timeout: 超时时间(秒，默认30秒)
     
     Returns:
         包含命令执行结果的JSON字符串
     """
     
-    # 安全检查：限制危险命令
-    dangerous_commands = [
-        'rm -rf', 'mkfs', 'dd if=', 'fdisk', 'parted',
-        'shutdown', 'reboot', 'init 0', 'init 6',
-        'passwd', 'userdel', 'groupdel',
-        '>', '>>', 'format', 'del /f'
-    ]
+    if not command:
+        return json.dumps({"error": "命令不能为空"})
     
-    command_lower = command.lower()
-    for dangerous in dangerous_commands:
-        if dangerous in command_lower:
-            return json.dumps({
-                "error": f"Command contains dangerous operation: {dangerous}. Command blocked for security."
-            })
+    # 解析命令
+    parts = command.strip().split()
+    if not parts:
+        return json.dumps({"error": "无效的命令"})
+    
+    cmd_name = parts[0]
+    
+    # 检查是否是允许的命令
+    if cmd_name not in UNRESTRICTED_COMMANDS:
+        return json.dumps({
+            "error": f"命令 '{cmd_name}' 不在允许列表中",
+            "allowed_commands": list(UNRESTRICTED_COMMANDS)
+        })
+    
+    # 安全检查
+    is_safe, safety_msg = is_command_safe(command)
+    if not is_safe:
+        return json.dumps({"error": safety_msg})
+    
+    # 额外的安全检查：命令长度限制
+    if len(command) > 500:
+        return json.dumps({"error": "命令过长，最多允许500个字符"})
+    
+    # 防止命令参数过多
+    if len(parts) > 20:
+        return json.dumps({"error": "命令参数过多，最多允许20个参数"})
     
     client = None
     try:
         client = _create_ssh_client()
         
-        logger.info(f"开始执行命令: {command} (超时: {timeout}秒)")
+        logger.info(f"执行命令: {command}")
         start_time = time.time()
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
         
@@ -423,19 +443,10 @@ async def execute_system_command(
         exit_code = stdout.channel.recv_exit_status()
         execution_time = time.time() - start_time
         
-        # 记录执行结果
-        if exit_code == 0:
-            logger.info(f"命令执行成功: {command} (耗时: {execution_time:.2f}秒)")
-        else:
-            logger.warning(f"命令执行失败: {command}, 退出码: {exit_code}, 耗时: {execution_time:.2f}秒")
-            if error_output:
-                logger.warning(f"错误输出: {error_output[:200]}...")  # 只记录前200字符
-        
         return json.dumps({
             "command": command,
             "exit_code": exit_code,
             "execution_time_seconds": round(execution_time, 2),
-            "timeout_used": timeout,
             "stdout": output,
             "stderr": error_output,
             "success": exit_code == 0,
@@ -443,21 +454,109 @@ async def execute_system_command(
         }, indent=2)
         
     except Exception as e:
-        error_type = type(e).__name__
-        logger.error(f"执行命令 '{command}' 时发生 {error_type}: {str(e)}")
+        logger.error(f"执行命令时出错: {str(e)}")
         return json.dumps({
-            "error": f"Failed to execute command: {str(e)}",
-            "error_type": error_type,
-            "command": command,
-            "timeout_used": timeout
+            "error": f"执行命令失败: {str(e)}",
+            "command": command
         })
     finally:
         if client:
-            try:
-                client.close()
-                logger.debug("SSH连接已关闭")
-            except Exception as e:
-                logger.warning(f"关闭SSH连接时出错: {e}")
+            client.close()
+
+@mcp.tool()
+async def execute_parameterized_command(
+    command_name: str,
+    parameters: Optional[Dict[str, Any]] = None,
+    timeout: int = 30
+) -> str:
+    """执行参数化的安全命令。如 tail_file、ping_host 等。
+    
+    Args:
+        command_name: 命令模板名称
+        parameters: 命令参数字典
+        timeout: 超时时间(秒)
+    
+    Returns:
+        包含命令执行结果的JSON字符串
+    """
+    
+    if parameters is None:
+        parameters = {}
+    
+    # 构建命令
+    is_valid, message, command = build_parameterized_command(command_name, parameters)
+    
+    if not is_valid:
+        return json.dumps({
+            "error": message,
+            "available_commands": list(PARAMETERIZED_COMMANDS.keys())
+        })
+    
+    client = None
+    try:
+        client = _create_ssh_client()
+        
+        logger.info(f"执行参数化命令: {command} ({message})")
+        start_time = time.time()
+        stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+        
+        # 读取输出
+        output = stdout.read().decode()
+        error_output = stderr.read().decode()
+        exit_code = stdout.channel.recv_exit_status()
+        execution_time = time.time() - start_time
+        
+        return json.dumps({
+            "command_name": command_name,
+            "command": command,
+            "description": message,
+            "parameters": parameters,
+            "exit_code": exit_code,
+            "execution_time_seconds": round(execution_time, 2),
+            "stdout": output,
+            "stderr": error_output,
+            "success": exit_code == 0,
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+        }, indent=2)
+        
+    except Exception as e:
+        logger.error(f"执行命令时出错: {str(e)}")
+        return json.dumps({
+            "error": f"执行命令失败: {str(e)}",
+            "command_name": command_name,
+            "parameters": parameters
+        })
+    finally:
+        if client:
+            client.close()
+
+@mcp.tool()
+async def list_available_commands() -> str:
+    """列出所有可用的SSH命令。
+    
+    Returns:
+        可用命令的详细信息
+    """
+    
+    return json.dumps(get_available_commands(), indent=2)
+
+@mcp.tool()
+async def execute_system_command(
+    connection_name: str = "default",
+    command: str = "",
+    timeout: int = 300
+) -> str:
+    """[已废弃] 请使用 execute_command 或 execute_parameterized_command。
+    
+    - execute_command: 执行不限制参数的命令（ls、grep、ps等）
+    - execute_parameterized_command: 执行参数化命令（tail_file、ping_host等）
+    """
+    
+    return json.dumps({
+        "error": "此函数已废弃",
+        "suggestion": "请使用 execute_command 或 execute_parameterized_command",
+        "help": "使用 list_available_commands 查看所有可用命令"
+    })
 
 if __name__ == "__main__":
     # 获取端口

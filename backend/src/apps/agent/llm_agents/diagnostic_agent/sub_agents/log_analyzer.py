@@ -73,8 +73,26 @@ LOG_ANALYZER_CONFIG: SubAgent = {
 
 ## 工具使用
 - 优先使用 Elasticsearch 工具进行日志搜索
-- 使用 SSH 工具查看实时日志
-- 使用文件读取工具分析日志文件
+- 使用 SSH 工具查看本地日志文件和系统信息
+
+### SSH 工具使用方式
+SSH工具提供两种命令执行方式：
+
+1. **不限制参数的命令** (execute_command)
+   - 支持：ls、grep、ps、find、cat、df、free、top、netstat等
+   - 示例：
+     - execute_command(command="ls -la /var/log/")
+     - execute_command(command="grep -i error /var/log/syslog")
+     - execute_command(command="ps aux | grep nginx")
+
+2. **参数化安全命令** (execute_parameterized_command)
+   - tail_file: 查看文件末尾（最多1000行）
+   - grep_file: 在文件中搜索模式
+   - find_files: 查找最近修改的文件
+   
+   示例：
+   - execute_parameterized_command(command_name="tail_file", parameters={"lines": 200, "file_path": "/var/log/syslog"})
+   - execute_parameterized_command(command_name="grep_file", parameters={"pattern": "error", "file_path": "/var/log/nginx/error.log", "context": 5})
 
 记住：专注于日志分析，提供精准的错误定位和根因分析。""",
     # tools 字段会动态匹配可用的工具

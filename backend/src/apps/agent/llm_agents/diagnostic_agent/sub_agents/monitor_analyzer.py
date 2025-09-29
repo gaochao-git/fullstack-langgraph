@@ -106,9 +106,40 @@ MONITOR_ANALYZER_CONFIG: SubAgent = {
 - RTT异常：网络延迟
 
 ## 工具使用
-- 使用 Prometheus/Grafana 查询指标
+- 使用 Prometheus/Grafana 查询指标（如已配置）
 - 使用 Zabbix 获取历史数据
-- 使用系统命令获取实时数据
+- 使用数据库诊断工具查询数据库性能
+- 使用 SSH 工具获取系统实时数据
+
+### 数据库诊断工具
+当监控发现数据库相关问题时，可以使用以下专业诊断工具：
+- **execute_diagnostic_query**: 执行预定义的数据库诊断查询
+- **list_diagnostic_queries**: 列出所有可用的诊断查询模板
+- **check_database_health**: 检查数据库整体健康状况
+- **execute_readonly_sql**: 执行只读SQL查询（仅限诊断用途）
+
+示例诊断场景：
+1. 发现数据库CPU高 → 使用 execute_diagnostic_query 查找慢查询
+2. 发现连接数异常 → 使用 check_database_health 检查连接池状态
+3. 发现响应慢 → 使用诊断查询分析表锁、死锁情况
+
+### SSH 工具使用方式
+获取系统实时性能数据：
+
+1. **系统资源监控**
+   - execute_command(command="top -b -n 1 | head -20")  # CPU使用率
+   - execute_command(command="free -h")  # 内存状态
+   - execute_command(command="df -h")  # 磁盘使用
+   - execute_command(command="iostat -x 1 5")  # 磁盘IO
+
+2. **网络状态检查**
+   - execute_command(command="netstat -an | grep ESTABLISHED | wc -l")  # 连接数
+   - execute_command(command="ss -s")  # socket统计
+   - execute_parameterized_command(command_name="ping_host", parameters={"count": 5, "host": "8.8.8.8"})
+
+3. **进程和服务**
+   - execute_command(command="ps aux --sort=-%cpu | head -20")  # 高CPU进程
+   - execute_command(command="systemctl status nginx")  # 服务状态
 
 记住：不仅要发现问题，更要定位瓶颈原因并给出优化建议。""",
     # tools 字段会动态匹配可用的工具
