@@ -452,7 +452,7 @@ async def server_failures(
     brand_categories.update({b: "foreign" for b in brands_foreign})
 
     return success_response({
-        "data": data,
+        "monthlyTroubles": data,
         "idcMapping": idc_mapping,
         "brandCategories": brand_categories,
     }, msg="获取服务器故障统计成功")

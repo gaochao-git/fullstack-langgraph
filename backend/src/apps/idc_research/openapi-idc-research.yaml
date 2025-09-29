@@ -1,0 +1,580 @@
+openapi: 3.0.3
+info:
+  title: IDC Research APIs
+  version: 1.0.0
+  description: |
+    API specification for IDC Research module.
+    Base prefix: `/api`.
+    Mounted routers:
+      - `/v1/idc-research` (analysis, mock data)
+      - `/v1/idc-reports` (reports management, mock data)
+servers:
+  - url: /api
+tags:
+  - name: idc-research
+    description: IDC analysis and monitoring (mock)
+  - name: idc-reports
+    description: IDC reports management (mock)
+paths:
+  /v1/idc-research/idcs:
+    get:
+      tags: [idc-research]
+      summary: List IDC overview with recent performance
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_IdcList'
+  /v1/idc-research/applications:
+    get:
+      tags: [idc-research]
+      summary: List applications and services metrics
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_ApplicationList'
+  /v1/idc-research/applications/business-types:
+    get:
+      tags: [idc-research]
+      summary: List application business types
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_StringItems'
+  /v1/idc-research/hardware/products:
+    get:
+      tags: [idc-research]
+      summary: List hardware products
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Category filter (e.g. server/network/storage/os/database/middleware/security)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_HardwareProducts'
+  /v1/idc-research/hardware/metrics:
+    get:
+      tags: [idc-research]
+      summary: Aggregated substitution metrics by category
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_HardwareMetrics'
+  /v1/idc-research/hardware/plans:
+    get:
+      tags: [idc-research]
+      summary: Substitution plans and recommendations
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_HardwarePlans'
+  /v1/idc-research/server-failures:
+    get:
+      tags: [idc-research]
+      summary: Server failures aggregated by month/IDC/brand
+      parameters:
+        - in: query
+          name: months
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 24
+            default: 12
+          description: Number of months to include
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_ServerFailures'
+
+  /v1/idc-reports/:
+    get:
+      tags: [idc-reports]
+      summary: List reports with filters (mock)
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1, minimum: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+        - in: query
+          name: keyword
+          schema: { type: string }
+        - in: query
+          name: idc_location
+          schema: { type: string }
+        - in: query
+          name: report_type
+          schema: { type: string, enum: [monthly, quarterly, yearly, custom] }
+        - in: query
+          name: status
+          schema: { type: string, enum: [pending, generating, completed, failed] }
+        - in: query
+          name: start_date
+          schema: { type: string, format: date-time }
+        - in: query
+          name: end_date
+          schema: { type: string, format: date-time }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_PaginatedReports'
+    post:
+      tags: [idc-reports]
+      summary: Create a new report job (mock)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_CreateReport'
+  /v1/idc-reports/{report_id}:
+    get:
+      tags: [idc-reports]
+      summary: Get report detail (mock)
+      parameters:
+        - in: path
+          name: report_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_ReportItem'
+    delete:
+      tags: [idc-reports]
+      summary: Delete a report (mock)
+      parameters:
+        - in: path
+          name: report_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_Message'
+  /v1/idc-reports/{report_id}/download:
+    get:
+      tags: [idc-reports]
+      summary: Download report file (mock)
+      parameters:
+        - in: path
+          name: report_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /v1/idc-reports/locations:
+    get:
+      tags: [idc-reports]
+      summary: List IDC locations (mock)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_Locations'
+  /v1/idc-reports/stats:
+    get:
+      tags: [idc-reports]
+      summary: Reports statistics (mock)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedResponse_ReportsStats'
+
+components:
+  schemas:
+    # ---------- Common Envelopes ----------
+    UnifiedResponse_IdcList:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/IdcOverview' }
+
+    UnifiedResponse_ApplicationList:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/Application' }
+
+    UnifiedResponse_StringItems:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { type: string }
+
+    UnifiedResponse_HardwareProducts:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/HardwareProduct' }
+
+    UnifiedResponse_HardwareMetrics:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/HardwareCategoryMetrics' }
+
+    UnifiedResponse_HardwarePlans:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: array
+          items: { $ref: '#/components/schemas/HardwarePlan' }
+
+    UnifiedResponse_ServerFailures:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: object
+          properties:
+            monthlyTroubles:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            idcMapping:
+              type: object
+              additionalProperties: { type: string }
+            brandCategories:
+              type: object
+              additionalProperties: { type: string, enum: [domestic, foreign] }
+
+    UnifiedResponse_PaginatedReports:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ReportItem' }
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+
+    UnifiedResponse_ReportItem:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          $ref: '#/components/schemas/ReportItem'
+
+    UnifiedResponse_CreateReport:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 201 }
+        msg: { type: string }
+        data:
+          type: object
+          properties:
+            report_id: { type: string, format: uuid }
+            message: { type: string }
+            status: { type: string, enum: [pending, generating, completed, failed] }
+            estimated_time: { type: integer, description: Estimated minutes }
+
+    UnifiedResponse_Message:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: object
+          properties:
+            message: { type: string }
+
+    UnifiedResponse_Locations:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              location_id: { type: string, format: uuid }
+              location_name: { type: string }
+              location_code: { type: string }
+
+    UnifiedResponse_ReportsStats:
+      type: object
+      properties:
+        status: { type: string, example: ok }
+        code: { type: integer, example: 200 }
+        msg: { type: string }
+        data:
+          type: object
+          properties:
+            total_reports: { type: integer }
+            pending_reports: { type: integer }
+            generating_reports: { type: integer }
+            completed_reports: { type: integer }
+            failed_reports: { type: integer }
+            this_month_reports: { type: integer }
+            total_locations: { type: integer }
+            recent_reports:
+              type: array
+              items: { $ref: '#/components/schemas/ReportItem' }
+
+    # ---------- Core Models ----------
+    IdcOverview:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        location: { type: string }
+        serverCount: { type: integer }
+        cpuUsage: { type: number }
+        memoryUsage: { type: number }
+        networkLoad: { type: number }
+        stabilityScore: { type: number }
+        powerUsage: { type: number }
+        temperature: { type: number }
+        uptime: { type: number }
+        status: { type: string, enum: [healthy, warning, critical] }
+        lastUpdated: { type: string, format: date-time }
+        performanceHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp: { type: string, format: date-time }
+              cpu: { type: number }
+              memory: { type: number }
+              network: { type: number }
+              temperature: { type: number }
+
+    Application:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        businessType: { type: string }
+        version: { type: string }
+        deployedIDCs:
+          type: array
+          items: { type: string }
+        isShared: { type: boolean }
+        status: { type: string, enum: [healthy, warning, critical] }
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/Service'
+
+    Service:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        type: { type: string, enum: [app, database, gateway] }
+        idcId: { type: string }
+        instances: { type: integer }
+        metrics: { $ref: '#/components/schemas/Metrics' }
+        dependencies:
+          type: array
+          items: { type: string }
+
+    Metrics:
+      type: object
+      properties:
+        cpuUsage: { type: number }
+        memoryUsage: { type: number }
+        diskUsage: { type: number }
+        networkIO: { type: number }
+        responseTime: { type: number }
+        throughput: { type: number }
+        errorRate: { type: number }
+        availability: { type: number }
+        connections: { type: number }
+
+    HardwareProduct:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string }
+        name: { type: string }
+        brand: { type: string }
+        isDomestic: { type: boolean }
+        model: { type: string }
+        quantity: { type: integer }
+        idcId: { type: string }
+        installDate: { type: string, format: date }
+        warrantyEndDate: { type: string, format: date }
+        status: { type: string }
+        failureCount: { type: integer }
+        mtbf: { type: integer }
+
+    HardwareCategoryMetrics:
+      type: object
+      properties:
+        category: { type: string }
+        totalCount: { type: integer }
+        domesticCount: { type: integer }
+        substitutionRate: { type: number }
+        brands:
+          type: array
+          items:
+            type: object
+            properties:
+              brand: { type: string }
+              isDomestic: { type: boolean }
+              count: { type: integer }
+              percentage: { type: number }
+              avgMtbf: { type: integer }
+        avgFailureRate: { type: number }
+        domesticFailureRate: { type: number }
+        importedFailureRate: { type: number }
+
+    HardwarePlan:
+      type: object
+      properties:
+        category: { type: string }
+        currentRate: { type: number }
+        targetRate: { type: number }
+        timeline: { type: string }
+        priority: { type: string }
+        challenges:
+          type: array
+          items: { type: string }
+        recommendations:
+          type: array
+          items: { type: string }
+
+    ReportItem:
+      type: object
+      properties:
+        report_id: { type: string, format: uuid }
+        report_name: { type: string }
+        idc_location: { type: string }
+        report_type: { type: string, enum: [monthly, quarterly, yearly, custom] }
+        status: { type: string, enum: [pending, generating, completed, failed] }
+        start_date: { type: string, format: date-time }
+        end_date: { type: string, format: date-time }
+        total_servers: { type: integer }
+        avg_cpu_usage: { type: number }
+        avg_memory_usage: { type: number }
+        total_power_consumption: { type: number }
+        pue_value: { type: number }
+        availability_rate: { type: number }
+        incident_count: { type: integer }
+        generated_by: { type: string }
+        generation_time: { type: string, format: date-time, nullable: true }
+        file_name: { type: string, nullable: true }
+        file_size: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        created_by: { type: string }
+        updated_by: { type: string }
+
+    Pagination:
+      type: object
+      properties:
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer }
+        pages: { type: integer }
+        has_next: { type: boolean }
+        has_prev: { type: boolean }
+
+    CreateReportRequest:
+      type: object
+      description: Compatible with frontend fields
+      properties:
+        reportName: { type: string }
+        idcLocation: { type: string }
+        reportType: { type: string, enum: [monthly, quarterly, yearly, custom] }
+        dateRange:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+            format: date-time
+

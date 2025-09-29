@@ -12,9 +12,9 @@ export function IDCOverviewDashboard() {
   const IDC_CODES = useMemo(() => ["BJ1", "BJ2", "SH1", "SH2", "SZ1", "SZ2"] as const, []);
 
   // 排序后的故障数据（按月份升序）
-  const [failureData, setFailureData] = useState<any>({ data: [], idcMapping: {}, brandCategories: {} });
+  const [failureData, setFailureData] = useState<any>({ monthlyTroubles: [], idcMapping: {}, brandCategories: {} });
   const sortedFailureData = useMemo(
-    () => [...(failureData.data || [])].sort((a, b) => a.month - b.month),
+    () => [...(failureData.monthlyTroubles || [])].sort((a, b) => a.month - b.month),
     [failureData],
   );
 
@@ -31,7 +31,7 @@ export function IDCOverviewDashboard() {
           IDCResearchApi.getIDCs(),
           IDCResearchApi.getApplications(),
         ]);
-        setFailureData(failResp?.data || { data: [], idcMapping: {}, brandCategories: {} });
+        setFailureData(failResp?.data || { monthlyTroubles: [], idcMapping: {}, brandCategories: {} });
         setIdcs(idcResp?.data || []);
         setApplications(appResp?.data || []);
       } catch (e) {

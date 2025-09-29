@@ -37,6 +37,10 @@ AUTH_EXCLUDE_PATHS = [
     "/openapi.json",
     "/health",
     "/api/health",
+    # IDC Research docs (module-specific docs)
+    "/api/v1/idc-research/docs",
+    "/api/v1/idc-research/docs/openapi.yaml",
+    "/api/v1/idc-research/redoc",
     # 添加 LangExtract HTML 查看接口（公开访问）
     "/api/v1/extract/",  # 匹配所有 /api/v1/extract/xxx/html 路径
 ]
@@ -51,6 +55,10 @@ RBAC_EXCLUDE_PATHS = [
     "/openapi.json",
     "/health",
     "/api/health",
+    # IDC Research docs
+    "/api/v1/idc-research/docs",
+    "/api/v1/idc-research/docs/openapi.yaml",
+    "/api/v1/idc-research/redoc",
 ]
 
 

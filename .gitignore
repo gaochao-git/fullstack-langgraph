@@ -213,3 +213,6 @@ software/
 Unla
 documents/
 
+backend/add_hardware_menu.sql
+backend/fix_hardware_menu.sql
+backend/update_hardware_menu.sh
