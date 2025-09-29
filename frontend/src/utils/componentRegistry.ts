@@ -29,7 +29,8 @@ export const componentRegistry = {
   'MCPManagement': lazy(() => import('../pages/mcp').then(m => ({ default: m.MCPManagement }))),
   
   'APIKeyManagement': lazy(() => import('../pages/user').then(m => ({ default: m.APIKeyManagement }))),
-  
+  'HardwareResourceManagement': lazy(() => import('../pages/rp_manage/hardware').then(m => ({ default: m.HardwareResourceManagement }))),
+
   // 敏感数据扫描
   'SensitiveScanManagement': lazy(() => import('../pages/sensitive_scan').then(m => ({ default: m.SensitiveScanManagement }))),
   'ScanTaskDetail': lazy(() => import('../pages/sensitive_scan').then(m => ({ default: m.ScanTaskDetail }))),

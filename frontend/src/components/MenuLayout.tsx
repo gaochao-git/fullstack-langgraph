@@ -114,17 +114,17 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
     const firstLevel = getFirstLevelPath(location.pathname);
     setSelectedTopMenu(firstLevel);
     setSideMenuItems(getSideMenuItems(firstLevel));
-    
+
     // 计算需要展开的父级菜单
     const pathParts = location.pathname.split('/').filter(Boolean);
     const parentPaths: string[] = [];
-    
+
     // 从第二级开始，到倒数第二级为止，都是需要展开的父级菜单
     for (let i = 2; i < pathParts.length; i++) {
       const parentPath = '/' + pathParts.slice(0, i).join('/');
       parentPaths.push(parentPath);
     }
-    
+
     // 合并现有的展开项和新的父级路径，避免覆盖用户手动展开的菜单
     setOpenKeys(prevKeys => {
       const newKeys = new Set([...prevKeys, ...parentPaths]);

@@ -2,6 +2,6 @@
 
 from .reports_endpoints import router as reports_router
 from .analysis_endpoints import router as analysis_router
+from .docs_endpoints import router as docs_router
 
-__all__ = ["reports_router", "analysis_router"]
-
+__all__ = ["reports_router", "analysis_router", "docs_router"]
