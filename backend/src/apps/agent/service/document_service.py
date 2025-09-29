@@ -599,11 +599,11 @@ class DocumentService:
                     return f"[警告: 文件可能包含无法识别的字符]\n{content}"
             except Exception as e:
                 logger.error(f"文本文件读取错误: {e}")
-                return f"文本文件读取失败: {str(e)}"
+                raise Exception(f"文本文件读取失败: {str(e)}")
                 
         except Exception as e:
             logger.error(f"文本文件读取错误: {e}")
-            return f"文本文件读取失败: {str(e)}"
+            raise Exception(f"文本文件读取失败: {str(e)}")
     
     async def _process_pdf_file(self, file_path: Path, file_name: str) -> str:
         """处理PDF文件"""
@@ -619,7 +619,7 @@ class DocumentService:
             return full_text
         except Exception as e:
             logger.error(f"PDF解析错误: {e}")
-            return f"PDF文件解析失败: {str(e)}"
+            raise Exception(f"PDF文件解析失败: {str(e)}")
     
     async def _process_doc_file(self, file_path: Path, file_name: str, file_id: str) -> tuple[str, Path, str]:
         """处理.doc文件，返回处理结果和可能更新的文件路径"""
@@ -649,19 +649,19 @@ class DocumentService:
         except FileNotFoundError:
             # LibreOffice未安装的情况
             logger.error(f".doc 转换失败: LibreOffice未安装")
-            return f"[.doc 文件: {file_name}]\n\n文档解析失败：系统未安装 LibreOffice，无法处理 .doc 格式文件。请联系管理员安装 LibreOffice 或将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+            raise Exception("系统未安装 LibreOffice，无法处理 .doc 格式文件。请联系管理员安装 LibreOffice 或将文件转换为 .docx 格式后重新上传")
         except subprocess.TimeoutExpired:
             # 转换超时的情况
             logger.error(f".doc 转换失败: 转换超时")
-            return f"[.doc 文件: {file_name}]\n\n文档解析失败：.doc 文件转换超时，可能文件过大或系统繁忙。请尝试将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+            raise Exception(".doc 文件转换超时，可能文件过大或系统繁忙。请尝试将文件转换为 .docx 格式后重新上传")
         except Exception as e:
             # 其他错误情况
             logger.error(f".doc 转换失败: {e}")
             error_msg = str(e).lower()
             if 'no such file' in error_msg or 'not found' in error_msg:
-                return f"[.doc 文件: {file_name}]\n\n文档解析失败：系统未安装 LibreOffice，无法处理 .doc 格式文件。请联系管理员安装 LibreOffice 或将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+                raise Exception("系统未安装 LibreOffice，无法处理 .doc 格式文件。请联系管理员安装 LibreOffice 或将文件转换为 .docx 格式后重新上传")
             else:
-                return f"[.doc 文件: {file_name}]\n\n文档解析失败：.doc 文件转换出错 - {str(e)}。建议将文件转换为 .docx 格式后重新上传。\n\n请通知管理员查看系统日志以了解详细原因。", file_path, '.doc'
+                raise Exception(f".doc 文件转换出错: {str(e)}。建议将文件转换为 .docx 格式后重新上传")
     
     async def _process_docx_file(self, file_path: Path, file_name: str) -> str:
         """处理Word文档"""
@@ -849,7 +849,7 @@ class DocumentService:
             
         except Exception as e:
             logger.error(f"Word文档解析错误: {e}")
-            return f"Word文档解析失败: {str(e)}"
+            raise Exception(f"Word文档解析失败: {str(e)}")
     
     async def _process_csv_file(self, file_path: Path, file_name: str) -> str:
         """处理CSV文件"""
@@ -903,32 +903,79 @@ class DocumentService:
             
         except Exception as e:
             logger.error(f"CSV文件解析错误: {e}")
-            return f"CSV文件解析失败: {str(e)}"
+            raise Exception(f"CSV文件解析失败: {str(e)}")
     
     async def _process_excel_file(self, file_path: Path, file_name: str) -> str:
         """处理Excel文件"""
         try:
             workbook = openpyxl.load_workbook(str(file_path), data_only=True)
             content_parts = []
+            content_parts.append(f"[Excel文件: {file_name}]")
+            content_parts.append(f"工作表数量: {len(workbook.sheetnames)}")
+            content_parts.append("")
             
-            for sheet_name in workbook.sheetnames:
+            for sheet_index, sheet_name in enumerate(workbook.sheetnames):
                 sheet = workbook[sheet_name]
-                content_parts.append(f"[工作表: {sheet_name}]")
                 
-                # 获取表格内容
-                table_data = []
-                for row in sheet.iter_rows(values_only=True):
-                    # 过滤空行
-                    if any(cell is not None for cell in row):
-                        row_text = " | ".join([str(cell) if cell is not None else "" for cell in row])
-                        table_data.append(row_text)
+                # 添加工作表标题
+                content_parts.append(f"【工作表{sheet_index + 1}: {sheet_name}】")
                 
-                if table_data:
-                    content_parts.append("\n".join(table_data))
-                else:
+                # 获取实际使用的行列范围
+                max_row = sheet.max_row
+                max_col = sheet.max_column
+                
+                if max_row == 0 or max_col == 0:
                     content_parts.append("(空表)")
+                    content_parts.append("")
+                    continue
                 
-                content_parts.append("")  # 添加空行分隔
+                # 处理合并单元格 - 创建一个字典存储合并单元格的值
+                merged_cells_values = {}
+                for merged_range in sheet.merged_cells.ranges:
+                    # 获取合并区域的值（左上角单元格的值）
+                    min_row = merged_range.min_row
+                    min_col = merged_range.min_col
+                    cell_value = sheet.cell(row=min_row, column=min_col).value
+                    
+                    # 将该值填充到合并区域的所有单元格
+                    for row in range(merged_range.min_row, merged_range.max_row + 1):
+                        for col in range(merged_range.min_col, merged_range.max_col + 1):
+                            merged_cells_values[(row, col)] = cell_value
+                
+                # 获取数据，使用更简洁的格式
+                row_count = 0
+                for row_idx in range(1, max_row + 1):
+                    # 获取行数据
+                    cells = []
+                    has_content = False
+                    
+                    for col_idx in range(1, max_col + 1):
+                        # 先检查是否是合并单元格
+                        if (row_idx, col_idx) in merged_cells_values:
+                            cell_value = merged_cells_values[(row_idx, col_idx)]
+                        else:
+                            cell = sheet.cell(row=row_idx, column=col_idx)
+                            cell_value = cell.value
+                        
+                        if cell_value is None:
+                            cells.append("")
+                        else:
+                            has_content = True
+                            # 将单元格内容转为字符串，处理换行符
+                            cell_str = str(cell_value).replace('\n', ' ').strip()
+                            cells.append(cell_str)
+                    
+                    # 过滤完全空的行
+                    if not has_content:
+                        continue
+                    
+                    row_count += 1
+                    # 使用制表符分隔，更紧凑
+                    row_text = "\t".join(cells)
+                    content_parts.append(f"行{row_idx}: {row_text}")
+                
+                content_parts.append(f"(共 {row_count} 行数据)")
+                content_parts.append("")  # 工作表之间添加空行
             
             full_text = "\n".join(content_parts)
             logger.info(f"Excel文件解析成功: {file_name}, 工作表数: {len(workbook.sheetnames)}")
@@ -936,7 +983,7 @@ class DocumentService:
             
         except Exception as e:
             logger.error(f"Excel文件解析错误: {e}")
-            return f"Excel文件解析失败: {str(e)}"
+            raise Exception(f"Excel文件解析失败: {str(e)}")
     
     async def _process_pptx_file(self, file_path: Path, file_name: str) -> str:
         """处理PowerPoint文件"""
@@ -1147,10 +1194,10 @@ class DocumentService:
             
         except ImportError:
             logger.warning(f"缺少python-pptx库，无法解析PowerPoint文件: {file_name}")
-            return f"[PowerPoint文件: {file_name}]\n\n需要安装 python-pptx 库才能解析PowerPoint文件。请运行: pip install python-pptx"
+            raise Exception("需要安装 python-pptx 库才能解析PowerPoint文件。请运行: pip install python-pptx")
         except Exception as e:
             logger.error(f"PowerPoint文件解析错误: {e}")
-            return f"PowerPoint文件解析失败: {str(e)}"
+            raise Exception(f"PowerPoint文件解析失败: {str(e)}")
     
     async def _process_image_file(self, file_path: Path, file_name: str) -> str:
         """处理图片文件"""
@@ -1178,31 +1225,27 @@ class DocumentService:
                     return f"[图片文件: {file_name}]\n\n{result['content']}"
                 else:
                     logger.warning(f"图片分析失败: {file_name}, 错误: {result.get('error')}")
-                    return f"[图片文件: {file_name}]\n\n图片分析失败: {result.get('error', '未知错误')}"
+                    raise Exception(f"图片分析失败: {result.get('error', '未知错误')}")
             except Exception as e:
                 logger.error(f"图片处理异常: {e}", exc_info=True)
-                return f"[图片文件: {file_name}]\n\n图片处理出错: {str(e)}"
+                raise Exception(f"图片处理出错: {str(e)}")
         else:
-            return f"[图片文件: {file_name}]\n\n未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY。"
+            raise Exception("未配置视觉模型，无法分析图片内容。请配置 VISION_API_KEY")
     
     def _handle_unsupported_file(self, file_ext: str, file_name: str) -> str:
         """处理不支持的文件格式"""
-        unsupported_msg = f"[{file_ext} 文件: {file_name}]\n\n"
-        
         # 检查是否是因为缺少依赖
         if file_ext == '.xlsx' and not HAS_OPENPYXL:
-            unsupported_msg += "Excel 文件解析功能未启用。请联系管理员安装 openpyxl 库。"
             logger.warning(f"用户尝试上传 Excel 文件，但未安装 openpyxl 库: {file_name}")
+            raise Exception("Excel 文件解析功能未启用。请联系管理员安装 openpyxl 库")
         elif file_ext == '.pdf' and not HAS_PDF:
-            unsupported_msg += "PDF 文件解析功能未启用。请联系管理员安装 pypdf 库。"
             logger.warning(f"用户尝试上传 PDF 文件，但未安装 pypdf 库: {file_name}")
+            raise Exception("PDF 文件解析功能未启用。请联系管理员安装 pypdf 库")
         elif file_ext == '.docx' and not HAS_DOCX:
-            unsupported_msg += "Word 文档解析功能未启用。请联系管理员安装 python-docx 库。"
             logger.warning(f"用户尝试上传 Word 文档，但未安装 python-docx 库: {file_name}")
+            raise Exception("Word 文档解析功能未启用。请联系管理员安装 python-docx 库")
         else:
-            unsupported_msg += "暂不支持此格式的文档解析。"
-        
-        return unsupported_msg
+            raise Exception(f"暂不支持 {file_ext} 格式的文档解析")
     
     async def _dispatch_file_processing(self, file_path: Path, file_ext: str, file_name: str, file_id: str) -> str:
         """文件处理分发器 - 根据文件类型调用相应的处理器"""

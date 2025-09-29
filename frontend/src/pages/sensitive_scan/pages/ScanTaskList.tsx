@@ -49,7 +49,7 @@ const ScanTaskList: React.FC = () => {
       
       if (response.data.status === 'ok') {
         setTasks(response.data.data.items);
-        setTotal(response.data.data.total);
+        setTotal(response.data.data.pagination.total);
       } else {
         message.error(response.data.msg || '获取任务列表失败');
       }

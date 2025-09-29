@@ -30,7 +30,6 @@ export interface Agent {
   agent_description: string;
   agent_capabilities: string[];
   agent_version: string;
-  agent_status: string; // 'running' | 'stopped' | 'error'
   agent_enabled: string; // 'yes' | 'no'
   agent_icon?: string; // 智能体图标
   is_builtin: string; // 'yes' | 'no'
@@ -90,7 +89,6 @@ export interface CreateAgentRequest {
   agent_description: string;
   agent_capabilities: string[];
   agent_version?: string;
-  agent_status?: string;
   agent_enabled?: string;
   agent_icon?: string;
   is_builtin?: string;

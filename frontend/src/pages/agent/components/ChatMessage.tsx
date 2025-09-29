@@ -1133,7 +1133,12 @@ function ChatMessages({
         });
         
         const errorMsg = error instanceof Error ? error.message : '未知错误';
-        message.error(`文件 ${file.name} 上传失败: ${errorMsg}`);
+        // 区分上传失败和处理失败
+        if (errorMsg.includes('文件解析失败') || errorMsg.includes('文件处理失败')) {
+          message.warning(`文件 ${file.name} 已上传但处理失败: ${errorMsg}`);
+        } else {
+          message.error(`文件 ${file.name} 上传失败: ${errorMsg}`);
+        }
         throw error;
       }
     });

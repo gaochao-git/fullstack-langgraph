@@ -11,14 +11,14 @@ from .tools import get_diagnostic_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
 from src.apps.agent.llm_agents.decorators import agent
 from src.shared.core.logging import get_logger
-from ..state_schemas import DiagnosticAgentState  # 导入自定义状态
+from src.apps.agent.llm_agents.state_schemas import DiagnosticAgentState  # 导入自定义状态
 
 logger = get_logger(__name__)
 
 
 @agent(**INIT_AGENT_CONFIG)
 async def create_diagnostic_agent(config: RunnableConfig):
-    """创建诊断智能体"""
+    """创建诊断智能体 - 默认使用多智能体架构"""
     from src.apps.agent.checkpoint_factory import get_checkpointer
     
     # 内置智能体使用文件中定义的常量
@@ -47,14 +47,8 @@ async def create_diagnostic_agent(config: RunnableConfig):
     # 获取 checkpointer
     checkpointer = await get_checkpointer()
     
-    # 直接使用 create_react_agent 创建并返回图
-    return create_react_agent(
-        model=llm,
-        tools=tools,
-        prompt=system_prompt,
-        pre_model_hook=monitor_hook,
-        checkpointer=checkpointer,
-        state_schema=DiagnosticAgentState,  # 使用自定义状态
-        name=f"{agent_id}-agent"
-    )
+    # 使用增强的 React Agent - 保持完全兼容性
+    logger.info(f"[Agent创建] 使用增强的诊断智能体")
+    from .enhanced_react_agent import create_enhanced_react_agent
+    return create_enhanced_react_agent(llm, tools, checkpointer, monitor_hook)
 
