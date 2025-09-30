@@ -188,6 +188,7 @@ async def execute_command(
     - head: 查看文件开头内容（注意：建议使用-n参数限制行数，如head -n 20）
     - wc: 统计行数、字数、字符数
     - sort: 对文本进行排序
+    - find: 查找文件（只允许参数：-name, -type, -mtime, -atime, -ctime, -size, -maxdepth）
     
     Args:
         command: 要在远程服务器上执行的命令

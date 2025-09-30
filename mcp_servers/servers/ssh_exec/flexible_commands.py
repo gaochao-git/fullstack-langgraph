@@ -21,6 +21,7 @@ UNRESTRICTED_COMMANDS = {
     "head",    # 查看文件开头
     "wc",      # 统计行数、字数等
     "sort",    # 排序文本
+    "find",    # 查找文件
 }
 
 # 限制参数的命令模板
@@ -327,6 +328,41 @@ def build_parameterized_command(command_name: str, parameters: Dict[str, Any]) -
     except KeyError as e:
         return False, f"模板参数错误: {e}", None
 
+def _check_find_args(tokens: List[str]) -> Tuple[bool, str]:
+    """检查find命令的参数是否安全
+    
+    Args:
+        tokens: shlex解析后的命令tokens，tokens[0]是'find'
+    
+    Returns:
+        (是否安全, 错误消息)
+    """
+    # find命令的安全参数白名单
+    FIND_SAFE_PARAMS = {
+        '-name',                     # 文件名匹配（最常用）
+        '-type',                     # 文件类型 f/d
+        '-mtime',                    # 修改时间
+        '-atime',                    # 访问时间
+        '-ctime',                    # 状态改变时间
+        '-size',                     # 文件大小
+        '-maxdepth',                 # 搜索深度限制
+    }
+    
+    # 跳过'find'本身，从第二个token开始检查
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        
+        # 检查是否是参数（以-开头）
+        if token.startswith('-'):
+            # 只允许白名单中的参数
+            if token not in FIND_SAFE_PARAMS:
+                return False, f"find命令包含未授权的参数: {token}"
+        
+        i += 1
+    
+    return True, "find命令参数检查通过"
+
 def is_command_safe(command: str) -> Tuple[bool, str]:
     """检查命令是否安全 - 使用白名单机制"""
     # 检查基本的危险模式，即使命令在白名单中
@@ -356,6 +392,12 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
         if first_cmd not in UNRESTRICTED_COMMANDS:
             return False, f"命令 '{first_cmd}' 不在允许列表中"
         
+        # 如果是find命令，进行额外的参数检查
+        if first_cmd == 'find':
+            is_safe, msg = _check_find_args(tokens)
+            if not is_safe:
+                return False, msg
+        
         # 如果包含管道，检查管道中的每个命令
         if '|' in tokens:
             # 找到所有管道符的位置
@@ -381,6 +423,12 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
                         
                         if cmd_name not in UNRESTRICTED_COMMANDS:
                             return False, f"管道命令 '{cmd_name}' 不在允许列表中"
+                        
+                        # 如果管道中的命令是find，也需要检查参数
+                        if cmd_name == 'find':
+                            is_safe, msg = _check_find_args(segment_tokens)
+                            if not is_safe:
+                                return False, msg
                             
     except ValueError as e:
         # shlex.split 失败通常是因为引号不匹配
