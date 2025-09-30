@@ -546,12 +546,18 @@ const MCPManagement: React.FC = () => {
         continue;
       }
       
-      if (currentSection === 'summary' && trimmedLine) {
-        summary += (summary ? ' ' : '') + trimmedLine;
+      if (currentSection === 'summary') {
+        // 保留换行符，特别是对于列表项
+        if (trimmedLine) {
+          summary += (summary ? '\n' : '') + line;
+        }
       } else if (currentSection === 'args' && trimmedLine) {
         args += (args ? '\n' : '') + trimmedLine;
-      } else if (currentSection === 'returns' && trimmedLine) {
-        returns += (returns ? ' ' : '') + trimmedLine;
+      } else if (currentSection === 'returns') {
+        // Returns部分也保留换行
+        if (trimmedLine) {
+          returns += (returns ? '\n' : '') + line;
+        }
       }
     }
     
@@ -929,7 +935,8 @@ const MCPManagement: React.FC = () => {
                             padding: '8px 12px',
                             border: `1px solid ${isDark ? '#4b5563' : '#f0f0f0'}`,
                             borderRadius: 4,
-                            lineHeight: '1.5'
+                            lineHeight: '1.5',
+                            whiteSpace: 'pre-wrap'
                           }}>
                             {summary}
                           </div>
@@ -982,7 +989,8 @@ const MCPManagement: React.FC = () => {
                             borderRadius: 4, 
                             border: `1px solid ${isDark ? '#059669' : '#b7eb8f'}`,
                             color: isDark ? '#10b981' : '#52c41a',
-                            lineHeight: '1.4'
+                            lineHeight: '1.4',
+                            whiteSpace: 'pre-wrap'
                           }}>
                             {returns}
                           </div>
@@ -1219,7 +1227,8 @@ const MCPManagement: React.FC = () => {
                               padding: '8px 12px',
                               border: `1px solid ${isDark ? '#4b5563' : '#f0f0f0'}`,
                               borderRadius: 4,
-                              lineHeight: '1.5'
+                              lineHeight: '1.5',
+                              whiteSpace: 'pre-wrap'
                             }}>
                               {summary}
                             </div>
@@ -1272,7 +1281,8 @@ const MCPManagement: React.FC = () => {
                               borderRadius: 4, 
                               border: `1px solid ${isDark ? '#059669' : '#b7eb8f'}`,
                               color: isDark ? '#10b981' : '#52c41a',
-                              lineHeight: '1.4'
+                              lineHeight: '1.4',
+                              whiteSpace: 'pre-wrap'
                             }}>
                               {returns}
                             </div>
