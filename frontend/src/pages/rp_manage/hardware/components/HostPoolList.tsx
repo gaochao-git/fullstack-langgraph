@@ -4,15 +4,20 @@ import { Table, Input, Select, Button, Card, Typography, Space, Tag, Modal, mess
 import { SearchOutlined, ReloadOutlined, EyeOutlined, HddOutlined, DatabaseOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import apiClient from '../services/apiClient';
+import HostDetail from './hostPoolSubPage/HostDetail';
 
 const { Option } = Select;
 const { Title } = Typography;
 
 interface HostApplication {
   id: number;
+  pool_id?: number;
   server_type: string;
   server_version?: string;
+  server_subtitle?: string;
   cluster_name?: string;
+  server_protocol?: string;
+  server_addr?: string;
   department_name?: string;
 }
 
@@ -35,6 +40,21 @@ interface Host {
   host_applications: HostApplication[];
   create_time?: string;
   update_time?: string;
+  // 新增字段
+  h3c_id?: string;
+  h3c_status?: string;
+  h3c_img_id?: string;
+  h3c_hm_name?: string;
+  if_h3c_sync?: string;
+  serial_number?: string;
+  rack_number?: string;
+  rack_height?: number;
+  rack_start_number?: number;
+  leaf_number?: string;
+  from_factor?: number;
+  is_deleted?: boolean;
+  is_static?: boolean;
+  is_delete?: string;
 }
 
 const HostPoolList: React.FC = () => {
@@ -365,44 +385,12 @@ const HostPoolList: React.FC = () => {
         }
         open={detailModalVisible}
         onCancel={() => setDetailModalVisible(false)}
-        width={800}
+        width={1200}
         footer={null}
+        style={{ top: 20 }}
+        bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
       >
-        {selectedHost && (
-          <div>
-            <Title level={5}>基本信息</Title>
-            <div style={{ marginBottom: 16 }}>
-              <p><strong>主机名：</strong>{selectedHost.host_name}</p>
-              <p><strong>IP地址：</strong>{selectedHost.host_ip}</p>
-              <p><strong>CPU核数：</strong>{selectedHost.vcpus} 核</p>
-              <p><strong>内存：</strong>{selectedHost.ram} GB</p>
-              <p><strong>硬盘：</strong>{selectedHost.disk_size} GB</p>
-              <p><strong>主机类型：</strong>{getHostTypeDisplay(selectedHost.host_type)}</p>
-              <p><strong>IDC机房：</strong>{getIdcName(selectedHost)}</p>
-            </div>
-
-            {selectedHost.host_applications && selectedHost.host_applications.length > 0 && (
-              <>
-                <Title level={5}>应用信息</Title>
-                <div>
-                  {selectedHost.host_applications.map((app, index) => (
-                    <Card
-                      key={app.id || index}
-                      size="small"
-                      style={{ marginBottom: 8 }}
-                      title={`应用 ${index + 1}`}
-                    >
-                      <p><strong>服务类型：</strong>{app.server_type}</p>
-                      {app.server_version && <p><strong>版本：</strong>{app.server_version}</p>}
-                      {app.cluster_name && <p><strong>集群名称：</strong>{app.cluster_name}</p>}
-                      {app.department_name && <p><strong>所属部门：</strong>{app.department_name}</p>}
-                    </Card>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        {selectedHost && <HostDetail host={selectedHost} onRefresh={loadHosts} />}
       </Modal>
     </Card>
   );
