@@ -58,7 +58,7 @@ const ClusterDetailsModal = ({ visible, onCancel, clusterName, dateRange }) => {
       }
 
       // 获取集群主机资源使用率详细数据
-      const response = await apiClient.axiosGet('/api/cmdb/v1/cluster-resources', { params });
+      const response = await apiClient.axiosGet('cmdb/v1/cluster-resources', { params });
 
       // 调试：检查API返回数据的字段结构
       if (response.data.list && response.data.list.length > 0) {
@@ -139,6 +139,16 @@ const ClusterDetailsModal = ({ visible, onCancel, clusterName, dateRange }) => {
   React.useEffect(() => {
     if (visible && clusterName) {
       fetchClusterDetails(pagination.current, pagination.pageSize);
+    } else if (!visible) {
+      // 当弹窗关闭时，清空数据
+      setClusterData([]);
+      setOriginalData([]);
+      setSortedInfo({});
+      setPagination({
+        current: 1,
+        pageSize: 10,
+        total: 0,
+      });
     }
   }, [visible, clusterName, dateRange]);
 

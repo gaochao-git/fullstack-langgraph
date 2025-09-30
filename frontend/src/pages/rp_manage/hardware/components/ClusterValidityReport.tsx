@@ -53,7 +53,7 @@ const ClusterValidityReport = ({ clusterName }) => {
 
     const fetchReportData = () => {
         setLoading(true);
-        apiClient.axiosGet('/api/cmdb/v1/backup-restore-check-info', {
+        apiClient.axiosGet('cmdb/v1/backup-restore-check-info', {
             params: { cluster_name: clusterName }
         })
             .then(response => {
@@ -82,7 +82,7 @@ const ClusterValidityReport = ({ clusterName }) => {
 
     const handleViewDetail = (checkSeq) => {
         setLoading(true);
-        apiClient.axiosGet('/api/cmdb/v1/cluster-confirm-summary', {
+        apiClient.axiosGet('cmdb/v1/cluster-confirm-summary', {
             params: { check_seq: checkSeq }
         })
             .then(response => {

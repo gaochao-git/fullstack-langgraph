@@ -85,7 +85,7 @@ const ServerMetricsLoader = () => {
 
     try {
       // 上传文件
-      const response = await apiClient.post('/api/cmdb/v1/load-server-metrics-csv', formData, {
+      const response = await apiClient.post('cmdb/v1/load-server-metrics-csv', formData, {
         validateStatus: function (status) {
           // 返回所有状态码，这样我们可以处理错误响应
           return true;
@@ -163,7 +163,7 @@ const ServerMetricsLoader = () => {
     // 创建新的定时器
     progressIntervalRef.current = setInterval(async () => {
       try {
-        const response = await apiClient.axiosGet('/api/cmdb/v1/server-metrics-csv-progress', {
+        const response = await apiClient.axiosGet('cmdb/v1/server-metrics-csv-progress', {
           signal: abortControllerRef.current?.signal
         });
         const progressData = response.data;

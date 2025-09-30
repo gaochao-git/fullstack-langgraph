@@ -67,7 +67,7 @@ const ScheduledTaskExecutionDetails = ({ executionTaskId, visible, onCancel }) =
     setError(null);
     
     try {
-      const result = await apiClient.get(`/api/cmdb/v1/scheduled-tasks/execution-details/${executionTaskId}`);
+      const result = await apiClient.get(`cmdb/v1/scheduled-tasks/execution-details/${executionTaskId}`);
       
       if (result.data.success) {
         setExecutionData(result.data.data);

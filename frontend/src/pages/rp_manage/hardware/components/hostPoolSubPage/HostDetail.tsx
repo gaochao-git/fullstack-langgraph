@@ -45,7 +45,7 @@ const HostDetail = ({ host, onRefresh }) => {
   const handleDeleteApplication = async (appId) => {
     try {
       setLoading(true);
-      const response = await apiClient.delete('/api/cmdb/v1/delete_hosts_application', {
+      const response = await apiClient.delete('cmdb/v1/delete_hosts_application', {
         app_ids: [parseInt(appId, 10)]
       });
       

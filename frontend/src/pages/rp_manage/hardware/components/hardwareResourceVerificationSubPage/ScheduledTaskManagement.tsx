@@ -57,7 +57,7 @@ const ScheduledTaskManagement = () => {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const result = await apiClient.get('/api/cmdb/v1/scheduled-tasks');
+      const result = await apiClient.get('cmdb/v1/scheduled-tasks');
       if (result.data.success) {
         setTasks(result.data.tasks || []);
       } else {
@@ -103,7 +103,7 @@ const ScheduledTaskManagement = () => {
     }
 
     try {
-      const result = await apiClient.post('/api/cmdb/v1/scheduled-tasks', {
+      const result = await apiClient.post('cmdb/v1/scheduled-tasks', {
         ...formData,
         host_ip_list: hostIpList,
         created_by: 'system' // 可以从用户上下文获取
@@ -178,7 +178,7 @@ const ScheduledTaskManagement = () => {
     }
 
     try {
-      const result = await apiClient.put(`/api/cmdb/v1/scheduled-tasks/${selectedTask.id}`, {
+      const result = await apiClient.put(`cmdb/v1/scheduled-tasks/${selectedTask.id}`, {
         ...formData,
         host_ip_list: hostIpList
       });
@@ -216,7 +216,7 @@ const ScheduledTaskManagement = () => {
   // 启用/禁用任务
   const handleToggleEnable = async (taskId, enabled) => {
     try {
-      const result = await apiClient.put('/api/cmdb/v1/scheduled-tasks/enable', {
+      const result = await apiClient.put('cmdb/v1/scheduled-tasks/enable', {
         id: taskId,
         is_enabled: enabled
       });
@@ -235,7 +235,7 @@ const ScheduledTaskManagement = () => {
   // 删除任务
   const handleDelete = async (taskId) => {
     try {
-      const result = await apiClient.delete(`/api/cmdb/v1/scheduled-tasks/${taskId}`);
+      const result = await apiClient.delete(`cmdb/v1/scheduled-tasks/${taskId}`);
       
       if (result.data.success) {
         message.success('任务删除成功');
@@ -254,7 +254,7 @@ const ScheduledTaskManagement = () => {
     setHistoryModalVisible(true);
     
     try {
-      const result = await apiClient.get('/api/cmdb/v1/scheduled-tasks/execution-history', {
+      const result = await apiClient.get('cmdb/v1/scheduled-tasks/execution-history', {
         scheduled_task_id: task.id,
         limit: 20
       });

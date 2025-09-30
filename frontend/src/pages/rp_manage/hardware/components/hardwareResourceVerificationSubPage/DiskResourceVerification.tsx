@@ -48,7 +48,7 @@ const DiskResourceVerification = () => {
   const fetchVerificationStatus = async () => {
     setStatusLoading(true);
     try {
-      const result = await apiClient.get('/api/cmdb/v1/hardware-resource-verification-status', { resource_type: 'disk' });
+      const result = await apiClient.get('cmdb/v1/hardware-resource-verification-status', { resource_type: 'disk' });
       
       if (result.data.success) {
         setVerificationStatus(result.data.verification_records || []);
@@ -66,7 +66,7 @@ const DiskResourceVerification = () => {
   const fetchHistoryData = async (hostIp) => {
     setHistoryLoading(true);
     try {
-      const result = await apiClient.get('/api/cmdb/v1/hardware-resource-verification-history', { host_ip: hostIp, resource_type: 'disk' });
+      const result = await apiClient.get('cmdb/v1/hardware-resource-verification-history', { host_ip: hostIp, resource_type: 'disk' });
       
       if (result.data.success) {
         setHistoryData(result.data.history_records || []);
@@ -141,7 +141,7 @@ const DiskResourceVerification = () => {
 
     setLoading(true);
     try {
-      const result = await apiClient.post('/api/cmdb/v1/hardware-resource-verification', {
+      const result = await apiClient.post('cmdb/v1/hardware-resource-verification', {
         host_ip_list: hostIpList,
         resource_type: 'disk',
         target_percent: targetPercent,

@@ -116,7 +116,7 @@ const HostResourceUsageAnalysis: React.FC = () => {
   });
 
   useEffect(() => {
-    apiClient.axiosGet('/api/cmdb/v1/cluster-groups')
+    apiClient.axiosGet('cmdb/v1/cluster-groups')
       .then(response => {
         let clusterGroupsList = [];
 
@@ -166,7 +166,7 @@ const HostResourceUsageAnalysis: React.FC = () => {
     message.loading({ content: '正在加载数据...', key: 'loadingData' });
 
     // 使用正确的接口 server-resources-max 获取峰值数据
-    apiClient.axiosGet('/api/cmdb/v1/server-resources-max', { params })
+    apiClient.axiosGet('cmdb/v1/server-resources-max', { params })
       .then(response => {
         setIsLoading(false);
 
@@ -571,7 +571,7 @@ const HostResourceUsageAnalysis: React.FC = () => {
           </html>
         `;
 
-        const response = await apiClient.axiosPost('/api/cmdb/v1/send-email', {
+        const response = await apiClient.axiosPost('cmdb/v1/send-email', {
           to: emailAddress,
           subject: '服务器资源使用情况报告',
           content: emailContent

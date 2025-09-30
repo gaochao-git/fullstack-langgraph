@@ -148,6 +148,14 @@ class Settings(BaseSettings):
     # Celery配置
     CELERY_BROKER_URL: Optional[str] = None  # Celery broker URL
     CELERY_RESULT_BACKEND: Optional[str] = None  # Celery result backend
+
+    # 主机资源池服务环境配置
+    HARDWARE_SERVICE_BASE_URL: Optional[str] = None # 主机资源池服务地址
+    HARDWARE_SERVICE_TOKEN: Optional[str] = "" # 主机资源池服务token 
+    HARDWARE_SERVICE_USERNAME: Optional[str] = None # 主机资源池服务用户名
+    HARDWARE_SERVICE_PASSWORD: Optional[str] = None # 主机资源池服务密码
+    HARDWARE_SERVICE_LOGIN_ENDPOINT: Optional[str] = None # 主机资源池服务登录地址
+    TOKEN_REFRESH_MARGIN: int = 120 # 登录token刷新时间
     
     class Config:
         env_file = ".env"

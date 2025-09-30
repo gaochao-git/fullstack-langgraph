@@ -31,7 +31,7 @@ const ClusterGroupSync = () => {
     setClusterGroupSyncResult(null);
     
     try {
-      const response = await apiClient.post('/api/cmdb/v1/sync-cluster-groups');
+      const response = await apiClient.post('cmdb/v1/sync-cluster-groups');
       
       // 处理成功响应 - 适配实际的API响应格式
       if (response.data.success === true) {
@@ -75,7 +75,7 @@ const ClusterGroupSync = () => {
     setHostSyncResult(null);
     
     try {
-      const response = await apiClient.post('/api/cmdb/v1/sync-hosts-from-clusters');
+      const response = await apiClient.post('cmdb/v1/sync-hosts-from-clusters');
       
       // 处理成功响应 - 适配实际的API响应格式
       if (response.data.success === true) {
