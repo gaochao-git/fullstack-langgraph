@@ -133,7 +133,7 @@ async def _get_tools_for_subagent(agent_name: str) -> List[Any]:
     
     # 调用主智能体的工具加载函数，但传入子智能体的配置
     # 需要临时修改获取配置的逻辑
-    from ..agent_utils import get_tools_config_from_db
+    from ...agent_utils import get_tools_config_from_db
     
     # 保存原函数
     original_get_config = get_tools_config_from_db
@@ -143,8 +143,8 @@ async def _get_tools_for_subagent(agent_name: str) -> List[Any]:
         return tools_config
     
     # 替换函数
-    import sys
-    sys.modules['src.apps.agent.llm_agents.agent_utils'].get_tools_config_from_db = mock_get_config
+    import src.apps.agent.llm_agents.agent_utils as agent_utils_module
+    agent_utils_module.get_tools_config_from_db = mock_get_config
     
     try:
         # 调用工具加载函数
@@ -153,7 +153,7 @@ async def _get_tools_for_subagent(agent_name: str) -> List[Any]:
         return tools
     finally:
         # 恢复原函数
-        sys.modules['src.apps.agent.llm_agents.agent_utils'].get_tools_config_from_db = original_get_config
+        agent_utils_module.get_tools_config_from_db = original_get_config
 
 
 async def _create_subagent_registry(
