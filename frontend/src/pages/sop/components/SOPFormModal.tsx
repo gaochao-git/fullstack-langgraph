@@ -101,9 +101,7 @@ const SOPFormModal: React.FC<SOPFormModalProps> = ({
   };
 
   // 示例文本常量
-  const EXAMPLE_TEXT = `## 故障现象
-描述具体的故障表现...
-
+  const EXAMPLE_TEXT = `
 ## 诊断步骤
 1. **检查服务状态**
    - 执行命令：systemctl status [service_name]
