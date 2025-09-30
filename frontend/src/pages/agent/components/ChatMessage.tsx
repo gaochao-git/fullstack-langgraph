@@ -1617,29 +1617,6 @@ function ChatMessages({
                               <Download className="h-3.5 w-3.5" />
                             )}
                           </Button>
-                          {idx === dialogRounds.length - 1 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
-                              onClick={() => {
-                                // 重新生成回复 - 使用当前轮次的用户消息
-                                if (round.user && round.user.content) {
-                                  const content = typeof round.user.content === 'string' 
-                                    ? round.user.content 
-                                    : JSON.stringify(round.user.content);
-                                  // 直接调用 onSubmit 重新生成
-                                  onSubmit(content);
-                                }
-                              }}
-                              disabled={isLoading}
-                              title="重新生成"
-                            >
-                              <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
-                            </Button>
-                          )}
-                          {/* 分隔线 */}
-                          <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1" />
                           {/* 点赞点踩按钮 */}
                           <Button
                             variant="ghost"
@@ -1669,6 +1646,27 @@ function ChatMessages({
                           >
                             <ThumbsDown className="h-3.5 w-3.5" fill={messageFeedbacks[lastAiMsg.id!] === 'thumbs_down' ? "currentColor" : "none"} />
                           </Button>
+                          {idx === dialogRounds.length - 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                              onClick={() => {
+                                // 重新生成回复 - 使用当前轮次的用户消息
+                                if (round.user && round.user.content) {
+                                  const content = typeof round.user.content === 'string' 
+                                    ? round.user.content 
+                                    : JSON.stringify(round.user.content);
+                                  // 直接调用 onSubmit 重新生成
+                                  onSubmit(content);
+                                }
+                              }}
+                              disabled={isLoading}
+                              title="重新生成"
+                            >
+                              <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+                            </Button>
+                          )}
                         </div>
                         {/* AI生成标识 - GB45438合规要求 */}
                         <div className={cn(

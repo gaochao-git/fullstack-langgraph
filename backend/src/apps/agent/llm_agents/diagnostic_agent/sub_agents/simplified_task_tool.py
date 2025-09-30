@@ -174,13 +174,13 @@ def _get_subagent_description(subagents: List[Dict]) -> List[str]:
     return [f"- {agent['name']}: {agent['description']}" for agent in subagents]
 
 
-def create_simplified_diagnostic_task_tool(
+def create_simplified_sub_agent_task_tool(
     tools: List[Any],
     main_prompt: str,
     model: LanguageModelLike,
     subagents: List[Dict] = None
 ):
-    """创建简化的诊断任务工具（基于 DeepAgent 设计）"""
+    """创建简化的子智能体任务工具（基于 DeepAgent 设计）"""
     
     if subagents is None:
         subagents = SIMPLIFIED_SUBAGENTS
@@ -210,7 +210,7 @@ def create_simplified_diagnostic_task_tool(
 - 根据返回的报告综合判断故障原因"""
     
     @tool(description=task_description)
-    async def diagnostic_task(
+    async def sub_agent_task(
         description: str,
         subagent_type: str,
         state: Annotated[Dict[str, Any], InjectedState],
@@ -289,4 +289,4 @@ def create_simplified_diagnostic_task_tool(
             logger.error(f"❌ 子智能体 {subagent_type} 执行失败: {e}", exc_info=True)
             return f"子智能体执行失败: {str(e)}"
     
-    return diagnostic_task
+    return sub_agent_task

@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 
 from src.shared.core.logging import get_logger
 from src.apps.agent.llm_agents.state_schemas import DiagnosticAgentState
-from .sub_agents.simplified_task_tool import create_simplified_diagnostic_task_tool, SIMPLIFIED_SUBAGENTS
+from .sub_agents.simplified_task_tool import create_simplified_sub_agent_task_tool, SIMPLIFIED_SUBAGENTS
 
 logger = get_logger(__name__)
 
@@ -274,8 +274,8 @@ TODO列表：
         ("placeholder", "{messages}")
     ])
     
-    # 创建诊断任务工具（简化版 - 基于 DeepAgent 设计）
-    task_tool = create_simplified_diagnostic_task_tool(
+    # 创建子智能体任务工具（简化版 - 基于 DeepAgent 设计）
+    task_tool = create_simplified_sub_agent_task_tool(
         tools=tools,
         main_prompt=enhanced_prompt_content,
         model=llm_model,
