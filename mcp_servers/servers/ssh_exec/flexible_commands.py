@@ -18,6 +18,9 @@ UNRESTRICTED_COMMANDS = {
     "tail",    # 查看文件末尾
     "ping",    # 网络连通性测试
     "uniq",    # 去除重复行
+    "head",    # 查看文件开头
+    "wc",      # 统计行数、字数等
+    "sort",    # 排序文本
 }
 
 # 限制参数的命令模板
@@ -352,11 +355,9 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
                 cmd_parts = part.split()
                 if cmd_parts:
                     cmd_name = cmd_parts[0]
-                    # 检查是否是白名单命令或常见的文本处理命令
-                    # 只允许安全命令和几个必需的文本处理命令
-                    allowed_pipe_commands = UNRESTRICTED_COMMANDS.union({
-                        'wc', 'sort', 'head', 'tail'
-                    })
+                    # 检查是否是白名单命令
+                    # 只允许在UNRESTRICTED_COMMANDS中的安全命令
+                    allowed_pipe_commands = UNRESTRICTED_COMMANDS
                     if cmd_name not in allowed_pipe_commands:
                         return False, f"管道命令 '{cmd_name}' 不在允许列表中"
     
