@@ -44,7 +44,7 @@ const ClusterResourceReport = ({ onShowValidityReport }) => {
 
     useEffect(() => {
         // 获取集群组数据
-        apiClient.axiosGet('/api/cmdb/v1/cluster-groups')
+        apiClient.axiosGet('cmdb/v1/cluster-groups')
             .then(response => {
                 // console.log('Cluster Groups API Response:', response.data);
                 let clusterGroupsList = [];
@@ -96,7 +96,7 @@ const ClusterResourceReport = ({ onShowValidityReport }) => {
         };
         
         // 使用新的集群专用接口
-        apiClient.axiosGet('/api/cmdb/v1/cluster-resources-max', { params })
+        apiClient.axiosGet('cmdb/v1/cluster-resources-max', { params })
             .then(response => {
                 let clusterResourcesList = [];
                 
@@ -397,7 +397,7 @@ const ClusterResourceReport = ({ onShowValidityReport }) => {
     const clusterResourceData = React.useMemo(() => {
         const aggregated = filteredData.reduce((acc, resource) => {
             const clusterName = resource.cluster_name || '未分配集群';
-            const groupName = resource.team || resource.group_name || '未分组';
+            const groupName = resource.cluster_group_name || '未分组';
             // 直接使用API返回的百分比数据
             const memoryUsage = Number(resource.max_memory_usage) || 0;
             const diskUsage = Number(resource.max_disk_usage) || 0;

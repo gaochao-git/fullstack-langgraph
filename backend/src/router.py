@@ -20,6 +20,7 @@ from .apps.sensitive_scan import router as scan_router
 from .apps.idc_research import reports_router as idc_reports_router
 from .apps.idc_research import analysis_router as idc_analysis_router
 from .apps.idc_research import docs_router as idc_docs_router
+from .apps.hardware_proxy import router as hardware_proxy_router
 
 # 创建主API路由器
 api_router = APIRouter()
@@ -41,6 +42,7 @@ api_router.include_router(scan_router, tags=["scan"])
 api_router.include_router(idc_reports_router, prefix="/v1/idc-reports", tags=["idc-reports"])
 api_router.include_router(idc_analysis_router, prefix="/v1/idc-research", tags=["idc-research"])
 api_router.include_router(idc_docs_router, prefix="/v1/idc-research", tags=["idc-research-docs"])
+api_router.include_router(hardware_proxy_router, tags=["hardware-proxy"])
 
 @api_router.get("/health")
 async def health_check():

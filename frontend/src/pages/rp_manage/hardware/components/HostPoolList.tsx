@@ -72,7 +72,7 @@ const HostPoolList: React.FC = () => {
   const loadHosts = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/api/cmdb/v1/get_hosts_pool_detail');
+      const response = await apiClient.get('cmdb/v1/get_hosts_pool_detail');
       const hostsList = Array.isArray(response.data)
         ? response.data
         : (response.data.list || []);

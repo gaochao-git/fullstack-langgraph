@@ -27,7 +27,7 @@ const ExternalCmdbSync = () => {
         force_update: formValues.forceUpdate || false
       };
 
-      const response = await apiClient.post('/api/cmdb/v1/sync-external-cmdb', requestData);
+      const response = await apiClient.post('cmdb/v1/sync-external-cmdb', requestData);
       
       if (response.data.success === true) {
         setSyncResult(response.data);

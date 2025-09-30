@@ -31,7 +31,7 @@ const HostList = () => {
 
   useEffect(() => {
     setLoading(true);
-    apiClient.get('/api/cmdb/v1/get_hosts_pool_detail')
+    apiClient.get('cmdb/v1/get_hosts_pool_detail')
       .then(response => {
         // 判断数据格式：如果是 {list: []} 格式则取 list，否则直接使用数组
         const hostsList = Array.isArray(response.data) 
@@ -92,7 +92,7 @@ const HostList = () => {
 
   const handleRefreshData = () => {
     setLoading(true);
-    apiClient.get('/api/cmdb/v1/get_hosts_pool_detail')
+    apiClient.get('cmdb/v1/get_hosts_pool_detail')
       .then(response => {
         const hostsList = Array.isArray(response.data) 
           ? response.data 

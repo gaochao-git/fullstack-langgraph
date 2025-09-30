@@ -19,7 +19,7 @@ const HardwareInfoSync = () => {
   const fetchHardwareInfo = async (hostIpList = []) => {
     setLoading(true);
     try {
-      const response = await apiClient.post('/api/cmdb/v1/fetch-hosts-hardware-info', {
+      const response = await apiClient.post('cmdb/v1/fetch-hosts-hardware-info', {
         host_ip_list: hostIpList
       });
       const result = response.data;

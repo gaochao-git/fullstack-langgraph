@@ -95,7 +95,7 @@ const HostMetricsModal: React.FC<HostMetricsModalProps> = ({ visible, onCancel, 
         params.endDate = moment().format('YYYY-MM-DD');
       }
 
-      const response = await apiClient.axiosGet('/api/cmdb/v1/server-resources', { params });
+      const response = await apiClient.axiosGet('cmdb/v1/server-resources', { params });
       const data = Array.isArray(response.data) ? response.data : (response.data.list || []);
 
       // 直接使用后端返回的数据，无需客户端过滤

@@ -8,7 +8,7 @@ const ReportDownload = () => {
 
   const handleDownloadClusterGroupReport = async () => {
     try {
-      const response = await apiClient.axiosGet('/api/cmdb/v1/cluster-group-report', {
+      const response = await apiClient.axiosGet('cmdb/v1/cluster-group-report', {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -24,7 +24,7 @@ const ReportDownload = () => {
 
   const handleDownloadIDCReport = async () => {
     try {
-      const response = await apiClient.axiosGet('/api/cmdb/v1/idc-report', {
+      const response = await apiClient.axiosGet('cmdb/v1/idc-report', {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));

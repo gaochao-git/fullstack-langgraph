@@ -27,7 +27,7 @@ const MonitoringVerification = () => {
     setVerificationResult(null);
     
     try {
-      const response = await apiClient.post('/api/cmdb/v1/verify-monitoring-data', {
+      const response = await apiClient.post('cmdb/v1/verify-monitoring-data', {
         start_time: timeRange[0].format('YYYY-MM-DD HH:mm:ss'),
         end_time: timeRange[1].format('YYYY-MM-DD HH:mm:ss')
       });
