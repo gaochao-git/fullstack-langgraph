@@ -347,19 +347,44 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
     
     # 如果包含管道，检查管道两边的命令是否都安全
     if '|' in command:
-        pipe_parts = command.split('|')
-        for part in pipe_parts:
-            part = part.strip()
-            if part:
-                # 获取每个部分的命令名
-                cmd_parts = part.split()
-                if cmd_parts:
-                    cmd_name = cmd_parts[0]
-                    # 检查是否是白名单命令
-                    # 只允许在UNRESTRICTED_COMMANDS中的安全命令
-                    allowed_pipe_commands = UNRESTRICTED_COMMANDS
-                    if cmd_name not in allowed_pipe_commands:
-                        return False, f"管道命令 '{cmd_name}' 不在允许列表中"
+        try:
+            # 使用 shlex 解析整个命令
+            tokens = shlex.split(command, posix=True)
+            
+            # 在 tokens 列表中找到管道符的位置
+            # shlex.split 会把管道符解析为单独的 token
+            pipe_indices = [i for i, token in enumerate(tokens) if token == '|']
+            
+            # 如果 shlex 没有将 | 解析为单独的 token，说明它在引号内
+            # 我们需要重新构建命令来找到真正的管道符
+            if not pipe_indices and '|' in command:
+                # 说明所有的 | 都在引号内，没有真正的管道
+                return True, "命令安全检查通过"
+            
+            # 如果有管道符，检查每个管道段的第一个命令
+            if pipe_indices:
+                # 添加起始和结束索引
+                indices = [0] + pipe_indices + [len(tokens)]
+                
+                for i in range(len(indices) - 1):
+                    start = indices[i]
+                    if i > 0:
+                        start += 1  # 跳过管道符本身
+                    end = indices[i + 1]
+                    
+                    # 获取这个管道段的 tokens
+                    segment_tokens = tokens[start:end]
+                    
+                    if segment_tokens:
+                        # 第一个 token 就是命令名
+                        cmd_name = segment_tokens[0]
+                        
+                        if cmd_name not in UNRESTRICTED_COMMANDS:
+                            return False, f"管道命令 '{cmd_name}' 不在允许列表中"
+                            
+        except ValueError as e:
+            # shlex.split 失败通常是因为引号不匹配
+            return False, f"命令语法错误：{str(e)}"
     
     return True, "命令安全检查通过"
 
