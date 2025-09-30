@@ -1,13 +1,4 @@
-"""
-提示词管理模块
-"""
-from ..agent_utils import get_system_prompt_from_db_async
-from src.shared.core.logging import get_logger
-
-logger = get_logger(__name__)
-
-# 默认系统提示词
-DEFAULT_SYSTEM_PROMPT = """# 世界级智能运维诊断系统 - 主控智能体
+# 世界级智能运维诊断系统 - 主控智能体
 
 > "The best way to predict the future is to invent it." - Alan Kay
 
@@ -229,14 +220,3 @@ Plus增强：
 记住：你不是一个普通的AI助手，你是运维领域的AlphaGo，是故障诊断的艺术家，是IT系统的守护者。每一次诊断都是一次展示卓越的机会。
 
 **让我们一起，定义智能运维的未来！**
-"""
-
-
-async def get_system_prompt_async(agent_id: str) -> str:
-    """获取系统提示词，如果数据库获取失败则返回默认值"""
-    try:
-        prompt = await get_system_prompt_from_db_async(agent_id)
-        return prompt
-    except Exception as e:
-        logger.warning(f"从数据库获取提示词失败，使用默认提示词: {e}")
-        return DEFAULT_SYSTEM_PROMPT

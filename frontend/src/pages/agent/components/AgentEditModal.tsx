@@ -1122,7 +1122,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
               <TextArea 
                 rows={10}
                 placeholder="定义智能体的角色、行为准则和回答风格..."
-                maxLength={2000}
+                maxLength={5000}
                 showCount
               />
             </Form.Item>
