@@ -397,12 +397,14 @@ async def analyze_system_logs(
 @mcp.tool()
 async def execute_command(
     command: str = "",
+    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
-    """执行不限制参数的安全命令。支持 ls、ps、grep、pgrep、df、free、uptime 等常用运维命令。
+    """执行不限制参数的安全命令。支持 ls、ps、grep、pgrep、df、free、uptime、ssh 等常用运维命令。
     
     Args:
         command: 要执行的命令
+        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
         timeout: 超时时间(秒，默认30秒)
     
     Returns:
@@ -441,9 +443,9 @@ async def execute_command(
     
     client = None
     try:
-        client = _create_ssh_client()
+        client = _create_ssh_client(host)
         
-        logger.info(f"执行命令: {command}")
+        logger.info(f"执行命令: {command} on host: {host or 'default'}")
         start_time = time.time()
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
         
@@ -477,6 +479,7 @@ async def execute_command(
 async def execute_parameterized_command(
     command_name: str,
     parameters: Optional[Dict[str, Any]] = None,
+    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """执行参数化的安全命令。如 tail_file、ping_host 等。
@@ -484,6 +487,7 @@ async def execute_parameterized_command(
     Args:
         command_name: 命令模板名称
         parameters: 命令参数字典
+        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
         timeout: 超时时间(秒)
     
     Returns:
@@ -504,9 +508,9 @@ async def execute_parameterized_command(
     
     client = None
     try:
-        client = _create_ssh_client()
+        client = _create_ssh_client(host)
         
-        logger.info(f"执行参数化命令: {command} ({message})")
+        logger.info(f"执行参数化命令: {command} ({message}) on host: {host or 'default'}")
         start_time = time.time()
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
         
