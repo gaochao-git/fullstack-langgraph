@@ -13,6 +13,11 @@ from io import StringIO
 import os
 from fastmcp import FastMCP
 from ..common.base_config import MCPServerConfig
+
+# 定义一个辅助函数来输出中文友好的JSON
+def json_dumps(obj, **kwargs):
+    """输出不转义中文的JSON"""
+    return json.dumps(obj, ensure_ascii=False, **kwargs)
 from .flexible_commands import (
     UNRESTRICTED_COMMANDS,
     PARAMETERIZED_COMMANDS,
@@ -31,10 +36,15 @@ mcp = FastMCP("SSH Tools Server")
 # 加载配置
 config = MCPServerConfig('ssh_exec')
 
-def _create_ssh_client():
-    """创建新的SSH连接，每次调用都重新连接"""
+def _create_ssh_client(host=None):
+    """创建新的SSH连接，每次调用都重新连接
+    
+    Args:
+        host: 目标主机IP或域名，如果不提供则使用配置中的默认主机
+    """
     ssh_configs = config.get('configs', [])
-    host = config.get('host')
+    if host is None:
+        host = config.get('host')
     port = config.get('ssh_port', 22)  # 使用ssh_port而不是port
     
     for ssh_config in ssh_configs:
@@ -83,18 +93,18 @@ def _create_ssh_client():
     raise Exception("无法建立SSH连接，请检查网络和服务器状态")
 
 @mcp.tool()
-async def get_system_info(connection_name: str = "default") -> str:
+async def get_system_info(host: Optional[str] = None) -> str:
     """获取系统基本信息。用于了解服务器的硬件配置和运行状态。
     
     Args:
-        connection_name: SSH连接名称（此参数保留兼容性，实际会创建新连接）
+        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
     
     Returns:
         包含系统信息的JSON字符串
     """
     client = None
     try:
-        client = _create_ssh_client()
+        client = _create_ssh_client(host)
         
         commands = {
             'hostname': 'hostname',
@@ -140,25 +150,25 @@ async def get_system_info(connection_name: str = "default") -> str:
             "raw_data": system_info
         }
         
-        return json.dumps(parsed_info, indent=2)
+        return json_dumps(parsed_info, indent=2)
         
     except Exception as e:
         logger.error(f"Error getting system info: {e}")
-        return json.dumps({"error": f"Failed to get system info: {str(e)}"})
+        return json_dumps({"error": f"Failed to get system info: {str(e)}"})
     finally:
         if client:
             client.close()
 
 @mcp.tool()
 async def analyze_processes(
-    connection_name: str = "default",
+    host: Optional[str] = None,
     process_name: Optional[str] = None,
     sort_by: str = "cpu"
 ) -> str:
     """分析系统进程。用于查看系统中运行的进程和资源使用情况。
     
     Args:
-        connection_name: SSH连接名称（此参数保留兼容性，实际会创建新连接）
+        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
         process_name: 进程名称筛选
         sort_by: 排序方式(cpu, memory, pid)
     
@@ -167,7 +177,7 @@ async def analyze_processes(
     """
     client = None
     try:
-        client = _create_ssh_client()
+        client = _create_ssh_client(host)
         
         # 构建ps命令
         if process_name:
@@ -221,7 +231,7 @@ async def analyze_processes(
                             "command": parts[10]
                         })
         
-        return json.dumps({
+        return json_dumps({
             "total_processes": total_processes,
             "filtered_processes": processes,
             "zombie_processes": zombie_processes.split('\n') if zombie_processes else [],
@@ -233,20 +243,20 @@ async def analyze_processes(
         
     except Exception as e:
         logger.error(f"Error analyzing processes: {e}")
-        return json.dumps({"error": f"Failed to analyze processes: {str(e)}"})
+        return json_dumps({"error": f"Failed to analyze processes: {str(e)}"})
     finally:
         if client:
             client.close()
 
 @mcp.tool()
 async def check_service_status(
-    connection_name: str = "default",
+    host: Optional[str] = None,
     service_names: Optional[List[str]] = None
 ) -> str:
     """检查系统服务状态。用于查看关键服务的运行状态。
     
     Args:
-        connection_name: SSH连接名称
+        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
         service_names: 要检查的服务名称列表
     
     Returns:
@@ -254,7 +264,7 @@ async def check_service_status(
     """
     client = None
     try:
-        client = _create_ssh_client()
+        client = _create_ssh_client(host)
         
         service_status = {}
         
@@ -299,18 +309,18 @@ async def check_service_status(
                         "healthy": False
                     }
         
-        return json.dumps(service_status, indent=2)
+        return json_dumps(service_status, indent=2)
         
     except Exception as e:
         logger.error(f"Error checking service status: {e}")
-        return json.dumps({"error": f"Failed to check service status: {str(e)}"})
+        return json_dumps({"error": f"Failed to check service status: {str(e)}"})
     finally:
         if client:
             client.close()
 
 @mcp.tool()
 async def analyze_system_logs(
-    connection_name: str = "default",
+    host: Optional[str] = None,
     log_file: str = "/var/log/syslog",
     lines: int = 100,
     pattern: Optional[str] = None
@@ -318,7 +328,7 @@ async def analyze_system_logs(
     """分析系统日志。用于查看系统日志中的错误和异常信息。
     
     Args:
-        connection_name: SSH连接名称
+        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
         log_file: 日志文件路径
         lines: 读取的行数
         pattern: 搜索模式（grep模式）
@@ -328,14 +338,14 @@ async def analyze_system_logs(
     """
     client = None
     try:
-        client = _create_ssh_client()
+        client = _create_ssh_client(host)
         
         # 检查日志文件是否存在
         stdin, stdout, stderr = client.exec_command(f"test -f {log_file} && echo 'exists' || echo 'not found'")
         file_check = stdout.read().decode().strip()
         
         if file_check != 'exists':
-            return json.dumps({"error": f"Log file {log_file} not found"})
+            return json_dumps({"error": f"Log file {log_file} not found"})
         
         # 构建命令
         if pattern:
@@ -364,7 +374,7 @@ async def analyze_system_logs(
         stdin, stdout, stderr = client.exec_command(f"tail -n {lines} {log_file} | grep -i 'error\\|critical\\|failed' | tail -10")
         recent_errors = stdout.read().decode().strip()
         
-        return json.dumps({
+        return json_dumps({
             "log_file": log_file,
             "lines_analyzed": lines,
             "pattern_filter": pattern,
@@ -379,7 +389,7 @@ async def analyze_system_logs(
         
     except Exception as e:
         logger.error(f"Error analyzing system logs: {e}")
-        return json.dumps({"error": f"Failed to analyze system logs: {str(e)}"})
+        return json_dumps({"error": f"Failed to analyze system logs: {str(e)}"})
     finally:
         if client:
             client.close()
@@ -400,18 +410,18 @@ async def execute_command(
     """
     
     if not command:
-        return json.dumps({"error": "命令不能为空"})
+        return json_dumps({"error": "命令不能为空"})
     
     # 解析命令
     parts = command.strip().split()
     if not parts:
-        return json.dumps({"error": "无效的命令"})
+        return json_dumps({"error": "无效的命令"})
     
     cmd_name = parts[0]
     
     # 检查是否是允许的命令
     if cmd_name not in UNRESTRICTED_COMMANDS:
-        return json.dumps({
+        return json_dumps({
             "error": f"命令 '{cmd_name}' 不在允许列表中",
             "allowed_commands": list(UNRESTRICTED_COMMANDS)
         })
@@ -419,15 +429,15 @@ async def execute_command(
     # 安全检查
     is_safe, safety_msg = is_command_safe(command)
     if not is_safe:
-        return json.dumps({"error": safety_msg})
+        return json_dumps({"error": safety_msg})
     
     # 额外的安全检查：命令长度限制
     if len(command) > 500:
-        return json.dumps({"error": "命令过长，最多允许500个字符"})
+        return json_dumps({"error": "命令过长，最多允许500个字符"})
     
     # 防止命令参数过多
     if len(parts) > 20:
-        return json.dumps({"error": "命令参数过多，最多允许20个参数"})
+        return json_dumps({"error": "命令参数过多，最多允许20个参数"})
     
     client = None
     try:
@@ -443,7 +453,7 @@ async def execute_command(
         exit_code = stdout.channel.recv_exit_status()
         execution_time = time.time() - start_time
         
-        return json.dumps({
+        return json_dumps({
             "command": command,
             "exit_code": exit_code,
             "execution_time_seconds": round(execution_time, 2),
@@ -455,7 +465,7 @@ async def execute_command(
         
     except Exception as e:
         logger.error(f"执行命令时出错: {str(e)}")
-        return json.dumps({
+        return json_dumps({
             "error": f"执行命令失败: {str(e)}",
             "command": command
         })
@@ -487,7 +497,7 @@ async def execute_parameterized_command(
     is_valid, message, command = build_parameterized_command(command_name, parameters)
     
     if not is_valid:
-        return json.dumps({
+        return json_dumps({
             "error": message,
             "available_commands": list(PARAMETERIZED_COMMANDS.keys())
         })
@@ -506,7 +516,7 @@ async def execute_parameterized_command(
         exit_code = stdout.channel.recv_exit_status()
         execution_time = time.time() - start_time
         
-        return json.dumps({
+        return json_dumps({
             "command_name": command_name,
             "command": command,
             "description": message,
@@ -521,7 +531,7 @@ async def execute_parameterized_command(
         
     except Exception as e:
         logger.error(f"执行命令时出错: {str(e)}")
-        return json.dumps({
+        return json_dumps({
             "error": f"执行命令失败: {str(e)}",
             "command_name": command_name,
             "parameters": parameters
@@ -538,7 +548,7 @@ async def list_available_commands() -> str:
         可用命令的详细信息
     """
     
-    return json.dumps(get_available_commands(), indent=2)
+    return json_dumps(get_available_commands(), indent=2)
 
 @mcp.tool()
 async def execute_system_command(
@@ -552,7 +562,7 @@ async def execute_system_command(
     - execute_parameterized_command: 执行参数化命令（tail_file、ping_host等）
     """
     
-    return json.dumps({
+    return json_dumps({
         "error": "此函数已废弃",
         "suggestion": "请使用 execute_command 或 execute_parameterized_command",
         "help": "使用 list_available_commands 查看所有可用命令"
