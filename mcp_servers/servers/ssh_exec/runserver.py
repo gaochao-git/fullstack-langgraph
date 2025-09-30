@@ -167,7 +167,7 @@ async def execute_command(
     host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
-    """执行不限制参数的安全命令。支持的命令完整列表：ls、ps、grep、pgrep、df、free、uptime、ssh、tail
+    """执行不限制参数的安全命令。支持的命令完整列表：ls、ps、grep、pgrep、df、free、uptime、ssh、tail、ping
     
     Args:
         command: 要执行的命令
@@ -249,7 +249,18 @@ async def execute_parameterized_command(
     host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
-    """执行参数化的安全命令。如 tail_file、ping_host 等。
+    """执行参数化的安全命令。支持的命令：
+    - check_port: 检查端口连通性。参数: {host: 目标主机, port: 端口号(1-65535)}
+    - disk_usage: 查看目录占用空间。参数: {directory: 目录路径, depth: 目录深度(1-2), lines: 显示行数(10-20)}
+    - netstat_filter: 过滤网络连接。参数: {pattern: 端口或IP模式}
+    - system_info: 获取系统信息。参数: {command: 系统信息命令}
+    - netstat_info: 查看网络连接信息。参数: {options: netstat选项}
+    - basic_info: 基础系统信息。参数: {command: 基础命令}
+    
+    示例:
+    - command_name="check_port", parameters={"host": "localhost", "port": 22}
+    - command_name="disk_usage", parameters={"directory": "/tmp", "depth": 1, "lines": 10}
+    - command_name="netstat_filter", parameters={"pattern": "22"}
     
     Args:
         command_name: 命令模板名称

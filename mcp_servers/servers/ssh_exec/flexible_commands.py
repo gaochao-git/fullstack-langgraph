@@ -17,49 +17,11 @@ UNRESTRICTED_COMMANDS = {
     "uptime",  # 系统运行时间
     "ssh",     # SSH到其他服务器
     "tail",    # 查看文件末尾
+    "ping",    # 网络连通性测试
 }
 
 # 限制参数的命令模板
 PARAMETERIZED_COMMANDS = {
-    "tail_file": {
-        "template": "tail -n {lines} {file_path}",
-        "description": "查看文件末尾内容",
-        "parameters": {
-            "lines": {
-                "type": "int",
-                "min": 1,
-                "max": 1000,
-                "default": 100,
-                "description": "显示的行数"
-            },
-            "file_path": {
-                "type": "str",
-                "description": "文件路径",
-                "validator": "file_path"
-            }
-        }
-    },
-    
-    "ping_host": {
-        "template": "ping -c {count} {host}",
-        "description": "测试网络连通性",
-        "parameters": {
-            "count": {
-                "type": "int",
-                "min": 1,
-                "max": 10,
-                "default": 4,
-                "description": "ping次数"
-            },
-            "host": {
-                "type": "str",
-                "description": "目标主机或IP",
-                "validator": "hostname_or_ip"
-            }
-        }
-    },
-    
-    
     
     "check_port": {
         "template": "timeout 5 nc -zv {host} {port}",
