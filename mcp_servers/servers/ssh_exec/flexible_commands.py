@@ -15,9 +15,9 @@ UNRESTRICTED_COMMANDS = {
     "df",      # 磁盘空间
     "free",    # 内存使用
     "uptime",  # 系统运行时间
-    "ssh",     # SSH到其他服务器
     "tail",    # 查看文件末尾
     "ping",    # 网络连通性测试
+    "uniq",    # 去除重复行
 }
 
 # 限制参数的命令模板

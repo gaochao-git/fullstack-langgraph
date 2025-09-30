@@ -174,7 +174,7 @@ async def execute_command(
     host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
-    """执行不限制参数的安全命令。支持的命令：
+    """在远程服务器上执行不限制参数的安全命令。支持的命令：
     - ls: 列出目录内容
     - ps: 查看进程状态
     - grep: 搜索文本内容
@@ -182,12 +182,12 @@ async def execute_command(
     - df: 查看磁盘空间使用情况
     - free: 查看内存使用情况
     - uptime: 查看系统运行时间和负载
-    - ssh: SSH到其他服务器
     - tail: 查看文件末尾内容（注意：必须指定-n参数限制行数，如tail -n 100，避免实时监听导致卡住）
     - ping: 测试网络连通性（注意：必须使用-c参数限制次数，如ping -c 4，避免持续ping导致卡住）
+    - uniq: 去除重复行，常用于管道命令中
     
     Args:
-        command: 要执行的命令
+        command: 要在远程服务器上执行的命令
         host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
         timeout: 超时时间(秒，默认30秒)
     
