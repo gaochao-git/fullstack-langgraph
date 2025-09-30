@@ -198,7 +198,7 @@ async def list_sops() -> str:
     """
     try:
         query = """
-        SELECT sop_id, sop_title, sop_description, sop_severity 
+        SELECT sop_id, sop_title, sop_description
         FROM sop_prompt_templates
         """
         results = _execute_query(query)
