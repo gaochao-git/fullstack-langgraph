@@ -33,10 +33,13 @@ class SOPService:
                 raise BusinessException(f"SOP template with ID {sop_data.sop_id} already exists", ResponseCode.CONFLICT)
             
             # 转换数据
-            data = sop_data.dict()
+            if isinstance(sop_data, dict):
+                data = sop_data
+            else:
+                data = sop_data.dict()
             
             # 设置默认值
-            data.setdefault('create_by', 'system')
+            data.setdefault('create_by', 'system')  # 如果没有传入create_by，使用默认值
             data.setdefault('create_time', now_shanghai())
             data.setdefault('update_time', now_shanghai())
             
@@ -112,13 +115,18 @@ class SOPService:
                 raise BusinessException(f"SOP template with ID {sop_id} not found", ResponseCode.NOT_FOUND)
             
             # 转换数据
-            data = sop_data.dict(exclude_unset=True)
+            if isinstance(sop_data, dict):
+                data = sop_data.copy()
+            else:
+                data = sop_data.dict(exclude_unset=True)
             
             # 移除不可更新字段
             data.pop('sop_id', None)
             data.pop('create_time', None)
             data.pop('create_by', None)
-            data['update_by'] = 'system'
+            
+            # 如果没有传入update_by，使用默认值
+            data.setdefault('update_by', 'system')
             data['update_time'] = now_shanghai()
             
             logger.info(f"Updating SOP template: {sop_id}")

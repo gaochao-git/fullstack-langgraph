@@ -18,7 +18,7 @@ import {
   ReloadOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
+import { SOPTemplate, SOPQueryParams } from '../types/sop';
 import { SOPApi, SOPUtils } from '@/services/sopApi';
 import SOPFormModal from '../components/SOPFormModal';
 
@@ -136,28 +136,6 @@ const SOPList: React.FC = () => {
     fetchSOPs();
   };
 
-  // 严重性颜色映射
-  const getSeverityColor = (severity: SOPSeverity): string => {
-    const colors = {
-      low: 'blue',
-      medium: 'orange', 
-      high: 'red',
-      critical: 'purple'
-    };
-    return colors[severity];
-  };
-
-  // 严重性文本映射
-  const getSeverityText = (severity: SOPSeverity): string => {
-    const texts = {
-      low: '低',
-      medium: '中',
-      high: '高', 
-      critical: '紧急'
-    };
-    return texts[severity];
-  };
-
   // 表格列定义
   const columns: ColumnsType<SOPTemplate> = [
     {
@@ -174,41 +152,24 @@ const SOPList: React.FC = () => {
       width: 150
     },
     {
-      title: '严重性',
-      dataIndex: 'sop_severity',
-      key: 'sop_severity',
-      width: 80,
-      render: (severity: SOPSeverity) => (
-        <Tag color={getSeverityColor(severity)}>
-          {getSeverityText(severity)}
-        </Tag>
-      )
-    },
-    {
-      title: '步骤数',
-      dataIndex: 'sop_steps',
-      key: 'steps_count',
-      width: 80,
-      render: (stepsJson: string) => {
-        const rootStep = SOPUtils.parseSteps(stepsJson);
-        // Count total steps recursively
-        const countSteps = (step: any): number => {
-          let count = 1; // Count current step
-          if (step.children && Array.isArray(step.children)) {
-            for (const child of step.children) {
-              count += countSteps(child);
-            }
-          }
-          return count;
-        };
-        return countSteps(rootStep);
-      }
-    },
-    {
-      title: '团队',
-      dataIndex: 'team_name',
-      key: 'team_name',
+      title: '创建人',
+      dataIndex: 'create_by',
+      key: 'create_by',
       width: 100
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'create_time',
+      key: 'create_time',
+      width: 150,
+      render: (time: string) => time.replace('T', ' ').slice(0, 16)
+    },
+    {
+      title: '更新人',
+      dataIndex: 'update_by',
+      key: 'update_by',
+      width: 100,
+      render: (text: string | undefined) => text || '-'
     },
     {
       title: '更新时间',
@@ -252,7 +213,7 @@ const SOPList: React.FC = () => {
   return (
     <div>
       <Card
-        title="知识管理"
+        title="SOP管理"
         extra={
           <Space>
             <Search
@@ -261,18 +222,6 @@ const SOPList: React.FC = () => {
               onSearch={handleSearch}
               style={{ width: 240 }}
             />
-            <Select
-              placeholder="严重性"
-              allowClear
-              style={{ width: 80 }}
-              onChange={(value) => handleFilter('severity', value)}
-              value={searchParams.severity}
-            >
-              <Option value="low">低</Option>
-              <Option value="medium">中</Option>
-              <Option value="high">高</Option>
-              <Option value="critical">紧急</Option>
-            </Select>
             <Button onClick={handleReset}>
               重置
             </Button>

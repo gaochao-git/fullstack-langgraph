@@ -31,17 +31,15 @@ async def create_sop_template(
     current_user: dict = Depends(get_current_user)
 ):
     """创建SOP模板"""
-    # 从当前用户信息中获取团队名称，如果没有则使用用户名
-    team_name = current_user.get("team_name", current_user.get("username", "default-team"))
+    # 获取当前用户名
+    username = current_user.get("username", "system")
     
-    # 将 team_name 设置到 sop_data 中
+    # 将用户信息添加到数据中
     sop_data_dict = sop_data.dict()
-    sop_data_dict["team_name"] = team_name
+    sop_data_dict["create_by"] = username
     
-    # 创建新的 SOPTemplateCreate 实例
-    sop_data_with_team = SOPTemplateCreate(**sop_data_dict)
-    
-    sop_template = await sop_service.create_sop(db, sop_data_with_team)
+    # 创建SOP
+    sop_template = await sop_service.create_sop(db, sop_data_dict)
     return success_response(
         data=sop_template,
         msg="SOP模板创建成功",
@@ -100,10 +98,19 @@ async def list_sop_templates(
 async def update_sop_template(
     sop_id: str,
     sop_data: SOPTemplateUpdate,
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """更新SOP模板"""
-    updated_template = await sop_service.update_sop(db, sop_id, sop_data)
+    # 获取当前用户名
+    username = current_user.get("username", "system")
+    
+    # 将用户信息添加到数据中
+    sop_data_dict = sop_data.dict()
+    sop_data_dict["update_by"] = username
+    
+    # 更新SOP
+    updated_template = await sop_service.update_sop(db, sop_id, sop_data_dict)
     if not updated_template:
         raise BusinessException(f"SOP模板 {sop_id} 不存在", ResponseCode.NOT_FOUND)
     

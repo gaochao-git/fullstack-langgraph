@@ -181,6 +181,20 @@ const SOPManagementSimple: React.FC = () => {
       width: 100
     },
     {
+      title: '创建时间',
+      dataIndex: 'create_time',
+      key: 'create_time',
+      width: 180,
+      render: (time: string) => time.replace('T', ' ').slice(0, 19)
+    },
+    {
+      title: '更新人',
+      dataIndex: 'update_by',
+      key: 'update_by',
+      width: 100,
+      render: (text: string | undefined) => text || '-'
+    },
+    {
       title: '更新时间',
       dataIndex: 'update_time',
       key: 'update_time',
@@ -230,7 +244,7 @@ const SOPManagementSimple: React.FC = () => {
   ];
 
   return (
-    <Card>
+    <Card title="SOP管理">
       {/* 搜索和筛选栏 */}
       <Space style={{ marginBottom: 16 }} wrap>
         <Search
