@@ -201,32 +201,17 @@ async def execute_command(
     if not command:
         return json_dumps({"error": "命令不能为空"})
     
-    # 解析命令
-    parts = command.strip().split()
-    if not parts:
-        return json_dumps({"error": "无效的命令"})
-    
-    cmd_name = parts[0]
-    
-    # 检查是否是允许的命令
-    if cmd_name not in UNRESTRICTED_COMMANDS:
+    # 使用统一的安全检查（包含白名单和语法检查）
+    is_safe, safety_msg = is_command_safe(command.strip())
+    if not is_safe:
         return json_dumps({
-            "error": f"命令 '{cmd_name}' 不在允许列表中",
+            "error": safety_msg,
             "allowed_commands": list(UNRESTRICTED_COMMANDS)
         })
-    
-    # 安全检查
-    is_safe, safety_msg = is_command_safe(command)
-    if not is_safe:
-        return json_dumps({"error": safety_msg})
     
     # 额外的安全检查：命令长度限制
     if len(command) > 500:
         return json_dumps({"error": "命令过长，最多允许500个字符"})
-    
-    # 防止命令参数过多
-    if len(parts) > 20:
-        return json_dumps({"error": "命令参数过多，最多允许20个参数"})
     
     client = None
     try:

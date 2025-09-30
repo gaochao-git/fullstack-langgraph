@@ -328,44 +328,44 @@ def build_parameterized_command(command_name: str, parameters: Dict[str, Any]) -
         return False, f"模板参数错误: {e}", None
 
 def is_command_safe(command: str) -> Tuple[bool, str]:
-    """检查命令是否安全"""
-    # 危险字符和模式（不包括管道符，因为管道在安全的命令间是允许的）
+    """检查命令是否安全 - 使用白名单机制"""
+    # 检查基本的危险模式，即使命令在白名单中
     dangerous_patterns = [
         '&&', '||', ';', '\n', '\r',  # 命令链接
-        '>', '>>', '<',                # 重定向
+        '>', '>>', '<',                # 重定向  
         '`', '$(',                     # 命令替换
-        'rm ', 'dd ', 'mkfs',          # 危险命令
-        'shutdown', 'reboot', 'init',  # 系统命令
-        'kill', 'pkill',               # 进程终止
-        'chmod', 'chown',              # 权限修改
-        'passwd', 'useradd', 'userdel', # 用户管理
+        '..',                          # 目录遍历
+        '/etc/passwd', '/etc/shadow',  # 敏感文件
+        '/root/', '~/',                # 敏感目录
+        '2>/dev/null',                 # 错误重定向（常用于探测）
     ]
     
     for pattern in dangerous_patterns:
         if pattern in command:
             return False, f"命令包含危险模式: {pattern}"
     
-    # 如果包含管道，检查管道两边的命令是否都安全
-    if '|' in command:
-        try:
-            # 使用 shlex 解析整个命令
-            tokens = shlex.split(command, posix=True)
-            
-            # 在 tokens 列表中找到管道符的位置
-            # shlex.split 会把管道符解析为单独的 token
+    try:
+        # 使用 shlex 解析整个命令，确保语法正确
+        tokens = shlex.split(command, posix=True)
+        
+        if not tokens:
+            return False, "空命令"
+        
+        # 检查第一个命令是否在白名单中
+        first_cmd = tokens[0]
+        if first_cmd not in UNRESTRICTED_COMMANDS:
+            return False, f"命令 '{first_cmd}' 不在允许列表中"
+        
+        # 如果包含管道，检查管道中的每个命令
+        if '|' in tokens:
+            # 找到所有管道符的位置
             pipe_indices = [i for i, token in enumerate(tokens) if token == '|']
             
-            # 如果 shlex 没有将 | 解析为单独的 token，说明它在引号内
-            # 我们需要重新构建命令来找到真正的管道符
-            if not pipe_indices and '|' in command:
-                # 说明所有的 | 都在引号内，没有真正的管道
-                return True, "命令安全检查通过"
-            
-            # 如果有管道符，检查每个管道段的第一个命令
             if pipe_indices:
                 # 添加起始和结束索引
                 indices = [0] + pipe_indices + [len(tokens)]
                 
+                # 检查每个管道段的第一个命令
                 for i in range(len(indices) - 1):
                     start = indices[i]
                     if i > 0:
@@ -382,9 +382,9 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
                         if cmd_name not in UNRESTRICTED_COMMANDS:
                             return False, f"管道命令 '{cmd_name}' 不在允许列表中"
                             
-        except ValueError as e:
-            # shlex.split 失败通常是因为引号不匹配
-            return False, f"命令语法错误：{str(e)}"
+    except ValueError as e:
+        # shlex.split 失败通常是因为引号不匹配
+        return False, f"命令语法错误：{str(e)}"
     
     return True, "命令安全检查通过"
 
