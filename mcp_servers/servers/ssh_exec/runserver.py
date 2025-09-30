@@ -20,10 +20,7 @@ def json_dumps(obj, **kwargs):
     return json.dumps(obj, ensure_ascii=False, **kwargs)
 from .flexible_commands import (
     UNRESTRICTED_COMMANDS,
-    PARAMETERIZED_COMMANDS,
-    build_parameterized_command,
-    is_command_safe,
-    get_available_commands
+    is_command_safe
 )
 
 # 配置日志
@@ -94,13 +91,23 @@ def _create_ssh_client(host=None):
 
 @mcp.tool()
 async def get_system_info(host: Optional[str] = None) -> str:
-    """获取系统基本信息。用于了解服务器的硬件配置和运行状态。
+    """获取系统基本信息。包括：主机名、内核版本、操作系统信息、运行时间、CPU型号、CPU核数、内存使用情况、磁盘使用情况、系统负载、登录用户
     
     Args:
         host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
     
     Returns:
-        包含系统信息的JSON字符串
+        包含系统信息的JSON字符串，字段包括：
+        - hostname: 主机名
+        - kernel_version: 内核版本
+        - os_info: 操作系统信息
+        - uptime: 系统运行时间
+        - cpu_model: CPU型号
+        - cpu_cores: CPU核心数
+        - memory_info: 内存使用情况（free -h输出）
+        - disk_usage: 磁盘使用情况（df -h输出）
+        - load_average: 系统负载（1分钟、5分钟、15分钟）
+        - logged_users: 当前登录用户
     """
     client = None
     try:
@@ -242,85 +249,6 @@ async def execute_command(
         if client:
             client.close()
 
-@mcp.tool()
-async def execute_parameterized_command(
-    command_name: str,
-    parameters: Optional[Dict[str, Any]] = None,
-    host: Optional[str] = None,
-    timeout: int = 30
-) -> str:
-    """执行参数化的安全命令。支持的命令：
-    - check_port: 检查端口连通性。参数: {host: 目标主机, port: 端口号(1-65535)}
-    - disk_usage: 查看目录占用空间。参数: {directory: 目录路径, depth: 目录深度(1-2), lines: 显示行数(10-20)}
-    - netstat_filter: 过滤网络连接。参数: {pattern: 端口或IP模式}
-    - system_info: 获取系统信息。参数: {command: 系统信息命令}
-    - netstat_info: 查看网络连接信息。参数: {options: netstat选项}
-    - basic_info: 基础系统信息。参数: {command: 基础命令}
-    
-    示例:
-    - command_name="check_port", parameters={"host": "localhost", "port": 22}
-    - command_name="disk_usage", parameters={"directory": "/tmp", "depth": 1, "lines": 10}
-    - command_name="netstat_filter", parameters={"pattern": "22"}
-    
-    Args:
-        command_name: 命令模板名称
-        parameters: 命令参数字典
-        host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
-        timeout: 超时时间(秒)
-    
-    Returns:
-        包含命令执行结果的JSON字符串
-    """
-    
-    if parameters is None:
-        parameters = {}
-    
-    # 构建命令
-    is_valid, message, command = build_parameterized_command(command_name, parameters)
-    
-    if not is_valid:
-        return json_dumps({
-            "error": message,
-            "available_commands": list(PARAMETERIZED_COMMANDS.keys())
-        })
-    
-    client = None
-    try:
-        client = _create_ssh_client(host)
-        
-        logger.info(f"执行参数化命令: {command} ({message}) on host: {host or 'default'}")
-        start_time = time.time()
-        stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
-        
-        # 读取输出
-        output = stdout.read().decode()
-        error_output = stderr.read().decode()
-        exit_code = stdout.channel.recv_exit_status()
-        execution_time = time.time() - start_time
-        
-        return json_dumps({
-            "command_name": command_name,
-            "command": command,
-            "description": message,
-            "parameters": parameters,
-            "exit_code": exit_code,
-            "execution_time_seconds": round(execution_time, 2),
-            "stdout": output,
-            "stderr": error_output,
-            "success": exit_code == 0,
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-        }, indent=2)
-        
-    except Exception as e:
-        logger.error(f"执行命令时出错: {str(e)}")
-        return json_dumps({
-            "error": f"执行命令失败: {str(e)}",
-            "command_name": command_name,
-            "parameters": parameters
-        })
-    finally:
-        if client:
-            client.close()
 
 if __name__ == "__main__":
     # 获取端口
