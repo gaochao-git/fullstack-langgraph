@@ -36,6 +36,89 @@ def _get_subagent_description(subagents: List[SubAgent]) -> List[str]:
     return [f"- {agent['name']}: {agent['description']}" for agent in subagents]
 
 
+def _get_tools_for_subagent(agent_name: str, tools_by_name: Dict[str, Any]) -> List[Any]:
+    """根据子智能体类型精确指定工具列表
+    
+    Args:
+        agent_name: 子智能体名称
+        tools_by_name: 工具名称到工具实例的映射
+        
+    Returns:
+        该子智能体应该拥有的工具列表
+    """
+    # 定义每个子智能体的精确工具列表
+    tool_assignments = {
+        "log-analyzer": [
+            # Elasticsearch工具
+            "get_es_data",
+            "get_es_trends_data", 
+            "get_es_indices",
+            # SSH工具
+            "execute_command",
+            "execute_parameterized_command",
+            "analyze_system_logs",
+            "list_available_commands",
+            # 系统工具
+            "get_current_time"
+        ],
+        "monitor-analyzer": [
+            # SSH工具
+            "execute_command",
+            "execute_parameterized_command",
+            "get_system_info",
+            "analyze_processes",
+            "check_service_status",
+            "list_available_commands",
+            # Zabbix工具
+            "get_zabbix_metric_data",
+            "get_zabbix_metrics",
+            # 数据库诊断工具
+            "execute_diagnostic_query",
+            "list_diagnostic_queries", 
+            "check_database_health",
+            "execute_readonly_sql",
+            # 系统工具
+            "get_current_time",
+            # 图表工具
+            "create_line_chart",
+            "create_bar_chart"
+        ],
+        "alert-correlator": [
+            # Zabbix工具
+            "get_zabbix_metric_data",
+            "get_zabbix_metrics",
+            # SSH基础工具
+            "check_service_status",
+            "execute_command",
+            # 系统工具
+            "get_current_time"
+        ],
+        "change-analyzer": [
+            # SSH基础工具
+            "execute_command",
+            "get_system_info",
+            # 系统工具
+            "get_current_time",
+            "get_documents_content"
+        ]
+    }
+    
+    # 获取该子智能体的工具名称列表
+    assigned_tool_names = tool_assignments.get(agent_name, [])
+    
+    # 根据名称获取实际的工具对象
+    assigned_tools = []
+    for tool_name in assigned_tool_names:
+        if tool_name in tools_by_name:
+            assigned_tools.append(tools_by_name[tool_name])
+        else:
+            logger.warning(f"工具 '{tool_name}' 未找到，跳过分配给 {agent_name}")
+    
+    logger.info(f"为 {agent_name} 分配了 {len(assigned_tools)} 个工具: {assigned_tool_names}")
+    
+    return assigned_tools
+
+
 async def _create_subagent_registry(
     tools: List[Any],
     main_prompt: str,
@@ -68,9 +151,8 @@ async def _create_subagent_registry(
     
     # 创建各个子智能体
     for agent_config in subagents:
-        # 子智能体默认使用所有可用工具
-        # 未来可以根据需要过滤特定工具
-        agent_tools = tools
+        # 根据子智能体类型精确分配工具
+        agent_tools = _get_tools_for_subagent(agent_config["name"], tools_by_name)
         
         # 简化处理：始终使用默认模型
         # 未来可以支持自定义模型配置
@@ -88,6 +170,17 @@ async def _create_subagent_registry(
         logger.info(f"  ✓ 创建子智能体: {agent_config['name']}")
         logger.info(f"    - 描述: {agent_config['description'][:50]}...")
         logger.info(f"    - 工具数: {len(agent_tools)}")
+        
+        # 显示分配的工具类别统计
+        tool_categories = {}
+        for tool in agent_tools:
+            tool_name = getattr(tool, 'name', str(tool))
+            if '_' in tool_name:
+                category = tool_name.split('_')[0]
+            else:
+                category = 'system'
+            tool_categories[category] = tool_categories.get(category, 0) + 1
+        logger.info(f"    - 工具类别: {tool_categories}")
     
     return agents
 
