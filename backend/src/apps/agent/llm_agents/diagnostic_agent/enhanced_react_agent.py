@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 
 from src.shared.core.logging import get_logger
 from src.apps.agent.llm_agents.state_schemas import DiagnosticAgentState
-from .sub_agents.task_tool import create_diagnostic_task_tool, DIAGNOSTIC_SUBAGENTS
+from .sub_agents.simplified_task_tool import create_simplified_diagnostic_task_tool, SIMPLIFIED_SUBAGENTS
 
 logger = get_logger(__name__)
 
@@ -274,23 +274,23 @@ TODO列表：
         ("placeholder", "{messages}")
     ])
     
-    # 创建诊断任务工具
-    task_tool = create_diagnostic_task_tool(
+    # 创建诊断任务工具（简化版 - 基于 DeepAgent 设计）
+    task_tool = create_simplified_diagnostic_task_tool(
         tools=tools,
         main_prompt=enhanced_prompt_content,
         model=llm_model,
-        subagents=DIAGNOSTIC_SUBAGENTS
+        subagents=SIMPLIFIED_SUBAGENTS
     )
     
     # 将任务工具添加到工具列表
     enhanced_tools = list(tools) + [task_tool]
     
-    logger.info("🎯 创建增强的诊断智能体")
+    logger.info("🎯 创建增强的诊断智能体（简化版）")
     logger.info(f"📊 配置信息:")
-    logger.info(f"   - 子智能体数量: {len(DIAGNOSTIC_SUBAGENTS)}")
+    logger.info(f"   - 子智能体数量: {len(SIMPLIFIED_SUBAGENTS)}")
     logger.info(f"   - 工具总数: {len(enhanced_tools)}")
     logger.info(f"   - 子智能体类型:")
-    for sub in DIAGNOSTIC_SUBAGENTS:
+    for sub in SIMPLIFIED_SUBAGENTS:
         logger.info(f"     • {sub['name']}: {sub['description'][:50]}...")
     
     # 使用标准的 create_react_agent，确保完全兼容
