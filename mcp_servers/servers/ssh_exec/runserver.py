@@ -22,7 +22,7 @@ from .flexible_commands import (
 )
 
 # 配置日志
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # 创建MCP服务器实例
@@ -35,7 +35,7 @@ def _create_ssh_client():
     """创建新的SSH连接，每次调用都重新连接"""
     ssh_configs = config.get('configs', [])
     host = config.get('host')
-    port = config.get('port', 22)
+    port = config.get('ssh_port', 22)  # 使用ssh_port而不是port
     
     for ssh_config in ssh_configs:
         try:

@@ -15,6 +15,7 @@ UNRESTRICTED_COMMANDS = {
     "df",      # 磁盘空间
     "free",    # 内存使用
     "uptime",  # 系统运行时间
+    "ssh",     # SSH到其他服务器
 }
 
 # 限制参数的命令模板
