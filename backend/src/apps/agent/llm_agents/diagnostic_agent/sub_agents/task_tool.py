@@ -36,87 +36,124 @@ def _get_subagent_description(subagents: List[SubAgent]) -> List[str]:
     return [f"- {agent['name']}: {agent['description']}" for agent in subagents]
 
 
-def _get_tools_for_subagent(agent_name: str, tools_by_name: Dict[str, Any]) -> List[Any]:
-    """根据子智能体类型精确指定工具列表
+def _get_subagent_tools_config(agent_name: str) -> Dict[str, Any]:
+    """获取子智能体的工具配置
     
     Args:
         agent_name: 子智能体名称
-        tools_by_name: 工具名称到工具实例的映射
         
     Returns:
-        该子智能体应该拥有的工具列表
+        工具配置字典
     """
-    # 定义每个子智能体的精确工具列表
-    tool_assignments = {
-        "log-analyzer": [
-            # Elasticsearch工具
-            "get_es_data",
-            "get_es_trends_data", 
-            "get_es_indices",
-            # SSH工具
-            "execute_command",
-            "execute_parameterized_command",
-            "analyze_system_logs",
-            "list_available_commands",
-            # 系统工具
-            "get_current_time"
-        ],
-        "monitor-analyzer": [
-            # SSH工具
-            "execute_command",
-            "execute_parameterized_command",
-            "get_system_info",
-            "analyze_processes",
-            "check_service_status",
-            "list_available_commands",
-            # Zabbix工具
-            "get_zabbix_metric_data",
-            "get_zabbix_metrics",
-            # 数据库诊断工具
-            "execute_diagnostic_query",
-            "list_diagnostic_queries", 
-            "check_database_health",
-            "execute_readonly_sql",
-            # 系统工具
-            "get_current_time",
-            # 图表工具
-            "create_line_chart",
-            "create_bar_chart"
-        ],
-        "alert-correlator": [
-            # Zabbix工具
-            "get_zabbix_metric_data",
-            "get_zabbix_metrics",
-            # SSH基础工具
-            "check_service_status",
-            "execute_command",
-            # 系统工具
-            "get_current_time"
-        ],
-        "change-analyzer": [
-            # SSH基础工具
-            "execute_command",
-            "get_system_info",
-            # 系统工具
-            "get_current_time",
-            "get_documents_content"
-        ]
+    # 定义每个子智能体的工具配置
+    tools_config = {
+        "log-analyzer": {
+            "system_tools": ["get_current_time"],
+            "mcp_tools": [
+                {
+                    "server_id": "es_search",
+                    "tools": ["get_es_data", "get_es_trends_data", "get_es_indices"]
+                },
+                {
+                    "server_id": "ssh_exec",
+                    "tools": ["execute_command", "execute_parameterized_command", 
+                             "analyze_system_logs", "list_available_commands"]
+                }
+            ]
+        },
+        "monitor-analyzer": {
+            "system_tools": ["get_current_time"],
+            "mcp_tools": [
+                {
+                    "server_id": "ssh_exec",
+                    "tools": ["execute_command", "execute_parameterized_command",
+                             "get_system_info", "analyze_processes",
+                             "check_service_status", "list_available_commands"]
+                },
+                {
+                    "server_id": "zabbix_monitor",
+                    "tools": ["get_zabbix_metric_data", "get_zabbix_metrics"]
+                },
+                {
+                    "server_id": "db_query",
+                    "tools": ["execute_diagnostic_query", "list_diagnostic_queries",
+                             "check_database_health", "execute_readonly_sql"]
+                },
+                {
+                    "server_id": "chart_server",
+                    "tools": ["create_line_chart", "create_bar_chart"]
+                }
+            ]
+        },
+        "alert-correlator": {
+            "system_tools": ["get_current_time"],
+            "mcp_tools": [
+                {
+                    "server_id": "zabbix_monitor",
+                    "tools": ["get_zabbix_metric_data", "get_zabbix_metrics"]
+                },
+                {
+                    "server_id": "ssh_exec",
+                    "tools": ["check_service_status", "execute_command"]
+                }
+            ]
+        },
+        "change-analyzer": {
+            "system_tools": ["get_current_time", "get_documents_content"],
+            "mcp_tools": [
+                {
+                    "server_id": "ssh_exec",
+                    "tools": ["execute_command", "get_system_info"]
+                }
+            ]
+        }
     }
     
-    # 获取该子智能体的工具名称列表
-    assigned_tool_names = tool_assignments.get(agent_name, [])
+    return tools_config.get(agent_name, {"system_tools": [], "mcp_tools": []})
+
+
+async def _get_tools_for_subagent(agent_name: str) -> List[Any]:
+    """为子智能体加载工具
     
-    # 根据名称获取实际的工具对象
-    assigned_tools = []
-    for tool_name in assigned_tool_names:
-        if tool_name in tools_by_name:
-            assigned_tools.append(tools_by_name[tool_name])
-        else:
-            logger.warning(f"工具 '{tool_name}' 未找到，跳过分配给 {agent_name}")
+    Args:
+        agent_name: 子智能体名称
+        
+    Returns:
+        工具列表
+    """
+    # 复用主智能体的工具加载逻辑
+    from ..tools import get_diagnostic_tools
     
-    logger.info(f"为 {agent_name} 分配了 {len(assigned_tools)} 个工具: {assigned_tool_names}")
+    # 获取子智能体的工具配置
+    tools_config = _get_subagent_tools_config(agent_name)
     
-    return assigned_tools
+    # 创建一个虚拟的agent_id，用于工具加载
+    # 实际上我们会用自定义的配置覆盖它
+    dummy_agent_id = f"subagent_{agent_name}"
+    
+    # 调用主智能体的工具加载函数，但传入子智能体的配置
+    # 需要临时修改获取配置的逻辑
+    from ..agent_utils import get_tools_config_from_db
+    
+    # 保存原函数
+    original_get_config = get_tools_config_from_db
+    
+    # 临时替换为返回子智能体配置的函数
+    def mock_get_config(agent_id):
+        return tools_config
+    
+    # 替换函数
+    import sys
+    sys.modules['src.apps.agent.llm_agents.agent_utils'].get_tools_config_from_db = mock_get_config
+    
+    try:
+        # 调用工具加载函数
+        tools = await get_diagnostic_tools(dummy_agent_id)
+        logger.info(f"子智能体 {agent_name} 加载了 {len(tools)} 个工具")
+        return tools
+    finally:
+        # 恢复原函数
+        sys.modules['src.apps.agent.llm_agents.agent_utils'].get_tools_config_from_db = original_get_config
 
 
 async def _create_subagent_registry(
@@ -151,8 +188,8 @@ async def _create_subagent_registry(
     
     # 创建各个子智能体
     for agent_config in subagents:
-        # 根据子智能体类型精确分配工具
-        agent_tools = _get_tools_for_subagent(agent_config["name"], tools_by_name)
+        # 每个子智能体独立加载自己的工具
+        agent_tools = await _get_tools_for_subagent(agent_config["name"])
         
         # 简化处理：始终使用默认模型
         # 未来可以支持自定义模型配置
