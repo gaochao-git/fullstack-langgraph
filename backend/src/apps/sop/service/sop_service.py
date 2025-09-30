@@ -34,8 +34,6 @@ class SOPService:
             
             # 转换数据
             data = sop_data.dict()
-            if 'steps' in data:
-                data['sop_steps'] = data.pop('steps')
             
             # 设置默认值
             data.setdefault('create_by', 'system')
@@ -66,51 +64,34 @@ class SOPService:
         params: SOPQueryParams
     ) -> Tuple[List[SOPTemplate], int]:
         """列出SOP模板"""
-        # 搜索功能
+        # 构建查询
+        query = select(SOPTemplate)
+        conditions = []
+        
+        # 搜索条件
         if params.search:
-            query = select(SOPTemplate).where(
-                SOPTemplate.sop_title.contains(params.search)
+            conditions.append(
+                SOPTemplate.sop_title.contains(params.search) |
+                SOPTemplate.sop_id.contains(params.search)
             )
-            if params.team_name:
-                query = query.where(SOPTemplate.team_name == params.team_name)
-            
-            query = query.offset(params.offset).limit(params.limit)
-            result = await db.execute(query)
-            templates = list(result.scalars().all())
-            
-            # 获取搜索总数
-            count_query = select(func.count(SOPTemplate.id)).where(
-                SOPTemplate.sop_title.contains(params.search)
-            )
-            if params.team_name:
-                count_query = count_query.where(SOPTemplate.team_name == params.team_name)
-            count_result = await db.execute(count_query)
-            total = count_result.scalar()
-        else:
-            # 普通查询
-            query = select(SOPTemplate)
-            conditions = []
-            if params.category:
-                conditions.append(SOPTemplate.sop_category == params.category)
-            if params.severity:
-                conditions.append(SOPTemplate.sop_severity == params.severity)
-            if params.team_name:
-                conditions.append(SOPTemplate.team_name == params.team_name)
-            
-            if conditions:
-                query = query.where(and_(*conditions))
-            
-            query = query.order_by(SOPTemplate.create_time.desc())
-            query = query.offset(params.offset).limit(params.limit)
-            result = await db.execute(query)
-            templates = list(result.scalars().all())
-            
-            # 计算总数
-            count_query = select(func.count(SOPTemplate.id))
-            if conditions:
-                count_query = count_query.where(and_(*conditions))
-            count_result = await db.execute(count_query)
-            total = count_result.scalar()
+        
+        
+        # 应用条件
+        if conditions:
+            query = query.where(and_(*conditions))
+        
+        # 排序和分页
+        query = query.order_by(SOPTemplate.create_time.desc())
+        query = query.offset(params.offset).limit(params.limit)
+        result = await db.execute(query)
+        templates = list(result.scalars().all())
+        
+        # 计算总数
+        count_query = select(func.count(SOPTemplate.id))
+        if conditions:
+            count_query = count_query.where(and_(*conditions))
+        count_result = await db.execute(count_query)
+        total = count_result.scalar()
         
         return templates, total
     
@@ -132,8 +113,6 @@ class SOPService:
             
             # 转换数据
             data = sop_data.dict(exclude_unset=True)
-            if 'steps' in data:
-                data['sop_steps'] = data.pop('steps')
             
             # 移除不可更新字段
             data.pop('sop_id', None)
@@ -175,15 +154,6 @@ class SOPService:
             return result.rowcount > 0
     
     # ========== 旧格式方法 - 向后兼容 ==========
-    async def get_categories(self, db: AsyncSession) -> List[str]:
-        """获取所有分类 - 字符串数组格式（向后兼容）"""
-        result = await db.execute(
-            select(distinct(SOPTemplate.sop_category)).where(
-                SOPTemplate.sop_category.isnot(None)
-            )
-        )
-        return [row[0] for row in result.fetchall()]
-    
     async def get_teams(self, db: AsyncSession) -> List[str]:  
         """获取所有团队 - 字符串数组格式（向后兼容）"""
         result = await db.execute(
@@ -193,32 +163,7 @@ class SOPService:
         )
         return [row[0] for row in result.fetchall()]
     
-    async def get_category_statistics(
-        self, 
-        db: AsyncSession
-    ) -> List[Dict[str, Any]]:
-        """获取分类统计 - 原有格式（向后兼容）"""
-        result = await db.execute(
-            select(
-                SOPTemplate.sop_category.label('category'),
-                func.count(SOPTemplate.id).label('count')
-            ).group_by(SOPTemplate.sop_category)
-        )
-        return [{'category': row.category, 'count': row.count} for row in result.fetchall()]
-    
     # ========== 新格式方法 - 统一标准格式 ==========
-    async def get_category_options(self, db: AsyncSession):
-        """获取分类选项 - 返回原始查询结果"""
-        return await db.execute(
-            select(
-                SOPTemplate.sop_category.label('value'),
-                SOPTemplate.sop_category.label('label'),
-                func.count(SOPTemplate.id).label('count')
-            )
-            .where(SOPTemplate.sop_category.isnot(None))
-            .group_by(SOPTemplate.sop_category)
-        )
-    
     async def get_team_options(self, db: AsyncSession):
         """获取团队选项 - 返回原始查询结果"""
         return await db.execute(

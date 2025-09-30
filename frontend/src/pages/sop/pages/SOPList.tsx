@@ -20,7 +20,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { SOPTemplate, SOPQueryParams, SOPSeverity } from '../types/sop';
 import { SOPApi, SOPUtils } from '@/services/sopApi';
-import SOPFormWithTreeModal from '../components/SOPFormWithTreeModal';
+import SOPFormModal from '../components/SOPFormModal';
 
 const { Search } = Input;
 const { Option } = Select;
@@ -174,15 +174,6 @@ const SOPList: React.FC = () => {
       width: 150
     },
     {
-      title: '分类',
-      dataIndex: 'sop_category',
-      key: 'sop_category',
-      width: 100,
-      render: (category: string) => (
-        <Tag color="blue">{category}</Tag>
-      )
-    },
-    {
       title: '严重性',
       dataIndex: 'sop_severity',
       key: 'sop_severity',
@@ -271,18 +262,6 @@ const SOPList: React.FC = () => {
               style={{ width: 240 }}
             />
             <Select
-              placeholder="分类"
-              allowClear
-              style={{ width: 100 }}
-              onChange={(value) => handleFilter('category', value)}
-              value={searchParams.category}
-            >
-              <Option value="database">数据库</Option>
-              <Option value="system">系统</Option>
-              <Option value="network">网络</Option>
-              <Option value="application">应用</Option>
-            </Select>
-            <Select
               placeholder="严重性"
               allowClear
               style={{ width: 80 }}
@@ -335,7 +314,7 @@ const SOPList: React.FC = () => {
       </Card>
 
       {/* SOP表单模态框 */}
-      <SOPFormWithTreeModal
+      <SOPFormModal
         visible={formModalVisible}
         onCancel={() => setFormModalVisible(false)}
         onSuccess={handleFormSuccess}

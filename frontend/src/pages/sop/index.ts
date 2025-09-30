@@ -11,13 +11,12 @@
 
 // === 页面组件 ===
 export { default as SOPList } from './pages/SOPList';
-export { default as SOPManagement } from './pages/SOPManagement';
+export { default as SOPManagement } from './pages/SOPManagementSimple'; // 使用简化版
 export { default as SOPProblemRuleManagement } from './pages/SOPProblemRuleManagement';
 
 // === 可复用组件 ===
-export { default as SOPFormWithTreeModal } from './components/SOPFormWithTreeModal';
+export { default as SOPFormModal } from './components/SOPFormModal';
 export { default as SOPDetailModal } from './components/SOPDetailModal';
-export { default as FaultTreeEditor } from './components/FaultTreeEditor';
 
 // === Hooks ===
 export { useSOPList } from './hooks/useSOPList';

@@ -70,7 +70,6 @@ async def list_sop_templates(
     page: int = Query(1, ge=1, description="页码"),
     size: int = Query(10, ge=1, le=100, description="每页数量"),
     search: Optional[str] = Query(None, max_length=200, description="搜索关键词"),
-    category: Optional[str] = Query(None, max_length=100, description="分类过滤"),
     severity: Optional[str] = Query(None, description="严重程度过滤"),
     team_name: Optional[str] = Query(None, max_length=100, description="团队过滤"),
     db: AsyncSession = Depends(get_async_db)
@@ -79,7 +78,6 @@ async def list_sop_templates(
     # 构建查询参数
     params = SOPQueryParams(
         search=search,
-        category=category,
         severity=severity,
         team_name=team_name,
         limit=size,
@@ -131,17 +129,6 @@ async def delete_sop_template(
     )
 
 
-@router.get("/v1/sops/meta/categories", response_model=UnifiedResponse)
-async def get_sop_categories(
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取所有SOP分类 - 统一对象格式"""
-    categories = await sop_service.get_category_options(db)
-    return success_response(
-        data=categories,
-        msg="获取SOP分类成功"
-    )
-
 
 @router.get("/v1/sops/meta/teams", response_model=UnifiedResponse)
 async def get_sop_teams(
@@ -167,16 +154,6 @@ async def get_sop_severity_options(
     )
 
 
-@router.get("/v1/sops/meta/statistics", response_model=UnifiedResponse)
-async def get_sop_statistics(
-    db: AsyncSession = Depends(get_async_db)
-):
-    """获取SOP统计信息"""
-    statistics = await sop_service.get_category_statistics(db)
-    return success_response(
-        data=statistics,
-        msg="获取SOP统计信息成功"
-    )
 
 
 # ============ SOP Problem Rule 相关接口 ============

@@ -5,43 +5,17 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 
-class SOPStep(BaseModel):
-    """SOP execution step schema - supports tree structure."""
-    id: Optional[str] = Field(None, description="Step unique identifier", max_length=100)
-    step: str = Field(..., description="Step name", min_length=1, max_length=200)
-    description: str = Field(..., description="Step description", min_length=1, max_length=1000)
-    execution_status: Optional[str] = Field("pending", description="Step execution status", max_length=20)
-    health_status: Optional[str] = Field("unknown", description="Step health status", max_length=20)
-    children: Optional[List[SOPStep]] = Field(None, description="Child steps for tree structure")
-    
-    class Config:
-        # 允许递归模型
-        arbitrary_types_allowed = True
-
-
 class SOPTemplateCreate(BaseModel):
     """Schema for creating SOP template."""
     sop_id: str = Field(..., description="Unique SOP identifier", min_length=1, max_length=100, pattern=r'^[a-zA-Z0-9_-]+$')
     sop_title: str = Field(..., description="SOP title", min_length=1, max_length=500)
-    sop_category: str = Field(..., description="SOP category", min_length=1, max_length=100)
-    sop_description: Optional[str] = Field(None, description="SOP description", max_length=2000)
-    sop_severity: Literal["low", "medium", "high", "critical"] = Field("high", description="SOP severity level")
-    steps: SOPStep = Field(..., description="Root execution step with nested children")
-    tools_required: Optional[List[str]] = Field(default_factory=list, description="List of required tools", max_items=20)
-    sop_recommendations: str = Field("", description="SOP recommendations", max_length=2000)
-    team_name: str = Field("", description="Responsible team name", max_length=100)
+    sop_description: str = Field(..., description="SOP description including all steps", min_length=1, max_length=10000)  # 必填字段
 
 
 class SOPTemplateUpdate(BaseModel):
     """Schema for updating SOP template."""
     sop_title: Optional[str] = Field(None, description="SOP title", min_length=1, max_length=500)
-    sop_category: Optional[str] = Field(None, description="SOP category", min_length=1, max_length=100)
-    sop_description: Optional[str] = Field(None, description="SOP description", max_length=2000)
-    sop_severity: Optional[Literal["low", "medium", "high", "critical"]] = Field(None, description="SOP severity level")
-    steps: Optional[SOPStep] = Field(None, description="Root execution step with nested children")
-    tools_required: Optional[List[str]] = Field(None, description="List of required tools", max_items=20)
-    sop_recommendations: Optional[str] = Field(None, description="SOP recommendations", max_length=2000)
-    team_name: Optional[str] = Field(None, description="Responsible team name", min_length=1, max_length=100)
+    sop_description: Optional[str] = Field(None, description="SOP description including all steps", max_length=10000)
 
 
 class SOPTemplateResponse(BaseModel):
@@ -49,13 +23,7 @@ class SOPTemplateResponse(BaseModel):
     id: int
     sop_id: str
     sop_title: str
-    sop_category: str
-    sop_description: Optional[str]
-    sop_severity: str
-    sop_steps: str  # JSON string
-    tools_required: Optional[str]  # JSON string
-    sop_recommendations: Optional[str]
-    team_name: str
+    sop_description: str
     create_by: str
     update_by: Optional[str]
     create_time: str
@@ -68,9 +36,6 @@ class SOPTemplateResponse(BaseModel):
 class SOPQueryParams(BaseModel):
     """Schema for SOP query parameters."""
     search: Optional[str] = Field(None, description="Search term for title, description, or ID", max_length=200)
-    category: Optional[str] = Field(None, description="Filter by category", max_length=100)
-    severity: Optional[Literal["low", "medium", "high", "critical"]] = Field(None, description="Filter by severity")
-    team_name: Optional[str] = Field(None, description="Filter by team name", max_length=100)
     limit: Optional[int] = Field(10, description="Number of results to return", ge=1, le=100)
     offset: Optional[int] = Field(0, description="Number of results to skip", ge=0)
 
@@ -89,8 +54,6 @@ class ApiResponse(BaseModel):
     error: Optional[str] = None
 
 
-# 更新前向引用以支持递归
-SOPStep.model_rebuild()
 
 # ============ SOP Problem Rule 相关模型 ============
 

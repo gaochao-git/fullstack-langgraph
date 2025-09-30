@@ -86,11 +86,22 @@ export class SOPApi {
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.size) queryParams.append('size', params.size.toString());
     if (params.search) queryParams.append('search', params.search);
-    if (params.category) queryParams.append('category', params.category);
     if (params.severity && params.severity !== 'all') queryParams.append('severity', params.severity);
     if (params.team_name) queryParams.append('team_name', params.team_name);
 
     const url = `/api/v1/sops${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    return await omind_get(url);
+  }
+  
+  // 查询SOP模板（使用查询参数）
+  static async querySOPTemplates(params: any = {}) {
+    const queryParams = new URLSearchParams();
+    
+    if (params.search) queryParams.append('search', params.search);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.offset) queryParams.append('offset', params.offset.toString());
+
+    const url = `/api/v1/sops/query${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
     return await omind_get(url);
   }
 
@@ -99,12 +110,22 @@ export class SOPApi {
     return await omind_get(`/api/v1/sops/${sopId}`);
   }
 
-  // 创建SOP
+  // 创建SOP模板
+  static async createTemplate(sopData: SOPTemplateRequest) {
+    return await omind_post('/api/v1/sops', sopData);
+  }
+  
+  // 更新SOP模板
+  static async updateTemplate(sopId: string, sopData: Partial<SOPTemplateRequest>) {
+    return await omind_put(`/api/v1/sops/${sopId}`, sopData);
+  }
+
+  // 创建SOP（兼容旧接口）
   static async createSOP(sopData: SOPTemplateRequest) {
     return await omind_post('/api/v1/sops', sopData);
   }
 
-  // 更新SOP
+  // 更新SOP（兼容旧接口）
   static async updateSOP(sopId: string, sopData: Partial<SOPTemplateRequest>) {
     return await omind_put(`/api/v1/sops/${sopId}`, sopData);
   }
@@ -114,10 +135,6 @@ export class SOPApi {
     return await omind_del(`/api/v1/sops/${sopId}`);
   }
 
-  // 获取分类列表
-  static async getCategories() {
-    return await omind_get('/api/v1/sops/meta/categories');
-  }
 
   // 获取团队列表
   static async getTeams() {

@@ -96,13 +96,6 @@ async def get_sop_detail(sop_key: str) -> str:
         
         if results:
             sop_data = results[0]
-            # 处理JSON字段
-            for field in ['sop_steps', 'tools_required']:
-                if field in sop_data and isinstance(sop_data[field], str):
-                    try:
-                        sop_data[field] = json.loads(sop_data[field])
-                    except:
-                        sop_data[field] = []
             
             return json.dumps({
                 "success": True,
@@ -144,8 +137,7 @@ async def get_sop_content(sop_key: str) -> str:
     try:
         logger.info(f"Getting SOP content for: {sop_key}")
         query = """
-        SELECT sop_id, sop_title, sop_category, sop_description, 
-               sop_severity, sop_steps, tools_required
+        SELECT sop_id, sop_title, sop_description
         FROM sop_prompt_templates 
         WHERE sop_id = %s
         LIMIT 1
@@ -156,31 +148,12 @@ async def get_sop_content(sop_key: str) -> str:
         if results:
             sop_data = results[0]
             
-            # 处理JSON字段
-            sop_steps = sop_data.get("sop_steps", [])
-            tools_required = sop_data.get("tools_required", [])
-            
-            if isinstance(sop_steps, str):
-                try:
-                    sop_steps = json.loads(sop_steps)
-                except:
-                    sop_steps = []
-            
-            if isinstance(tools_required, str):
-                try:
-                    tools_required = json.loads(tools_required)
-                except:
-                    tools_required = []
-            
-            # 提取SOP内容
+            # 提取SOP内容 - 简化版
             sop_content = {
                 "id": sop_data.get("sop_id", ""),
                 "title": sop_data.get("sop_title", ""),
-                "category": sop_data.get("sop_category", ""),
                 "description": sop_data.get("sop_description", ""),
-                "severity": sop_data.get("sop_severity", ""),
-                "steps": sop_steps,
-                "tools_needed": tools_required
+                "content": sop_data.get("sop_description", "")  # 所有内容都在description中
             }
             
             return json.dumps({
@@ -217,29 +190,18 @@ async def get_sop_content(sop_key: str) -> str:
         }, ensure_ascii=False, indent=2)
 
 @mcp.tool()
-async def list_sops(category: str = "") -> str:
+async def list_sops() -> str:
     """列出所有可用的SOP
-    
-    Args:
-        category: SOP分类，如system、database、network
     
     Returns:
         JSON格式的SOP列表
     """
     try:
-        if category:
-            query = """
-            SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
-            FROM sop_prompt_templates
-            WHERE sop_category = %s
-            """
-            results = _execute_query(query, (category,))
-        else:
-            query = """
-            SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
-            FROM sop_prompt_templates
-            """
-            results = _execute_query(query)
+        query = """
+        SELECT sop_id, sop_title, sop_description, sop_severity 
+        FROM sop_prompt_templates
+        """
+        results = _execute_query(query)
         logger.info(f"Query results: {len(results) if results else 0} rows found")
         return json.dumps({
             "status": "ok",
@@ -264,7 +226,7 @@ async def search_sops(keyword: str) -> str:
     """
     try:
         query = """
-        SELECT sop_id, sop_title, sop_category, sop_description, sop_severity 
+        SELECT sop_id, sop_title, sop_description
         FROM sop_prompt_templates
         WHERE sop_title LIKE %s OR sop_description LIKE %s
         LIMIT 20
@@ -278,9 +240,7 @@ async def search_sops(keyword: str) -> str:
                 "key": sop.get("sop_id", ""),
                 "id": sop.get("sop_id", ""),
                 "title": sop.get("sop_title", ""),
-                "category": sop.get("sop_category", ""),
-                "description": sop.get("sop_description", ""),
-                "severity": sop.get("sop_severity", "")
+                "description": sop.get("sop_description", "")
             })
         
         return json.dumps({
