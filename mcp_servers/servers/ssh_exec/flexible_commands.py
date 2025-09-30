@@ -16,6 +16,7 @@ UNRESTRICTED_COMMANDS = {
     "free",    # 内存使用
     "uptime",  # 系统运行时间
     "ssh",     # SSH到其他服务器
+    "tail",    # 查看文件末尾
 }
 
 # 限制参数的命令模板
