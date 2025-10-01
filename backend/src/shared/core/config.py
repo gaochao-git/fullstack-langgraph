@@ -174,7 +174,7 @@ class Settings(BaseSettings):
     # 记忆配置
     MEM0_MEMORY_VERSION: str = "v1.1"  # 记忆版本控制
     MEM0_SEARCH_LIMIT: int = 10  # 默认搜索返回数量
-    MEM0_RELEVANCE_THRESHOLD: float = 0.5  # 相关性阈值 (距离阈值，越小越相关)
+    MEM0_RELEVANCE_THRESHOLD: float = 0.1  # 相关性阈值 (距离阈值，越小越相关)
     
     class Config:
         env_file = ".env"
