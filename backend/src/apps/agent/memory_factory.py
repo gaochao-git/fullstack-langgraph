@@ -77,6 +77,8 @@ class EnterpriseMemory:
                 # 构建配置
                 config = self._build_config()
                 
+                logger.info(f"Mem0配置: {config}")
+                
                 # 创建 Memory 实例
                 _memory_store = Memory.from_config(config)
                 self.memory = _memory_store
@@ -90,28 +92,33 @@ class EnterpriseMemory:
     
     def _build_config(self) -> Dict[str, Any]:
         """构建 Mem0 配置"""
-        # 使用兼容 OpenAI 的嵌入模型
+        
+        # 设置embedder所需的环境变量
+        os.environ["OPENAI_API_KEY"] = os.getenv("EMBEDDING_API_KEY", settings.LLM_API_KEY)
+        
+        # 嵌入模型配置 (使用兼容OpenAI的API)
         embedder_config = {
             "provider": "openai",
             "config": {
-                "model": settings.MEM0_EMBEDDING_MODEL,
-                "api_key": settings.LLM_API_KEY,  # 复用现有的 API Key
+                "model": os.getenv("EMBEDDING_MODEL_NAME", settings.MEM0_EMBEDDING_MODEL),
+                "openai_base_url": os.getenv("EMBEDDING_API_BASE_URL"),
                 "embedding_dims": settings.MEM0_EMBEDDING_DIM
             }
         }
         
-        # 使用兼容 OpenAI 的 LLM
+        # LLM配置 (用于记忆推理)
         llm_config = {
             "provider": "openai", 
             "config": {
-                "model": settings.LLM_MODEL,  # 复用现有的模型名称
-                "api_key": settings.LLM_API_KEY,  # 复用现有的 API Key
+                "model": settings.LLM_MODEL,
+                "api_key": settings.LLM_API_KEY,
+                "openai_base_url": settings.LLM_BASE_URL,
                 "temperature": 0.7,
                 "max_tokens": 2000
             }
         }
         
-        # 向量存储配置
+        # 向量存储配置 (PostgreSQL + pgvector)
         vector_store_config = {
             "provider": settings.MEM0_VECTOR_DB_TYPE,
             "config": {
@@ -136,11 +143,12 @@ class EnterpriseMemory:
         if not self.memory:
             await self.initialize()
         
-        # 格式化命名空间
-        formatted_namespace = namespace.format(**kwargs)
+        # 获取并格式化命名空间模板
+        namespace_template = self.NAMESPACES.get(namespace, namespace)
+        formatted_namespace = namespace_template.format(**kwargs)
         
-        # 构建消息
-        messages = [{"role": "assistant", "content": content}]
+        # 构建消息（使用正确的格式）
+        messages = [{"role": "user", "content": content}]
         
         # 添加元数据
         if metadata is None:
@@ -151,11 +159,12 @@ class EnterpriseMemory:
             "version": settings.MEM0_MEMORY_VERSION
         })
         
-        # 添加记忆
+        # 添加记忆（使用正确的API调用方式）
         result = self.memory.add(
-            messages=messages,
+            messages,  # 直接传递messages作为位置参数
             user_id=formatted_namespace,
-            metadata=metadata
+            metadata=metadata,
+            infer=True  # 启用记忆推理
         )
         
         logger.info(f"添加记忆到 {formatted_namespace}: {result}")
@@ -166,25 +175,49 @@ class EnterpriseMemory:
         if not self.memory:
             await self.initialize()
         
-        # 格式化命名空间
-        formatted_namespace = namespace.format(**kwargs)
+        # 获取并格式化命名空间模板
+        namespace_template = self.NAMESPACES.get(namespace, namespace)
+        formatted_namespace = namespace_template.format(**kwargs)
         
-        # 搜索
+        # 搜索记忆
         memories = self.memory.search(
             query=query,
             user_id=formatted_namespace,
             limit=limit or settings.MEM0_SEARCH_LIMIT
         )
         
-        # 过滤相关性
+        # 处理搜索结果，支持不同的返回格式
+        if isinstance(memories, dict) and 'results' in memories:
+            memory_list = memories['results']
+        elif isinstance(memories, list):
+            memory_list = memories
+        else:
+            logger.warning(f"未知的搜索结果格式: {type(memories)}")
+            memory_list = []
+        
+        # 解析和过滤记忆
         filtered_memories = []
-        for memory in memories:
-            if hasattr(memory, 'score') and memory.score >= settings.MEM0_RELEVANCE_THRESHOLD:
+        for memory in memory_list:
+            # 解析记忆数据
+            if isinstance(memory, dict):
+                memory_id = memory.get('id')
+                content = memory.get('memory') or memory.get('text') or memory.get('content')
+                score = memory.get('score', 1.0)
+                metadata = memory.get('metadata', {})
+            else:
+                # 处理对象格式
+                memory_id = getattr(memory, 'id', None)
+                content = getattr(memory, 'memory', None) or getattr(memory, 'text', None) or getattr(memory, 'content', None)
+                score = getattr(memory, 'score', 1.0)
+                metadata = getattr(memory, 'metadata', {})
+            
+            # 过滤有效内容和相关性
+            if content and score >= settings.MEM0_RELEVANCE_THRESHOLD:
                 filtered_memories.append({
-                    "id": memory.id if hasattr(memory, 'id') else None,
-                    "content": memory.memory if hasattr(memory, 'memory') else str(memory),
-                    "score": memory.score if hasattr(memory, 'score') else 1.0,
-                    "metadata": memory.metadata if hasattr(memory, 'metadata') else {}
+                    "id": memory_id,
+                    "content": content,
+                    "score": score,
+                    "metadata": metadata
                 })
         
         logger.info(f"从 {formatted_namespace} 搜索到 {len(filtered_memories)} 条相关记忆")
@@ -195,8 +228,9 @@ class EnterpriseMemory:
         if not self.memory:
             await self.initialize()
         
-        # 格式化命名空间
-        formatted_namespace = namespace.format(**kwargs)
+        # 获取并格式化命名空间模板
+        namespace_template = self.NAMESPACES.get(namespace, namespace)
+        formatted_namespace = namespace_template.format(**kwargs)
         
         # 获取所有记忆
         memories = self.memory.get_all(user_id=formatted_namespace)
@@ -215,8 +249,9 @@ class EnterpriseMemory:
         if not self.memory:
             await self.initialize()
         
-        # 格式化命名空间
-        formatted_namespace = namespace.format(**kwargs)
+        # 获取并格式化命名空间模板
+        namespace_template = self.NAMESPACES.get(namespace, namespace)
+        formatted_namespace = namespace_template.format(**kwargs)
         
         # 更新记忆
         self.memory.update(memory_id, content, user_id=formatted_namespace)
@@ -227,8 +262,9 @@ class EnterpriseMemory:
         if not self.memory:
             await self.initialize()
         
-        # 格式化命名空间
-        formatted_namespace = namespace.format(**kwargs)
+        # 获取并格式化命名空间模板
+        namespace_template = self.NAMESPACES.get(namespace, namespace)
+        formatted_namespace = namespace_template.format(**kwargs)
         
         # 删除记忆
         self.memory.delete(memory_id, user_id=formatted_namespace)
