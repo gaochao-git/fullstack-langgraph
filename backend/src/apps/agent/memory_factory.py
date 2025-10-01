@@ -229,19 +229,22 @@ class EnterpriseMemory:
             raise
     
     async def search_memories(self, namespace: str, query: str, limit: int = None, **kwargs) -> List[Dict]:
-        """搜索记忆（使用官方标准API）"""
+        """搜索记忆（简化版：只基于user_id和agent_id过滤）"""
         if not self.memory:
             await self.initialize()
         
-        # 准备标准化的调用参数
-        call_params = self._prepare_call_params(namespace, None, **kwargs)
+        # 直接提取参数，不使用复杂的命名空间逻辑
+        user_id = kwargs.get("user_id") or kwargs.get("user_name")
+        if not user_id:
+            raise ValueError("user_id or user_name is required")
+        
+        agent_id = kwargs.get("agent_id")
         
         # 使用官方标准API搜索
         memories = self.memory.search(
             query=query,
-            user_id=call_params["user_id"],
-            agent_id=call_params.get("agent_id"),
-            run_id=call_params.get("run_id"),
+            user_id=user_id,
+            agent_id=agent_id,
             limit=limit or settings.MEM0_SEARCH_LIMIT
         )
         
@@ -254,9 +257,8 @@ class EnterpriseMemory:
             logger.warning(f"未知的搜索结果格式: {type(memories)}")
             memory_list = []
         
-        # 解析和过滤记忆（加入namespace过滤）
+        # 简化的过滤逻辑
         filtered_memories = []
-        expected_namespace = call_params["metadata"]["business_namespace"]
         
         for memory in memory_list:
             # 解析记忆数据
@@ -272,24 +274,21 @@ class EnterpriseMemory:
                 score = getattr(memory, 'score', 1.0)
                 memory_metadata = getattr(memory, 'metadata', {})
             
-            # 基于相关性和业务命名空间过滤
-            if (content and 
-                score <= settings.MEM0_RELEVANCE_THRESHOLD and
-                memory_metadata.get('business_namespace') == expected_namespace):
-                
+            # 简单过滤：只基于相关性
+            if content and score <= settings.MEM0_RELEVANCE_THRESHOLD:
                 filtered_memories.append({
                     "id": memory_id,
                     "content": content,
                     "score": score,
                     "metadata": memory_metadata,
-                    # 从元数据中提取审计字段
+                    # 从元数据中提取审计字段（如果有的话）
                     "created_by": memory_metadata.get("created_by"),
                     "updated_by": memory_metadata.get("updated_by"),
                     "create_time": memory_metadata.get("create_time"),
                     "update_time": memory_metadata.get("update_time")
                 })
         
-        logger.info(f"搜索记忆: user_id={call_params['user_id']}, namespace={namespace}, 结果数量={len(filtered_memories)}")
+        logger.info(f"搜索记忆: user_id={user_id}, agent_id={agent_id}, query={query}, 结果数量={len(filtered_memories)}")
         return filtered_memories
     
     async def list_all_memories(self, user_id: str, agent_id: str = None, run_id: str = None) -> List[Dict]:

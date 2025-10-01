@@ -17,6 +17,7 @@ import {
   Modal,
   Form,
   Input,
+  Select,
   message,
   Popconfirm,
   Typography,
@@ -39,6 +40,7 @@ import { memoryApi, Memory } from '../../services/memoryApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+const { Option } = Select;
 
 /**
  * AI 记忆管理页面组件
@@ -93,7 +95,7 @@ const MemoryManagement: React.FC = () => {
       const response = await memoryApi.addConversationMemory(
         messages,
         undefined, // 使用当前用户
-        'test_agent',
+        values.agent_id || 'test_agent', // 使用用户选择的智能体
         `test_${Date.now()}`,
         { source: 'manual_test', timestamp: new Date().toISOString() }
       );
@@ -121,10 +123,12 @@ const MemoryManagement: React.FC = () => {
       setSearchLoading(true);
 
       const response = await memoryApi.searchMemories({
-        namespace: 'user_profile', // 使用用户档案命名空间
+        namespace: 'user_memories', // 简化命名空间
         query: values.query,
         limit: 20,
-        namespace_params: {}
+        namespace_params: {
+          agent_id: values.agent_id || 'test_agent' // 使用用户选择的智能体
+        }
       });
 
       if (response.status === 'ok' && response.data) {
@@ -342,6 +346,17 @@ const MemoryManagement: React.FC = () => {
               placeholder="例如：好的，我记住了您的专业背景..."
             />
           </Form.Item>
+
+          <Form.Item
+            name="agent_id"
+            label="智能体选择"
+            initialValue="test_agent"
+          >
+            <Select placeholder="选择智能体">
+              <Option value="test_agent">测试智能体</Option>
+              <Option value="omind_diagnostic_agent">诊断智能体</Option>
+            </Select>
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -371,6 +386,16 @@ const MemoryManagement: React.FC = () => {
               placeholder="例如：运维、技能、偏好..."
               onPressEnter={handleSearchMemories}
             />
+          </Form.Item>
+
+          <Form.Item
+            name="agent_id"
+            label="智能体选择（可选）"
+          >
+            <Select placeholder="选择智能体（留空搜索所有）" allowClear>
+              <Option value="test_agent">测试智能体</Option>
+              <Option value="omind_diagnostic_agent">诊断智能体</Option>
+            </Select>
           </Form.Item>
         </Form>
       </Modal>

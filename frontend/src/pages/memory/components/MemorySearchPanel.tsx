@@ -68,7 +68,8 @@ const MemorySearchPanel: React.FC<MemorySearchPanelProps> = ({
         namespace_params: {
           user_id: values.user_id || '',
           system_id: values.system_id || '',
-          problem_type: values.problem_type || ''
+          problem_type: values.problem_type || '',
+          agent_id: values.agent_id || ''
         }
       };
 
@@ -313,6 +314,15 @@ const MemorySearchPanel: React.FC<MemorySearchPanelProps> = ({
                 <Col span={12}>
                   <Form.Item name="problem_type" label="问题类型 (可选)">
                     <Input placeholder="如: database, network" />
+                  </Form.Item>
+                </Col>
+
+                <Col span={12}>
+                  <Form.Item name="agent_id" label="智能体ID (可选)">
+                    <Select placeholder="选择智能体" allowClear>
+                      <Option value="test_agent">测试智能体</Option>
+                      <Option value="omind_diagnostic_agent">诊断智能体</Option>
+                    </Select>
                   </Form.Item>
                 </Col>
 
