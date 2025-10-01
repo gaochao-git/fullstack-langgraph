@@ -63,18 +63,28 @@ class MemoryService:
             logger.error(f"搜索记忆失败: {e}")
             raise BusinessException(f"搜索记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
     
-    async def update_memory(self, db: AsyncSession, data: MemoryUpdate) -> None:
+    async def update_memory(self, db: AsyncSession, data: MemoryUpdate, current_user: dict = None) -> None:
         """更新记忆"""
         try:
             memory = await self._get_memory()
+            
+            # 获取当前用户信息用于审计
+            user_name = "system"
+            if current_user:
+                user_name = current_user.get("username", "system")
+            
+            # 添加用户信息到namespace_params
+            update_params = dict(data.namespace_params)
+            update_params["user_name"] = user_name
+            
             await memory.update_memory(
                 namespace=data.namespace,
                 memory_id=data.memory_id,
                 content=data.content,
-                **data.namespace_params
+                **update_params
             )
             
-            logger.info(f"成功更新记忆: {data.memory_id}")
+            logger.info(f"成功更新记忆: {data.memory_id}, updated_by={user_name}")
             
         except Exception as e:
             logger.error(f"更新记忆失败: {e}")
@@ -159,13 +169,13 @@ class MemoryService:
         try:
             memory = await self._get_memory()
             
-            # 获取对应的命名空间模板
+            # 检查命名空间类型是否支持
             namespace_template = memory.NAMESPACES.get(namespace_type)
             if not namespace_template:
                 raise BusinessException(f"不支持的命名空间类型: {namespace_type}", ResponseCode.BAD_REQUEST)
             
             memories = await memory.get_all_memories(
-                namespace=namespace_template,
+                namespace=namespace_type,  # 传递namespace_type而不是模板
                 **params
             )
             

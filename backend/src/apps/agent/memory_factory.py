@@ -28,9 +28,9 @@ class EnterpriseMemory:
     # 记忆命名空间定义
     NAMESPACES = {
         # 用户维度
-        "user_profile": "user:{user_id}:profile",
-        "user_expertise": "user:{user_id}:expertise",
-        "user_preferences": "user:{user_id}:preferences",
+        "user_profile": "user:{user_name}:profile",
+        "user_expertise": "user:{user_name}:expertise", 
+        "user_preferences": "user:{user_name}:preferences",
         
         # 系统架构维度
         "system_topology": "org:architecture:topology",
@@ -140,10 +140,10 @@ class EnterpriseMemory:
     def _prepare_call_params(self, namespace: str, metadata: Dict[str, Any] = None, **kwargs) -> Dict[str, Any]:
         """准备符合官方标准的调用参数"""
         
-        # 提取真实的用户ID（必需）
-        user_id = kwargs.get("user_id")
+        # 提取真实的用户ID（必需），兼容user_name和user_id
+        user_id = kwargs.get("user_id") or kwargs.get("user_name")
         if not user_id:
-            raise ValueError("user_id is required for Mem0 API calls")
+            raise ValueError("user_id or user_name is required for Mem0 API calls")
         
         # 提取可选的智能体ID和会话ID
         agent_id = kwargs.get("agent_id", "omind_diagnostic_agent")  # 默认诊断智能体
@@ -151,18 +151,29 @@ class EnterpriseMemory:
         
         # 构建namespace和业务元数据
         namespace_template = self.NAMESPACES.get(namespace, namespace)
-        formatted_namespace = namespace_template.format(**kwargs)
+        # 确保kwargs中包含user_name字段用于格式化
+        format_kwargs = dict(kwargs)
+        format_kwargs["user_name"] = user_id  # 将获取到的用户标识作为user_name
+        formatted_namespace = namespace_template.format(**format_kwargs)
+        
+        # 获取当前时间戳
+        current_time = datetime.now().isoformat()
         
         # 合并元数据，将我们的namespace概念放到metadata中
         combined_metadata = {
             "business_namespace": formatted_namespace,  # 我们的业务命名空间
             "namespace_type": namespace,  # 命名空间类型
-            "timestamp": datetime.now().isoformat(),
-            "version": settings.MEM0_MEMORY_VERSION
+            "timestamp": current_time,
+            "version": settings.MEM0_MEMORY_VERSION,
+            # 审计字段
+            "created_by": user_id,
+            "create_time": current_time
         }
         
         if metadata:
             combined_metadata.update(metadata)
+        
+        logger.info(f"准备调用参数: user_id={user_id}, business_namespace={formatted_namespace}, namespace_type={namespace}")
         
         return {
             "user_id": user_id,
@@ -182,18 +193,49 @@ class EnterpriseMemory:
         # 准备标准化的调用参数
         call_params = self._prepare_call_params(namespace, metadata, **kwargs)
         
-        # 使用官方标准API调用
-        result = self.memory.add(
-            messages,
-            user_id=call_params["user_id"],
-            agent_id=call_params.get("agent_id"),
-            run_id=call_params.get("run_id"),
-            metadata=call_params["metadata"],
-            infer=True
-        )
-        
-        logger.info(f"添加记忆: user_id={call_params['user_id']}, namespace={namespace}, content={content[:50]}...")
-        return result
+        try:
+            # 记录调用参数
+            logger.info(f"Mem0 add调用参数: messages={messages}, user_id={call_params['user_id']}, agent_id={call_params.get('agent_id')}, metadata={call_params['metadata']}")
+            
+            # 使用官方标准API调用，关闭推理以确保存储
+            result = self.memory.add(
+                messages,
+                user_id=call_params["user_id"],
+                agent_id=call_params.get("agent_id"),
+                run_id=call_params.get("run_id"),
+                metadata=call_params["metadata"],
+                infer=False  # 关闭推理，强制存储
+            )
+            
+            logger.info(f"Mem0 add原始返回结果: {result}, 类型: {type(result)}")
+            
+            # 处理返回值格式
+            if isinstance(result, dict):
+                # 检查是否是空结果
+                if result.get("results") == []:
+                    logger.warning("Mem0返回空结果，可能添加失败")
+                    # 尝试生成一个唯一ID
+                    import uuid
+                    memory_id = str(uuid.uuid4())
+                    logger.warning(f"使用生成的ID: {memory_id}")
+                elif result.get("results") and len(result["results"]) > 0:
+                    # 从results中提取第一个记忆的ID
+                    first_result = result["results"][0]
+                    memory_id = first_result.get("id", str(result))
+                    logger.info(f"从results中提取到memory_id: {memory_id}")
+                else:
+                    # 如果返回是字典，尝试提取memory_id或id
+                    memory_id = result.get("memory_id") or result.get("id") or str(result)
+            else:
+                # 如果返回是字符串或其他类型，直接转换
+                memory_id = str(result)
+            
+            logger.info(f"添加记忆完成: user_id={call_params['user_id']}, namespace={namespace}, memory_id={memory_id}")
+            return memory_id
+            
+        except Exception as e:
+            logger.error(f"Mem0 add调用失败: {e}")
+            raise
     
     async def search_memories(self, namespace: str, query: str, limit: int = None, **kwargs) -> List[Dict]:
         """搜索记忆（使用官方标准API）"""
@@ -248,7 +290,12 @@ class EnterpriseMemory:
                     "id": memory_id,
                     "content": content,
                     "score": score,
-                    "metadata": memory_metadata
+                    "metadata": memory_metadata,
+                    # 从元数据中提取审计字段
+                    "created_by": memory_metadata.get("created_by"),
+                    "updated_by": memory_metadata.get("updated_by"),
+                    "create_time": memory_metadata.get("create_time"),
+                    "update_time": memory_metadata.get("update_time")
                 })
         
         logger.info(f"搜索记忆: user_id={call_params['user_id']}, namespace={namespace}, 结果数量={len(filtered_memories)}")
@@ -263,25 +310,52 @@ class EnterpriseMemory:
         call_params = self._prepare_call_params(namespace, None, **kwargs)
         
         # 使用官方标准API获取所有记忆
-        memories = self.memory.get_all(
-            user_id=call_params["user_id"],
-            agent_id=call_params.get("agent_id"),
-            run_id=call_params.get("run_id")
-        )
+        try:
+            memories = self.memory.get_all(
+                user_id=call_params["user_id"],
+                agent_id=call_params.get("agent_id"),
+                run_id=call_params.get("run_id")
+            )
+            logger.info(f"Mem0 get_all返回原始数据: {memories}, 类型: {type(memories)}")
+        except Exception as e:
+            logger.error(f"Mem0 get_all调用失败: {e}")
+            memories = []
         
         # 过滤属于当前business_namespace的记忆
         expected_namespace = call_params["metadata"]["business_namespace"]
         filtered_memories = []
         
+        logger.info(f"获取所有记忆: user_id={call_params['user_id']}, namespace={namespace}, expected_namespace={expected_namespace}, 总数量={len(memories)}")
+        
         for m in memories:
             memory_metadata = m.metadata if hasattr(m, 'metadata') else {}
-            if memory_metadata.get('business_namespace') == expected_namespace:
-                filtered_memories.append({
+            memory_business_namespace = memory_metadata.get('business_namespace')
+            memory_namespace_type = memory_metadata.get('namespace_type')
+            
+            # 记录详细调试信息
+            logger.info(f"记忆项: id={getattr(m, 'id', 'unknown')}, content={getattr(m, 'memory', str(m))[:50]}, business_namespace={memory_business_namespace}, namespace_type={memory_namespace_type}, expected={expected_namespace}")
+            
+            # 修复匹配逻辑：主要匹配namespace_type，business_namespace作为辅助
+            is_match = (memory_namespace_type == namespace or 
+                       memory_business_namespace == expected_namespace)
+            
+            if is_match:
+                memory_item = {
                     "id": m.id if hasattr(m, 'id') else None,
                     "content": m.memory if hasattr(m, 'memory') else str(m),
-                    "metadata": memory_metadata
-                })
+                    "metadata": memory_metadata,
+                    "created_at": getattr(m, 'created_at', None),
+                    "updated_at": getattr(m, 'updated_at', None),
+                    # 从元数据中提取审计字段
+                    "created_by": memory_metadata.get("created_by"),
+                    "updated_by": memory_metadata.get("updated_by"),
+                    "create_time": memory_metadata.get("create_time"),
+                    "update_time": memory_metadata.get("update_time")
+                }
+                filtered_memories.append(memory_item)
+                logger.info(f"匹配成功，添加记忆: {memory_item['id']}")
         
+        logger.info(f"过滤后记忆数量: {len(filtered_memories)}")
         return filtered_memories
     
     async def update_memory(self, namespace: str, memory_id: str, content: str, **kwargs):
@@ -289,8 +363,18 @@ class EnterpriseMemory:
         if not self.memory:
             await self.initialize()
         
+        # 获取用户ID和当前时间
+        user_id = kwargs.get("user_id") or kwargs.get("user_name")
+        current_time = datetime.now().isoformat()
+        
+        # 构建更新的元数据，包含审计字段
+        update_metadata = {
+            "updated_by": user_id,
+            "update_time": current_time
+        }
+        
         # 准备标准化的调用参数
-        call_params = self._prepare_call_params(namespace, None, **kwargs)
+        call_params = self._prepare_call_params(namespace, update_metadata, **kwargs)
         
         # 使用官方标准API更新记忆
         self.memory.update(
@@ -300,7 +384,7 @@ class EnterpriseMemory:
             agent_id=call_params.get("agent_id"),
             run_id=call_params.get("run_id")
         )
-        logger.info(f"更新记忆: memory_id={memory_id}, user_id={call_params['user_id']}")
+        logger.info(f"更新记忆: memory_id={memory_id}, user_id={call_params['user_id']}, updated_by={user_id}")
     
     async def delete_memory(self, namespace: str, memory_id: str, **kwargs):
         """删除记忆（使用官方标准API）"""
