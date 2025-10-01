@@ -189,6 +189,7 @@ async def execute_command(
     - wc: 统计行数、字数、字符数
     - sort: 对文本进行排序
     - find: 查找文件（只允许参数：-name, -type, -mtime, -atime, -ctime, -size, -maxdepth）
+    - netstat: 查看网络连接状态（可使用所有参数，如：-an, -tlnp, -s等）
     
     Args:
         command: 要在远程服务器上执行的命令
