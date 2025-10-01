@@ -221,7 +221,7 @@ class EnterpriseMemory:
                 # 如果返回是字符串或其他类型，直接转换
                 memory_id = str(result)
             
-            logger.info(f"添加记忆完成: user_id={call_params['user_id']}, namespace={namespace}, memory_id={memory_id}")
+            logger.info(f"添加记忆完成: user_id={user_id}, memory_id={memory_id}")
             return memory_id
             
         except Exception as e:
@@ -292,62 +292,83 @@ class EnterpriseMemory:
         logger.info(f"搜索记忆: user_id={call_params['user_id']}, namespace={namespace}, 结果数量={len(filtered_memories)}")
         return filtered_memories
     
-    async def get_all_memories(self, namespace: str, **kwargs) -> List[Dict]:
-        """获取命名空间下的所有记忆（使用官方标准API）"""
+    async def list_all_memories(self, user_id: str, agent_id: str = None, run_id: str = None) -> List[Dict]:
+        """获取所有记忆（使用 Mem0 原生 get_all 方法）"""
         if not self.memory:
             await self.initialize()
         
-        # 准备标准化的调用参数
-        call_params = self._prepare_call_params(namespace, None, **kwargs)
-        
-        # 使用官方标准API获取所有记忆
         try:
-            memories = self.memory.get_all(
-                user_id=call_params["user_id"],
-                agent_id=call_params.get("agent_id"),
-                run_id=call_params.get("run_id")
+            # 使用 Mem0 原生 get_all 方法
+            raw_result = self.memory.get_all(
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id
             )
-            logger.info(f"Mem0 get_all返回原始数据: {memories}, 类型: {type(memories)}")
+            logger.info(f"Mem0 get_all原始返回: {raw_result}, 类型: {type(raw_result)}")
+            
+            # 处理不同的返回格式
+            if isinstance(raw_result, dict) and 'results' in raw_result:
+                memories = raw_result['results']
+            elif isinstance(raw_result, list):
+                memories = raw_result
+            else:
+                logger.warning(f"未知的get_all返回格式: {type(raw_result)}")
+                memories = []
+            
+            logger.info(f"提取到的记忆数组: {len(memories)} 条记忆")
+            
+            # 转换为统一格式
+            formatted_memories = []
+            for i, memory in enumerate(memories):
+                logger.info(f"处理第{i}个记忆对象: {type(memory)}")
+                logger.info(f"记忆对象内容: {memory}")
+                
+                if memory is not None:
+                    # 处理不同的记忆对象格式
+                    if isinstance(memory, dict):
+                        memory_item = {
+                            "id": memory.get('id'),
+                            "content": memory.get('memory') or memory.get('text') or memory.get('content'),
+                            "metadata": memory.get('metadata', {}),
+                            "user_id": memory.get('user_id', user_id)
+                        }
+                    else:
+                        # 如果是对象格式
+                        memory_item = {
+                            "id": getattr(memory, 'id', None),
+                            "content": getattr(memory, 'memory', None) or getattr(memory, 'text', None) or str(memory),
+                            "metadata": getattr(memory, 'metadata', {}),
+                            "user_id": getattr(memory, 'user_id', user_id)
+                        }
+                    
+                    formatted_memories.append(memory_item)
+                    logger.info(f"添加格式化记忆: {memory_item}")
+            
+            logger.info(f"最终返回 {len(formatted_memories)} 条格式化记忆")
+            return formatted_memories
+            
         except Exception as e:
             logger.error(f"Mem0 get_all调用失败: {e}")
-            memories = []
+            return []
+    
+    async def delete_all_memories(self, user_id: str, agent_id: str = None, run_id: str = None) -> bool:
+        """删除所有记忆（使用 Mem0 原生 delete_all 方法）"""
+        if not self.memory:
+            await self.initialize()
         
-        # 过滤属于当前business_namespace的记忆
-        expected_namespace = call_params["metadata"]["business_namespace"]
-        filtered_memories = []
-        
-        logger.info(f"获取所有记忆: user_id={call_params['user_id']}, namespace={namespace}, expected_namespace={expected_namespace}, 总数量={len(memories)}")
-        
-        for m in memories:
-            memory_metadata = m.metadata if hasattr(m, 'metadata') else {}
-            memory_business_namespace = memory_metadata.get('business_namespace')
-            memory_namespace_type = memory_metadata.get('namespace_type')
+        try:
+            # 使用 Mem0 原生 delete_all 方法，至少需要一个过滤条件
+            self.memory.delete_all(
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id
+            )
+            logger.info(f"成功删除记忆: user_id={user_id}, agent_id={agent_id}, run_id={run_id}")
+            return True
             
-            # 记录详细调试信息
-            logger.info(f"记忆项: id={getattr(m, 'id', 'unknown')}, content={getattr(m, 'memory', str(m))[:50]}, business_namespace={memory_business_namespace}, namespace_type={memory_namespace_type}, expected={expected_namespace}")
-            
-            # 修复匹配逻辑：主要匹配namespace_type，business_namespace作为辅助
-            is_match = (memory_namespace_type == namespace or 
-                       memory_business_namespace == expected_namespace)
-            
-            if is_match:
-                memory_item = {
-                    "id": m.id if hasattr(m, 'id') else None,
-                    "content": m.memory if hasattr(m, 'memory') else str(m),
-                    "metadata": memory_metadata,
-                    "created_at": getattr(m, 'created_at', None),
-                    "updated_at": getattr(m, 'updated_at', None),
-                    # 从元数据中提取审计字段
-                    "created_by": memory_metadata.get("created_by"),
-                    "updated_by": memory_metadata.get("updated_by"),
-                    "create_time": memory_metadata.get("create_time"),
-                    "update_time": memory_metadata.get("update_time")
-                }
-                filtered_memories.append(memory_item)
-                logger.info(f"匹配成功，添加记忆: {memory_item['id']}")
-        
-        logger.info(f"过滤后记忆数量: {len(filtered_memories)}")
-        return filtered_memories
+        except Exception as e:
+            logger.error(f"删除记忆失败: {e}")
+            return False
     
     async def update_memory(self, namespace: str, memory_id: str, content: str, **kwargs):
         """更新记忆（使用官方标准API）"""

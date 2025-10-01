@@ -1,5 +1,11 @@
 /**
- * 记忆管理页面 - 标签页分类管理
+ * AI 记忆查看和管理页面
+ * 
+ * 基于 Mem0 原生方法：
+ * - add_conversation: 从对话中学习记忆
+ * - search_memory: 搜索相关记忆
+ * - list_all: 查看所有记忆
+ * - delete_all: 清理记忆
  */
 
 import React, { useState, useEffect } from 'react';
@@ -11,120 +17,60 @@ import {
   Modal,
   Form,
   Input,
-  Select,
-  Radio,
   message,
   Popconfirm,
-  Tag,
-  Tabs,
+  Typography,
+  Alert,
+  Divider,
   Row,
-  Col
+  Col,
+  Tag
 } from 'antd';
 import { 
-  PlusOutlined,
-  EditOutlined,
+  BulbOutlined,
+  SearchOutlined,
   DeleteOutlined,
+  PlusOutlined,
   ReloadOutlined,
-  ExclamationCircleOutlined,
-  UserOutlined,
-  DatabaseOutlined,
-  ClusterOutlined
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 
-import { memoryApi, Memory, MemoryCreate } from '../../services/memoryApi';
+import { memoryApi, Memory } from '../../services/memoryApi';
 
+const { Title, Text } = Typography;
 const { TextArea } = Input;
-const { Option } = Select;
-const { TabPane } = Tabs;
 
 /**
- * 记忆分类定义
- */
-const MEMORY_CATEGORIES = {
-  personal: {
-    label: '个人记忆',
-    icon: <UserOutlined />,
-    single: true, // 标记为单条记录模式
-    types: {
-      'user_profile': '个人档案'
-    }
-  },
-  system: {
-    label: '业务系统记忆',
-    icon: <DatabaseOutlined />,
-    types: {
-      'crm_system': 'CRM系统',
-      'erp_system': 'ERP系统',
-      'oa_system': 'OA系统',
-      'monitoring_system': '监控系统',
-      'log_system': '日志系统',
-      'database_system': '数据库系统'
-    }
-  },
-  architecture: {
-    label: '基础设施架构记忆',
-    icon: <ClusterOutlined />,
-    types: {
-      'system_topology': '系统拓扑',
-      'service_dependencies': '服务依赖',
-      'deployment_info': '部署架构',
-      'network_architecture': '网络架构',
-      'data_architecture': '数据架构'
-    }
-  }
-};
-
-/**
- * 记忆管理页面组件
+ * AI 记忆管理页面组件
  */
 const MemoryManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
-  const [currentCategory, setCurrentCategory] = useState('personal');
-  const [currentType, setCurrentType] = useState('user_profile');
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [testModalVisible, setTestModalVisible] = useState(false);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [searchForm] = Form.useForm();
 
   /**
-   * 初始化数据
+   * 加载所有记忆
    */
-  useEffect(() => {
-    loadMemories();
-  }, [currentType]);
-
-  /**
-   * 加载指定类型的记忆数据
-   */
-  const loadMemories = async () => {
+  const loadAllMemories = async () => {
     setLoading(true);
     try {
-      // 构建请求参数 - 为个人记忆传递用户参数，其他类型暂时不传参数
-      const params: { user_name?: string; system_id?: string } = {};
-      
-      // 个人记忆不需要手动传参，后端会自动获取当前用户
-      // 其他类型的记忆目前不需要特定参数
-      
-      // 使用管理接口加载记忆数据
-      const response = await memoryApi.listMemories(currentType, params);
-      console.log('Memory API request:', { currentType, params }); // 添加调试日志
-      console.log('Memory API response:', response); // 添加调试日志
+      const response = await memoryApi.listAllMemories();
+      console.log('Memory response:', response);
       
       if (response.status === 'ok' && response.data) {
-        const memoriesWithType = response.data.map((mem: Memory) => ({
-          ...mem,
-          memory_category: currentCategory,
-          memory_type: currentType,
-          type_label: getCurrentTypeLabel()
-        }));
-        setMemories(memoriesWithType);
-        console.log('Loaded memories:', memoriesWithType); // 添加调试日志
+        setMemories(response.data);
+        message.success(`加载了 ${response.data.length} 条记忆`);
       } else {
-        console.log('Empty response or error:', response);
         setMemories([]);
+        message.info('暂无记忆数据');
       }
     } catch (error) {
-      console.error(`加载${getCurrentTypeLabel()}记忆失败:`, error);
+      console.error('加载记忆失败:', error);
+      message.error('加载记忆失败');
       setMemories([]);
     } finally {
       setLoading(false);
@@ -132,371 +78,298 @@ const MemoryManagement: React.FC = () => {
   };
 
   /**
-   * 获取当前类型的标签
+   * 测试添加对话记忆
    */
-  const getCurrentTypeLabel = () => {
-    const category = MEMORY_CATEGORIES[currentCategory as keyof typeof MEMORY_CATEGORIES];
-    return category?.types[currentType as keyof typeof category.types] || currentType;
-  };
-
-  /**
-   * 处理标签页变化
-   */
-  const handleTabChange = (key: string) => {
-    setCurrentCategory(key);
-    const category = MEMORY_CATEGORIES[key as keyof typeof MEMORY_CATEGORIES];
-    const firstType = Object.keys(category.types)[0];
-    setCurrentType(firstType);
-  };
-
-  /**
-   * 处理子类型变化
-   */
-  const handleTypeChange = (type: string) => {
-    setCurrentType(type);
-  };
-
-  /**
-   * 显示添加/编辑记忆模态框
-   */
-  const showMemoryModal = (memory?: Memory) => {
-    if (memory) {
-      setEditingMemory(memory);
-      form.setFieldsValue({
-        content: memory.content
-      });
-    } else {
-      setEditingMemory(null);
-      form.resetFields();
-    }
-    setIsModalVisible(true);
-  };
-
-  /**
-   * 处理模态框确认
-   */
-  const handleModalOk = async () => {
+  const handleTestConversation = async () => {
     try {
       const values = await form.validateFields();
+      
+      // 构建对话消息
+      const messages = [
+        { role: 'user', content: values.userMessage },
+        { role: 'assistant', content: values.assistantMessage || '好的，我记住了' }
+      ];
 
-      const memoryData: MemoryCreate = {
-        namespace: currentType,
-        content: values.content,
-        metadata: {
-          namespace_type: currentType,
-          memory_category: currentCategory
-        },
-        namespace_params: {}
-      };
+      const response = await memoryApi.addConversationMemory(
+        messages,
+        undefined, // 使用当前用户
+        'test_agent',
+        `test_${Date.now()}`,
+        { source: 'manual_test', timestamp: new Date().toISOString() }
+      );
 
-      if (editingMemory) {
-        // 更新记忆
-        await memoryApi.updateMemory({
-          namespace: currentType,
-          memory_id: editingMemory.id,
-          content: values.content,
-          namespace_params: memoryData.namespace_params
-        });
-        message.success('记忆更新成功');
+      if (response.status === 'ok') {
+        message.success('测试对话记忆添加成功');
+        setTestModalVisible(false);
+        form.resetFields();
+        await loadAllMemories(); // 重新加载记忆列表
       } else {
-        // 添加新记忆
-        await memoryApi.addMemory(memoryData);
-        message.success('记忆添加成功');
+        message.error('添加失败');
       }
-
-      setIsModalVisible(false);
-      form.resetFields();
-      setEditingMemory(null);
-      await loadMemories();
     } catch (error) {
-      console.error('保存记忆失败:', error);
-      message.error('保存记忆失败');
+      console.error('添加对话记忆失败:', error);
+      message.error('添加对话记忆失败');
     }
   };
 
   /**
-   * 删除记忆
+   * 搜索记忆
    */
-  const handleDeleteMemory = async (memory: Memory) => {
+  const handleSearchMemories = async () => {
     try {
-      await memoryApi.deleteMemory(memory.id, currentType);
-      message.success('记忆删除成功');
-      await loadMemories();
+      const values = await searchForm.validateFields();
+      setSearchLoading(true);
+
+      const response = await memoryApi.searchMemories({
+        namespace: 'user_profile', // 使用用户档案命名空间
+        query: values.query,
+        limit: 20,
+        namespace_params: {}
+      });
+
+      if (response.status === 'ok' && response.data) {
+        setMemories(response.data);
+        message.success(`搜索到 ${response.data.length} 条相关记忆`);
+      } else {
+        setMemories([]);
+        message.info('未找到相关记忆');
+      }
     } catch (error) {
-      console.error('删除记忆失败:', error);
-      message.error('删除记忆失败');
+      console.error('搜索记忆失败:', error);
+      message.error('搜索记忆失败');
+    } finally {
+      setSearchLoading(false);
     }
   };
 
   /**
-   * 个人记忆表格列定义（简化版）
+   * 清除所有记忆
    */
-  const getPersonalColumns = () => [
-    {
-      title: '个人档案内容',
-      dataIndex: 'content',
-      key: 'content',
-      ellipsis: { showTitle: false },
-      render: (text: string) => (
-        <div style={{ maxWidth: 300 }}>
-          {text.length > 150 ? `${text.substring(0, 150)}...` : text}
-        </div>
-      ),
-    },
-    {
-      title: '创建人',
-      dataIndex: 'created_by',
-      key: 'created_by',
-      width: 100,
-      render: (text: string, record: Memory) => {
-        const metadata = record.metadata || {};
-        return metadata.created_by || text || '-';
-      },
-    },
-    {
-      title: '修改人',
-      dataIndex: 'updated_by',
-      key: 'updated_by',
-      width: 100,
-      render: (text: string, record: Memory) => {
-        const metadata = record.metadata || {};
-        return metadata.updated_by || text || '-';
-      },
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 110,
-      render: (text: string, record: Memory) => {
-        // 优先使用create_time，其次使用created_at
-        const createTime = record.metadata?.create_time || text;
-        return createTime ? new Date(createTime).toLocaleDateString() : '-';
-      },
-    },
-    {
-      title: '修改时间',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
-      width: 110,
-      render: (text: string, record: Memory) => {
-        // 优先使用update_time，其次使用updated_at
-        const updateTime = record.metadata?.update_time || text;
-        return updateTime ? new Date(updateTime).toLocaleDateString() : '-';
-      },
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 80,
-      render: (_: any, record: Memory) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<EditOutlined />}
-          onClick={() => showMemoryModal(record)}
-        >
-          编辑
-        </Button>
-      ),
-    },
-  ];
+  const handleDeleteAll = async () => {
+    try {
+      const response = await memoryApi.deleteAllMemories();
+      
+      if (response.status === 'ok') {
+        message.success('所有记忆已清除');
+        setMemories([]);
+      } else {
+        message.error('清除失败');
+      }
+    } catch (error) {
+      console.error('清除记忆失败:', error);
+      message.error('清除记忆失败');
+    }
+  };
 
   /**
-   * 普通记忆表格列定义
+   * 记忆表格列定义
    */
-  const getNormalColumns = () => [
+  const columns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 200,
+      render: (text: string) => (
+        <Text code style={{ fontSize: '12px' }}>
+          {text ? text.substring(0, 8) + '...' : '-'}
+        </Text>
+      ),
+    },
     {
       title: '记忆内容',
       dataIndex: 'content',
       key: 'content',
       ellipsis: { showTitle: false },
       render: (text: string) => (
-        <div style={{ maxWidth: 250 }}>
-          {text.length > 120 ? `${text.substring(0, 120)}...` : text}
+        <div style={{ maxWidth: 400 }}>
+          {text ? (text.length > 100 ? `${text.substring(0, 100)}...` : text) : '-'}
         </div>
       ),
     },
     {
-      title: '创建人',
-      dataIndex: 'created_by',
-      key: 'created_by',
-      width: 100,
-      render: (text: string, record: Memory) => {
-        const metadata = record.metadata || {};
-        return metadata.created_by || text || '-';
-      },
-    },
-    {
-      title: '修改人',
-      dataIndex: 'updated_by',
-      key: 'updated_by',
-      width: 100,
-      render: (text: string, record: Memory) => {
-        const metadata = record.metadata || {};
-        return metadata.updated_by || text || '-';
-      },
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 110,
-      render: (text: string, record: Memory) => {
-        // 优先使用create_time，其次使用created_at
-        const createTime = record.metadata?.create_time || text;
-        return createTime ? new Date(createTime).toLocaleDateString() : '-';
-      },
-    },
-    {
-      title: '修改时间',
-      dataIndex: 'updated_at',
-      key: 'updated_at',
-      width: 110,
-      render: (text: string, record: Memory) => {
-        // 优先使用update_time，其次使用updated_at
-        const updateTime = record.metadata?.update_time || text;
-        return updateTime ? new Date(updateTime).toLocaleDateString() : '-';
-      },
-    },
-    {
-      title: '操作',
-      key: 'action',
+      title: '用户ID',
+      dataIndex: 'user_id',
+      key: 'user_id',
       width: 120,
-      render: (_: any, record: Memory) => (
-        <Space size="small">
-          <Button
-            type="primary"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => showMemoryModal(record)}
-          >
-            编辑
-          </Button>
-          <Popconfirm
-            title="确认删除这条记忆吗？"
-            icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
-            onConfirm={() => handleDeleteMemory(record)}
-            okText="确认"
-            cancelText="取消"
-          >
-            <Button
-              danger
-              size="small"
-              icon={<DeleteOutlined />}
-            >
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
+      render: (text: string) => text ? <Tag color="blue">{text}</Tag> : '-',
     },
   ];
 
-  /**
-   * 渲染操作按钮区域
-   */
-  const renderActionBar = () => {
-    const isPersonal = currentCategory === 'personal';
-    
-    return (
-      <Row justify="end" align="middle" style={{ marginBottom: '16px' }}>
-        <Col>
-          <Space>
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={loadMemories}
-              loading={loading}
-            >
-              刷新
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => showMemoryModal()}
-            >
-              {isPersonal ? '新增个人档案' : 
-               currentCategory === 'system' ? '新增系统记忆' :
-               currentCategory === 'architecture' ? '新增架构记忆' : 
-               `新增${getCurrentTypeLabel()}`}
-            </Button>
-          </Space>
-        </Col>
-      </Row>
-    );
-  };
+  useEffect(() => {
+    loadAllMemories();
+  }, []);
 
   return (
     <div style={{ padding: '24px' }}>
-      <Tabs 
-        activeKey={currentCategory} 
-        onChange={handleTabChange}
-        type="card"
-        size="large"
-      >
-          {Object.entries(MEMORY_CATEGORIES).map(([key, category]) => (
-            <TabPane
-              tab={
-                <span>
-                  {category.icon}
-                  {category.label}
-                </span>
-              }
-              key={key}
-            >
-              {renderActionBar()}
-              
-              <Table
-                dataSource={memories}
-                columns={currentCategory === 'personal' ? getPersonalColumns() : getNormalColumns()}
-                rowKey="id"
-                loading={loading}
-                scroll={{ x: 1000 }}
-                pagination={{
-                  pageSize: 15,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`
-                }}
-                size="small"
-                locale={{
-                  emptyText: `暂无${getCurrentTypeLabel()}记忆数据`
-                }}
-              />
-            </TabPane>
-          ))}
-        </Tabs>
+      <Row gutter={[0, 16]}>
+        <Col span={24}>
+          <Title level={2}>
+            <BulbOutlined style={{ marginRight: 8 }} />
+            AI 记忆系统
+          </Title>
+          
+          <Alert
+            message="基于 Mem0 的智能记忆管理"
+            description="AI 会从对话中自动学习和记住重要信息，无需手动输入。您可以查看 AI 学到的记忆，搜索相关内容，或在需要时清理记忆。"
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        </Col>
 
-      {/* 添加/编辑记忆模态框 */}
+        <Col span={24}>
+          <Card>
+            <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+              <Col>
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<ReloadOutlined />}
+                    onClick={loadAllMemories}
+                    loading={loading}
+                  >
+                    刷新记忆
+                  </Button>
+                  
+                  <Button
+                    icon={<SearchOutlined />}
+                    onClick={() => setSearchModalVisible(true)}
+                  >
+                    搜索记忆
+                  </Button>
+                </Space>
+              </Col>
+
+              <Col>
+                <Space>
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() => setTestModalVisible(true)}
+                  >
+                    测试添加对话
+                  </Button>
+                  
+                  <Popconfirm
+                    title="确认清除所有记忆吗？"
+                    description="此操作不可恢复，将删除当前用户的所有记忆数据。"
+                    icon={<ExclamationCircleOutlined style={{ color: 'red' }} />}
+                    onConfirm={handleDeleteAll}
+                    okText="确认清除"
+                    okType="danger"
+                    cancelText="取消"
+                  >
+                    <Button 
+                      danger 
+                      icon={<DeleteOutlined />}
+                    >
+                      清除所有记忆
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              </Col>
+            </Row>
+
+            <Table
+              dataSource={memories}
+              columns={columns}
+              rowKey="id"
+              loading={loading}
+              scroll={{ x: 1000 }}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记忆`
+              }}
+              locale={{
+                emptyText: (
+                  <div style={{ padding: '40px', textAlign: 'center' }}>
+                    <BulbOutlined style={{ fontSize: '24px', color: '#ccc', marginBottom: '8px' }} />
+                    <div>暂无记忆数据</div>
+                    <div style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
+                      AI 会在对话中自动学习和记住重要信息
+                    </div>
+                  </div>
+                )
+              }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 测试添加对话记忆模态框 */}
       <Modal
-        title={editingMemory ? `编辑${getCurrentTypeLabel()}` : `新增${getCurrentTypeLabel()}`}
-        open={isModalVisible}
-        onOk={handleModalOk}
+        title="测试添加对话记忆"
+        open={testModalVisible}
+        onOk={handleTestConversation}
         onCancel={() => {
-          setIsModalVisible(false);
+          setTestModalVisible(false);
           form.resetFields();
-          setEditingMemory(null);
         }}
-        width={700}
-        destroyOnClose
+        width={600}
+        okText="添加记忆"
+        cancelText="取消"
       >
+        <Alert
+          message="模拟对话测试"
+          description="输入一段对话内容，AI 会从中提取和学习重要信息作为长期记忆。"
+          type="info"
+          style={{ marginBottom: 16 }}
+        />
+        
         <Form
           form={form}
           layout="vertical"
         >
           <Form.Item
-            name="content"
-            label={`${getCurrentTypeLabel()}内容`}
-            rules={[{ required: true, message: `请输入${getCurrentTypeLabel()}内容` }]}
+            name="userMessage"
+            label="用户消息"
+            rules={[{ required: true, message: '请输入用户消息' }]}
           >
             <TextArea
-              rows={8}
-              placeholder={currentCategory === 'personal' ? 
-                '请输入您的个人档案信息，包括教育背景、工作经历、技能特长、专业领域、个人偏好等...' : 
-                `请输入详细的${getCurrentTypeLabel()}内容...`
-              }
-              maxLength={2000}
-              showCount
+              rows={3}
+              placeholder="例如：我是高超，是一名资深运维工程师，擅长 Kubernetes 和 Python..."
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="assistantMessage"
+            label="AI 回复（可选）"
+          >
+            <TextArea
+              rows={2}
+              placeholder="例如：好的，我记住了您的专业背景..."
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 搜索记忆模态框 */}
+      <Modal
+        title="搜索记忆"
+        open={searchModalVisible}
+        onOk={handleSearchMemories}
+        onCancel={() => {
+          setSearchModalVisible(false);
+          searchForm.resetFields();
+        }}
+        confirmLoading={searchLoading}
+        okText="搜索"
+        cancelText="取消"
+      >
+        <Form
+          form={searchForm}
+          layout="vertical"
+        >
+          <Form.Item
+            name="query"
+            label="搜索关键词"
+            rules={[{ required: true, message: '请输入搜索关键词' }]}
+          >
+            <Input
+              placeholder="例如：运维、技能、偏好..."
+              onPressEnter={handleSearchMemories}
             />
           </Form.Item>
         </Form>

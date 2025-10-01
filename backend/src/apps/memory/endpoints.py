@@ -31,6 +31,12 @@ async def search_memories(
     current_user: dict = Depends(get_current_user)
 ):
     """搜索记忆"""
+    # 自动填充当前用户信息
+    if not data.namespace_params.get("user_name"):
+        user_name = current_user.get("username", "system")
+        data.namespace_params["user_name"] = user_name
+        logger.info(f"自动填充用户信息: user_name={user_name}")
+    
     memories = await memory_service.search_memories(db, data)
     return success_response(data=memories)
 
@@ -71,10 +77,95 @@ async def search_memories_by_namespace(
     return success_response(data=memories)
 
 
-# 删除错误的记忆管理接口 - Mem0 不应该用于 CRUD 管理
+# === 基于 Mem0 原生方法的记忆查看和管理接口 ===
+
+from pydantic import BaseModel
+
+class ConversationMemoryRequest(BaseModel):
+    messages: List[Dict[str, str]]
+    user_id: Optional[str] = None
+    agent_id: str = "omind_diagnostic_agent"
+    run_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+@router.post("/v1/memory/add_conversation", response_model=UnifiedResponse)
+async def add_conversation_memory(
+    request: ConversationMemoryRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """从对话中添加记忆（Mem0 原生 add 方法）"""
+    # 如果没有指定用户，使用当前用户
+    user_id = request.user_id or current_user.get("username", "system")
+    
+    try:
+        memory = await memory_service._get_memory()
+        memory_id = await memory.add_conversation_memory(
+            messages=request.messages,
+            user_id=user_id,
+            agent_id=request.agent_id,
+            run_id=request.run_id,
+            metadata=request.metadata
+        )
+        return success_response(data={"memory_id": memory_id}, msg="对话记忆添加成功")
+    except Exception as e:
+        logger.error(f"添加对话记忆失败: {e}")
+        raise BusinessException(f"添加对话记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
-# 删除手动更新/删除记忆接口 - Mem0 应该通过对话自动管理
+@router.get("/v1/memory/list_all", response_model=UnifiedResponse)
+async def list_all_memories(
+    user_id: Optional[str] = Query(None),
+    agent_id: Optional[str] = Query(None),
+    run_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """获取所有记忆（Mem0 原生 get_all 方法）"""
+    # 如果没有指定用户，使用当前用户
+    if not user_id:
+        user_id = current_user.get("username", "system")
+    
+    try:
+        memory = await memory_service._get_memory()
+        memories = await memory.list_all_memories(
+            user_id=user_id,
+            agent_id=agent_id,
+            run_id=run_id
+        )
+        return success_response(data=memories)
+    except Exception as e:
+        logger.error(f"获取记忆列表失败: {e}")
+        raise BusinessException(f"获取记忆列表失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
+@router.delete("/v1/memory/delete_all", response_model=UnifiedResponse)
+async def delete_all_memories(
+    user_id: Optional[str] = Query(None),
+    agent_id: Optional[str] = Query(None),
+    run_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """删除所有记忆（Mem0 原生 delete_all 方法）"""
+    # 如果没有指定用户，使用当前用户
+    if not user_id:
+        user_id = current_user.get("username", "system")
+    
+    try:
+        memory = await memory_service._get_memory()
+        success = await memory.delete_all_memories(
+            user_id=user_id,
+            agent_id=agent_id,
+            run_id=run_id
+        )
+        if success:
+            return success_response(msg="记忆删除成功")
+        else:
+            raise BusinessException("记忆删除失败", ResponseCode.INTERNAL_ERROR)
+    except Exception as e:
+        logger.error(f"删除记忆失败: {e}")
+        raise BusinessException(f"删除记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
 # 专用接口

@@ -10,10 +10,7 @@ export interface Memory {
   content: string;
   score?: number;
   metadata: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string;
-  updated_by?: string;
+  user_id?: string;
   memory_type?: string;  // 添加记忆类型属性
   namespace_label?: string;  // 添加命名空间标签属性
 }
@@ -91,7 +88,18 @@ export interface DiagnosisContext {
  * 记忆管理 API
  */
 export const memoryApi = {
-  // 删除手动添加记忆 - 应通过 AI 对话自动学习
+  /**
+   * 从对话中添加记忆（Mem0 原生方法）
+   */
+  async addConversationMemory(messages: Array<{role: string, content: string}>, userId?: string, agentId?: string, runId?: string, metadata?: Record<string, any>) {
+    return omind_post('/api/v1/memory/add_conversation', {
+      messages,
+      user_id: userId,
+      agent_id: agentId,
+      run_id: runId,
+      metadata
+    });
+  },
 
   /**
    * 搜索记忆
@@ -100,9 +108,29 @@ export const memoryApi = {
     return omind_post('/api/v1/memory/search', data);
   },
 
-  // 删除手动更新/删除记忆 - Mem0 应通过对话自动管理
+  /**
+   * 获取所有记忆（Mem0 原生方法）
+   */
+  async listAllMemories(userId?: string, agentId?: string, runId?: string) {
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (agentId) params.append('agent_id', agentId);
+    if (runId) params.append('run_id', runId);
+    const queryString = params.toString();
+    return omind_get(`/api/v1/memory/list_all${queryString ? '?' + queryString : ''}`);
+  },
 
-  // 删除记忆管理接口 - 改用数据库直接管理用户档案
+  /**
+   * 删除所有记忆（Mem0 原生方法）
+   */
+  async deleteAllMemories(userId?: string, agentId?: string, runId?: string) {
+    const params = new URLSearchParams();
+    if (userId) params.append('user_id', userId);
+    if (agentId) params.append('agent_id', agentId);
+    if (runId) params.append('run_id', runId);
+    const queryString = params.toString();
+    return omind_del(`/api/v1/memory/delete_all${queryString ? '?' + queryString : ''}`);
+  },
 
   /**
    * 检索指定命名空间的记忆（用于AI诊断）
