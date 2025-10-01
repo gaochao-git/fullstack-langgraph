@@ -21,6 +21,7 @@ from .apps.idc_research import reports_router as idc_reports_router
 from .apps.idc_research import analysis_router as idc_analysis_router
 from .apps.idc_research import docs_router as idc_docs_router
 from .apps.hardware_proxy import router as hardware_proxy_router
+from .apps.memory import router as memory_router
 
 # 创建主API路由器
 api_router = APIRouter()
@@ -37,6 +38,7 @@ api_router.include_router(rbac_router, tags=["rbac"])
 api_router.include_router(kb_router, tags=["knowledge-base"])
 api_router.include_router(speech_router, tags=["speech"])
 api_router.include_router(scan_router, tags=["scan"])
+api_router.include_router(memory_router, tags=["memory"])
 # 注意：全局在 main.py 中已挂载前缀 "/api"，
 # 这里仅加版本前缀，避免出现 "/api/api/..." 的重复。
 api_router.include_router(idc_reports_router, prefix="/v1/idc-reports", tags=["idc-reports"])

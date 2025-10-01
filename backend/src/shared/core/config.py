@@ -157,6 +157,25 @@ class Settings(BaseSettings):
     HARDWARE_SERVICE_LOGIN_ENDPOINT: Optional[str] = None # 主机资源池服务登录地址
     TOKEN_REFRESH_MARGIN: int = 120 # 登录token刷新时间
     
+    # Mem0 长期记忆配置
+    MEM0_ENABLE: bool = True  # 是否启用Mem0
+    MEM0_EMBEDDING_MODEL: str = "BAAI/bge-large-zh-v1.5"  # 嵌入模型
+    MEM0_EMBEDDING_DIM: int = 1024  # 嵌入维度
+    
+    # 向量存储配置
+    MEM0_VECTOR_DB_TYPE: str = "pgvector"  # 向量数据库类型
+    MEM0_VECTOR_DB_HOST: str = "82.156.146.51"  # 向量数据库主机
+    MEM0_VECTOR_DB_PORT: int = 5432  # 向量数据库端口
+    MEM0_VECTOR_DB_NAME: str = "omind_memory"  # 向量数据库名称
+    MEM0_VECTOR_DB_USER: Optional[str] = None  # 向量数据库用户
+    MEM0_VECTOR_DB_PASSWORD: Optional[str] = None  # 向量数据库密码
+    MEM0_VECTOR_DB_TABLE: str = "enterprise_memories"  # 向量存储表名
+    
+    # 记忆配置
+    MEM0_MEMORY_VERSION: str = "v1.1"  # 记忆版本控制
+    MEM0_SEARCH_LIMIT: int = 10  # 默认搜索返回数量
+    MEM0_RELEVANCE_THRESHOLD: float = 0.7  # 相关性阈值
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
