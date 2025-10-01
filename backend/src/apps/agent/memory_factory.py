@@ -211,8 +211,8 @@ class EnterpriseMemory:
                 score = getattr(memory, 'score', 1.0)
                 metadata = getattr(memory, 'metadata', {})
             
-            # 过滤有效内容和相关性
-            if content and score >= settings.MEM0_RELEVANCE_THRESHOLD:
+            # 过滤有效内容和相关性 (score越小越相关，使用<=判断)
+            if content and score <= settings.MEM0_RELEVANCE_THRESHOLD:
                 filtered_memories.append({
                     "id": memory_id,
                     "content": content,
