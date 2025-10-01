@@ -89,6 +89,7 @@ matplotlib-inline==0.1.7
 mccabe==0.7.0
 mcp==1.12.1
 mdurl==0.1.2
+mem0ai==0.1.118
 multidict==6.6.3
 mypy==1.16.1
 mypy_extensions==1.1.0
