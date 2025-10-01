@@ -143,3 +143,30 @@
     min-width: 44px;
   }
 }
+
+/* 防止顶部菜单文本省略号 */
+.top-menu-no-ellipsis .ant-menu-item {
+  white-space: nowrap !important;
+}
+
+.top-menu-no-ellipsis .ant-menu-title-content {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* 折叠状态的侧边栏菜单防止省略号 */
+.ant-layout-sider-collapsed .ant-menu-inline-collapsed > .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu-inline-collapsed > .ant-menu-submenu > .ant-menu-submenu-title {
+  padding: 0 16px !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item-icon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .ant-menu-item-icon {
+  font-size: 16px !important;
+}
+
+/* 确保折叠时的提示框显示完整文本 */
+.ant-tooltip-inner {
+  white-space: nowrap !important;
+}

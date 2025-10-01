@@ -198,6 +198,7 @@ const MenuLayout: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
                   borderBottom: 'none',
                   minWidth: 'auto'
                 }}
+                className="top-menu-no-ellipsis"
                 onClick={({ key }) => {
                   // 导航到对应模块的默认页面
                   let targetMenu = null;
