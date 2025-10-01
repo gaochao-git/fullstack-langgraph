@@ -94,14 +94,14 @@ class EnterpriseMemory:
         """构建 Mem0 配置"""
         
         # 设置embedder所需的环境变量
-        os.environ["OPENAI_API_KEY"] = os.getenv("EMBEDDING_API_KEY", settings.LLM_API_KEY)
+        os.environ["OPENAI_API_KEY"] = settings.EMBEDDING_API_KEY or settings.LLM_API_KEY
         
         # 嵌入模型配置 (使用兼容OpenAI的API)
         embedder_config = {
             "provider": "openai",
             "config": {
-                "model": os.getenv("EMBEDDING_MODEL_NAME", settings.MEM0_EMBEDDING_MODEL),
-                "openai_base_url": os.getenv("EMBEDDING_API_BASE_URL"),
+                "model": settings.EMBEDDING_MODEL_NAME,
+                "openai_base_url": settings.EMBEDDING_API_BASE_URL,
                 "embedding_dims": settings.MEM0_EMBEDDING_DIM
             }
         }
