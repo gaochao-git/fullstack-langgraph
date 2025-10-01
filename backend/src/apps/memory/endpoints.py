@@ -21,27 +21,7 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["Memory Management"])
 
 
-@router.post("/v1/memory/add", response_model=UnifiedResponse)
-async def add_memory(
-    data: MemoryCreate,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """添加记忆"""
-    # 根据记忆类型自动填充用户信息
-    memory_category = data.metadata.get("memory_category", "")
-    
-    if memory_category == "personal":
-        # 个人记忆：使用当前用户信息
-        user_name = current_user.get("username", "system")
-        data.namespace_params["user_name"] = user_name
-    else:
-        # 系统记忆：使用系统标识
-        if "user_name" not in data.namespace_params:
-            data.namespace_params["user_name"] = "system"
-    
-    result = await memory_service.add_memory(db, data)
-    return success_response(data=result, msg="记忆添加成功")
+# 删除手动添加记忆接口 - 应该通过 AI 对话自动学习
 
 
 @router.post("/v1/memory/search", response_model=UnifiedResponse)
@@ -91,71 +71,10 @@ async def search_memories_by_namespace(
     return success_response(data=memories)
 
 
-@router.get("/v1/memory/manage/{namespace_type}", response_model=UnifiedResponse)
-async def manage_memories(
-    namespace_type: str,
-    user_name: Optional[str] = Query(None),
-    system_id: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """管理指定命名空间的所有记忆（用于记忆管理界面）"""
-    # 构建参数
-    params = {}
-    
-    # 为个人记忆自动获取当前用户
-    if namespace_type == "user_profile":
-        current_user_name = current_user.get("username", "system")
-        params['user_name'] = current_user_name
-    elif user_name:
-        params['user_name'] = user_name
-    
-    if system_id:
-        params['system_id'] = system_id
-    
-    # 临时解决方案：使用搜索功能来获取所有记忆，因为 get_all 有问题
-    logger.info(f"管理接口: namespace_type={namespace_type}, params={params}")
-    
-    # 使用一个通用查询来获取所有相关记忆
-    search_data = MemorySearch(
-        namespace=namespace_type,
-        query="个人档案 高超 信息 记忆 内容",  # 使用通用查询词以获取更多记忆
-        limit=100,  # 足够大的限制
-        namespace_params=params
-    )
-    
-    try:
-        memories = await memory_service.search_memories(db, search_data)
-        logger.info(f"通过搜索获取到记忆数量: {len(memories)}")
-        return success_response(data=memories)
-    except Exception as e:
-        logger.error(f"管理接口获取记忆失败: {e}")
-        # 如果搜索失败，尝试原来的方法
-        memories = await memory_service.list_memories_by_namespace(db, namespace_type, **params)
-        return success_response(data=memories)
+# 删除错误的记忆管理接口 - Mem0 不应该用于 CRUD 管理
 
 
-@router.put("/v1/memory/update", response_model=UnifiedResponse)
-async def update_memory(
-    data: MemoryUpdate,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """更新记忆"""
-    await memory_service.update_memory(db, data, current_user)
-    return success_response(msg="记忆更新成功")
-
-
-@router.delete("/v1/memory/{memory_id}", response_model=UnifiedResponse)
-async def delete_memory(
-    memory_id: str,
-    namespace: str = Query(..., description="命名空间"),
-    db: AsyncSession = Depends(get_async_db),
-    current_user: dict = Depends(get_current_user)
-):
-    """删除记忆"""
-    await memory_service.delete_memory(db, namespace, memory_id)
-    return success_response(msg="记忆删除成功")
+# 删除手动更新/删除记忆接口 - Mem0 应该通过对话自动管理
 
 
 # 专用接口

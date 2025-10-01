@@ -182,29 +182,20 @@ class EnterpriseMemory:
             "metadata": combined_metadata
         }
     
-    async def add_memory(self, namespace: str, content: str, metadata: Dict[str, Any] = None, **kwargs) -> str:
-        """添加记忆（使用官方标准API）"""
+    async def add_conversation_memory(self, messages: List[Dict[str, str]], user_id: str, agent_id: str = "omind_diagnostic_agent", run_id: str = None, metadata: Dict[str, Any] = None) -> str:
+        """从对话中添加记忆（Mem0 正确用法）"""
         if not self.memory:
             await self.initialize()
         
-        # 构建消息（官方标准格式）
-        messages = [{"role": "user", "content": content}]
-        
-        # 准备标准化的调用参数
-        call_params = self._prepare_call_params(namespace, metadata, **kwargs)
-        
         try:
-            # 记录调用参数
-            logger.info(f"Mem0 add调用参数: messages={messages}, user_id={call_params['user_id']}, agent_id={call_params.get('agent_id')}, metadata={call_params['metadata']}")
-            
-            # 使用官方标准API调用，关闭推理以确保存储
+            # 使用 Mem0 的正确方式：从对话消息中智能提取记忆
             result = self.memory.add(
                 messages,
-                user_id=call_params["user_id"],
-                agent_id=call_params.get("agent_id"),
-                run_id=call_params.get("run_id"),
-                metadata=call_params["metadata"],
-                infer=False  # 关闭推理，强制存储
+                user_id=user_id,
+                agent_id=agent_id,
+                run_id=run_id,
+                metadata=metadata or {},
+                infer=True  # 开启推理，让 Mem0 智能提取记忆
             )
             
             logger.info(f"Mem0 add原始返回结果: {result}, 类型: {type(result)}")

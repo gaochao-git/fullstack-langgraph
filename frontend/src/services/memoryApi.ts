@@ -91,12 +91,7 @@ export interface DiagnosisContext {
  * 记忆管理 API
  */
 export const memoryApi = {
-  /**
-   * 添加记忆
-   */
-  async addMemory(data: MemoryCreate) {
-    return omind_post('/api/v1/memory/add', data);
-  },
+  // 删除手动添加记忆 - 应通过 AI 对话自动学习
 
   /**
    * 搜索记忆
@@ -105,30 +100,9 @@ export const memoryApi = {
     return omind_post('/api/v1/memory/search', data);
   },
 
-  /**
-   * 更新记忆
-   */
-  async updateMemory(data: MemoryUpdate) {
-    return omind_put('/api/v1/memory/update', data);
-  },
+  // 删除手动更新/删除记忆 - Mem0 应通过对话自动管理
 
-  /**
-   * 删除记忆
-   */
-  async deleteMemory(memoryId: string, namespace: string) {
-    return omind_del(`/api/v1/memory/${memoryId}?namespace=${namespace}`);
-  },
-
-  /**
-   * 获取指定命名空间的记忆列表（用于管理界面）
-   */
-  async listMemories(namespaceType: string, params?: { user_name?: string; system_id?: string }) {
-    const queryParams = new URLSearchParams();
-    if (params?.user_name) queryParams.append('user_name', params.user_name);
-    if (params?.system_id) queryParams.append('system_id', params.system_id);
-    const queryString = queryParams.toString();
-    return omind_get(`/api/v1/memory/manage/${namespaceType}${queryString ? '?' + queryString : ''}`);
-  },
+  // 删除记忆管理接口 - 改用数据库直接管理用户档案
 
   /**
    * 检索指定命名空间的记忆（用于AI诊断）
