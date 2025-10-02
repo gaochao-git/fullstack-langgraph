@@ -37,6 +37,7 @@ import {
 } from '@ant-design/icons';
 
 import { memoryApi, Memory } from '../../services/memoryApi';
+import { agentApi } from '../../services/agentApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -53,6 +54,21 @@ const MemoryManagement: React.FC = () => {
   const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
+  const [agents, setAgents] = useState<any[]>([]);
+
+  /**
+   * 加载智能体列表
+   */
+  const loadAgents = async () => {
+    try {
+      const response = await agentApi.getAgents({ enabled_only: true });
+      if (response.status === 'ok' && response.data?.items) {
+        setAgents(response.data.items);
+      }
+    } catch (error) {
+      console.error('加载智能体列表失败:', error);
+    }
+  };
 
   /**
    * 加载所有记忆
@@ -62,7 +78,7 @@ const MemoryManagement: React.FC = () => {
     try {
       const response = await memoryApi.listAllMemories();
       console.log('Memory response:', response);
-      
+
       if (response.status === 'ok' && response.data) {
         setMemories(response.data);
         message.success(`加载了 ${response.data.length} 条记忆`);
@@ -170,15 +186,11 @@ const MemoryManagement: React.FC = () => {
    */
   const columns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 200,
-      render: (text: string) => (
-        <Text code style={{ fontSize: '12px' }}>
-          {text ? text.substring(0, 8) + '...' : '-'}
-        </Text>
-      ),
+      title: '用户ID',
+      dataIndex: 'user_id',
+      key: 'user_id',
+      width: 120,
+      render: (text: string) => text ? <Tag color="blue">{text}</Tag> : '-',
     },
     {
       title: '记忆内容',
@@ -186,21 +198,26 @@ const MemoryManagement: React.FC = () => {
       key: 'content',
       ellipsis: { showTitle: false },
       render: (text: string) => (
-        <div style={{ maxWidth: 400 }}>
-          {text ? (text.length > 100 ? `${text.substring(0, 100)}...` : text) : '-'}
+        <div style={{ maxWidth: 500 }}>
+          {text || '-'}
         </div>
       ),
     },
     {
-      title: '用户ID',
-      dataIndex: 'user_id',
-      key: 'user_id',
-      width: 120,
-      render: (text: string) => text ? <Tag color="blue">{text}</Tag> : '-',
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 300,
+      render: (text: string) => (
+        <Text code style={{ fontSize: '12px' }}>
+          {text || '-'}
+        </Text>
+      ),
     },
   ];
 
   useEffect(() => {
+    loadAgents();
     loadAllMemories();
   }, []);
 
@@ -350,11 +367,14 @@ const MemoryManagement: React.FC = () => {
           <Form.Item
             name="agent_id"
             label="智能体选择"
-            initialValue="test_agent"
+            initialValue={agents.length > 0 ? agents[0].agent_id : undefined}
           >
-            <Select placeholder="选择智能体">
-              <Option value="test_agent">测试智能体</Option>
-              <Option value="diagnostic_agent">诊断智能体</Option>
+            <Select placeholder="选择智能体" loading={agents.length === 0}>
+              {agents.map(agent => (
+                <Option key={agent.agent_id} value={agent.agent_id}>
+                  {agent.agent_name}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
         </Form>
@@ -392,9 +412,12 @@ const MemoryManagement: React.FC = () => {
             name="agent_id"
             label="智能体选择（可选）"
           >
-            <Select placeholder="选择智能体（留空搜索所有）" allowClear>
-              <Option value="test_agent">测试智能体</Option>
-              <Option value="diagnostic_agent">诊断智能体</Option>
+            <Select placeholder="选择智能体（留空搜索所有）" allowClear loading={agents.length === 0}>
+              {agents.map(agent => (
+                <Option key={agent.agent_id} value={agent.agent_id}>
+                  {agent.agent_name}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
         </Form>
