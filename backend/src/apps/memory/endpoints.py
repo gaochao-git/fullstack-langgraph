@@ -125,7 +125,7 @@ async def list_all_memories(
     # 如果没有指定用户，使用当前用户
     if not user_id:
         user_id = current_user.get("username", "system")
-    
+
     try:
         memory = await memory_service._get_memory()
         memories = await memory.list_all_memories(
@@ -137,6 +137,117 @@ async def list_all_memories(
     except Exception as e:
         logger.error(f"获取记忆列表失败: {e}")
         raise BusinessException(f"获取记忆列表失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
+@router.get("/v1/memory/list_by_level", response_model=UnifiedResponse)
+async def list_memories_by_level(
+    level: Optional[str] = Query(None, description="记忆层级: organization/user_global/agent_global/user_agent/session"),
+    user_id: Optional[str] = Query(None),
+    agent_id: Optional[str] = Query(None),
+    limit: int = Query(100, description="返回结果数量"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    按记忆层级查询记忆（管理员功能）
+
+    Args:
+        level: 记忆层级，可选值：
+            - organization: 组织级全局记忆（所有人共享）
+            - user_global: 用户级全局记忆（该用户所有智能体共享）
+            - agent_global: 智能体级全局记忆（该智能体所有用户共享）
+            - user_agent: 用户-智能体交互记忆
+            - session: 会话临时记忆
+            - 不传则返回所有记忆
+        user_id: 用户ID（用于筛选user_global和user_agent层级）
+        agent_id: 智能体ID（用于筛选agent_global和user_agent层级）
+    """
+    try:
+        memory = await memory_service._get_memory()
+
+        # 如果指定了层级，则按层级查询
+        if level:
+            if level == "organization":
+                memories = await memory.search_organization_memory(query="", limit=limit)
+            elif level == "user_global":
+                if not user_id:
+                    user_id = current_user.get("username", "system")
+                memories = await memory.search_user_global_memory(query="", user_id=user_id, limit=limit)
+            elif level == "agent_global":
+                if not agent_id:
+                    raise BusinessException("查询智能体全局记忆需要指定agent_id", ResponseCode.PARAM_ERROR)
+                memories = await memory.search_agent_global_memory(query="", agent_id=agent_id, limit=limit)
+            elif level == "user_agent":
+                if not user_id:
+                    user_id = current_user.get("username", "system")
+                if not agent_id:
+                    raise BusinessException("查询用户-智能体记忆需要指定agent_id", ResponseCode.PARAM_ERROR)
+                memories = await memory.search_user_agent_memory(query="", user_id=user_id, agent_id=agent_id, limit=limit)
+            elif level == "session":
+                # 会话记忆暂时返回空
+                memories = []
+            else:
+                raise BusinessException(f"不支持的记忆层级: {level}", ResponseCode.PARAM_ERROR)
+        else:
+            # 不指定层级，返回所有记忆
+            if not user_id:
+                user_id = current_user.get("username", "system")
+            memories = await memory.list_all_memories(user_id=user_id, agent_id=agent_id)
+
+        return success_response(data=memories)
+    except BusinessException:
+        raise
+    except Exception as e:
+        logger.error(f"按层级查询记忆失败: {e}")
+        raise BusinessException(f"按层级查询记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
+@router.post("/v1/memory/add_organization", response_model=UnifiedResponse)
+async def add_organization_memory(
+    content: str = Query(..., description="记忆内容"),
+    memory_type: str = Query("general", description="记忆类型: system_architecture/standard_procedure/enterprise_policy/technical_decision"),
+    category: str = Query("general", description="分类标签"),
+    importance: str = Query("medium", description="重要性: low/medium/high"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    手动添加组织级全局记忆（管理员功能）
+
+    Args:
+        content: 记忆内容
+        memory_type: 记忆类型
+            - system_architecture: 系统架构
+            - standard_procedure: 标准流程
+            - enterprise_policy: 企业规范
+            - technical_decision: 技术决策
+            - general: 通用知识
+        category: 分类标签
+        importance: 重要性等级
+    """
+    try:
+        memory = await memory_service._get_memory()
+
+        # 构造消息格式
+        messages = [
+            {"role": "admin", "content": content}
+        ]
+
+        memory_id = await memory.add_organization_memory(
+            messages=messages,
+            memory_type=memory_type,
+            metadata={
+                "category": category,
+                "importance": importance,
+                "source": "manual_admin",
+                "created_by": current_user.get("username", "admin")
+            }
+        )
+
+        return success_response(data={"memory_id": memory_id}, msg="组织记忆添加成功")
+    except Exception as e:
+        logger.error(f"添加组织记忆失败: {e}")
+        raise BusinessException(f"添加组织记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
 @router.delete("/v1/memory/delete_all", response_model=UnifiedResponse)
