@@ -164,18 +164,30 @@ class MemoryEnhancedDiagnosticAgent:
             # 使用后台任务异步保存记忆，避免阻塞对话结束
             if conversation_messages:
                 import asyncio
-                # 创建后台任务，不等待完成
-                task = asyncio.create_task(self._save_memory_background(
-                    conversation_messages, 
-                    user_id, 
-                    agent_id,
-                    {
-                        "session_type": "diagnostic",
-                        "system_id": configurable.get("system_id", ""),
-                        "resolved": state.get("resolved", False)
-                    }
-                ))
-                logger.info(f"已启动后台记忆保存任务 (user_id={user_id})")
+                import threading
+                # 使用线程池执行，完全独立于当前事件循环
+                def start_background_memory_save():
+                    try:
+                        import asyncio
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        loop.run_until_complete(self._save_memory_background(
+                            conversation_messages, 
+                            user_id, 
+                            agent_id,
+                            {
+                                "session_type": "diagnostic",
+                                "system_id": configurable.get("system_id", ""),
+                                "resolved": state.get("resolved", False)
+                            }
+                        ))
+                        loop.close()
+                    except Exception as e:
+                        logger.error(f"后台记忆保存线程失败: {e}")
+                
+                # 在单独线程中执行记忆保存
+                threading.Thread(target=start_background_memory_save, daemon=True).start()
+                logger.info(f"已启动后台记忆保存线程 (user_id={user_id})")
             
         except Exception as e:
             logger.error(f"保存诊断结果失败: {e}")
