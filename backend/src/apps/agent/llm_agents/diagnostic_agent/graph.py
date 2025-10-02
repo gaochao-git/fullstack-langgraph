@@ -47,8 +47,18 @@ async def create_diagnostic_agent(config: RunnableConfig):
     # 获取 checkpointer
     checkpointer = await get_checkpointer()
     
-    # 使用增强的 React Agent - 保持完全兼容性
-    logger.info(f"[Agent创建] 使用增强的诊断智能体")
-    from .enhanced_react_agent import create_enhanced_react_agent
-    return create_enhanced_react_agent(llm, tools, checkpointer, monitor_hook)
+    # 检查是否启用记忆功能（默认启用）
+    use_memory = config.get("configurable", {}).get("use_memory", True) if config else True
+    
+    if use_memory:
+        # 使用集成记忆的智能体
+        logger.info(f"[Agent创建] 使用集成记忆的诊断智能体")
+        from .memory_enhanced_agent import create_memory_enhanced_diagnostic_agent
+        # 注意：memory_enhanced_agent 不需要 monitor_hook 参数
+        return await create_memory_enhanced_diagnostic_agent(llm, tools, checkpointer, agent_id)
+    else:
+        # 使用增强的 React Agent - 保持完全兼容性
+        logger.info(f"[Agent创建] 使用增强的诊断智能体")
+        from .enhanced_react_agent import create_enhanced_react_agent
+        return create_enhanced_react_agent(llm, tools, checkpointer, monitor_hook)
 

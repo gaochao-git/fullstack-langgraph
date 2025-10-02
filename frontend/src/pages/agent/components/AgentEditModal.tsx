@@ -98,6 +98,14 @@ interface LocalAgent {
     user_prompt_template?: string;
     assistant_prompt_template?: string;
   };
+  memory_info?: {
+    enable_memory?: boolean;
+    memory_types?: string[];
+    memory_search_limit?: number;
+    memory_similarity_threshold?: number;
+    memory_save_strategy?: 'auto' | 'manual' | 'session_end';
+    memory_scope?: 'user' | 'team' | 'organization';
+  };
   tools_info?: {
     system_tools?: string[];
     mcp_tools?: Array<{
@@ -518,6 +526,22 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           }
         }
 
+        // 记忆配置 - 设置记忆相关配置
+        if (fullAgent.memory_info) {
+          formValues.enable_memory = fullAgent.memory_info.enable_memory || false;
+          formValues.memory_types = fullAgent.memory_info.memory_types || [];
+          formValues.memory_search_limit = fullAgent.memory_info.memory_search_limit || 5;
+          formValues.memory_similarity_threshold = fullAgent.memory_info.memory_similarity_threshold || 0.7;
+          formValues.memory_save_strategy = fullAgent.memory_info.memory_save_strategy || 'auto';
+          formValues.memory_scope = fullAgent.memory_info.memory_scope || 'user';
+        } else {
+          // 设置默认值
+          formValues.enable_memory = false;
+          formValues.memory_search_limit = 5;
+          formValues.memory_save_strategy = 'auto';
+          formValues.memory_scope = 'user';
+        }
+
         form.setFieldsValue(formValues);
         
         // 处理工具配置
@@ -606,11 +630,48 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       promptConfig.assistant_prompt_template = values.assistant_prompt_template;
     }
 
+    // 构建记忆配置
+    const memoryConfig: any = {
+      enable_memory: values.enable_memory || false,
+      memory_types: values.memory_types || [],
+      memory_search_limit: values.memory_search_limit || 5,
+      memory_similarity_threshold: values.memory_similarity_threshold || 0.7,
+      memory_save_strategy: values.memory_save_strategy || 'auto',
+      memory_scope: values.memory_scope || 'user'
+    };
+    
+    // 如果是编辑模式且原有记忆配置，合并配置
+    if (!isCreating && agent?.memory_info) {
+      Object.assign(memoryConfig, agent.memory_info, {
+        enable_memory: values.enable_memory,
+        memory_types: values.memory_types,
+        memory_search_limit: values.memory_search_limit,
+        memory_similarity_threshold: values.memory_similarity_threshold,
+        memory_save_strategy: values.memory_save_strategy,
+        memory_scope: values.memory_scope
+      });
+    }
+
+    // 清理表单值，移除不需要提交的字段
+    const {
+      llm_configs,
+      system_prompt,
+      user_prompt_template,
+      assistant_prompt_template,
+      enable_memory,
+      memory_types,
+      memory_search_limit,
+      memory_save_strategy,
+      memory_scope,
+      ...baseValues
+    } = values;
+
     const formData = {
-      ...values,
+      ...baseValues,
       tools_info: toolsConfig,
       llm_info: llmConfig,
       prompt_info: promptConfig,
+      memory_info: memoryConfig,
       // 确保权限字段被包含
       visibility_type: values.visibility_type || 'private',
       visibility_additional_users: values.visibility_additional_users || []
@@ -1127,6 +1188,153 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
               />
             </Form.Item>
 
+          </TabPane>
+
+          {/* 记忆配置 */}
+          <TabPane tab="记忆配置" key="memory">
+            <div className="space-y-4">
+              {/* 功能说明提示 */}
+              <div className="p-3 bg-blue-50 rounded-lg mb-4">
+                <div className="text-sm text-blue-800">
+                  <strong>💡 提示：</strong>
+                  <ul className="mt-1 ml-5 list-disc">
+                    <li>启用记忆功能后，智能体将能够记住用户的历史信息和偏好</li>
+                    <li>记忆数据会自动加密存储，确保隐私安全</li>
+                    <li>可以通过"记忆管理"页面查看和管理所有记忆数据</li>
+                  </ul>
+                </div>
+              </div>
+              {/* 启用记忆功能 */}
+              <Form.Item
+                name="enable_memory"
+                label="启用记忆功能"
+                tooltip="启用后，智能体会记住用户的历史对话和偏好"
+                initialValue={false}
+              >
+                <Radio.Group>
+                  <Radio value={true}>启用</Radio>
+                  <Radio value={false}>禁用</Radio>
+                </Radio.Group>
+              </Form.Item>
+
+              {/* 记忆类型和检索配置 - 同一行 */}
+              <Form.Item
+                dependencies={['enable_memory']}
+                noStyle
+              >
+                {({ getFieldValue }) => (
+                  <Row gutter={16}>
+                    <Col span={16}>
+                      <Form.Item
+                        name="memory_types"
+                        label="记忆类型"
+                        tooltip="选择智能体需要记忆的信息类型"
+                      >
+                        <Select
+                          mode="multiple"
+                          placeholder="选择需要记忆的信息类型"
+                          disabled={!getFieldValue('enable_memory')}
+                        >
+                          <Option value="user_profile">用户档案</Option>
+                          <Option value="user_expertise">用户技能</Option>
+                          <Option value="user_preferences">用户偏好</Option>
+                          <Option value="system_topology">系统拓扑</Option>
+                          <Option value="incident_history">故障历史</Option>
+                          <Option value="solution_patterns">解决方案模式</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        name="memory_search_limit"
+                        label="记忆检索数量"
+                        tooltip="每次对话时检索的相关记忆数量"
+                        initialValue={5}
+                      >
+                        <InputNumber
+                          min={1}
+                          max={20}
+                          style={{ width: '100%' }}
+                          disabled={!getFieldValue('enable_memory')}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                )}
+              </Form.Item>
+
+              {/* 相似性阈值配置 */}
+              <Form.Item
+                dependencies={['enable_memory']}
+                noStyle
+              >
+                {({ getFieldValue }) => (
+                  <Form.Item
+                    name="memory_similarity_threshold"
+                    label="相似性阈值"
+                    tooltip="相似度阈值，0.7表示70%相似度"
+                    initialValue={0.7}
+                  >
+                    <InputNumber
+                      min={0}
+                      max={1}
+                      step={0.1}
+                      style={{ width: 200 }}
+                      disabled={!getFieldValue('enable_memory')}
+                      formatter={value => `${value}`}
+                      parser={value => parseFloat(value)}
+                    />
+                  </Form.Item>
+                )}
+              </Form.Item>
+
+
+              {/* 记忆保存策略 */}
+              <Form.Item
+                dependencies={['enable_memory']}
+                noStyle
+              >
+                {({ getFieldValue }) => (
+                  <Form.Item
+                    name="memory_save_strategy"
+                    label="记忆保存策略"
+                    tooltip="控制何时保存新的记忆"
+                    initialValue="auto"
+                  >
+                    <Radio.Group 
+                      disabled={!getFieldValue('enable_memory')}
+                    >
+                      <Radio value="auto">自动保存（推荐）</Radio>
+                      <Radio value="manual">手动确认</Radio>
+                      <Radio value="session_end">会话结束时</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                )}
+              </Form.Item>
+
+              {/* 记忆权限配置 */}
+              <Form.Item
+                dependencies={['enable_memory']}
+                noStyle
+              >
+                {({ getFieldValue }) => (
+                  <Form.Item
+                    name="memory_scope"
+                    label="记忆共享范围"
+                    tooltip="控制记忆的可见范围"
+                    initialValue="user"
+                  >
+                    <Radio.Group 
+                      disabled={!getFieldValue('enable_memory')}
+                    >
+                      <Radio value="user">仅当前用户</Radio>
+                      <Radio value="team">团队共享</Radio>
+                      <Radio value="organization">组织共享</Radio>
+                    </Radio.Group>
+                  </Form.Item>
+                )}
+              </Form.Item>
+            </div>
           </TabPane>
         </Tabs>
 

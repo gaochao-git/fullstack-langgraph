@@ -24,6 +24,7 @@ class AgentConfig(BaseModel):
     tools_info = Column(JSONType, nullable=True, default=dict)     # 工具配置
     llm_info = Column(JSONType, nullable=True, default=dict)       # 大模型配置
     prompt_info = Column(JSONType, nullable=True, default=dict)    # 提示词配置
+    memory_info = Column(JSONType, nullable=True, default=dict)    # 记忆配置
     # 运行统计
     total_runs = Column(Integer, default=0, nullable=False)
     success_rate = Column(Float, default=0.0, nullable=False)
@@ -59,6 +60,10 @@ class AgentConfig(BaseModel):
     
     def _process_prompt_info(self, value):
         """自定义处理prompt_info字段 - 解析为Python字典"""
+        return self._parse_json_field(value, default={})
+    
+    def _process_memory_info(self, value):
+        """自定义处理memory_info字段 - 解析为Python字典"""
         return self._parse_json_field(value, default={})
     
     def _process_visibility_additional_users(self, value):

@@ -56,6 +56,7 @@ class AgentCreate(AgentBase):
     tools_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="工具配置信息")
     llm_info: Optional[List[LLMModelConfig]] = Field(default_factory=list, description="LLM配置信息列表")
     prompt_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="提示词配置信息")
+    memory_info: Optional[Dict[str, Any]] = Field(default_factory=dict, description="记忆配置信息")
     # 权限相关字段
     visibility_type: Optional[str] = Field(default="private", pattern=r'^(private|team|department|public)$', description="可见权限级别")
     visibility_additional_users: Optional[List[str]] = Field(default_factory=list, description="额外授权用户列表")
@@ -86,6 +87,7 @@ class AgentUpdate(BaseModel):
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具配置信息")
     llm_info: Optional[List[LLMModelConfig]] = Field(None, description="LLM配置信息列表")
     prompt_info: Optional[Dict[str, Any]] = Field(None, description="提示词配置信息")
+    memory_info: Optional[Dict[str, Any]] = Field(None, description="记忆配置信息")
     # 权限相关字段
     visibility_type: Optional[str] = Field(None, pattern=r'^(private|team|department|public)$', description="可见权限级别")
     visibility_additional_users: Optional[List[str]] = Field(None, description="额外授权用户列表")
@@ -199,6 +201,7 @@ class AgentResponse(BaseModel):
     tools_info: Optional[Dict[str, Any]] = Field(None, description="工具信息")
     llm_info: Optional[List[LLMModelConfig]] = Field(None, description="LLM信息列表")
     prompt_info: Optional[Dict[str, Any]] = Field(None, description="提示词信息")
+    memory_info: Optional[Dict[str, Any]] = Field(None, description="记忆配置信息")
     create_time: Optional[datetime] = Field(None, description="创建时间")
     update_time: Optional[datetime] = Field(None, description="更新时间")
 

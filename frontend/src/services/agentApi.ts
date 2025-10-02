@@ -57,6 +57,14 @@ export interface Agent {
     user_prompt_template?: string;
     assistant_prompt_template?: string;
   };
+  memory_info?: {
+    enabled?: boolean;
+    memory_types?: string[];
+    search_limit?: number;
+    similarity_threshold?: number;
+    save_strategy?: string;
+    share_scope?: string;
+  };
   mcp_config?: {
     total_tools: number;
     selected_tools: string[];
@@ -115,6 +123,14 @@ export interface CreateAgentRequest {
     system_prompt: string;
     user_prompt_template?: string;
     assistant_prompt_template?: string;
+  };
+  memory_info?: {
+    enabled?: boolean;
+    memory_types?: string[];
+    search_limit?: number;
+    similarity_threshold?: number;
+    save_strategy?: string;
+    share_scope?: string;
   };
   mcp_config?: {
     total_tools: number;

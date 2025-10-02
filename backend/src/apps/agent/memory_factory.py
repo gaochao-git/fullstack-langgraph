@@ -240,13 +240,32 @@ class EnterpriseMemory:
         
         agent_id = kwargs.get("agent_id")
         
+        # 提取元数据参数（用于业务层过滤）
+        metadata = kwargs.get("metadata", {})
+        
+        # 提取相似性阈值（如果有传递）
+        similarity_threshold = kwargs.get("threshold") or kwargs.get("similarity_threshold")
+        
+        # 转换相似度到距离分数（前端传的是相似度，后端需要距离）
+        threshold = None
+        if similarity_threshold is not None:
+            # 相似度阈值转换为距离阈值
+            threshold = 1 - float(similarity_threshold)
+        
+        # 构建搜索参数
+        search_params = {
+            "query": query,
+            "user_id": user_id,
+            "agent_id": agent_id,
+            "limit": limit or settings.MEM0_SEARCH_LIMIT
+        }
+        
+        # 如果指定了阈值，添加到参数中
+        if threshold is not None:
+            search_params["threshold"] = threshold
+        
         # 使用官方标准API搜索
-        memories = self.memory.search(
-            query=query,
-            user_id=user_id,
-            agent_id=agent_id,
-            limit=limit or settings.MEM0_SEARCH_LIMIT
-        )
+        memories = self.memory.search(**search_params)
         
         # 处理搜索结果，支持不同的返回格式
         if isinstance(memories, dict) and 'results' in memories:

@@ -9,6 +9,7 @@ import json
 
 from src.apps.agent.memory_factory import get_enterprise_memory
 from src.shared.core.logging import get_logger
+from src.shared.db.config import get_sync_db
 from .state_schemas import DiagnosticAgentState
 
 logger = get_logger(__name__)
@@ -17,11 +18,12 @@ logger = get_logger(__name__)
 class MemoryEnhancedDiagnosticAgent:
     """集成长期记忆的诊断Agent"""
     
-    def __init__(self, llm, tools, checkpointer):
+    def __init__(self, llm, tools, checkpointer, memory_config=None):
         self.llm = llm
         self.tools = tools
         self.checkpointer = checkpointer
         self.memory = None
+        self.memory_config = memory_config or {}
         
     async def initialize(self):
         """初始化记忆系统"""
@@ -38,12 +40,32 @@ class MemoryEnhancedDiagnosticAgent:
             user_id = config.get("user_id", "default_user")
             system_id = config.get("system_id", "default_system")
             
-            # 获取诊断上下文
-            context = await self.memory.get_diagnosis_context(
-                issue=user_message,
-                system_id=system_id,
-                user_id=user_id
-            )
+            # 从配置中获取记忆搜索参数
+            search_limit = self.memory_config.get('memory_search_limit', 10)
+            similarity_threshold = self.memory_config.get('memory_similarity_threshold', None)
+            agent_id = config.get("agent_id", "omind_diagnostic_agent")
+            
+            # 使用标准的 Mem0 API 参数
+            search_params = {
+                "namespace": "diagnostic_context",  # 保留用于 search_memories 方法
+                "query": user_message,
+                "limit": search_limit,
+                "user_id": user_id,
+                "agent_id": agent_id,  # 添加 agent_id
+                # 将 system_id 移到 metadata 中
+                "metadata": {
+                    "system_id": system_id,
+                    "context_type": "diagnostic"
+                }
+            }
+            
+            # 如果配置了相似性阈值，添加到搜索参数
+            if similarity_threshold is not None:
+                search_params["similarity_threshold"] = similarity_threshold
+            
+            # 暂时分离出 metadata，因为 search_memories 可能还不支持
+            metadata = search_params.pop("metadata", {})
+            context = await self.memory.search_memories(**search_params)
             
             # 构建增强的系统提示
             enhanced_prompt = self._build_enhanced_prompt(context)
@@ -99,31 +121,31 @@ class MemoryEnhancedDiagnosticAgent:
         try:
             # 获取配置信息
             config = state.get("config", {})
-            system_id = config.get("system_id", "default_system")
+            user_id = config.get("user_id", "default_user")
+            agent_id = config.get("agent_id", "omind_diagnostic_agent")
             
-            # 获取诊断结果（最后一条AI消息）
-            if state["messages"] and hasattr(state["messages"][-1], 'content'):
-                diagnosis_result = state["messages"][-1].content
-                
-                # 获取原始问题
-                user_message = ""
-                for msg in state["messages"]:
-                    if hasattr(msg, 'type') and msg.type == "human":
-                        user_message = msg.content
-                        break
-                
-                # 构建故障案例
-                incident = {
-                    "symptoms": user_message,
-                    "diagnosis": diagnosis_result,
-                    "timestamp": state.get("timestamp", ""),
-                    "resolved": state.get("resolved", False),
-                }
-                
-                # 如果问题已解决，保存到故障历史
-                if state.get("resolved"):
-                    await self.memory.store_incident(system_id, incident)
-                    logger.info(f"已保存诊断案例到系统 {system_id}")
+            # 构建对话消息用于Mem0学习
+            conversation_messages = []
+            for msg in state["messages"]:
+                if hasattr(msg, 'type'):
+                    if msg.type == "human":
+                        conversation_messages.append({"role": "user", "content": msg.content})
+                    elif msg.type == "ai":
+                        conversation_messages.append({"role": "assistant", "content": msg.content})
+            
+            # 使用Mem0的对话记忆功能自动学习
+            if conversation_messages:
+                memory_id = await self.memory.add_conversation_memory(
+                    messages=conversation_messages,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    metadata={
+                        "session_type": "diagnostic",
+                        "system_id": config.get("system_id", ""),
+                        "resolved": state.get("resolved", False)
+                    }
+                )
+                logger.info(f"已保存对话记忆: {memory_id}")
             
         except Exception as e:
             logger.error(f"保存诊断结果失败: {e}")
@@ -264,9 +286,25 @@ class MemoryEnhancedDiagnosticAgent:
         return "save"
 
 
-async def create_memory_enhanced_diagnostic_agent(llm, tools, checkpointer):
+async def create_memory_enhanced_diagnostic_agent(llm, tools, checkpointer, agent_id="omind_diagnostic_agent"):
     """创建集成长期记忆的诊断Agent"""
-    agent = MemoryEnhancedDiagnosticAgent(llm, tools, checkpointer)
+    # 获取智能体的memory_info配置
+    memory_config = {}
+    try:
+        from ..agent_utils import get_agent_config_from_db
+        db_gen = get_sync_db()
+        db = next(db_gen)
+        try:
+            from src.apps.agent.service.agent_config_service import AgentConfigService
+            full_config = AgentConfigService.get_agent_config(agent_id, db)
+            if full_config:
+                memory_config = full_config.get('memory_info', {})
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"无法获取智能体记忆配置: {e}")
+    
+    agent = MemoryEnhancedDiagnosticAgent(llm, tools, checkpointer, memory_config)
     await agent.initialize()
     return agent.create_graph()
 
