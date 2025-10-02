@@ -94,20 +94,54 @@ async def add_conversation_memory(
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """从对话中添加记忆（Mem0 原生 add 方法）"""
+    """
+    从对话中添加记忆（新版三层记忆架构）
+
+    会智能分析对话内容并保存到合适的记忆层级：
+    - 如果包含用户档案信息 → 用户全局记忆
+    - 如果包含有价值的经验 → 智能体全局记忆
+    - 默认保存为 → 用户-智能体交互记忆
+    """
     # 如果没有指定用户，使用当前用户
     user_id = request.user_id or current_user.get("username", "system")
-    
+
     try:
         memory = await memory_service._get_memory()
-        memory_id = await memory.add_conversation_memory(
+
+        # 检测是否包含用户档案信息
+        user_profile_keywords = ["我是", "我叫", "我负责", "我的专长", "我擅长"]
+        content = " ".join([msg.get("content", "") for msg in request.messages])
+
+        has_user_profile = any(keyword in content for keyword in user_profile_keywords)
+
+        memory_ids = []
+
+        # 如果包含用户档案信息，保存为用户全局记忆
+        if has_user_profile:
+            user_memory_id = await memory.add_user_global_memory(
+                messages=request.messages,
+                user_id=user_id,
+                memory_type="profile",
+                metadata={**(request.metadata or {}), "source": "conversation_test"}
+            )
+            memory_ids.append(user_memory_id)
+            logger.info(f"保存了用户全局记忆: {user_memory_id}")
+
+        # 默认保存为用户-智能体交互记忆
+        interaction_memory_id = await memory.add_user_agent_memory(
             messages=request.messages,
             user_id=user_id,
             agent_id=request.agent_id,
-            run_id=request.run_id,
-            metadata=request.metadata
+            memory_type="interaction",
+            metadata={**(request.metadata or {}), "source": "conversation_test"}
         )
-        return success_response(data={"memory_id": memory_id}, msg="对话记忆添加成功")
+        memory_ids.append(interaction_memory_id)
+        logger.info(f"保存了用户-智能体交互记忆: {interaction_memory_id}")
+
+        return success_response(
+            data={"memory_ids": memory_ids, "count": len(memory_ids)},
+            msg=f"对话记忆添加成功，保存了 {len(memory_ids)} 条记忆"
+        )
     except Exception as e:
         logger.error(f"添加对话记忆失败: {e}")
         raise BusinessException(f"添加对话记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
