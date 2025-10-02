@@ -320,7 +320,8 @@ class EnterpriseMemory:
                     "id": memory_id,
                     "content": content,
                     "score": score,
-                    "metadata": memory_metadata
+                    "metadata": memory_metadata,
+                    "user_id": user_id  # 添加 user_id 字段
                 })
         
         logger.info(f"搜索记忆: user_id={user_id}, agent_id={agent_id}, query={query}, 原始结果数量={len(memory_list)}, 过滤后结果数量={len(filtered_memories)}")
