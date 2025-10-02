@@ -429,7 +429,14 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           user_prompt_template: '',
           assistant_prompt_template: '',
           visibility_type: 'private',
-          visibility_additional_users: []
+          visibility_additional_users: [],
+          // 记忆配置默认值
+          enable_memory: false,
+          memory_types: [],
+          memory_search_limit: 5,
+          memory_distance_threshold: 0.5,
+          memory_save_strategy: 'auto',
+          memory_scope: 'user'
         });
       } else if (agent) {
         // 编辑时的初始化
@@ -631,6 +638,15 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
     }
 
     // 构建记忆配置
+    console.log('📝 表单values中的记忆字段:', {
+      enable_memory: values.enable_memory,
+      memory_types: values.memory_types,
+      memory_search_limit: values.memory_search_limit,
+      memory_distance_threshold: values.memory_distance_threshold,
+      memory_save_strategy: values.memory_save_strategy,
+      memory_scope: values.memory_scope
+    });
+
     const memoryConfig: any = {
       enable_memory: values.enable_memory || false,
       memory_types: values.memory_types || [],
@@ -639,7 +655,9 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       memory_save_strategy: values.memory_save_strategy || 'auto',
       memory_scope: values.memory_scope || 'user'
     };
-    
+
+    console.log('🔧 构建的memoryConfig:', memoryConfig);
+
     // 如果是编辑模式且原有记忆配置，合并配置
     if (!isCreating && agent?.memory_info) {
       Object.assign(memoryConfig, agent.memory_info, {
@@ -650,6 +668,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         memory_save_strategy: values.memory_save_strategy,
         memory_scope: values.memory_scope
       });
+      console.log('🔄 合并后的memoryConfig:', memoryConfig);
     }
 
     // 清理表单值，移除不需要提交的字段
@@ -661,6 +680,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       enable_memory,
       memory_types,
       memory_search_limit,
+      memory_distance_threshold,
       memory_save_strategy,
       memory_scope,
       ...baseValues
@@ -677,6 +697,8 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       visibility_additional_users: values.visibility_additional_users || []
     };
 
+    console.log('📤 最终提交的formData:', formData);
+    console.log('📤 formData中的memory_info:', formData.memory_info);
 
     await onSave(formData);
   };

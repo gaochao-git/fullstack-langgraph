@@ -436,6 +436,7 @@ const AgentManagement: React.FC = () => {
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info,
+          memory_info: values.memory_info,
           visibility_type: values.visibility_type || 'private',
           visibility_additional_users: values.visibility_additional_users || []
         };
@@ -462,6 +463,7 @@ const AgentManagement: React.FC = () => {
           tools_info: values.tools_info,
           llm_info: values.llm_info,
           prompt_info: values.prompt_info,
+          memory_info: values.memory_info,
           visibility_type: values.visibility_type || 'private',
           visibility_additional_users: values.visibility_additional_users || []
         };

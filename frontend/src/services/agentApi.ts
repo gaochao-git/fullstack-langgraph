@@ -58,12 +58,12 @@ export interface Agent {
     assistant_prompt_template?: string;
   };
   memory_info?: {
-    enabled?: boolean;
+    enable_memory?: boolean;
     memory_types?: string[];
-    search_limit?: number;
-    distance_threshold?: number;
-    save_strategy?: string;
-    share_scope?: string;
+    memory_search_limit?: number;
+    memory_distance_threshold?: number;
+    memory_save_strategy?: string;
+    memory_scope?: string;
   };
   mcp_config?: {
     total_tools: number;
@@ -125,12 +125,12 @@ export interface CreateAgentRequest {
     assistant_prompt_template?: string;
   };
   memory_info?: {
-    enabled?: boolean;
+    enable_memory?: boolean;
     memory_types?: string[];
-    search_limit?: number;
-    distance_threshold?: number;
-    save_strategy?: string;
-    share_scope?: string;
+    memory_search_limit?: number;
+    memory_distance_threshold?: number;
+    memory_save_strategy?: string;
+    memory_scope?: string;
   };
   mcp_config?: {
     total_tools: number;
