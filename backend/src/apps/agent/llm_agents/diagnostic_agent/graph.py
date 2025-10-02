@@ -11,7 +11,7 @@ from .tools import get_diagnostic_tools
 from src.apps.agent.llm_agents.hooks import create_monitor_hook
 from src.apps.agent.llm_agents.decorators import agent
 from src.shared.core.logging import get_logger
-from src.apps.agent.llm_agents.state_schemas import DiagnosticAgentState  # 导入自定义状态
+# from src.apps.agent.llm_agents.state_schemas import DiagnosticAgentState  # 暂时不需要
 
 logger = get_logger(__name__)
 

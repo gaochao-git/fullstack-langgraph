@@ -3,6 +3,7 @@
 """
 from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
 import json
@@ -10,7 +11,7 @@ import json
 from src.apps.agent.memory_factory import get_enterprise_memory
 from src.shared.core.logging import get_logger
 from src.shared.db.config import get_sync_db
-from .state_schemas import DiagnosticAgentState
+from .state import DiagnosticState
 
 logger = get_logger(__name__)
 
@@ -29,21 +30,25 @@ class MemoryEnhancedDiagnosticAgent:
         """初始化记忆系统"""
         self.memory = await get_enterprise_memory()
         
-    async def retrieve_context(self, state: DiagnosticAgentState) -> DiagnosticAgentState:
+    async def retrieve_context(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """从长期记忆中检索相关上下文"""
         try:
             # 获取最新的用户消息
             user_message = state["messages"][-1].content if state["messages"] else ""
             
             # 从配置中获取用户ID和系统ID
-            config = state.get("config", {})
-            user_id = config.get("user_id", "default_user")
-            system_id = config.get("system_id", "default_system")
+            configurable = config.get("configurable", {})
+            
+            # 优先从 configurable 中获取，这是 LangGraph 的标准方式
+            user_id = configurable.get("user_name") or configurable.get("user_id") or "default_user"
+            agent_id = configurable.get("agent_id") or "diagnostic_agent"
+            system_id = configurable.get("system_id") or "default_system"
+            
+            logger.info(f"从配置中获取到的用户信息: user_id={user_id}, agent_id={agent_id}, configurable={configurable}")
             
             # 从配置中获取记忆搜索参数
             search_limit = self.memory_config.get('memory_search_limit', 10)
             similarity_threshold = self.memory_config.get('memory_similarity_threshold', None)
-            agent_id = config.get("agent_id", "omind_diagnostic_agent")
             
             # 使用标准的 Mem0 API 参数
             search_params = {
@@ -65,19 +70,32 @@ class MemoryEnhancedDiagnosticAgent:
             
             # 暂时分离出 metadata，因为 search_memories 可能还不支持
             metadata = search_params.pop("metadata", {})
-            context = await self.memory.search_memories(**search_params)
+            memories = await self.memory.search_memories(**search_params)
             
-            # 构建增强的系统提示
-            enhanced_prompt = self._build_enhanced_prompt(context)
+            # 将搜索结果组织成结构化的上下文
+            context = {
+                "system_context": [],
+                "similar_incidents": [],
+                "solution_patterns": [],
+                "user_preferences": []
+            }
             
-            # 添加系统消息到状态
-            state["messages"].insert(0, SystemMessage(content=enhanced_prompt))
+            # 根据记忆内容分类（简化处理）
+            for memory in memories:
+                if memory and isinstance(memory, dict):
+                    # 暂时将所有记忆都作为历史经验
+                    context["similar_incidents"].append(memory)
+            
+            # 如果有相关记忆，构建增强的系统提示
+            if any(context.values()):
+                enhanced_prompt = self._build_enhanced_prompt(context)
+                # 添加系统消息到状态
+                state["messages"].insert(0, SystemMessage(content=enhanced_prompt))
             
             # 保存上下文到状态供后续使用
             state["memory_context"] = context
             
-            logger.info(f"已检索到记忆上下文: 系统架构 {len(context['system_context'])} 条, "
-                       f"历史故障 {len(context['similar_incidents'])} 条")
+            logger.info(f"搜索记忆: user_id={user_id}, agent_id={agent_id}, 找到 {len(memories)} 条相关记忆")
             
         except Exception as e:
             logger.error(f"检索记忆上下文失败: {e}")
@@ -116,13 +134,17 @@ class MemoryEnhancedDiagnosticAgent:
         
         return "\n".join(prompt_parts)
     
-    async def save_diagnosis_result(self, state: DiagnosticAgentState) -> DiagnosticAgentState:
+    async def save_diagnosis_result(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """保存诊断结果到长期记忆"""
         try:
             # 获取配置信息
-            config = state.get("config", {})
-            user_id = config.get("user_id", "default_user")
-            agent_id = config.get("agent_id", "omind_diagnostic_agent")
+            configurable = config.get("configurable", {})
+            
+            # 优先从 configurable 中获取
+            user_id = configurable.get("user_name") or configurable.get("user_id") or "default_user"
+            agent_id = configurable.get("agent_id") or "diagnostic_agent"
+            
+            logger.info(f"保存记忆时的用户信息: user_id={user_id}, agent_id={agent_id}")
             
             # 构建对话消息用于Mem0学习
             conversation_messages = []
@@ -141,7 +163,7 @@ class MemoryEnhancedDiagnosticAgent:
                     agent_id=agent_id,
                     metadata={
                         "session_type": "diagnostic",
-                        "system_id": config.get("system_id", ""),
+                        "system_id": configurable.get("system_id", ""),
                         "resolved": state.get("resolved", False)
                     }
                 )
@@ -152,7 +174,7 @@ class MemoryEnhancedDiagnosticAgent:
             
         return state
     
-    async def analyze_and_learn(self, state: DiagnosticAgentState) -> DiagnosticAgentState:
+    async def analyze_and_learn(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """分析诊断过程并学习新模式"""
         try:
             # 获取工具调用历史
@@ -192,7 +214,7 @@ class MemoryEnhancedDiagnosticAgent:
             
         return state
     
-    def _extract_problem_type(self, state: DiagnosticAgentState) -> str:
+    def _extract_problem_type(self, state: DiagnosticState) -> str:
         """提取问题类型"""
         # 这里可以使用NLP或规则提取问题类型
         # 简化示例：基于关键词
@@ -213,7 +235,7 @@ class MemoryEnhancedDiagnosticAgent:
         else:
             return "general"
     
-    def _extract_diagnosis_steps(self, state: DiagnosticAgentState) -> List[str]:
+    def _extract_diagnosis_steps(self, state: DiagnosticState) -> List[str]:
         """提取诊断步骤"""
         steps = []
         
@@ -234,7 +256,7 @@ class MemoryEnhancedDiagnosticAgent:
         tool_node = ToolNode(self.tools)
         
         # 创建状态图
-        workflow = StateGraph(DiagnosticAgentState)
+        workflow = StateGraph(DiagnosticState)
         
         # 添加节点
         workflow.add_node("retrieve_context", self.retrieve_context)
@@ -264,7 +286,7 @@ class MemoryEnhancedDiagnosticAgent:
         # 编译图
         return workflow.compile(checkpointer=self.checkpointer)
     
-    async def _agent_node(self, state: DiagnosticAgentState) -> DiagnosticAgentState:
+    async def _agent_node(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """Agent节点处理逻辑"""
         # 调用LLM
         response = await self.llm.ainvoke(state["messages"])
@@ -276,7 +298,7 @@ class MemoryEnhancedDiagnosticAgent:
         
         return state
     
-    def _should_use_tools(self, state: DiagnosticAgentState) -> str:
+    def _should_use_tools(self, state: DiagnosticState) -> str:
         """判断是否需要使用工具"""
         last_message = state["messages"][-1]
         
@@ -291,14 +313,23 @@ async def create_memory_enhanced_diagnostic_agent(llm, tools, checkpointer, agen
     # 获取智能体的memory_info配置
     memory_config = {}
     try:
-        from ..agent_utils import get_agent_config_from_db
+        from src.apps.agent.service.agent_config_service import AgentConfigService
         db_gen = get_sync_db()
         db = next(db_gen)
         try:
-            from src.apps.agent.service.agent_config_service import AgentConfigService
-            full_config = AgentConfigService.get_agent_config(agent_id, db)
-            if full_config:
-                memory_config = full_config.get('memory_info', {})
+            # 直接查询数据库获取 agent 配置
+            from sqlalchemy import select
+            from src.apps.agent.models import AgentConfig
+            
+            stmt = select(AgentConfig).where(AgentConfig.agent_id == agent_id)
+            result = db.execute(stmt)
+            agent_config = result.scalar_one_or_none()
+            
+            if agent_config and agent_config.memory_info:
+                memory_config = agent_config.memory_info
+                logger.info(f"获取到智能体记忆配置: {memory_config}")
+            else:
+                logger.info(f"智能体 {agent_id} 没有配置记忆信息")
         finally:
             db.close()
     except Exception as e:
