@@ -202,21 +202,28 @@ async def list_memories_by_level(
         # 如果指定了层级，则按层级查询
         if level:
             if level == "organization":
-                memories = await memory.search_organization_memory(query="", limit=limit)
+                # 组织级记忆: user_id=organization
+                memories = await memory.list_all_memories(user_id="organization")
             elif level == "user_global":
                 if not user_id:
                     user_id = current_user.get("username", "system")
-                memories = await memory.search_user_global_memory(query="", user_id=user_id, limit=limit)
+                # 用户全局记忆: 只指定user_id
+                memories = await memory.list_all_memories(user_id=user_id)
             elif level == "agent_global":
                 if not agent_id:
                     raise BusinessException("查询智能体全局记忆需要指定agent_id", ResponseCode.PARAM_ERROR)
-                memories = await memory.search_agent_global_memory(query="", agent_id=agent_id, limit=limit)
+                # 智能体全局记忆: user_id=agent_{agent_id} + agent_id
+                memories = await memory.list_all_memories(
+                    user_id=f"agent_{agent_id}",
+                    agent_id=agent_id
+                )
             elif level == "user_agent":
                 if not user_id:
                     user_id = current_user.get("username", "system")
                 if not agent_id:
                     raise BusinessException("查询用户-智能体记忆需要指定agent_id", ResponseCode.PARAM_ERROR)
-                memories = await memory.search_user_agent_memory(query="", user_id=user_id, agent_id=agent_id, limit=limit)
+                # 用户-智能体记忆: user_id + agent_id
+                memories = await memory.list_all_memories(user_id=user_id, agent_id=agent_id)
             elif level == "session":
                 # 会话记忆暂时返回空
                 memories = []
