@@ -169,10 +169,15 @@ class MemoryService:
         try:
             memory = await self._get_memory()
             
+            # 检查memory对象是否初始化成功
+            if not memory:
+                raise BusinessException("记忆系统未初始化", ResponseCode.INTERNAL_ERROR)
+            
             # 检查命名空间类型是否支持
-            namespace_template = memory.NAMESPACES.get(namespace_type)
-            if not namespace_template:
-                raise BusinessException(f"不支持的命名空间类型: {namespace_type}", ResponseCode.BAD_REQUEST)
+            if hasattr(memory, 'NAMESPACES'):
+                namespace_template = memory.NAMESPACES.get(namespace_type)
+                if not namespace_template:
+                    raise BusinessException(f"不支持的命名空间类型: {namespace_type}", ResponseCode.BAD_REQUEST)
             
             memories = await memory.get_all_memories(
                 namespace=namespace_type,  # 传递namespace_type而不是模板

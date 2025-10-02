@@ -41,14 +41,17 @@ class MemoryEnhancedDiagnosticAgent:
             
             # 优先从 configurable 中获取，这是 LangGraph 的标准方式
             user_id = configurable.get("user_name") or configurable.get("user_id") or "default_user"
-            agent_id = configurable.get("agent_id") or "diagnostic_agent"
+            agent_id = configurable.get("agent_id")
+            if not agent_id:
+                from src.shared.core.exceptions import BusinessException, ResponseCode
+                raise BusinessException("agent_id is required in configurable", ResponseCode.PARAM_ERROR)
             system_id = configurable.get("system_id") or "default_system"
             
             logger.info(f"从配置中获取到的用户信息: user_id={user_id}, agent_id={agent_id}, configurable={configurable}")
             
             # 从配置中获取记忆搜索参数
             search_limit = self.memory_config.get('memory_search_limit', 10)
-            similarity_threshold = self.memory_config.get('memory_similarity_threshold', None)
+            distance_threshold = self.memory_config.get('memory_distance_threshold', None)
             
             # 使用标准的 Mem0 API 参数
             search_params = {
@@ -64,9 +67,9 @@ class MemoryEnhancedDiagnosticAgent:
                 }
             }
             
-            # 如果配置了相似性阈值，添加到搜索参数
-            if similarity_threshold is not None:
-                search_params["similarity_threshold"] = similarity_threshold
+            # 如果配置了距离阈值，添加到搜索参数
+            if distance_threshold is not None:
+                search_params["distance_threshold"] = distance_threshold
             
             # 暂时分离出 metadata，因为 search_memories 可能还不支持
             metadata = search_params.pop("metadata", {})
@@ -142,7 +145,10 @@ class MemoryEnhancedDiagnosticAgent:
             
             # 优先从 configurable 中获取
             user_id = configurable.get("user_name") or configurable.get("user_id") or "default_user"
-            agent_id = configurable.get("agent_id") or "diagnostic_agent"
+            agent_id = configurable.get("agent_id")
+            if not agent_id:
+                from src.shared.core.exceptions import BusinessException, ResponseCode
+                raise BusinessException("agent_id is required in configurable", ResponseCode.PARAM_ERROR)
             
             logger.info(f"保存记忆时的用户信息: user_id={user_id}, agent_id={agent_id}")
             
@@ -308,7 +314,7 @@ class MemoryEnhancedDiagnosticAgent:
         return "save"
 
 
-async def create_memory_enhanced_diagnostic_agent(llm, tools, checkpointer, agent_id="omind_diagnostic_agent"):
+async def create_memory_enhanced_diagnostic_agent(llm, tools, checkpointer, agent_id="diagnostic_agent"):
     """创建集成长期记忆的诊断Agent"""
     # 获取智能体的memory_info配置
     memory_config = {}

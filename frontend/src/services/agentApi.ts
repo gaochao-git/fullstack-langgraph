@@ -61,7 +61,7 @@ export interface Agent {
     enabled?: boolean;
     memory_types?: string[];
     search_limit?: number;
-    similarity_threshold?: number;
+    distance_threshold?: number;
     save_strategy?: string;
     share_scope?: string;
   };
@@ -128,7 +128,7 @@ export interface CreateAgentRequest {
     enabled?: boolean;
     memory_types?: string[];
     search_limit?: number;
-    similarity_threshold?: number;
+    distance_threshold?: number;
     save_strategy?: string;
     share_scope?: string;
   };

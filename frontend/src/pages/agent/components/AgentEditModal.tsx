@@ -102,7 +102,7 @@ interface LocalAgent {
     enable_memory?: boolean;
     memory_types?: string[];
     memory_search_limit?: number;
-    memory_similarity_threshold?: number;
+    memory_distance_threshold?: number;
     memory_save_strategy?: 'auto' | 'manual' | 'session_end';
     memory_scope?: 'user' | 'team' | 'organization';
   };
@@ -531,7 +531,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
           formValues.enable_memory = fullAgent.memory_info.enable_memory || false;
           formValues.memory_types = fullAgent.memory_info.memory_types || [];
           formValues.memory_search_limit = fullAgent.memory_info.memory_search_limit || 5;
-          formValues.memory_similarity_threshold = fullAgent.memory_info.memory_similarity_threshold || 0.7;
+          formValues.memory_distance_threshold = fullAgent.memory_info.memory_distance_threshold || 0.5;
           formValues.memory_save_strategy = fullAgent.memory_info.memory_save_strategy || 'auto';
           formValues.memory_scope = fullAgent.memory_info.memory_scope || 'user';
         } else {
@@ -635,7 +635,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
       enable_memory: values.enable_memory || false,
       memory_types: values.memory_types || [],
       memory_search_limit: values.memory_search_limit || 5,
-      memory_similarity_threshold: values.memory_similarity_threshold || 0.7,
+      memory_distance_threshold: values.memory_distance_threshold || 0.5,
       memory_save_strategy: values.memory_save_strategy || 'auto',
       memory_scope: values.memory_scope || 'user'
     };
@@ -646,7 +646,7 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
         enable_memory: values.enable_memory,
         memory_types: values.memory_types,
         memory_search_limit: values.memory_search_limit,
-        memory_similarity_threshold: values.memory_similarity_threshold,
+        memory_distance_threshold: values.memory_distance_threshold,
         memory_save_strategy: values.memory_save_strategy,
         memory_scope: values.memory_scope
       });
@@ -1263,17 +1263,17 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({
                 )}
               </Form.Item>
 
-              {/* 相似性阈值配置 */}
+              {/* 距离阈值配置 */}
               <Form.Item
                 dependencies={['enable_memory']}
                 noStyle
               >
                 {({ getFieldValue }) => (
                   <Form.Item
-                    name="memory_similarity_threshold"
-                    label="相似性阈值"
-                    tooltip="相似度阈值，0.7表示70%相似度"
-                    initialValue={0.7}
+                    name="memory_distance_threshold"
+                    label="距离阈值"
+                    tooltip="向量距离阈值，越小越相似"
+                    initialValue={0.5}
                   >
                     <InputNumber
                       min={0}

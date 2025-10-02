@@ -146,7 +146,7 @@ class EnterpriseMemory:
             raise ValueError("user_id or user_name is required for Mem0 API calls")
         
         # 提取可选的智能体ID和会话ID
-        agent_id = kwargs.get("agent_id", "omind_diagnostic_agent")  # 默认诊断智能体
+        agent_id = kwargs.get("agent_id", "diagnostic_agent")  # 默认诊断智能体
         run_id = kwargs.get("run_id")  # 会话级记忆，可选
         
         # 构建namespace和业务元数据
@@ -182,7 +182,7 @@ class EnterpriseMemory:
             "metadata": combined_metadata
         }
     
-    async def add_conversation_memory(self, messages: List[Dict[str, str]], user_id: str, agent_id: str = "omind_diagnostic_agent", run_id: str = None, metadata: Dict[str, Any] = None) -> str:
+    async def add_conversation_memory(self, messages: List[Dict[str, str]], user_id: str, agent_id: str = "diagnostic_agent", run_id: str = None, metadata: Dict[str, Any] = None) -> str:
         """从对话中添加记忆（Mem0 正确用法）"""
         if not self.memory:
             await self.initialize()
@@ -243,14 +243,13 @@ class EnterpriseMemory:
         # 提取元数据参数（用于业务层过滤）
         metadata = kwargs.get("metadata", {})
         
-        # 提取相似性阈值（如果有传递）
-        similarity_threshold = kwargs.get("threshold") or kwargs.get("similarity_threshold")
+        # 提取距离阈值（如果有传递）
+        distance_threshold = kwargs.get("threshold") or kwargs.get("distance_threshold")
         
-        # 转换相似度到距离分数（前端传的是相似度，后端需要距离）
+        # 直接使用距离阈值，不需要转换
         threshold = None
-        if similarity_threshold is not None:
-            # 相似度阈值转换为距离阈值
-            threshold = 1 - float(similarity_threshold)
+        if distance_threshold is not None:
+            threshold = float(distance_threshold)
         
         # 构建搜索参数
         search_params = {
@@ -264,8 +263,15 @@ class EnterpriseMemory:
         if threshold is not None:
             search_params["threshold"] = threshold
         
+        # 添加详细的调试日志
+        logger.info(f"Mem0搜索参数: {search_params}")
+        logger.info(f"传入的distance_threshold={distance_threshold}, 使用的threshold={threshold}")
+        
         # 使用官方标准API搜索
         memories = self.memory.search(**search_params)
+        
+        # 详细记录原始搜索结果
+        logger.info(f"Mem0原始搜索结果: type={type(memories)}, content={memories}")
         
         # 处理搜索结果，支持不同的返回格式
         if isinstance(memories, dict) and 'results' in memories:
@@ -276,10 +282,15 @@ class EnterpriseMemory:
             logger.warning(f"未知的搜索结果格式: {type(memories)}")
             memory_list = []
         
-        # 简化的过滤逻辑
+        logger.info(f"提取到的记忆列表长度: {len(memory_list)}")
+        
+        # 修复过滤逻辑：如果用户指定了threshold，则使用用户的；否则使用默认的
+        effective_threshold = threshold if threshold is not None else settings.MEM0_RELEVANCE_THRESHOLD
+        logger.info(f"使用的有效阈值: {effective_threshold} (用户指定: {threshold is not None})")
+        
         filtered_memories = []
         
-        for memory in memory_list:
+        for i, memory in enumerate(memory_list):
             # 解析记忆数据
             if isinstance(memory, dict):
                 memory_id = memory.get('id')
@@ -293,21 +304,26 @@ class EnterpriseMemory:
                 score = getattr(memory, 'score', 1.0)
                 memory_metadata = getattr(memory, 'metadata', {})
             
-            # 简单过滤：只基于相关性
-            if content and score <= settings.MEM0_RELEVANCE_THRESHOLD:
+            logger.info(f"处理记忆{i}: id={memory_id}, score={score}, content_preview={content[:50] if content else 'None'}...")
+            
+            # 简化过滤逻辑：Mem0已经返回了相关的结果，直接接受
+            should_include = False
+            if content:
+                # Mem0返回的结果已经是相关的，直接接受
+                should_include = True
+                logger.info(f"记忆{i}: 接受Mem0返回的结果 (score={score})")
+            else:
+                logger.info(f"记忆{i}: 内容为空，跳过")
+            
+            if should_include:
                 filtered_memories.append({
                     "id": memory_id,
                     "content": content,
                     "score": score,
-                    "metadata": memory_metadata,
-                    # 从元数据中提取审计字段（如果有的话）
-                    "created_by": memory_metadata.get("created_by"),
-                    "updated_by": memory_metadata.get("updated_by"),
-                    "create_time": memory_metadata.get("create_time"),
-                    "update_time": memory_metadata.get("update_time")
+                    "metadata": memory_metadata
                 })
         
-        logger.info(f"搜索记忆: user_id={user_id}, agent_id={agent_id}, query={query}, 结果数量={len(filtered_memories)}")
+        logger.info(f"搜索记忆: user_id={user_id}, agent_id={agent_id}, query={query}, 原始结果数量={len(memory_list)}, 过滤后结果数量={len(filtered_memories)}")
         return filtered_memories
     
     async def list_all_memories(self, user_id: str, agent_id: str = None, run_id: str = None) -> List[Dict]:

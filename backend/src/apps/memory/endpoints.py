@@ -84,7 +84,7 @@ from pydantic import BaseModel
 class ConversationMemoryRequest(BaseModel):
     messages: List[Dict[str, str]]
     user_id: Optional[str] = None
-    agent_id: str = "omind_diagnostic_agent"
+    agent_id: str = "diagnostic_agent"
     run_id: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 

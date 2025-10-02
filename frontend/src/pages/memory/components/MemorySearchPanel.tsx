@@ -321,7 +321,7 @@ const MemorySearchPanel: React.FC<MemorySearchPanelProps> = ({
                   <Form.Item name="agent_id" label="智能体ID (可选)">
                     <Select placeholder="选择智能体" allowClear>
                       <Option value="test_agent">测试智能体</Option>
-                      <Option value="omind_diagnostic_agent">诊断智能体</Option>
+                      <Option value="diagnostic_agent">诊断智能体</Option>
                     </Select>
                   </Form.Item>
                 </Col>
