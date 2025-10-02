@@ -354,7 +354,7 @@ const MemoryManagement: React.FC = () => {
           >
             <Select placeholder="选择智能体">
               <Option value="test_agent">测试智能体</Option>
-              <Option value="omind_diagnostic_agent">诊断智能体</Option>
+              <Option value="diagnostic_agent">诊断智能体</Option>
             </Select>
           </Form.Item>
         </Form>
@@ -394,7 +394,7 @@ const MemoryManagement: React.FC = () => {
           >
             <Select placeholder="选择智能体（留空搜索所有）" allowClear>
               <Option value="test_agent">测试智能体</Option>
-              <Option value="omind_diagnostic_agent">诊断智能体</Option>
+              <Option value="diagnostic_agent">诊断智能体</Option>
             </Select>
           </Form.Item>
         </Form>

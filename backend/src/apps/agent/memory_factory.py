@@ -353,10 +353,7 @@ class EnterpriseMemory:
             
             # 转换为统一格式
             formatted_memories = []
-            for i, memory in enumerate(memories):
-                logger.info(f"处理第{i}个记忆对象: {type(memory)}")
-                logger.info(f"记忆对象内容: {memory}")
-                
+            for memory in memories:
                 if memory is not None:
                     # 处理不同的记忆对象格式
                     if isinstance(memory, dict):
@@ -376,9 +373,8 @@ class EnterpriseMemory:
                         }
                     
                     formatted_memories.append(memory_item)
-                    logger.info(f"添加格式化记忆: {memory_item}")
             
-            logger.info(f"最终返回 {len(formatted_memories)} 条格式化记忆")
+            logger.info(f"list_all_memories: 返回 {len(formatted_memories)} 条记忆 (user_id={user_id}, agent_id={agent_id})")
             return formatted_memories
             
         except Exception as e:

@@ -161,24 +161,39 @@ class MemoryEnhancedDiagnosticAgent:
                     elif msg.type == "ai":
                         conversation_messages.append({"role": "assistant", "content": msg.content})
             
-            # 使用Mem0的对话记忆功能自动学习
+            # 使用后台任务异步保存记忆，避免阻塞对话结束
             if conversation_messages:
-                memory_id = await self.memory.add_conversation_memory(
-                    messages=conversation_messages,
-                    user_id=user_id,
-                    agent_id=agent_id,
-                    metadata={
+                import asyncio
+                # 创建后台任务，不等待完成
+                task = asyncio.create_task(self._save_memory_background(
+                    conversation_messages, 
+                    user_id, 
+                    agent_id,
+                    {
                         "session_type": "diagnostic",
                         "system_id": configurable.get("system_id", ""),
                         "resolved": state.get("resolved", False)
                     }
-                )
-                logger.info(f"已保存对话记忆: {memory_id}")
+                ))
+                logger.info(f"已启动后台记忆保存任务 (user_id={user_id})")
             
         except Exception as e:
             logger.error(f"保存诊断结果失败: {e}")
             
         return state
+    
+    async def _save_memory_background(self, conversation_messages, user_id, agent_id, metadata):
+        """后台异步保存记忆，不阻塞主流程"""
+        try:
+            memory_id = await self.memory.add_conversation_memory(
+                messages=conversation_messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                metadata=metadata
+            )
+            logger.info(f"后台记忆保存完成: {memory_id} (user_id={user_id})")
+        except Exception as e:
+            logger.error(f"后台记忆保存失败: {e} (user_id={user_id})")
     
     async def analyze_and_learn(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """分析诊断过程并学习新模式"""
