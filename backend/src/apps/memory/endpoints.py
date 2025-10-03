@@ -21,8 +21,28 @@ router = APIRouter(tags=["Memory Management"])
 
 
 def format_memory_times(memory: dict) -> dict:
-    """直接返回记忆数据，不做格式转换（数据存储时已处理）"""
-    return memory if memory else {}
+    """格式化时间字段，从US/Pacific转换到Asia/Shanghai"""
+    if not memory:
+        return {}
+
+    # 处理created_at和updated_at
+    for time_field in ['created_at', 'updated_at']:
+        if time_field in memory and memory[time_field]:
+            try:
+                time_str = memory[time_field]
+                if isinstance(time_str, str) and 'T' in time_str:
+                    # 解析ISO格式时间（Mem0使用US/Pacific时区）
+                    # 2025-10-03T16:37:32.038811-07:00 -> 2025-10-04 07:37:32
+                    dt = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                    # 转换到上海时区
+                    shanghai_tz = timezone(timedelta(hours=8))
+                    dt_shanghai = dt.astimezone(shanghai_tz)
+                    # 格式化
+                    memory[time_field] = dt_shanghai.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                pass
+
+    return memory
 
 
 # ==================== Mem0标准数据模型 ====================

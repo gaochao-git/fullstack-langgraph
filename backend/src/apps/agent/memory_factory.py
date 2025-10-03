@@ -406,6 +406,10 @@ class EnterpriseMemory:
 
             result = self.memory.add(**kwargs)
 
+            # 调试：打印Mem0返回结果
+            logger.info(f"Mem0 add返回结果类型: {type(result)}")
+            logger.info(f"Mem0 add返回结果: {result}")
+
             memory_id = self._extract_memory_id(result)
             logger.info(f"✅ 记忆添加成功: memory_id={memory_id}")
             return memory_id
