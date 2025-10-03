@@ -236,9 +236,11 @@ class EnterpriseMemory:
                 **(metadata or {})
             }
 
+            # 仅传递agent_id，不传user_id
             result = self.memory.add(
                 messages,
                 agent_id=agent_id,
+                user_id=None,  # 明确设置为None，确保不会有user_id
                 metadata=combined_metadata,
                 infer=True
             )
@@ -355,22 +357,56 @@ class EnterpriseMemory:
         run_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
-        """从对话中学习记忆（Mem0原生方法）"""
+        """从对话中学习记忆（Mem0原生方法）
+
+        严格遵循Mem0三层架构:
+        1. 用户记忆: 仅user_id
+        2. 智能体记忆: 仅agent_id (不能有user_id)
+        3. 会话记忆: user_id + run_id
+        4. 交互记忆: user_id + agent_id
+        """
         if not self.memory:
             await self.initialize()
 
         try:
-            result = self.memory.add(
-                messages,
-                user_id=user_id,
-                agent_id=agent_id,
-                run_id=run_id,
-                metadata=metadata,
-                infer=True
-            )
+            # 根据参数组合，确保正确的记忆层级
+            kwargs = {"messages": messages, "metadata": metadata, "infer": True}
+
+            # 智能体记忆：仅有agent_id时，确保不传user_id
+            if agent_id and not user_id and not run_id:
+                kwargs["agent_id"] = agent_id
+                kwargs["user_id"] = None  # 明确设置为None
+                kwargs["run_id"] = None
+                logger.info(f"添加纯智能体记忆: agent_id={agent_id}")
+            # 用户记忆：仅有user_id
+            elif user_id and not agent_id and not run_id:
+                kwargs["user_id"] = user_id
+                kwargs["agent_id"] = None
+                kwargs["run_id"] = None
+                logger.info(f"添加纯用户记忆: user_id={user_id}")
+            # 会话记忆：user_id + run_id
+            elif user_id and run_id and not agent_id:
+                kwargs["user_id"] = user_id
+                kwargs["run_id"] = run_id
+                kwargs["agent_id"] = None
+                logger.info(f"添加会话记忆: user_id={user_id}, run_id={run_id}")
+            # 交互记忆：user_id + agent_id
+            elif user_id and agent_id and not run_id:
+                kwargs["user_id"] = user_id
+                kwargs["agent_id"] = agent_id
+                kwargs["run_id"] = None
+                logger.info(f"添加交互记忆: user_id={user_id}, agent_id={agent_id}")
+            # 其他组合
+            else:
+                kwargs["user_id"] = user_id
+                kwargs["agent_id"] = agent_id
+                kwargs["run_id"] = run_id
+                logger.info(f"添加记忆: user_id={user_id}, agent_id={agent_id}, run_id={run_id}")
+
+            result = self.memory.add(**kwargs)
 
             memory_id = self._extract_memory_id(result)
-            logger.info(f"✅ 添加对话记忆: user_id={user_id}, agent_id={agent_id}, run_id={run_id}")
+            logger.info(f"✅ 记忆添加成功: memory_id={memory_id}")
             return memory_id
 
         except Exception as e:
@@ -458,9 +494,19 @@ class EnterpriseMemory:
     def _extract_memory_id(self, result: Any) -> str:
         """从Mem0返回结果中提取memory_id"""
         if isinstance(result, dict):
-            return result.get('id', 'unknown')
+            # 可能是单个记忆对象或包含results的字典
+            if 'id' in result:
+                return result['id']
+            elif 'results' in result and result['results']:
+                # 返回第一个结果的ID
+                return result['results'][0].get('id', 'unknown')
+            return 'unknown'
         elif isinstance(result, list) and result:
+            # 返回第一个记忆的ID
             return result[0].get('id', 'unknown')
+        elif isinstance(result, str):
+            # 直接返回字符串ID
+            return result
         return 'unknown'
 
     async def reset(self):

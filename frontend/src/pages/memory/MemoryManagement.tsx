@@ -108,7 +108,19 @@ const MemoryManagement: React.FC = () => {
   const loadMemoriesByLevel = async (level?: string, userId?: string, agentId?: string, runId?: string) => {
     setLoading(true);
     try {
-      const response = await memoryApi.listMemoriesByLevel(level, userId, agentId, runId, 100);
+      // 使用新的Mem0标准API
+      let response;
+      if (level && ['user', 'agent', 'session', 'user_agent'].includes(level)) {
+        response = await memoryApi.getMemoriesByLevel(level as any, {
+          userId,
+          agentId,
+          runId,
+          limit: 100
+        });
+      } else {
+        // 如果没有指定层级或层级不合法，获取所有记忆
+        response = await memoryApi.getAllMemories(userId, agentId, runId, 100);
+      }
       console.log('Memory response:', response);
 
       if (response.status === 'ok' && response.data) {
@@ -216,40 +228,30 @@ const MemoryManagement: React.FC = () => {
 
       if (memoryLevel === 'user') {
         // 用户记忆：只传user_id
-        response = await memoryApi.addConversationMemory(
-          messages,
-          values.user_id || undefined, // 使用指定用户或当前用户
-          undefined, // 不传agent_id
-          undefined, // 不传run_id
+        response = await memoryApi.addConversationMemory(messages, {
+          userId: values.user_id || undefined,
           metadata
-        );
+        });
       } else if (memoryLevel === 'agent') {
         // 智能体记忆：只传agent_id
-        response = await memoryApi.addConversationMemory(
-          messages,
-          undefined, // 不传user_id
-          values.agent_id,
-          undefined, // 不传run_id
+        response = await memoryApi.addConversationMemory(messages, {
+          agentId: values.agent_id,
           metadata
-        );
+        });
       } else if (memoryLevel === 'user_agent') {
         // 用户-智能体记忆：传user_id和agent_id
-        response = await memoryApi.addConversationMemory(
-          messages,
-          undefined, // 使用当前用户
-          values.agent_id,
-          undefined, // 不传run_id
+        response = await memoryApi.addConversationMemory(messages, {
+          userId: undefined, // 使用当前用户
+          agentId: values.agent_id,
           metadata
-        );
+        });
       } else if (memoryLevel === 'session') {
         // 会话记忆：传user_id和run_id
-        response = await memoryApi.addConversationMemory(
-          messages,
-          undefined, // 使用当前用户
-          undefined, // 不传agent_id
-          values.run_id || `session_${Date.now()}`, // 使用指定的或生成新的会话ID
+        response = await memoryApi.addConversationMemory(messages, {
+          userId: undefined, // 使用当前用户
+          runId: values.run_id || `session_${Date.now()}`,
           metadata
-        );
+        });
       }
 
       if (response && response.status === 'ok') {
@@ -381,8 +383,8 @@ const MemoryManagement: React.FC = () => {
     },
     {
       title: '记忆内容',
-      dataIndex: 'content',
-      key: 'content',
+      dataIndex: 'memory',
+      key: 'memory',
       ellipsis: { showTitle: false },
       render: (text: string, record: Memory) => (
         <Tooltip title={text}>
@@ -743,7 +745,7 @@ const MemoryManagement: React.FC = () => {
               <Text code copyable>{selectedMemory.id}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="记忆内容">
-              <Paragraph copyable>{selectedMemory.content}</Paragraph>
+              <Paragraph copyable>{selectedMemory.memory}</Paragraph>
             </Descriptions.Item>
             {selectedMemory.user_id && (
               <Descriptions.Item label="用户ID">

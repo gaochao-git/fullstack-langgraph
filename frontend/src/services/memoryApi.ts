@@ -1,242 +1,216 @@
 /**
- * 记忆管理 API 服务
+ * 记忆管理 API 服务 - 完全符合Mem0标准
  */
 
 import { omind_get, omind_post, omind_put, omind_del } from '../utils/base_api';
 
-// 记忆数据类型定义
+// ==================== Mem0标准数据类型 ====================
+
 export interface Memory {
   id: string;
-  content: string;
-  score?: number;
-  metadata: Record<string, any>;
+  memory: string;  // Mem0使用memory字段而不是content
+  hash?: string;
+  metadata?: Record<string, any>;
+  created_at?: string;
+  updated_at?: string;
   user_id?: string;
-  memory_type?: string;  // 添加记忆类型属性
-  namespace_label?: string;  // 添加命名空间标签属性
+  agent_id?: string;
+  run_id?: string;
 }
 
-export interface MemoryCreate {
-  namespace: string;
+export interface MemoryAddRequest {
+  messages: Array<{role: string, content: string}>;
+  user_id?: string;
+  agent_id?: string;
+  run_id?: string;
+  metadata?: Record<string, any>;
+  infer?: boolean;
+}
+
+export interface MemoryUpdateRequest {
   content: string;
   metadata?: Record<string, any>;
-  namespace_params: Record<string, string>;
 }
 
-export interface MemorySearch {
-  namespace: string;
+export interface MemorySearchParams {
   query: string;
-  limit?: number;
-  namespace_params: Record<string, string>;
-}
-
-export interface MemoryUpdate {
-  namespace: string;
-  memory_id: string;
-  content: string;
-  namespace_params: Record<string, string>;
-}
-
-export interface MemoryStats {
-  current_user: string;
-  user_memory_count: {
-    profile: number;
-    expertise: number;
-    preferences: number;
-  };
-  status: string;
-}
-
-export interface UserProfileMemories {
-  profile: Memory[];
-  expertise: Memory[];
-  preferences: Memory[];
-  user_id: string;
-}
-
-export interface NamespaceInfo {
-  user: Record<string, string>;
-  architecture: Record<string, string>;
-  business: Record<string, string>;
-  operations: Record<string, string>;
-}
-
-export interface SystemArchitectureCreate {
-  system_id: string;
-  architecture_info: Record<string, any>;
-}
-
-export interface IncidentCreate {
-  system_id: string;
-  incident: Record<string, any>;
-}
-
-export interface UserPreferenceCreate {
   user_id?: string;
-  preference: Record<string, any>;
+  agent_id?: string;
+  run_id?: string;
+  limit?: number;
+  threshold?: number;
 }
 
-export interface DiagnosisContext {
-  system_context: Memory[];
-  similar_incidents: Memory[];
-  solution_patterns: Memory[];
-  user_preferences: Memory[];
-  current_issue: string;
-  timestamp: string;
-}
+// ==================== Mem0标准API ====================
 
 /**
- * 记忆管理 API
+ * 记忆管理 API - 完全符合Mem0标准
  */
 export const memoryApi = {
   /**
-   * 从对话中添加记忆（Mem0 原生方法）
+   * 添加记忆 (Mem0: memory.add())
    */
-  async addConversationMemory(messages: Array<{role: string, content: string}>, userId?: string, agentId?: string, runId?: string, metadata?: Record<string, any>) {
-    return omind_post('/api/v1/memory/add_conversation', {
-      messages,
-      user_id: userId,
-      agent_id: agentId,
-      run_id: runId,
-      metadata
-    });
+  async addMemory(data: MemoryAddRequest) {
+    return omind_post('/api/v1/memory', data);
   },
 
   /**
-   * 搜索记忆（旧版，使用namespace）
+   * 获取所有记忆 (Mem0: memory.get_all())
    */
-  async searchMemoriesOld(data: MemorySearch) {
-    return omind_post('/api/v1/memory/search', data);
-  },
-
-  /**
-   * 搜索记忆（Mem0 原生方法）
-   */
-  async searchMemories(query: string, userId?: string, agentId?: string, runId?: string, limit?: number) {
-    const params = new URLSearchParams();
-    params.append('query', query);
-    if (userId) params.append('user_id', userId);
-    if (agentId) params.append('agent_id', agentId);
-    if (runId) params.append('run_id', runId);
-    if (limit) params.append('limit', limit.toString());
-    const queryString = params.toString();
-    return omind_get(`/api/v1/memory/search?${queryString}`);
-  },
-
-  /**
-   * 获取所有记忆（Mem0 原生方法）
-   */
-  async listAllMemories(userId?: string, agentId?: string, runId?: string) {
+  async getAllMemories(userId?: string, agentId?: string, runId?: string, limit: number = 100) {
     const params = new URLSearchParams();
     if (userId) params.append('user_id', userId);
     if (agentId) params.append('agent_id', agentId);
     if (runId) params.append('run_id', runId);
-    const queryString = params.toString();
-    return omind_get(`/api/v1/memory/list_all${queryString ? '?' + queryString : ''}`);
+    params.append('limit', limit.toString());
+    return omind_get(`/api/v1/memory?${params.toString()}`);
   },
 
   /**
-   * 删除所有记忆（Mem0 原生方法）
+   * 搜索记忆 (Mem0: memory.search())
+   */
+  async searchMemories(searchParams: MemorySearchParams) {
+    const params = new URLSearchParams();
+    params.append('query', searchParams.query);
+    if (searchParams.user_id) params.append('user_id', searchParams.user_id);
+    if (searchParams.agent_id) params.append('agent_id', searchParams.agent_id);
+    if (searchParams.run_id) params.append('run_id', searchParams.run_id);
+    if (searchParams.limit) params.append('limit', searchParams.limit.toString());
+    if (searchParams.threshold) params.append('threshold', searchParams.threshold.toString());
+    return omind_get(`/api/v1/memory/search?${params.toString()}`);
+  },
+
+  /**
+   * 获取单个记忆 (Mem0: memory.get())
+   */
+  async getMemory(memoryId: string) {
+    return omind_get(`/api/v1/memory/${memoryId}`);
+  },
+
+  /**
+   * 更新记忆 (Mem0: memory.update())
+   */
+  async updateMemory(memoryId: string, data: MemoryUpdateRequest) {
+    return omind_put(`/api/v1/memory/${memoryId}`, data);
+  },
+
+  /**
+   * 删除单个记忆 (Mem0: memory.delete())
+   */
+  async deleteMemory(memoryId: string) {
+    return omind_del(`/api/v1/memory/${memoryId}`);
+  },
+
+  /**
+   * 删除所有记忆 (Mem0: memory.delete_all())
    */
   async deleteAllMemories(userId?: string, agentId?: string, runId?: string) {
     const params = new URLSearchParams();
     if (userId) params.append('user_id', userId);
     if (agentId) params.append('agent_id', agentId);
     if (runId) params.append('run_id', runId);
-    const queryString = params.toString();
-    return omind_del(`/api/v1/memory/delete_all${queryString ? '?' + queryString : ''}`);
+    return omind_del(`/api/v1/memory?${params.toString()}`);
   },
 
   /**
-   * 检索指定命名空间的记忆（用于AI诊断）
+   * 获取记忆历史 (Mem0: memory.history())
    */
-  async searchMemoriesByNamespace(namespaceType: string, query: string, params?: { user_name?: string; system_id?: string; limit?: number }) {
-    const queryParams = new URLSearchParams();
-    queryParams.append('query', query);
-    if (params?.user_name) queryParams.append('user_name', params.user_name);
-    if (params?.system_id) queryParams.append('system_id', params.system_id);
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    const queryString = queryParams.toString();
-    return omind_get(`/api/v1/memory/search/${namespaceType}?${queryString}`);
+  async getMemoryHistory(memoryId: string) {
+    return omind_get(`/api/v1/memory/${memoryId}/history`);
   },
 
   /**
-   * 获取所有可用的命名空间
+   * 重置记忆系统 (Mem0: memory.reset())
+   * 危险操作：删除所有记忆
    */
-  async getNamespaces() {
-    return omind_get('/api/v1/memory/namespaces');
+  async resetMemory() {
+    return omind_post('/api/v1/memory/reset', {});
+  },
+
+  // ==================== 便捷方法 ====================
+
+  /**
+   * 按层级获取记忆（便捷方法）
+   */
+  async getMemoriesByLevel(level: 'user' | 'agent' | 'session' | 'user_agent', params?: {
+    userId?: string;
+    agentId?: string;
+    runId?: string;
+    limit?: number;
+  }) {
+    switch(level) {
+      case 'user':
+        // 用户记忆：仅user_id
+        return this.getAllMemories(params?.userId, undefined, undefined, params?.limit);
+
+      case 'agent':
+        // 智能体记忆：仅agent_id
+        return this.getAllMemories(undefined, params?.agentId, undefined, params?.limit);
+
+      case 'session':
+        // 会话记忆：user_id + run_id
+        return this.getAllMemories(params?.userId, undefined, params?.runId, params?.limit);
+
+      case 'user_agent':
+        // 交互记忆：user_id + agent_id
+        return this.getAllMemories(params?.userId, params?.agentId, undefined, params?.limit);
+
+      default:
+        return this.getAllMemories(params?.userId, params?.agentId, params?.runId, params?.limit);
+    }
   },
 
   /**
-   * 获取记忆统计信息
+   * 从对话中添加记忆（便捷方法）
    */
-  async getMemoryStats() {
-    return omind_get('/api/v1/memory/stats');
+  async addConversationMemory(messages: Array<{role: string, content: string}>, params?: {
+    userId?: string;
+    agentId?: string;
+    runId?: string;
+    metadata?: Record<string, any>;
+  }) {
+    return this.addMemory({
+      messages,
+      user_id: params?.userId,
+      agent_id: params?.agentId,
+      run_id: params?.runId,
+      metadata: params?.metadata,
+      infer: true
+    });
   },
 
   /**
-   * 获取当前用户的个人档案记忆
+   * 简化的搜索接口（便捷方法）
    */
-  async getUserProfileMemories() {
-    return omind_get('/api/v1/memory/user/profile');
-  },
-
-  /**
-   * 批量创建记忆
-   */
-  async batchCreateMemories(memories: MemoryCreate[]) {
-    return omind_post('/api/v1/memory/batch', memories);
-  },
-
-  /**
-   * 存储系统架构信息
-   */
-  async storeSystemArchitecture(data: SystemArchitectureCreate) {
-    return omind_post('/api/v1/memory/system-architecture', data);
-  },
-
-  /**
-   * 存储故障案例
-   */
-  async storeIncident(data: IncidentCreate) {
-    return omind_post('/api/v1/memory/incident', data);
-  },
-
-  /**
-   * 存储用户偏好
-   */
-  async storeUserPreference(data: UserPreferenceCreate) {
-    return omind_post('/api/v1/memory/user-preference', data);
-  },
-
-  /**
-   * 获取诊断上下文
-   */
-  async getDiagnosisContext(issue: string, systemId: string, userId?: string) {
-    const params = new URLSearchParams();
-    params.append('issue', issue);
-    params.append('system_id', systemId);
-    if (userId) params.append('user_id', userId);
-    return omind_get(`/api/v1/memory/diagnosis-context?${params.toString()}`);
-  },
-
-  /**
-   * 按记忆层级查询记忆
-   * @param level 记忆层级: user/agent/user_agent/session，不传则返回所有
-   * @param userId 用户ID（可选）
-   * @param agentId 智能体ID（可选）
-   * @param runId 会话ID（可选）
-   * @param limit 返回数量限制
-   */
-  async listMemoriesByLevel(level?: string, userId?: string, agentId?: string, runId?: string, limit?: number) {
-    const params = new URLSearchParams();
-    if (level) params.append('level', level);
-    if (userId) params.append('user_id', userId);
-    if (agentId) params.append('agent_id', agentId);
-    if (runId) params.append('run_id', runId);
-    if (limit) params.append('limit', limit.toString());
-    const queryString = params.toString();
-    return omind_get(`/api/v1/memory/list_by_level${queryString ? '?' + queryString : ''}`);
+  async simpleSearch(query: string, limit: number = 20) {
+    return this.searchMemories({ query, limit });
   }
+};
+
+// ==================== 迁移提示 ====================
+
+/**
+ * @deprecated 请使用 memoryApi.addMemory 代替
+ */
+export const addConversationMemory = (messages: any, userId?: string, agentId?: string) => {
+  console.warn('addConversationMemory 已废弃，请使用 memoryApi.addMemory');
+  return memoryApi.addConversationMemory(messages, { userId, agentId });
+};
+
+/**
+ * @deprecated 请使用 memoryApi.getAllMemories 代替
+ */
+export const listAllMemories = (userId?: string, agentId?: string) => {
+  console.warn('listAllMemories 已废弃，请使用 memoryApi.getAllMemories');
+  return memoryApi.getAllMemories(userId, agentId);
+};
+
+/**
+ * @deprecated 请使用 memoryApi.deleteAllMemories 代替
+ */
+export const deleteAllMemories = (userId?: string, agentId?: string) => {
+  console.warn('deleteAllMemories 已废弃，请使用 memoryApi.deleteAllMemories');
+  return memoryApi.deleteAllMemories(userId, agentId);
 };
 
 export default memoryApi;
