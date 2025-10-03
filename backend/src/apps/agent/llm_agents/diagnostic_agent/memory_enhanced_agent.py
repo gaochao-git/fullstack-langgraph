@@ -15,6 +15,12 @@ from langgraph.prebuilt import ToolNode
 import json
 
 from src.apps.agent.memory_factory import get_enterprise_memory
+from src.apps.agent.memory_utils import (
+    search_combined_memory,
+    build_layered_context,
+    analyze_conversation_for_memory,
+    save_layered_memories
+)
 from src.shared.core.logging import get_logger
 from src.shared.db.config import get_sync_db
 from .state import DiagnosticState
@@ -57,8 +63,9 @@ class MemoryEnhancedDiagnosticAgent:
             search_limit = self.memory_config.get('memory_search_limit', 3)  # 每层3条
             distance_threshold = self.memory_config.get('memory_distance_threshold', None)
 
-            # 组合检索多层记忆
-            combined_memories = await self.memory.search_combined_memory(
+            # 组合检索多层记忆（使用辅助函数）
+            combined_memories = await search_combined_memory(
+                memory=self.memory,
                 query=user_message,
                 user_id=user_id,
                 agent_id=agent_id,
@@ -66,9 +73,9 @@ class MemoryEnhancedDiagnosticAgent:
                 threshold=distance_threshold
             )
 
-            # 构建增强的系统提示
+            # 构建增强的系统提示（使用辅助函数）
             if self._has_relevant_memories(combined_memories):
-                enhanced_prompt = self._build_layered_prompt(combined_memories)
+                enhanced_prompt = build_layered_context(combined_memories, max_per_layer=3)
                 # 将增强提示插入到消息列表开头
                 state["messages"].insert(0, SystemMessage(content=enhanced_prompt))
                 logger.info(f"✅ 已注入多层记忆上下文到系统提示")
@@ -89,31 +96,6 @@ class MemoryEnhancedDiagnosticAgent:
         """检查是否有相关记忆"""
         return any(memories for memories in combined_memories.values())
 
-    def _build_layered_prompt(self, combined_memories: Dict[str, List[Dict]]) -> str:
-        """构建分层的增强提示"""
-        prompt_parts = ["# 相关记忆上下文\n"]
-
-        # 1. 用户个人档案
-        if combined_memories.get("user_global"):
-            prompt_parts.append("\n## 👤 用户档案:")
-            for mem in combined_memories["user_global"][:2]:
-                prompt_parts.append(f"- {mem['content']}")
-
-        # 3. 智能体专业知识
-        if combined_memories.get("agent_global"):
-            prompt_parts.append("\n## 🤖 专业经验:")
-            for mem in combined_memories["agent_global"][:2]:
-                prompt_parts.append(f"- {mem['content']}")
-
-        # 4. 用户-智能体交互历史
-        if combined_memories.get("user_agent"):
-            prompt_parts.append("\n## 💬 交互历史:")
-            for mem in combined_memories["user_agent"][:2]:
-                prompt_parts.append(f"- {mem['content']}")
-
-        prompt_parts.append("\n请基于以上记忆提供个性化的专业诊断建议。")
-
-        return "\n".join(prompt_parts)
 
     async def save_diagnosis_result(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """分层保存诊断结果到长期记忆"""
@@ -180,38 +162,27 @@ class MemoryEnhancedDiagnosticAgent:
     ):
         """分层保存记忆"""
         try:
-            # 1. 检测是否包含用户档案信息 → 保存为用户全局记忆
-            if self._contains_user_profile_info(conversation_messages):
-                await self.memory.add_user_memory(
-                    messages=conversation_messages,
-                    user_id=user_id,
-                    memory_type="profile",
-                    metadata={"source": "diagnostic_session"}
-                )
-                logger.info(f"✅ 已保存用户全局记忆")
+            # 使用辅助函数分析对话内容
+            analysis = analyze_conversation_for_memory(conversation_messages)
 
-            # 2. 检测是否包含有价值的诊断经验 → 保存为智能体全局记忆
-            if self._contains_valuable_experience(conversation_messages, state):
-                await self.memory.add_agent_global_memory(
-                    messages=conversation_messages,
-                    agent_id=agent_id,
-                    memory_type="experience",
-                    metadata={
-                        "problem_type": self._extract_problem_type(state),
-                        "resolved": state.get("resolved", False)
-                    }
-                )
-                logger.info(f"✅ 已保存智能体全局记忆（诊断经验）")
+            # 添加状态相关的分析
+            if state.get("diagnosis_result"):
+                analysis["has_problem_solution"] = True
+                analysis["problem_type"] = self._extract_problem_type(state)
 
-            # 3. 默认保存为用户-智能体交互记忆
-            await self.memory.add_user_agent_memory(
+            # 使用辅助函数分层保存记忆
+            saved_memories = await save_layered_memories(
+                memory=self.memory,
                 messages=conversation_messages,
                 user_id=user_id,
                 agent_id=agent_id,
-                memory_type="interaction",
-                metadata={"session_type": "diagnostic"}
+                analysis=analysis
             )
-            logger.info(f"✅ 已保存用户-智能体交互记忆")
+
+            # 记录保存结果
+            for memory_type, memory_ids in saved_memories.items():
+                if memory_ids:
+                    logger.info(f"✅ 已保存{memory_type}记忆: {memory_ids}")
 
         except Exception as e:
             logger.error(f"分层保存记忆失败: {e}", exc_info=True)

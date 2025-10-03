@@ -92,15 +92,40 @@ class EnterpriseMemory:
 
     def _build_config(self) -> Dict[str, Any]:
         """构建 Mem0 配置"""
-        # 嵌入模型配置
-        embedder_config = {
-            "provider": "openai",
-            "config": {
+        # 判断嵌入模型提供商
+        embedding_model = settings.MEM0_EMBEDDING_MODEL.lower()
+
+        # 根据模型名称选择provider
+        if "openai" in embedding_model or "text-embedding" in embedding_model:
+            embedder_provider = "openai"
+            embedder_config = {
                 "model": settings.MEM0_EMBEDDING_MODEL,
                 "api_key": settings.LLM_API_KEY,
                 "openai_base_url": settings.LLM_BASE_URL,
                 "embedding_dims": settings.MEM0_EMBEDDING_DIM
             }
+        elif "bge" in embedding_model or "baai" in embedding_model:
+            # 使用兼容OpenAI格式的API（如SiliconFlow）
+            embedder_provider = "openai"  # 很多服务商提供OpenAI兼容API
+            embedder_config = {
+                "model": settings.MEM0_EMBEDDING_MODEL,
+                "api_key": settings.EMBEDDING_API_KEY or settings.LLM_API_KEY,
+                "openai_base_url": settings.EMBEDDING_API_BASE_URL or settings.LLM_BASE_URL,
+                "embedding_dims": settings.MEM0_EMBEDDING_DIM
+            }
+        else:
+            # 默认使用OpenAI兼容格式
+            embedder_provider = "openai"
+            embedder_config = {
+                "model": settings.MEM0_EMBEDDING_MODEL,
+                "api_key": settings.LLM_API_KEY,
+                "openai_base_url": settings.LLM_BASE_URL,
+                "embedding_dims": settings.MEM0_EMBEDDING_DIM
+            }
+
+        embedder_config_dict = {
+            "provider": embedder_provider,
+            "config": embedder_config
         }
 
         # LLM配置
@@ -131,7 +156,7 @@ class EnterpriseMemory:
 
         return {
             "llm": llm_config,
-            "embedder": embedder_config,
+            "embedder": embedder_config_dict,
             "vector_store": vector_store_config,
             "version": settings.MEM0_MEMORY_VERSION
         }
