@@ -28,8 +28,7 @@ export interface MemoryAddRequest {
 }
 
 export interface MemoryUpdateRequest {
-  content: string;
-  metadata?: Record<string, any>;
+  content: string;  // 只能更新内容，metadata保持不变
 }
 
 export interface MemorySearchParams {

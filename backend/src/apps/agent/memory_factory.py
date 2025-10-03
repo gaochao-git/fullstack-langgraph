@@ -21,6 +21,7 @@ import asyncio
 
 from src.shared.core.config import settings
 from src.shared.core.logging import get_logger
+from src.shared.db.models import now_shanghai
 
 logger = get_logger(__name__)
 
@@ -188,7 +189,7 @@ class EnterpriseMemory:
         try:
             combined_metadata = {
                 "type": memory_type,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": now_shanghai().strftime('%Y-%m-%d %H:%M:%S'),
                 **(metadata or {})
             }
 
@@ -232,7 +233,7 @@ class EnterpriseMemory:
         try:
             combined_metadata = {
                 "type": memory_type,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": now_shanghai().strftime('%Y-%m-%d %H:%M:%S'),
                 **(metadata or {})
             }
 
@@ -280,7 +281,7 @@ class EnterpriseMemory:
         try:
             combined_metadata = {
                 "type": memory_type,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": now_shanghai().strftime('%Y-%m-%d %H:%M:%S'),
                 **(metadata or {})
             }
 
@@ -327,7 +328,7 @@ class EnterpriseMemory:
         try:
             combined_metadata = {
                 "type": memory_type,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": now_shanghai().strftime('%Y-%m-%d %H:%M:%S'),
                 **(metadata or {})
             }
 

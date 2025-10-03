@@ -335,8 +335,7 @@ const MemoryManagement: React.FC = () => {
   const handleEditMemory = (memory: Memory) => {
     setEditingMemory(memory);
     editForm.setFieldsValue({
-      memory: memory.memory,
-      metadata: JSON.stringify(memory.metadata, null, 2)
+      memory: memory.memory
     });
     setEditModalVisible(true);
   };
@@ -351,20 +350,8 @@ const MemoryManagement: React.FC = () => {
 
       setLoading(true);
 
-      // 解析元数据
-      let metadata = {};
-      if (values.metadata) {
-        try {
-          metadata = JSON.parse(values.metadata);
-        } catch (e) {
-          message.error('元数据格式错误，请输入有效的JSON');
-          return;
-        }
-      }
-
       const response = await memoryApi.updateMemory(editingMemory.id, {
-        content: values.memory,
-        metadata
+        content: values.memory
       });
 
       if (response.status === 'ok') {
@@ -471,6 +458,50 @@ const MemoryManagement: React.FC = () => {
       ),
     },
     {
+      title: '用户ID',
+      dataIndex: 'user_id',
+      key: 'user_id',
+      width: 120,
+      render: (user_id: string) => {
+        if (!user_id) return '-';
+        return (
+          <Tag icon={<UserOutlined />} color="blue">
+            {user_id}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: '智能体ID',
+      key: 'agent_id',
+      width: 150,
+      render: (_: any, record: Memory) => {
+        // agent_id 可能在根级别或metadata中
+        const agent_id = record.agent_id || record.metadata?.agent_id;
+        if (!agent_id) return '-';
+        return (
+          <Tag icon={<RobotOutlined />} color="green">
+            {agent_id}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: '会话ID',
+      key: 'run_id',
+      width: 150,
+      render: (_: any, record: Memory) => {
+        // run_id 可能在根级别或metadata中
+        const run_id = record.run_id || record.metadata?.run_id;
+        if (!run_id) return '-';
+        return (
+          <Tag icon={<ClockCircleOutlined />} color="purple">
+            {run_id.length > 8 ? `${run_id.substring(0, 8)}...` : run_id}
+          </Tag>
+        );
+      },
+    },
+    {
       title: '距离',
       dataIndex: 'score',
       key: 'score',
@@ -520,6 +551,30 @@ const MemoryManagement: React.FC = () => {
           />
         );
       },
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 160,
+      sorter: (a: Memory, b: Memory) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeA - timeB;
+      },
+      render: (time: string) => time || '-'
+    },
+    {
+      title: '更新时间',
+      dataIndex: 'updated_at',
+      key: 'updated_at',
+      width: 160,
+      sorter: (a: Memory, b: Memory) => {
+        const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        return timeA - timeB;
+      },
+      render: (time: string) => time || '-'
     },
     {
       title: '操作',
@@ -834,33 +889,26 @@ const MemoryManagement: React.FC = () => {
             rules={[{ required: true, message: '请输入记忆内容' }]}
           >
             <TextArea
-              rows={6}
+              rows={8}
               placeholder="输入记忆内容..."
             />
           </Form.Item>
 
-          <Form.Item
-            name="metadata"
-            label="元数据（JSON格式）"
-            rules={[
-              {
-                validator: (_, value) => {
-                  if (!value) return Promise.resolve();
-                  try {
-                    JSON.parse(value);
-                    return Promise.resolve();
-                  } catch (e) {
-                    return Promise.reject(new Error('请输入有效的JSON格式'));
-                  }
-                },
-              },
-            ]}
-          >
-            <TextArea
-              rows={8}
-              placeholder='{"type": "example", "importance": "high"}'
-            />
-          </Form.Item>
+          {editingMemory?.metadata && (
+            <div style={{ marginTop: 16 }}>
+              <Text strong>元数据（不可修改）：</Text>
+              <pre style={{
+                backgroundColor: '#f5f5f5',
+                padding: '12px',
+                borderRadius: '4px',
+                marginTop: '8px',
+                maxHeight: '200px',
+                overflow: 'auto'
+              }}>
+                {JSON.stringify(editingMemory.metadata, null, 2)}
+              </pre>
+            </div>
+          )}
         </Form>
       </Modal>
 

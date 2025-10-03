@@ -3,11 +3,13 @@
 仅包含Mem0官方API，无任何扩展或废弃接口
 """
 from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, Query, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from src.shared.db.config import get_async_db
+from src.shared.db.models import now_shanghai
 from src.shared.core.exceptions import BusinessException
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import UnifiedResponse, success_response, ResponseCode
@@ -16,6 +18,11 @@ from .service import memory_service
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["Memory Management"])
+
+
+def format_memory_times(memory: dict) -> dict:
+    """直接返回记忆数据，不做格式转换（数据存储时已处理）"""
+    return memory if memory else {}
 
 
 # ==================== Mem0标准数据模型 ====================
@@ -30,9 +37,8 @@ class MemoryAddRequest(BaseModel):
     infer: bool = True
 
 class MemoryUpdateRequest(BaseModel):
-    """更新记忆请求"""
+    """更新记忆请求 - 只能更新内容"""
     content: str
-    metadata: Optional[Dict[str, Any]] = None
 
 
 # ==================== Mem0核心API ====================
@@ -64,6 +70,12 @@ async def add_memory(
 
     try:
         memory = await memory_service._get_memory()
+
+        # 确保metadata包含timestamp
+        if request.metadata is None:
+            request.metadata = {}
+        if 'timestamp' not in request.metadata:
+            request.metadata['timestamp'] = now_shanghai().strftime('%Y-%m-%d %H:%M:%S')
 
         # 调用标准的add_conversation_memory方法
         result = await memory.add_conversation_memory(
@@ -120,6 +132,9 @@ async def search_memories(
         else:
             memories = result
 
+        # 格式化时间字段
+        memories = [format_memory_times(mem) for mem in memories]
+
         logger.info(f"搜索记忆: query='{query[:50]}...', 返回 {len(memories)} 条结果")
         return success_response(data=memories)
     except Exception as e:
@@ -164,6 +179,9 @@ async def get_all_memories(
         if len(memories) > limit:
             memories = memories[:limit]
 
+        # 格式化时间字段
+        memories = [format_memory_times(mem) for mem in memories]
+
         logger.info(f"获取记忆列表: user_id={user_id}, 返回 {len(memories)} 条")
         return success_response(data=memories)
     except Exception as e:
@@ -189,6 +207,8 @@ async def get_memory(
         if hasattr(memory.memory, 'get'):
             result = memory.memory.get(memory_id)
             if result:
+                # 格式化时间字段
+                result = format_memory_times(result)
                 return success_response(data=result)
             else:
                 raise BusinessException(f"记忆不存在: {memory_id}", ResponseCode.NOT_FOUND)
@@ -212,7 +232,7 @@ async def update_memory(
     """
     更新记忆 (Mem0: memory.update())
 
-    更新指定记忆的内容或元数据。
+    只更新记忆内容，metadata保持不变。
     """
     try:
         memory = await memory_service._get_memory()
@@ -223,10 +243,10 @@ async def update_memory(
                 memory_id=memory_id,
                 data=request.content
             )
-            logger.info(f"成功更新记忆: {memory_id}")
+            logger.info(f"成功更新记忆内容: {memory_id}")
             return success_response(
                 data={"memory_id": memory_id, "updated": True},
-                msg="记忆更新成功"
+                msg="记忆内容更新成功"
             )
         else:
             raise BusinessException("当前Mem0版本不支持update方法", ResponseCode.NOT_IMPLEMENTED)
