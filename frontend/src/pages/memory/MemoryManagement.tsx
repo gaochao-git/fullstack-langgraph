@@ -1,15 +1,18 @@
 /**
- * AI 记忆查看和管理页面
- * 
- * 基于 Mem0 原生方法：
- * - add_conversation: 从对话中学习记忆
- * - search_memory: 搜索相关记忆
- * - list_all: 查看所有记忆
- * - delete_all: 清理记忆
+ * AI 记忆管理页面
+ *
+ * 基于 Mem0 标准三层架构：
+ * - 用户记忆: 使用 user_id
+ * - 智能体记忆: 使用 agent_id
+ * - 会话记忆: 使用 run_id
+ *
+ * 支持组合使用：
+ * - user_id + agent_id: 用户与特定智能体的交互记忆
+ * - user_id + run_id: 用户的特定会话记忆
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Card,
   Table,
   Button,
@@ -58,8 +61,7 @@ const MemoryManagement: React.FC = () => {
   const [currentLevel, setCurrentLevel] = useState<string | undefined>(undefined);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
-  const [orgModalVisible, setOrgModalVisible] = useState(false);
-  const [orgForm] = Form.useForm();
+  const [selectedRunId, setSelectedRunId] = useState<string | undefined>(undefined);
 
   /**
    * 加载智能体列表
@@ -78,16 +80,18 @@ const MemoryManagement: React.FC = () => {
   /**
    * 按层级加载记忆
    */
-  const loadMemoriesByLevel = async (level?: string, userId?: string, agentId?: string) => {
+  const loadMemoriesByLevel = async (level?: string, userId?: string, agentId?: string, runId?: string) => {
     setLoading(true);
     try {
-      const response = await memoryApi.listMemoriesByLevel(level, userId, agentId, 100);
+      const response = await memoryApi.listMemoriesByLevel(level, userId, agentId, runId, 100);
       console.log('Memory response:', response);
 
       if (response.status === 'ok' && response.data) {
-        setMemories(response.data);
+        // 确保 data 是数组
+        const memoriesData = Array.isArray(response.data) ? response.data : [];
+        setMemories(memoriesData);
         const levelName = level ? getLevelName(level) : '所有';
-        message.success(`加载了 ${response.data.length} 条${levelName}记忆`);
+        message.success(`加载了 ${memoriesData.length} 条${levelName}记忆`);
       } else {
         setMemories([]);
         message.info('暂无记忆数据');
@@ -106,11 +110,10 @@ const MemoryManagement: React.FC = () => {
    */
   const getLevelName = (level: string) => {
     const levelNames: Record<string, string> = {
-      organization: '🏢 组织级',
-      user_global: '👤 用户全局',
-      agent_global: '🤖 智能体全局',
+      user: '👤 用户',
+      agent: '🤖 智能体',
       user_agent: '💬 用户-智能体',
-      session: '⏱️ 会话临时'
+      session: '⏱️ 会话'
     };
     return levelNames[level] || level;
   };
@@ -119,7 +122,7 @@ const MemoryManagement: React.FC = () => {
    * 加载所有记忆（兼容旧方法）
    */
   const loadAllMemories = async () => {
-    await loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId);
+    await loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, selectedRunId);
   };
 
   /**
@@ -127,38 +130,7 @@ const MemoryManagement: React.FC = () => {
    */
   const handleLevelChange = async (level: string | undefined) => {
     setCurrentLevel(level);
-    await loadMemoriesByLevel(level, selectedUserId, selectedAgentId);
-  };
-
-  /**
-   * 手动添加组织记忆
-   */
-  const handleAddOrganizationMemory = async () => {
-    try {
-      const values = await orgForm.validateFields();
-
-      const response = await memoryApi.addOrganizationMemory(
-        values.content,
-        values.memory_type || 'general',
-        values.category || 'general',
-        values.importance || 'medium'
-      );
-
-      if (response.status === 'ok') {
-        message.success('组织记忆添加成功');
-        setOrgModalVisible(false);
-        orgForm.resetFields();
-        // 如果当前在查看组织记忆，则刷新
-        if (currentLevel === 'organization') {
-          await loadAllMemories();
-        }
-      } else {
-        message.error('添加失败');
-      }
-    } catch (error) {
-      console.error('添加组织记忆失败:', error);
-      message.error('添加组织记忆失败');
-    }
+    await loadMemoriesByLevel(level, selectedUserId, selectedAgentId, selectedRunId);
   };
 
   /**
@@ -214,8 +186,10 @@ const MemoryManagement: React.FC = () => {
       });
 
       if (response.status === 'ok' && response.data) {
-        setMemories(response.data);
-        message.success(`搜索到 ${response.data.length} 条相关记忆`);
+        // 确保 data 是数组
+        const memoriesData = Array.isArray(response.data) ? response.data : [];
+        setMemories(memoriesData);
+        message.success(`搜索到 ${memoriesData.length} 条相关记忆`);
       } else {
         setMemories([]);
         message.info('未找到相关记忆');
@@ -259,9 +233,8 @@ const MemoryManagement: React.FC = () => {
       render: (level: string) => {
         if (!level) return <Tag>未分类</Tag>;
         const levelConfig: Record<string, { color: string; text: string }> = {
-          organization: { color: 'purple', text: '🏢 组织级' },
-          user_global: { color: 'blue', text: '👤 用户全局' },
-          agent_global: { color: 'green', text: '🤖 智能体全局' },
+          user: { color: 'blue', text: '👤 用户' },
+          agent: { color: 'green', text: '🤖 智能体' },
           user_agent: { color: 'orange', text: '💬 用户-智能体' },
           session: { color: 'gray', text: '⏱️ 会话' }
         };
@@ -338,21 +311,20 @@ const MemoryManagement: React.FC = () => {
                     allowClear
                   >
                     <Option value={undefined}>全部</Option>
-                    <Option value="organization">🏢 组织级全局</Option>
-                    <Option value="user_global">👤 用户全局</Option>
-                    <Option value="agent_global">🤖 智能体全局</Option>
+                    <Option value="user">👤 用户</Option>
+                    <Option value="agent">🤖 智能体</Option>
                     <Option value="user_agent">💬 用户-智能体</Option>
-                    <Option value="session">⏱️ 会话临时</Option>
+                    <Option value="session">⏱️ 会话</Option>
                   </Select>
 
-                  {(currentLevel === 'agent_global' || currentLevel === 'user_agent') && (
+                  {(currentLevel === 'agent' || currentLevel === 'user_agent') && (
                     <Select
                       style={{ width: 180 }}
                       placeholder="选择智能体"
                       value={selectedAgentId}
                       onChange={(value) => {
                         setSelectedAgentId(value);
-                        loadMemoriesByLevel(currentLevel, selectedUserId, value);
+                        loadMemoriesByLevel(currentLevel, selectedUserId, value, selectedRunId);
                       }}
                       allowClear
                       loading={agents.length === 0}
@@ -365,14 +337,18 @@ const MemoryManagement: React.FC = () => {
                     </Select>
                   )}
 
-                  {currentLevel === 'organization' && (
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => setOrgModalVisible(true)}
-                    >
-                      添加组织知识
-                    </Button>
+                  {currentLevel === 'session' && (
+                    <Input
+                      style={{ width: 180 }}
+                      placeholder="输入会话ID"
+                      value={selectedRunId}
+                      onChange={(e) => {
+                        setSelectedRunId(e.target.value);
+                        if (e.target.value) {
+                          loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, e.target.value);
+                        }
+                      }}
+                    />
                   )}
                 </Space>
               </Col>
@@ -557,79 +533,6 @@ const MemoryManagement: React.FC = () => {
                   {agent.agent_name}
                 </Option>
               ))}
-            </Select>
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* 添加组织记忆模态框 */}
-      <Modal
-        title="🏢 添加组织级全局记忆"
-        open={orgModalVisible}
-        onOk={handleAddOrganizationMemory}
-        onCancel={() => {
-          setOrgModalVisible(false);
-          orgForm.resetFields();
-        }}
-        width={700}
-        okText="添加"
-        cancelText="取消"
-      >
-        <Alert
-          message="组织级全局记忆"
-          description="添加的知识将对所有用户和所有智能体可见，用于存储企业共享的系统架构、标准流程、企业规范、技术决策等重要信息。"
-          type="info"
-          showIcon
-          style={{ marginBottom: 16 }}
-        />
-
-        <Form
-          form={orgForm}
-          layout="vertical"
-        >
-          <Form.Item
-            name="content"
-            label="记忆内容"
-            rules={[{ required: true, message: '请输入记忆内容' }]}
-          >
-            <TextArea
-              rows={6}
-              placeholder="例如：&#10;- 订单系统的MySQL主库在10.0.1.10，从库在10.0.1.11&#10;- MySQL主库故障应急预案：1.通知DBA 2.切换流量到从库...&#10;- 数据库命名规范：{系统名}_{环境}，如 order_prod"
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="memory_type"
-            label="记忆类型"
-            initialValue="general"
-            rules={[{ required: true, message: '请选择记忆类型' }]}
-          >
-            <Select placeholder="选择记忆类型">
-              <Option value="system_architecture">🏗️ 系统架构</Option>
-              <Option value="standard_procedure">📋 标准流程</Option>
-              <Option value="enterprise_policy">📜 企业规范</Option>
-              <Option value="technical_decision">💡 技术决策</Option>
-              <Option value="general">📚 通用知识</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="category"
-            label="分类标签"
-            initialValue="general"
-          >
-            <Input placeholder="例如: database, network, security, deployment" />
-          </Form.Item>
-
-          <Form.Item
-            name="importance"
-            label="重要性"
-            initialValue="medium"
-          >
-            <Select>
-              <Option value="low">低</Option>
-              <Option value="medium">中</Option>
-              <Option value="high">高</Option>
             </Select>
           </Form.Item>
         </Form>

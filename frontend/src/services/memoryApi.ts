@@ -206,36 +206,22 @@ export const memoryApi = {
   },
 
   /**
-   * 按记忆层级查询记忆（管理员功能）
-   * @param level 记忆层级: organization/user_global/agent_global/user_agent/session，不传则返回所有
+   * 按记忆层级查询记忆
+   * @param level 记忆层级: user/agent/user_agent/session，不传则返回所有
    * @param userId 用户ID（可选）
    * @param agentId 智能体ID（可选）
+   * @param runId 会话ID（可选）
    * @param limit 返回数量限制
    */
-  async listMemoriesByLevel(level?: string, userId?: string, agentId?: string, limit?: number) {
+  async listMemoriesByLevel(level?: string, userId?: string, agentId?: string, runId?: string, limit?: number) {
     const params = new URLSearchParams();
     if (level) params.append('level', level);
     if (userId) params.append('user_id', userId);
     if (agentId) params.append('agent_id', agentId);
+    if (runId) params.append('run_id', runId);
     if (limit) params.append('limit', limit.toString());
     const queryString = params.toString();
     return omind_get(`/api/v1/memory/list_by_level${queryString ? '?' + queryString : ''}`);
-  },
-
-  /**
-   * 手动添加组织级全局记忆（管理员功能）
-   * @param content 记忆内容
-   * @param memoryType 记忆类型
-   * @param category 分类标签
-   * @param importance 重要性
-   */
-  async addOrganizationMemory(content: string, memoryType: string, category: string, importance: string) {
-    const params = new URLSearchParams();
-    params.append('content', content);
-    params.append('memory_type', memoryType);
-    params.append('category', category);
-    params.append('importance', importance);
-    return omind_post(`/api/v1/memory/add_organization?${params.toString()}`, {});
   }
 };
 

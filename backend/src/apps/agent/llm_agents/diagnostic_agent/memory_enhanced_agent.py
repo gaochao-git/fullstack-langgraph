@@ -93,13 +93,7 @@ class MemoryEnhancedDiagnosticAgent:
         """构建分层的增强提示"""
         prompt_parts = ["# 相关记忆上下文\n"]
 
-        # 1. 组织级知识（优先级最高）
-        if combined_memories.get("organization"):
-            prompt_parts.append("\n## 📚 企业知识库:")
-            for mem in combined_memories["organization"][:2]:  # 最多2条
-                prompt_parts.append(f"- {mem['content']}")
-
-        # 2. 用户个人档案
+        # 1. 用户个人档案
         if combined_memories.get("user_global"):
             prompt_parts.append("\n## 👤 用户档案:")
             for mem in combined_memories["user_global"][:2]:
@@ -186,23 +180,9 @@ class MemoryEnhancedDiagnosticAgent:
     ):
         """分层保存记忆"""
         try:
-            # 0. 检测是否包含组织级信息 → 保存为组织全局记忆
-            org_info = self._contains_organization_info(conversation_messages)
-            if org_info:
-                await self.memory.add_organization_memory(
-                    messages=conversation_messages,
-                    memory_type=org_info["type"],
-                    metadata={
-                        "source": "diagnostic_session",
-                        "category": org_info["category"],
-                        "importance": org_info.get("importance", "medium")
-                    }
-                )
-                logger.info(f"✅ 已保存组织全局记忆: type={org_info['type']}, category={org_info['category']}")
-
             # 1. 检测是否包含用户档案信息 → 保存为用户全局记忆
             if self._contains_user_profile_info(conversation_messages):
-                await self.memory.add_user_global_memory(
+                await self.memory.add_user_memory(
                     messages=conversation_messages,
                     user_id=user_id,
                     memory_type="profile",
@@ -235,76 +215,6 @@ class MemoryEnhancedDiagnosticAgent:
 
         except Exception as e:
             logger.error(f"分层保存记忆失败: {e}", exc_info=True)
-
-    def _contains_organization_info(self, messages: List[Dict]) -> dict:
-        """
-        检测是否包含组织级信息
-
-        Returns:
-            dict or None: 如果包含组织信息，返回 {"type": "类型", "category": "分类", "importance": "重要性"}
-        """
-        # 系统架构关键词
-        architecture_keywords = [
-            "系统架构", "服务器配置", "数据库配置", "网络拓扑",
-            "主库", "从库", "集群配置", "负载均衡",
-            "ip地址", "端口", "域名", "服务地址"
-        ]
-
-        # 标准流程关键词
-        sop_keywords = [
-            "标准流程", "操作规范", "处理步骤", "应急预案",
-            "发布流程", "回滚流程", "审批流程"
-        ]
-
-        # 企业规范关键词
-        policy_keywords = [
-            "公司规定", "企业标准", "安全策略", "命名规范",
-            "权限管理", "访问控制", "合规要求"
-        ]
-
-        # 重要决策关键词
-        decision_keywords = [
-            "架构调整", "技术选型", "版本升级", "迁移方案",
-            "重大变更", "战略决策"
-        ]
-
-        content_lower = " ".join([msg.get("content", "").lower() for msg in messages])
-
-        # 检测系统架构信息
-        if any(keyword in content_lower for keyword in architecture_keywords):
-            # 进一步判断重要性：是否包含具体的配置信息
-            importance = "high" if any(kw in content_lower for kw in ["主库", "从库", "ip", "端口", "集群"]) else "medium"
-            return {
-                "type": "system_architecture",
-                "category": "architecture",
-                "importance": importance
-            }
-
-        # 检测标准操作流程
-        if any(keyword in content_lower for keyword in sop_keywords):
-            return {
-                "type": "standard_procedure",
-                "category": "sop",
-                "importance": "high"
-            }
-
-        # 检测企业规范
-        if any(keyword in content_lower for keyword in policy_keywords):
-            return {
-                "type": "enterprise_policy",
-                "category": "policy",
-                "importance": "high"
-            }
-
-        # 检测重要决策
-        if any(keyword in content_lower for keyword in decision_keywords):
-            return {
-                "type": "technical_decision",
-                "category": "decision",
-                "importance": "high"
-            }
-
-        return None
 
     def _contains_user_profile_info(self, messages: List[Dict]) -> bool:
         """检测是否包含用户档案信息"""
