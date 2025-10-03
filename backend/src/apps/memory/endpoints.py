@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 from src.shared.db.config import get_async_db
-from src.shared.db.models import now_shanghai
 from src.shared.core.exceptions import BusinessException
 from src.shared.core.logging import get_logger
 from src.shared.schemas.response import UnifiedResponse, success_response, ResponseCode
@@ -90,12 +89,6 @@ async def add_memory(
 
     try:
         memory = await memory_service._get_memory()
-
-        # 确保metadata包含timestamp
-        if request.metadata is None:
-            request.metadata = {}
-        if 'timestamp' not in request.metadata:
-            request.metadata['timestamp'] = now_shanghai().strftime('%Y-%m-%d %H:%M:%S')
 
         # 调用标准的add_conversation_memory方法
         result = await memory.add_conversation_memory(
