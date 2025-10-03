@@ -147,6 +147,46 @@ async def add_conversation_memory(
         raise BusinessException(f"添加对话记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
 
 
+@router.get("/v1/memory/search", response_model=UnifiedResponse)
+async def search_memories_native(
+    query: str = Query(..., description="搜索查询"),
+    user_id: Optional[str] = Query(None, description="用户ID，留空使用当前用户"),
+    agent_id: Optional[str] = Query(None, description="智能体ID"),
+    run_id: Optional[str] = Query(None, description="会话ID"),
+    limit: int = Query(20, description="返回结果数量"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    搜索记忆（Mem0 原生 search 方法）
+
+    支持搜索不同用户的记忆：
+    - 指定 user_id: 搜索特定用户的记忆
+    - 不指定 user_id: 搜索当前登录用户的记忆
+    """
+    # 如果没有指定用户，使用当前用户
+    if not user_id:
+        user_id = current_user.get("username", "system")
+        logger.info(f"未指定user_id，使用当前用户: {user_id}")
+    else:
+        logger.info(f"搜索指定用户的记忆: {user_id}")
+
+    try:
+        memory = await memory_service._get_memory()
+        memories = await memory.search_memories(
+            query=query,
+            user_id=user_id,
+            agent_id=agent_id,
+            run_id=run_id,
+            limit=limit
+        )
+        logger.info(f"搜索记忆: query='{query}', user_id={user_id}, 返回 {len(memories)} 条结果")
+        return success_response(data=memories)
+    except Exception as e:
+        logger.error(f"搜索记忆失败: {e}")
+        raise BusinessException(f"搜索记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)
+
+
 @router.get("/v1/memory/list_all", response_model=UnifiedResponse)
 async def list_all_memories(
     user_id: Optional[str] = Query(None),
@@ -176,9 +216,9 @@ async def list_all_memories(
 @router.get("/v1/memory/list_by_level", response_model=UnifiedResponse)
 async def list_memories_by_level(
     level: Optional[str] = Query(None, description="记忆层级: user/agent/user_agent/session"),
-    user_id: Optional[str] = Query(None),
-    agent_id: Optional[str] = Query(None),
-    run_id: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None, description="用户ID，留空使用当前用户"),
+    agent_id: Optional[str] = Query(None, description="智能体ID"),
+    run_id: Optional[str] = Query(None, description="会话ID"),
     limit: int = Query(100, description="返回结果数量"),
     db: AsyncSession = Depends(get_async_db),
     current_user: dict = Depends(get_current_user)
@@ -192,8 +232,8 @@ async def list_memories_by_level(
             - agent: 智能体记忆（仅agent_id）
             - user_agent: 用户-智能体交互记忆（user_id + agent_id）
             - session: 会话记忆（user_id + run_id）
-            - 不传则返回当前用户的所有记忆
-        user_id: 用户ID
+            - 不传则返回指定用户的所有记忆
+        user_id: 用户ID（支持查询任意用户的记忆）
         agent_id: 智能体ID
         run_id: 会话ID
     """
@@ -203,9 +243,12 @@ async def list_memories_by_level(
         # 如果指定了层级，则按层级查询
         if level:
             if level == "user":
+                # 用户记忆: 只指定user_id，支持查询任意用户
                 if not user_id:
                     user_id = current_user.get("username", "system")
-                # 用户记忆: 只指定user_id
+                    logger.info(f"查询当前用户记忆: {user_id}")
+                else:
+                    logger.info(f"查询指定用户记忆: {user_id}")
                 memories = await memory.list_all_memories(user_id=user_id)
             elif level == "agent":
                 if not agent_id:
@@ -213,27 +256,37 @@ async def list_memories_by_level(
                 # 智能体记忆: 只指定agent_id
                 memories = await memory.list_all_memories(agent_id=agent_id)
             elif level == "user_agent":
+                # 用户-智能体记忆: user_id + agent_id，支持查询任意用户
                 if not user_id:
                     user_id = current_user.get("username", "system")
+                    logger.info(f"查询当前用户-智能体记忆: {user_id}")
+                else:
+                    logger.info(f"查询指定用户-智能体记忆: {user_id}")
                 if not agent_id:
                     raise BusinessException("查询用户-智能体记忆需要指定agent_id", ResponseCode.PARAM_ERROR)
-                # 用户-智能体记忆: user_id + agent_id
                 memories = await memory.list_all_memories(user_id=user_id, agent_id=agent_id)
             elif level == "session":
+                # 会话记忆: user_id + run_id，支持查询任意用户
                 if not user_id:
                     user_id = current_user.get("username", "system")
+                    logger.info(f"查询当前用户会话记忆: {user_id}")
+                else:
+                    logger.info(f"查询指定用户会话记忆: {user_id}")
                 if not run_id:
                     raise BusinessException("查询会话记忆需要指定run_id", ResponseCode.PARAM_ERROR)
-                # 会话记忆: user_id + run_id
                 memories = await memory.list_all_memories(user_id=user_id, run_id=run_id)
             else:
                 raise BusinessException(f"不支持的记忆层级: {level}", ResponseCode.PARAM_ERROR)
         else:
-            # 不指定层级，返回当前用户的所有记忆
+            # 不指定层级，返回指定用户的所有记忆
             if not user_id:
                 user_id = current_user.get("username", "system")
+                logger.info(f"查询当前用户所有记忆: {user_id}")
+            else:
+                logger.info(f"查询指定用户所有记忆: {user_id}")
             memories = await memory.list_all_memories(user_id=user_id, agent_id=agent_id, run_id=run_id)
 
+        logger.info(f"查询记忆: level={level}, user_id={user_id}, 返回 {len(memories)} 条")
         return success_response(data=memories)
     except BusinessException:
         raise

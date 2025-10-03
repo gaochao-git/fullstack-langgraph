@@ -102,10 +102,24 @@ export const memoryApi = {
   },
 
   /**
-   * 搜索记忆
+   * 搜索记忆（旧版，使用namespace）
    */
-  async searchMemories(data: MemorySearch) {
+  async searchMemoriesOld(data: MemorySearch) {
     return omind_post('/api/v1/memory/search', data);
+  },
+
+  /**
+   * 搜索记忆（Mem0 原生方法）
+   */
+  async searchMemories(query: string, userId?: string, agentId?: string, runId?: string, limit?: number) {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    if (userId) params.append('user_id', userId);
+    if (agentId) params.append('agent_id', agentId);
+    if (runId) params.append('run_id', runId);
+    if (limit) params.append('limit', limit.toString());
+    const queryString = params.toString();
+    return omind_get(`/api/v1/memory/search?${queryString}`);
   },
 
   /**
