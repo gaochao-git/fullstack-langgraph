@@ -52,7 +52,8 @@ import {
   FilterOutlined,
   ExperimentOutlined,
   InfoCircleOutlined,
-  BulbFilled
+  BulbFilled,
+  EditOutlined
 } from '@ant-design/icons';
 
 import { memoryApi, Memory } from '../../services/memoryApi';
@@ -71,8 +72,9 @@ const MemoryManagement: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [testModalVisible, setTestModalVisible] = useState(false);
   const [searchModalVisible, setSearchModalVisible] = useState(false);
-  const [memoryDetailVisible, setMemoryDetailVisible] = useState(false);
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingMemory, setEditingMemory] = useState<Memory | null>(null);
+  const [editForm] = Form.useForm();
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
   const [agents, setAgents] = useState<any[]>([]);
@@ -328,11 +330,79 @@ const MemoryManagement: React.FC = () => {
   };
 
   /**
-   * 显示记忆详情
+   * 编辑记忆
    */
-  const showMemoryDetail = (memory: Memory) => {
-    setSelectedMemory(memory);
-    setMemoryDetailVisible(true);
+  const handleEditMemory = (memory: Memory) => {
+    setEditingMemory(memory);
+    editForm.setFieldsValue({
+      memory: memory.memory,
+      metadata: JSON.stringify(memory.metadata, null, 2)
+    });
+    setEditModalVisible(true);
+  };
+
+  /**
+   * 保存编辑的记忆
+   */
+  const handleSaveEdit = async () => {
+    try {
+      const values = await editForm.validateFields();
+      if (!editingMemory) return;
+
+      setLoading(true);
+
+      // 解析元数据
+      let metadata = {};
+      if (values.metadata) {
+        try {
+          metadata = JSON.parse(values.metadata);
+        } catch (e) {
+          message.error('元数据格式错误，请输入有效的JSON');
+          return;
+        }
+      }
+
+      const response = await memoryApi.updateMemory(editingMemory.id, {
+        content: values.memory,
+        metadata
+      });
+
+      if (response.status === 'ok') {
+        message.success('记忆更新成功');
+        setEditModalVisible(false);
+        setEditingMemory(null);
+        editForm.resetFields();
+        await loadAllMemories();
+      } else {
+        message.error('更新失败');
+      }
+    } catch (error) {
+      console.error('更新记忆失败:', error);
+      message.error('更新记忆失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 删除单个记忆
+   */
+  const handleDeleteMemory = async (memoryId: string) => {
+    try {
+      setLoading(true);
+      const response = await memoryApi.deleteMemory(memoryId);
+      if (response.status === 'ok') {
+        message.success('记忆删除成功');
+        await loadAllMemories(); // 重新加载列表
+      } else {
+        message.error('删除失败');
+      }
+    } catch (error) {
+      console.error('删除记忆失败:', error);
+      message.error('删除记忆失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -385,40 +455,43 @@ const MemoryManagement: React.FC = () => {
       title: '记忆内容',
       dataIndex: 'memory',
       key: 'memory',
-      ellipsis: { showTitle: false },
-      render: (text: string, record: Memory) => (
-        <Tooltip title={text}>
-          <Paragraph
-            ellipsis={{ rows: 2 }}
-            style={{ marginBottom: 0, cursor: 'pointer' }}
-            onClick={() => showMemoryDetail(record)}
-          >
-            {text || '-'}
-          </Paragraph>
-        </Tooltip>
+      width: 400,
+      render: (text: string) => (
+        <Input.TextArea
+          value={text || '-'}
+          readOnly
+          autoSize={{ minRows: 2, maxRows: 4 }}
+          style={{
+            resize: 'none',
+            backgroundColor: 'transparent',
+            border: 'none',
+            cursor: 'text'
+          }}
+        />
       ),
     },
     {
-      title: '相关性',
+      title: '距离',
       dataIndex: 'score',
       key: 'score',
       width: 100,
-      sorter: (a: Memory, b: Memory) => (a.score || 0) - (b.score || 0),
+      sorter: (a: Memory, b: Memory) => (a.score || 999) - (b.score || 999),  // 升序，距离小的在前
       render: (score: number) => {
-        if (!score) return '-';
-        const percent = Math.round(score * 100);
-        let color = 'default';
-        if (percent >= 80) color = 'success';
-        else if (percent >= 60) color = 'warning';
-        else if (percent >= 40) color = 'processing';
+        if (score === undefined || score === null) return '-';
+
+        // 保留2位小数
+        const scoreValue = score.toFixed(2);
+
+        // 根据距离设置颜色 (cosine距离：0最相似，2最不相似)
+        let color = '#52c41a';  // 绿色 (高相似度，距离小)
+        if (score > 0.6) color = '#ff4d4f';  // 红色 (低相似度，距离大)
+        else if (score > 0.4) color = '#faad14';  // 橙色
+        else if (score > 0.2) color = '#1890ff';  // 蓝色
 
         return (
-          <Badge
-            count={`${percent}%`}
-            showZero
-            color={color}
-            style={{ backgroundColor: color }}
-          />
+          <Tag color={color}>
+            {scoreValue}
+          </Tag>
         );
       },
     },
@@ -426,43 +499,60 @@ const MemoryManagement: React.FC = () => {
       title: '元数据',
       dataIndex: 'metadata',
       key: 'metadata',
-      width: 200,
+      width: 300,
       render: (metadata: Record<string, any>) => {
         if (!metadata || Object.keys(metadata).length === 0) return '-';
 
-        const importantKeys = ['type', 'source', 'timestamp'];
-        const displayItems = importantKeys
-          .filter(key => metadata[key])
-          .slice(0, 2);
-
+        const metaStr = JSON.stringify(metadata, null, 2);
         return (
-          <Space size={4} wrap>
-            {displayItems.map(key => (
-              <Tag key={key} color="blue">
-                {key}: {metadata[key]}
-              </Tag>
-            ))}
-            {Object.keys(metadata).length > 2 && (
-              <Tag>+{Object.keys(metadata).length - 2}</Tag>
-            )}
-          </Space>
+          <Input.TextArea
+            value={metaStr}
+            readOnly
+            autoSize={{ minRows: 2, maxRows: 4 }}
+            style={{
+              resize: 'none',
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'text',
+              fontSize: '12px',
+              fontFamily: 'monospace'
+            }}
+          />
         );
       },
     },
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 120,
       fixed: 'right',
       render: (_: any, record: Memory) => (
         <Space>
-          <Button
-            size="small"
-            type="link"
-            onClick={() => showMemoryDetail(record)}
+          <Tooltip title="编辑">
+            <Button
+              size="small"
+              type="link"
+              icon={<EditOutlined />}
+              onClick={() => handleEditMemory(record)}
+            />
+          </Tooltip>
+          <Popconfirm
+            title="删除记忆"
+            description="确定要删除这条记忆吗？此操作不可恢复。"
+            onConfirm={() => handleDeleteMemory(record.id)}
+            okText="确定"
+            cancelText="取消"
+            placement="left"
           >
-            详情
-          </Button>
+            <Tooltip title="删除">
+              <Button
+                size="small"
+                type="link"
+                danger
+                icon={<DeleteOutlined />}
+              />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -716,60 +806,62 @@ const MemoryManagement: React.FC = () => {
         </Spin>
       </Card>
 
-      {/* 记忆详情模态框 */}
+      {/* 编辑记忆模态框 */}
       <Modal
         title={
           <Space>
-            <InfoCircleOutlined />
-            记忆详情
+            <EditOutlined />
+            编辑记忆
           </Space>
         }
-        open={memoryDetailVisible}
+        open={editModalVisible}
+        onOk={handleSaveEdit}
         onCancel={() => {
-          setMemoryDetailVisible(false);
-          setSelectedMemory(null);
+          setEditModalVisible(false);
+          setEditingMemory(null);
+          editForm.resetFields();
         }}
-        footer={[
-          <Button key="close" onClick={() => {
-            setMemoryDetailVisible(false);
-            setSelectedMemory(null);
-          }}>
-            关闭
-          </Button>
-        ]}
+        confirmLoading={loading}
         width={700}
       >
-        {selectedMemory && (
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="记忆ID">
-              <Text code copyable>{selectedMemory.id}</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label="记忆内容">
-              <Paragraph copyable>{selectedMemory.memory}</Paragraph>
-            </Descriptions.Item>
-            {selectedMemory.user_id && (
-              <Descriptions.Item label="用户ID">
-                <Tag color="blue">{selectedMemory.user_id}</Tag>
-              </Descriptions.Item>
-            )}
-            {selectedMemory.score && (
-              <Descriptions.Item label="相关性分数">
-                <Badge
-                  count={`${Math.round(selectedMemory.score * 100)}%`}
-                  showZero
-                  color="processing"
-                />
-              </Descriptions.Item>
-            )}
-            {selectedMemory.metadata && (
-              <Descriptions.Item label="元数据">
-                <pre style={{ margin: 0 }}>
-                  {JSON.stringify(selectedMemory.metadata, null, 2)}
-                </pre>
-              </Descriptions.Item>
-            )}
-          </Descriptions>
-        )}
+        <Form
+          form={editForm}
+          layout="vertical"
+        >
+          <Form.Item
+            name="memory"
+            label="记忆内容"
+            rules={[{ required: true, message: '请输入记忆内容' }]}
+          >
+            <TextArea
+              rows={6}
+              placeholder="输入记忆内容..."
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="metadata"
+            label="元数据（JSON格式）"
+            rules={[
+              {
+                validator: (_, value) => {
+                  if (!value) return Promise.resolve();
+                  try {
+                    JSON.parse(value);
+                    return Promise.resolve();
+                  } catch (e) {
+                    return Promise.reject(new Error('请输入有效的JSON格式'));
+                  }
+                },
+              },
+            ]}
+          >
+            <TextArea
+              rows={8}
+              placeholder='{"type": "example", "importance": "high"}'
+            />
+          </Form.Item>
+        </Form>
       </Modal>
 
       {/* 测试添加对话记忆模态框 */}
