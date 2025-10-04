@@ -16,6 +16,7 @@ export interface Memory {
   user_id?: string;
   agent_id?: string;
   run_id?: string;
+  score?: number;  // 搜索时的相似度分数（余弦距离，0-2之间）
 }
 
 export interface MemoryAddRequest {

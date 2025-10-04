@@ -20,6 +20,7 @@ import {
   Modal,
   Form,
   Input,
+  InputNumber,
   Select,
   message,
   Popconfirm,
@@ -89,6 +90,8 @@ const MemoryManagement: React.FC = () => {
     sessionCount: 0
   });
   const [memoryLevel, setMemoryLevel] = useState<string>('user_agent');
+  const [searchKeyword, setSearchKeyword] = useState<string>('');  // 当前搜索关键词
+  const [isSearchResult, setIsSearchResult] = useState<boolean>(false);  // 是否为搜索结果
 
   /**
    * 加载智能体列表
@@ -109,6 +112,8 @@ const MemoryManagement: React.FC = () => {
    */
   const loadMemoriesByLevel = async (level?: string, userId?: string, agentId?: string, runId?: string) => {
     setLoading(true);
+    setIsSearchResult(false);  // 清除搜索状态
+    setSearchKeyword('');  // 清除搜索关键词
     try {
       // 使用Mem0标准API - 通过参数组合来查询不同层级的记忆
       let response;
@@ -283,25 +288,56 @@ const MemoryManagement: React.FC = () => {
       setSearchLoading(true);
       const values = await searchForm.validateFields();
 
-      // 直接使用Mem0原生搜索方法
-      const response = await memoryApi.searchMemories(
-        values.query,
-        values.user_id || undefined, // user_id - 如果指定了用户名则使用，否则使用当前用户
-        values.agent_id, // agent_id - 可选
-        undefined, // run_id
-        20 // limit
-      );
+      // 构造搜索参数对象
+      const searchParams: any = {
+        query: values.query,
+        user_id: values.user_id || undefined,
+        agent_id: values.agent_id || undefined,
+        run_id: values.run_id || undefined,
+        threshold: values.threshold || undefined,
+        limit: values.limit || 20
+      };
+
+      // 调用搜索API
+      const response = await memoryApi.searchMemories(searchParams);
 
       if (response.status === 'ok' && response.data) {
         // 确保 data 是数组
-        const memoriesData = Array.isArray(response.data) ? response.data : [];
+        let memoriesData = Array.isArray(response.data) ? response.data : [];
+
+        // 如果有记忆类型筛选，在前端过滤
+        if (values.memory_type && values.memory_type.length > 0) {
+          memoriesData = memoriesData.filter((m: Memory) => {
+            // 判断记忆类型
+            if (values.memory_type.includes('user') && m.user_id && !m.agent_id && !m.run_id) return true;
+            if (values.memory_type.includes('agent') && m.agent_id && !m.user_id) return true;
+            if (values.memory_type.includes('user_agent') && m.user_id && m.agent_id && !m.run_id) return true;
+            if (values.memory_type.includes('session') && m.run_id) return true;
+            return false;
+          });
+        }
+
         setMemories(memoriesData);
         updateStats(memoriesData);
-        const userInfo = values.user_id ? `用户 ${values.user_id} 的` : '';
-        message.success(`搜索到 ${userInfo}${memoriesData.length} 条相关记忆`);
+        setSearchKeyword(values.query);  // 保存搜索关键词
+        setIsSearchResult(true);  // 标记为搜索结果
+
+        // 构建搜索结果提示信息
+        let searchInfo = `搜索到 ${memoriesData.length} 条相关记忆`;
+        if (values.user_id) searchInfo = `用户 ${values.user_id} 的${memoriesData.length} 条相关记忆`;
+        if (values.agent_id) {
+          const agent = agents.find(a => a.agent_id === values.agent_id);
+          if (agent) searchInfo += `（智能体：${agent.agent_name}）`;
+        }
+        if (values.threshold) searchInfo += `（相似度≥${values.threshold}）`;
+
+        message.success(searchInfo);
+        setSearchModalVisible(false);
+        searchForm.resetFields();
       } else {
         setMemories([]);
         updateStats([]);
+        setIsSearchResult(false);
         message.info('未找到相关记忆');
       }
     } catch (error) {
@@ -309,7 +345,6 @@ const MemoryManagement: React.FC = () => {
       message.error('搜索记忆失败');
     } finally {
       setSearchLoading(false);
-      setSearchModalVisible(false);
     }
   };
 
@@ -591,6 +626,31 @@ const MemoryManagement: React.FC = () => {
       },
     },
     {
+      title: '相似度',
+      dataIndex: 'score',
+      key: 'score',
+      width: 100,
+      render: (score: number) => {
+        if (score === undefined || score === null) return '-';
+        const percentage = (1 - score / 2) * 100; // 将cosine距离转换为相似度百分比
+        let color = 'green';
+        if (percentage < 60) color = 'red';
+        else if (percentage < 80) color = 'orange';
+        return (
+          <Tooltip title={`余弦距离: ${score?.toFixed(4) || 'N/A'}`}>
+            <Tag color={color}>
+              {percentage.toFixed(1)}%
+            </Tag>
+          </Tooltip>
+        );
+      },
+      sorter: (a: Memory, b: Memory) => {
+        const scoreA = a.score || 2;
+        const scoreB = b.score || 2;
+        return scoreA - scoreB;
+      },
+    },
+    {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
@@ -730,6 +790,22 @@ const MemoryManagement: React.FC = () => {
         </Col>
       </Row>
 
+      {/* 搜索结果提示 */}
+      {isSearchResult && (
+        <Alert
+          message={`当前显示搜索结果：关键词 "${searchKeyword}"`}
+          type="info"
+          showIcon
+          closable
+          onClose={() => {
+            setIsSearchResult(false);
+            setSearchKeyword('');
+            loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, selectedRunId);
+          }}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* 主要内容区 */}
       <Card bordered={false}>
         {/* 筛选和操作栏 */}
@@ -832,12 +908,14 @@ const MemoryManagement: React.FC = () => {
               </Space>
 
               <Space>
-                <Button
-                  icon={<SearchOutlined />}
-                  onClick={() => setSearchModalVisible(true)}
-                >
-                  搜索记忆
-                </Button>
+                <Badge dot={isSearchResult} offset={[-5, 5]}>
+                  <Button
+                    icon={<SearchOutlined />}
+                    onClick={() => setSearchModalVisible(true)}
+                  >
+                    搜索记忆
+                  </Button>
+                </Badge>
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={loadAllMemories}
@@ -1173,7 +1251,7 @@ const MemoryManagement: React.FC = () => {
         confirmLoading={searchLoading}
         okText="搜索"
         cancelText="取消"
-        width={600}
+        width={700}
       >
         <Form
           form={searchForm}
@@ -1214,6 +1292,70 @@ const MemoryManagement: React.FC = () => {
                   {agent.agent_name}
                 </Option>
               ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="run_id"
+            label="会话ID（可选）"
+            tooltip="输入特定会话ID，精确搜索会话记忆"
+          >
+            <Input
+              placeholder="输入会话ID"
+              prefix={<ClockCircleOutlined />}
+              allowClear
+            />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="threshold"
+                label="相似度阈值"
+                tooltip="0-1之间，值越大要求越相似，默认0.7"
+                initialValue={0.7}
+              >
+                <InputNumber
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  style={{ width: '100%' }}
+                  placeholder="0.7"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="limit"
+                label="返回数量"
+                tooltip="最多返回多少条记忆"
+                initialValue={20}
+              >
+                <InputNumber
+                  min={1}
+                  max={200}
+                  step={10}
+                  style={{ width: '100%' }}
+                  placeholder="20"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="memory_type"
+            label="记忆类型筛选"
+            tooltip="选择要搜索的记忆类型"
+          >
+            <Select
+              mode="multiple"
+              placeholder="选择记忆类型（留空搜索所有类型）"
+              allowClear
+            >
+              <Option value="user">用户记忆</Option>
+              <Option value="agent">智能体记忆</Option>
+              <Option value="user_agent">用户-智能体记忆</Option>
+              <Option value="session">会话记忆</Option>
             </Select>
           </Form.Item>
         </Form>
