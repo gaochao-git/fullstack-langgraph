@@ -21,8 +21,8 @@ router = APIRouter(tags=["Memory Management"])
 
 def format_memory_times(memory: dict) -> dict:
     """格式化时间字段，从US/Pacific转换到Asia/Shanghai"""
-    if not memory:
-        return {}
+    if not memory or not isinstance(memory, dict):
+        return memory if isinstance(memory, dict) else {}
 
     # 处理created_at和updated_at
     for time_field in ['created_at', 'updated_at']:
@@ -140,12 +140,12 @@ async def search_memories(
         else:
             memories = result
 
-        # 格式化时间字段
-        memories = [format_memory_times(mem) for mem in memories]
+        # 格式化时间字段（只处理字典类型）
+        memories = [format_memory_times(mem) if isinstance(mem, dict) else mem for mem in memories]
 
         # 记录结果详情
         if memories:
-            scores = [m.get('score', 'N/A') for m in memories[:5]]
+            scores = [m.get('score', 'N/A') if isinstance(m, dict) else 'N/A' for m in memories[:5]]
             logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(memories)} 条结果, 前5个距离: {scores}")
         else:
             logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 未找到匹配结果")
@@ -194,8 +194,8 @@ async def get_all_memories(
         if len(memories) > limit:
             memories = memories[:limit]
 
-        # 格式化时间字段
-        memories = [format_memory_times(mem) for mem in memories]
+        # 格式化时间字段（只处理字典类型）
+        memories = [format_memory_times(mem) if isinstance(mem, dict) else mem for mem in memories]
 
         logger.info(f"获取记忆列表: user_id={user_id}, 返回 {len(memories)} 条")
         return success_response(data=memories)

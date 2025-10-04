@@ -439,9 +439,29 @@ class EnterpriseMemory:
                 threshold=None  # 不使用Mem0的错误threshold逻辑
             )
 
+            # 处理Mem0返回格式：可能是dict或list
+            if isinstance(results, dict):
+                logger.info(f"Mem0返回字典格式: keys={list(results.keys())}")
+                results = results.get('results', [])
+
+            logger.info(f"处理后的搜索结果: 类型={type(results)}, 数量={len(results)}")
+            if results and len(results) > 0:
+                logger.info(f"第一条结果类型={type(results[0])}, 内容={results[0]}")
+
             # 正确过滤：保留 score <= threshold 的结果（距离小的，相似的）
             if threshold is not None:
-                results = [r for r in results if r.get('score', float('inf')) <= threshold]
+                filtered_results = []
+                for idx, r in enumerate(results):
+                    try:
+                        # 尝试获取score，支持dict和对象属性两种方式
+                        score = r.get('score') if hasattr(r, 'get') else getattr(r, 'score', None)
+                        logger.info(f"记录{idx}: score={score}, threshold={threshold}, 保留={score is not None and score <= threshold}")
+                        if score is not None and score <= threshold:
+                            filtered_results.append(r)
+                    except Exception as e:
+                        logger.warning(f"无法获取记录{idx}的score: {e}，保留该记录")
+                        filtered_results.append(r)
+                results = filtered_results
 
             logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(results)} 条结果")
             return results
