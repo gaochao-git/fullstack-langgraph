@@ -506,7 +506,7 @@ const MemoryManagement: React.FC = () => {
       title: '类型',
       dataIndex: ['metadata', 'level'],
       key: 'level',
-      width: 100,
+      width: 130,
       render: (level: string, record: Memory) => {
         // 根据数据推断层级
         let inferredLevel = level;
@@ -520,28 +520,45 @@ const MemoryManagement: React.FC = () => {
           }
         }
 
-        const levelIcons: Record<string, React.ReactNode> = {
-          user: <UserOutlined />,
-          agent: <RobotOutlined />,
-          user_agent: <MessageOutlined />,
-          session: <ClockCircleOutlined />
-        };
-
-        const levelColors: Record<string, string> = {
-          user: 'blue',
-          agent: 'green',
-          user_agent: 'orange',
-          session: 'purple'
-        };
-
-        return (
-          <Tag
-            icon={levelIcons[inferredLevel]}
-            color={levelColors[inferredLevel] || 'default'}
-          >
-            {getLevelName(inferredLevel)}
-          </Tag>
-        );
+        return getLevelName(inferredLevel) || '-';
+      },
+    },
+    {
+      title: '用户ID',
+      dataIndex: 'user_id',
+      key: 'user_id',
+      width: 120,
+      render: (user_id: string) => user_id || '-',
+    },
+    {
+      title: '智能体ID',
+      key: 'agent_id',
+      width: 150,
+      render: (_: any, record: Memory) => {
+        // agent_id 可能在根级别或metadata中
+        const agent_id = record.agent_id || record.metadata?.agent_id;
+        return agent_id || '-';
+      },
+    },
+    {
+      title: '会话ID',
+      key: 'run_id',
+      width: 150,
+      render: (_: any, record: Memory) => {
+        // run_id 可能在根级别或metadata中
+        const run_id = record.run_id || record.metadata?.run_id;
+        return run_id || '-';
+      },
+    },
+    {
+      title: '距离',
+      dataIndex: 'score',
+      key: 'score',
+      width: 100,
+      sorter: (a: Memory, b: Memory) => (a.score || 999) - (b.score || 999),  // 升序，距离小的在前
+      render: (score: number) => {
+        if (score === undefined || score === null) return '-';
+        return score.toFixed(2);
       },
     },
     {
@@ -562,75 +579,6 @@ const MemoryManagement: React.FC = () => {
           }}
         />
       ),
-    },
-    {
-      title: '用户ID',
-      dataIndex: 'user_id',
-      key: 'user_id',
-      width: 120,
-      render: (user_id: string) => {
-        if (!user_id) return '-';
-        return (
-          <Tag icon={<UserOutlined />} color="blue">
-            {user_id}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: '智能体ID',
-      key: 'agent_id',
-      width: 150,
-      render: (_: any, record: Memory) => {
-        // agent_id 可能在根级别或metadata中
-        const agent_id = record.agent_id || record.metadata?.agent_id;
-        if (!agent_id) return '-';
-        return (
-          <Tag icon={<RobotOutlined />} color="green">
-            {agent_id}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: '会话ID',
-      key: 'run_id',
-      width: 150,
-      render: (_: any, record: Memory) => {
-        // run_id 可能在根级别或metadata中
-        const run_id = record.run_id || record.metadata?.run_id;
-        if (!run_id) return '-';
-        return (
-          <Tag icon={<ClockCircleOutlined />} color="purple">
-            {run_id.length > 8 ? `${run_id.substring(0, 8)}...` : run_id}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: '距离',
-      dataIndex: 'score',
-      key: 'score',
-      width: 100,
-      sorter: (a: Memory, b: Memory) => (a.score || 999) - (b.score || 999),  // 升序，距离小的在前
-      render: (score: number) => {
-        if (score === undefined || score === null) return '-';
-
-        // 保留2位小数
-        const scoreValue = score.toFixed(2);
-
-        // 根据距离设置颜色 (cosine距离：0最相似，2最不相似)
-        let color = '#52c41a';  // 绿色 (高相似度，距离小)
-        if (score > 0.6) color = '#ff4d4f';  // 红色 (低相似度，距离大)
-        else if (score > 0.4) color = '#faad14';  // 橙色
-        else if (score > 0.2) color = '#1890ff';  // 蓝色
-
-        return (
-          <Tag color={color}>
-            {scoreValue}
-          </Tag>
-        );
-      },
     },
     {
       title: '元数据',
@@ -656,32 +604,6 @@ const MemoryManagement: React.FC = () => {
             }}
           />
         );
-      },
-    },
-    {
-      title: '相似度',
-      dataIndex: 'score',
-      key: 'score',
-      width: 100,
-      render: (score: number) => {
-        if (score === undefined || score === null) return '-';
-        // score是余弦距离(0-2)，转换为相似度百分比
-        const percentage = (1 - score / 2) * 100;
-        let color = 'green';
-        if (percentage < 60) color = 'red';
-        else if (percentage < 80) color = 'orange';
-        return (
-          <Tooltip title={`余弦距离: ${score?.toFixed(4) || 'N/A'}（距离越小越相似）`}>
-            <Tag color={color}>
-              {percentage.toFixed(1)}%
-            </Tag>
-          </Tooltip>
-        );
-      },
-      sorter: (a: Memory, b: Memory) => {
-        const scoreA = a.score || 2;
-        const scoreB = b.score || 2;
-        return scoreA - scoreB;
       },
     },
     {
