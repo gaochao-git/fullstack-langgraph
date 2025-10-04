@@ -419,7 +419,8 @@ class EnterpriseMemory:
         user_id: Optional[str] = None,
         agent_id: Optional[str] = None,
         run_id: Optional[str] = None,
-        limit: int = 10
+        limit: int = 10,
+        threshold: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """搜索记忆（Mem0原生方法）"""
         if not self.memory:
@@ -431,7 +432,8 @@ class EnterpriseMemory:
                 user_id=user_id,
                 agent_id=agent_id,
                 run_id=run_id,
-                limit=limit
+                limit=limit,
+                threshold=threshold
             )
 
             logger.info(f"搜索记忆: query='{query[:50]}...', 返回 {len(results)} 条结果")

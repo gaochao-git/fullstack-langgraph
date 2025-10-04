@@ -141,7 +141,8 @@ async def search_memories(
             user_id=user_id,
             agent_id=agent_id,
             run_id=run_id,
-            limit=limit
+            limit=limit,
+            threshold=threshold
         )
 
         # 处理Mem0返回格式
