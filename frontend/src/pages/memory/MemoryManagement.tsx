@@ -252,7 +252,7 @@ const MemoryManagement: React.FC = () => {
       } else if (memoryLevel === 'user_agent') {
         // 用户-智能体记忆：传user_id和agent_id
         response = await memoryApi.addConversationMemory(messages, {
-          userId: undefined, // 使用当前用户
+          userId: values.user_id || undefined, // 使用输入的用户或当前用户
           agentId: values.agent_id,
           metadata
         });
@@ -1172,8 +1172,49 @@ const MemoryManagement: React.FC = () => {
           </Form.Item>
 
           {/* 根据记忆层级显示不同的选择器 */}
-          {(memoryLevel === 'user_agent' ||
-            memoryLevel === 'agent') && (
+          {memoryLevel === 'user' && (
+            <Form.Item
+              name="user_id"
+              label="用户名（可选）"
+              tooltip="留空则为当前用户添加记忆"
+            >
+              <Input
+                placeholder="输入用户名，默认为当前用户"
+                prefix={<UserOutlined />}
+              />
+            </Form.Item>
+          )}
+
+          {memoryLevel === 'user_agent' && (
+            <>
+              <Form.Item
+                name="user_id"
+                label="用户名（可选）"
+                tooltip="留空则为当前用户添加记忆"
+              >
+                <Input
+                  placeholder="输入用户名，默认为当前用户"
+                  prefix={<UserOutlined />}
+                />
+              </Form.Item>
+              <Form.Item
+                name="agent_id"
+                label="智能体选择"
+                rules={[{ required: true, message: '请选择智能体' }]}
+                initialValue={agents.length > 0 ? agents[0].agent_id : undefined}
+              >
+                <Select placeholder="选择智能体" loading={agents.length === 0}>
+                  {agents.map(agent => (
+                    <Option key={agent.agent_id} value={agent.agent_id}>
+                      {agent.agent_name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </>
+          )}
+
+          {memoryLevel === 'agent' && (
             <Form.Item
               name="agent_id"
               label="智能体选择"
@@ -1187,19 +1228,6 @@ const MemoryManagement: React.FC = () => {
                   </Option>
                 ))}
               </Select>
-            </Form.Item>
-          )}
-
-          {memoryLevel === 'user' && (
-            <Form.Item
-              name="user_id"
-              label="用户名（可选）"
-              tooltip="留空则为当前用户添加记忆"
-            >
-              <Input
-                placeholder="输入用户名，默认为当前用户"
-                prefix={<UserOutlined />}
-              />
             </Form.Item>
           )}
 

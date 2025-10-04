@@ -130,7 +130,13 @@ export const memoryApi = {
   // ==================== 便捷方法 ====================
 
   /**
-   * 按层级获取记忆（便捷方法）
+   * 按层级获取记忆（符合Mem0官方规范）
+   *
+   * Mem0官方示例：
+   * - get_all(user_id="alice") - 用户记忆
+   * - get_all(agent_id="diet-assistant") - 智能体记忆
+   * - get_all(user_id="alice", agent_id="diet-assistant") - 用户-智能体记忆
+   * - get_all(user_id="alice", run_id="consultation-001") - 会话记忆
    */
   async getMemoriesByLevel(level: 'user' | 'agent' | 'session' | 'user_agent', params?: {
     userId?: string;
@@ -138,52 +144,43 @@ export const memoryApi = {
     runId?: string;
     limit?: number;
   }) {
-    // 获取所有记忆，然后在前端根据层级过滤
-    const response = await this.getAllMemories(
-      params?.userId || undefined,
-      params?.agentId || undefined,
-      params?.runId || undefined,
-      params?.limit || 500
-    );
+    // 根据层级类型构建正确的参数组合，符合Mem0官方规范
+    let userId: string | undefined;
+    let agentId: string | undefined;
+    let runId: string | undefined;
 
-    if (response.status === 'ok' && response.data) {
-      // 在前端根据层级过滤
-      let filteredData = response.data;
+    switch(level) {
+      case 'user':
+        // 用户记忆：只传user_id
+        userId = params?.userId || undefined;  // 不传则使用当前用户
+        agentId = undefined;
+        runId = undefined;
+        break;
 
-      switch(level) {
-        case 'user':
-          // 纯用户记忆：有user_id，没有agent_id和run_id
-          filteredData = response.data.filter((m: Memory) =>
-            m.user_id && !m.agent_id && !m.run_id
-          );
-          break;
+      case 'agent':
+        // 智能体记忆：只传agent_id
+        userId = undefined;
+        agentId = params?.agentId || undefined;
+        runId = undefined;
+        break;
 
-        case 'agent':
-          // 纯智能体记忆：有agent_id，没有user_id
-          filteredData = response.data.filter((m: Memory) =>
-            m.agent_id && !m.user_id
-          );
-          break;
+      case 'user_agent':
+        // 用户-智能体记忆：传user_id和agent_id
+        userId = params?.userId || undefined;
+        agentId = params?.agentId || undefined;
+        runId = undefined;
+        break;
 
-        case 'session':
-          // 会话记忆：有run_id
-          filteredData = response.data.filter((m: Memory) =>
-            m.run_id
-          );
-          break;
-
-        case 'user_agent':
-          // 用户-智能体交互记忆：有user_id和agent_id，没有run_id
-          filteredData = response.data.filter((m: Memory) =>
-            m.user_id && m.agent_id && !m.run_id
-          );
-          break;
-      }
-
-      response.data = filteredData;
+      case 'session':
+        // 会话记忆：传user_id和run_id
+        userId = params?.userId || undefined;
+        agentId = undefined;
+        runId = params?.runId || undefined;
+        break;
     }
 
-    return response;
+    // 调用后端API，让Mem0根据参数组合进行过滤
+    return await this.getAllMemories(userId, agentId, runId, params?.limit || 100);
   },
 
   /**
