@@ -128,12 +128,8 @@ async def search_memories(
     搜索记忆 (Mem0: memory.search())
 
     搜索符合条件的记忆，支持语义搜索。
+    根据传入的user_id、agent_id、run_id组合查询不同范围的记忆。
     """
-    # 如果没有指定任何条件，使用当前用户
-    # 如果指定了agent_id或run_id，则按指定条件查询
-    if not user_id and not agent_id and not run_id:
-        user_id = current_user.get("username", "system")
-
     try:
         logger.info(f"搜索记忆请求: query='{query}', threshold={threshold}, user_id={user_id}, agent_id={agent_id}, run_id={run_id}, limit={limit}")
 
@@ -182,12 +178,12 @@ async def get_all_memories(
     获取所有记忆 (Mem0: memory.get_all())
 
     获取指定条件的所有记忆，完全符合Mem0标准。
+    至少需要提供一个参数：
+    - user_id：返回该用户的记忆
+    - agent_id：返回该智能体的记忆
+    - user_id + agent_id：返回用户-智能体记忆
+    - user_id + agent_id + run_id：返回会话记忆
     """
-    # 如果没有指定任何条件，使用当前用户
-    # 如果指定了agent_id或run_id，则按指定条件查询
-    if not user_id and not agent_id and not run_id:
-        user_id = current_user.get("username", "system")
-
     try:
         memory = await memory_service._get_memory()
         result = await memory.list_all_memories(

@@ -79,15 +79,15 @@ const MemoryManagement: React.FC = () => {
   const [form] = Form.useForm();
   const [searchForm] = Form.useForm();
   const [agents, setAgents] = useState<any[]>([]);
-  const [currentLevel, setCurrentLevel] = useState<string | undefined>(undefined);
+  const [currentLevel, setCurrentLevel] = useState<string>('user');
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(undefined);
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(undefined);
   const [stats, setStats] = useState({
-    total: 0,
     userCount: 0,
     agentCount: 0,
-    sessionCount: 0
+    sessionCount: 0,
+    userAgentCount: 0
   });
   const [memoryLevel, setMemoryLevel] = useState<string>('user_agent');
   const [searchKeyword, setSearchKeyword] = useState<string>('');  // 当前搜索关键词
@@ -115,19 +115,43 @@ const MemoryManagement: React.FC = () => {
     setIsSearchResult(false);  // 清除搜索状态
     setSearchKeyword('');  // 清除搜索关键词
     try {
-      // 使用Mem0标准API - 通过参数组合来查询不同层级的记忆
-      let response;
-      if (level && ['user', 'agent', 'session', 'user_agent'].includes(level)) {
-        response = await memoryApi.getMemoriesByLevel(level as any, {
-          userId,
-          agentId,
-          runId,
-          limit: 100
-        });
-      } else {
-        // 获取所有记忆 - 不传任何参数
-        response = await memoryApi.getAllMemories(undefined, undefined, undefined, 100);
+      // 检查必要参数是否提供
+      if (level === 'user' && !userId) {
+        message.warning('请输入用户名');
+        setMemories([]);
+        updateStats([]);
+        setLoading(false);
+        return;
       }
+      if (level === 'agent' && !agentId) {
+        message.warning('请选择智能体');
+        setMemories([]);
+        updateStats([]);
+        setLoading(false);
+        return;
+      }
+      if (level === 'user_agent' && (!userId || !agentId)) {
+        message.warning('请输入用户名并选择智能体');
+        setMemories([]);
+        updateStats([]);
+        setLoading(false);
+        return;
+      }
+      if (level === 'session' && (!userId || !agentId || !runId)) {
+        message.warning('请输入用户名、选择智能体并输入会话ID');
+        setMemories([]);
+        updateStats([]);
+        setLoading(false);
+        return;
+      }
+
+      // 使用Mem0标准API - 通过参数组合来查询不同层级的记忆
+      const response = await memoryApi.getMemoriesByLevel(level as any, {
+        userId,
+        agentId,
+        runId,
+        limit: 100
+      });
       console.log('Memory response:', response);
 
       if (response.status === 'ok' && response.data) {
@@ -138,6 +162,8 @@ const MemoryManagement: React.FC = () => {
         const levelName = level ? getLevelName(level) : '所有';
         if (memoriesData.length > 0) {
           message.success(`加载了 ${memoriesData.length} 条${levelName}记忆`);
+        } else {
+          message.info('暂无记忆数据');
         }
       } else {
         setMemories([]);
@@ -173,10 +199,10 @@ const MemoryManagement: React.FC = () => {
     );
 
     setStats({
-      total: memoriesData.length,
       userCount: userMemories.length,
       agentCount: agentMemories.length,
-      sessionCount: sessionMemories.length
+      sessionCount: sessionMemories.length,
+      userAgentCount: userAgentMemories.length
     });
   };
 
@@ -203,13 +229,19 @@ const MemoryManagement: React.FC = () => {
   /**
    * 处理层级切换
    */
-  const handleLevelChange = async (level: string | undefined) => {
-    setCurrentLevel(level === '全部' ? undefined : level);
-    await loadMemoriesByLevel(level === '全部' ? undefined : level, selectedUserId, selectedAgentId, selectedRunId);
+  const handleLevelChange = async (level: string) => {
+    setCurrentLevel(level);
+    // 清空之前的筛选条件，重新开始
+    setSelectedUserId(undefined);
+    setSelectedAgentId(undefined);
+    setSelectedRunId(undefined);
+    // 切换层级后，等待用户输入参数
+    setMemories([]);
+    updateStats([]);
   };
 
   /**
-   * 测试添加对话记忆
+   * 添加对话记忆
    */
   const handleTestConversation = async () => {
     try {
@@ -752,16 +784,6 @@ const MemoryManagement: React.FC = () => {
         <Col xs={24} sm={12} md={6}>
           <Card bordered={false}>
             <Statistic
-              title="总记忆数"
-              value={stats.total}
-              prefix={<DatabaseOutlined />}
-              valueStyle={{ color: '#1890ff' }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card bordered={false}>
-            <Statistic
               title="用户记忆"
               value={stats.userCount}
               prefix={<UserOutlined />}
@@ -782,9 +804,19 @@ const MemoryManagement: React.FC = () => {
         <Col xs={24} sm={12} md={6}>
           <Card bordered={false}>
             <Statistic
+              title="用户-智能体"
+              value={stats.userAgentCount}
+              prefix={<MessageOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card bordered={false}>
+            <Statistic
               title="会话记忆"
               value={stats.sessionCount}
-              prefix={<MessageOutlined />}
+              prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#fa8c16' }}
             />
           </Card>
@@ -816,13 +848,12 @@ const MemoryManagement: React.FC = () => {
               <Space wrap>
                 <Segmented
                   options={[
-                    { label: '全部', value: '全部', icon: <DatabaseOutlined /> },
                     { label: '用户', value: 'user', icon: <UserOutlined /> },
                     { label: '智能体', value: 'agent', icon: <RobotOutlined /> },
                     { label: '用户-智能体', value: 'user_agent', icon: <MessageOutlined /> },
                     { label: '会话', value: 'session', icon: <ClockCircleOutlined /> },
                   ]}
-                  value={currentLevel || '全部'}
+                  value={currentLevel || 'user'}
                   onChange={handleLevelChange}
                 />
 
@@ -881,12 +912,27 @@ const MemoryManagement: React.FC = () => {
                       allowClear
                       onClear={() => {
                         setSelectedUserId(undefined);
-                        if (selectedRunId) {
-                          loadMemoriesByLevel(currentLevel, undefined, selectedAgentId, selectedRunId);
-                        }
+                        loadMemoriesByLevel(currentLevel, undefined, selectedAgentId, selectedRunId);
                       }}
                       prefix={<UserOutlined />}
                     />
+                    <Select
+                      style={{ width: 200 }}
+                      placeholder="选择智能体"
+                      value={selectedAgentId}
+                      onChange={(value) => {
+                        setSelectedAgentId(value);
+                        loadMemoriesByLevel(currentLevel, selectedUserId, value, selectedRunId);
+                      }}
+                      allowClear
+                      loading={agents.length === 0}
+                    >
+                      {agents.map(agent => (
+                        <Option key={agent.agent_id} value={agent.agent_id}>
+                          {agent.agent_name}
+                        </Option>
+                      ))}
+                    </Select>
                     <Input
                       style={{ width: 200 }}
                       placeholder="输入会话ID（回车搜索）"
@@ -1041,7 +1087,7 @@ const MemoryManagement: React.FC = () => {
         title={
           <Space>
             <ExperimentOutlined />
-            测试添加对话记忆
+            添加对话记忆
           </Space>
         }
         open={testModalVisible}

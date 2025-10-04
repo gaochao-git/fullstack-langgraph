@@ -456,7 +456,10 @@ class EnterpriseMemory:
         agent_id: Optional[str] = None,
         run_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """列出所有记忆（Mem0原生方法）"""
+        """列出所有记忆（Mem0原生方法）
+
+        注意：Mem0要求至少提供一个参数(user_id/agent_id/run_id)
+        """
         if not self.memory:
             await self.initialize()
 
@@ -466,8 +469,7 @@ class EnterpriseMemory:
                 agent_id=agent_id,
                 run_id=run_id
             )
-
-            logger.info(f"列出记忆: user_id={user_id}, agent_id={agent_id}, 返回 {len(memories)} 条")
+            logger.info(f"列出记忆: user_id={user_id}, agent_id={agent_id}, run_id={run_id}, 返回 {len(memories)} 条")
             return memories
 
         except Exception as e:

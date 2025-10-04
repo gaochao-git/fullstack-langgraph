@@ -136,7 +136,7 @@ export const memoryApi = {
    * - get_all(user_id="alice") - 用户记忆
    * - get_all(agent_id="diet-assistant") - 智能体记忆
    * - get_all(user_id="alice", agent_id="diet-assistant") - 用户-智能体记忆
-   * - get_all(user_id="alice", run_id="consultation-001") - 会话记忆
+   * - get_all(user_id="alice", agent_id="diet-assistant", run_id="consultation-001") - 会话记忆
    */
   async getMemoriesByLevel(level: 'user' | 'agent' | 'session' | 'user_agent', params?: {
     userId?: string;
@@ -172,9 +172,9 @@ export const memoryApi = {
         break;
 
       case 'session':
-        // 会话记忆：传user_id和run_id
+        // 会话记忆：传user_id + agent_id + run_id
         userId = params?.userId || undefined;
-        agentId = undefined;
+        agentId = params?.agentId || undefined;
         runId = params?.runId || undefined;
         break;
     }
