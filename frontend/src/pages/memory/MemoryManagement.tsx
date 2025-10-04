@@ -270,29 +270,30 @@ const MemoryManagement: React.FC = () => {
       const memoryLevel = values.memoryLevel;
 
       if (memoryLevel === 'user') {
-        // 用户记忆：只传user_id
+        // 用户记忆：只传user_id（必填）
         response = await memoryApi.addConversationMemory(messages, {
-          userId: values.user_id || undefined,
+          userId: values.user_id,
           metadata
         });
       } else if (memoryLevel === 'agent') {
-        // 智能体记忆：只传agent_id
+        // 智能体记忆：只传agent_id（必填）
         response = await memoryApi.addConversationMemory(messages, {
           agentId: values.agent_id,
           metadata
         });
       } else if (memoryLevel === 'user_agent') {
-        // 用户-智能体记忆：传user_id和agent_id
+        // 用户-智能体记忆：传user_id和agent_id（全部必填）
         response = await memoryApi.addConversationMemory(messages, {
-          userId: values.user_id || undefined, // 使用输入的用户或当前用户
+          userId: values.user_id,
           agentId: values.agent_id,
           metadata
         });
       } else if (memoryLevel === 'session') {
-        // 会话记忆：传user_id和run_id
+        // 会话记忆：传user_id + agent_id + run_id（全部必填）
         response = await memoryApi.addConversationMemory(messages, {
-          userId: undefined, // 使用当前用户
-          runId: values.run_id || `session_${Date.now()}`,
+          userId: values.user_id,
+          agentId: values.agent_id,
+          runId: values.run_id,
           metadata
         });
       }
@@ -1196,36 +1197,15 @@ const MemoryManagement: React.FC = () => {
             )}
           </div>
 
-          <Form.Item
-            name="userMessage"
-            label="用户消息"
-            rules={[{ required: true, message: '请输入用户消息' }]}
-          >
-            <TextArea
-              rows={3}
-              placeholder="例如：我是高超，是一名资深运维工程师，擅长 Kubernetes 和 Python..."
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="assistantMessage"
-            label="AI 回复（可选）"
-          >
-            <TextArea
-              rows={2}
-              placeholder="例如：好的，我记住了您的专业背景..."
-            />
-          </Form.Item>
-
           {/* 根据记忆层级显示不同的选择器 */}
           {memoryLevel === 'user' && (
             <Form.Item
               name="user_id"
-              label="用户名（可选）"
-              tooltip="留空则为当前用户添加记忆"
+              label="用户名"
+              rules={[{ required: true, message: '请输入用户名' }]}
             >
               <Input
-                placeholder="输入用户名，默认为当前用户"
+                placeholder="输入用户名"
                 prefix={<UserOutlined />}
               />
             </Form.Item>
@@ -1235,11 +1215,11 @@ const MemoryManagement: React.FC = () => {
             <>
               <Form.Item
                 name="user_id"
-                label="用户名（可选）"
-                tooltip="留空则为当前用户添加记忆"
+                label="用户名"
+                rules={[{ required: true, message: '请输入用户名' }]}
               >
                 <Input
-                  placeholder="输入用户名，默认为当前用户"
+                  placeholder="输入用户名"
                   prefix={<UserOutlined />}
                 />
               </Form.Item>
@@ -1278,17 +1258,64 @@ const MemoryManagement: React.FC = () => {
           )}
 
           {memoryLevel === 'session' && (
-            <Form.Item
-              name="run_id"
-              label="会话ID（可选）"
-              tooltip="指定会话ID，留空则自动生成"
-            >
-              <Input
-                placeholder="输入会话ID或留空自动生成"
-                prefix={<ClockCircleOutlined />}
-              />
-            </Form.Item>
+            <>
+              <Form.Item
+                name="user_id"
+                label="用户名"
+                rules={[{ required: true, message: '请输入用户名' }]}
+              >
+                <Input
+                  placeholder="输入用户名"
+                  prefix={<UserOutlined />}
+                />
+              </Form.Item>
+              <Form.Item
+                name="agent_id"
+                label="智能体选择"
+                rules={[{ required: true, message: '请选择智能体' }]}
+                initialValue={agents.length > 0 ? agents[0].agent_id : undefined}
+              >
+                <Select placeholder="选择智能体" loading={agents.length === 0}>
+                  {agents.map(agent => (
+                    <Option key={agent.agent_id} value={agent.agent_id}>
+                      {agent.agent_name}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item
+                name="run_id"
+                label="会话ID"
+                rules={[{ required: true, message: '请输入会话ID' }]}
+              >
+                <Input
+                  placeholder="输入会话ID"
+                  prefix={<ClockCircleOutlined />}
+                />
+              </Form.Item>
+            </>
           )}
+
+          <Form.Item
+            name="userMessage"
+            label="用户消息"
+            rules={[{ required: true, message: '请输入用户消息' }]}
+          >
+            <TextArea
+              rows={3}
+              placeholder="例如：我是高超，是一名资深运维工程师，擅长 Kubernetes 和 Python..."
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="assistantMessage"
+            label="AI 回复（可选）"
+          >
+            <TextArea
+              rows={2}
+              placeholder="例如：好的，我记住了您的专业背景..."
+            />
+          </Form.Item>
 
           <Form.Item
             name="metadata"

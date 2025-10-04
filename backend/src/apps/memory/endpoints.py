@@ -82,15 +82,6 @@ async def add_memory(
     - 会话记忆：指定user_id + run_id
     - 交互记忆：指定user_id + agent_id
     """
-    # 智能体记忆特殊处理：如果仅有agent_id，不要自动添加user_id
-    if request.agent_id and not request.user_id and not request.run_id:
-        # 纯智能体记忆，不添加user_id
-        logger.info(f"添加纯智能体记忆: agent_id={request.agent_id}")
-    elif not request.user_id and not request.agent_id:
-        # 如果既没有user_id也没有agent_id，使用当前用户
-        request.user_id = current_user.get("username", "system")
-        logger.info(f"未指定任何ID，使用当前用户: {request.user_id}")
-
     try:
         memory = await memory_service._get_memory()
 
