@@ -59,6 +59,7 @@ import {
 
 import { memoryApi, Memory } from '../../services/memoryApi';
 import { agentApi } from '../../services/agentApi';
+import { useAuth } from '../../hooks/useAuth';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -69,6 +70,7 @@ const { Option } = Select;
  */
 const MemoryManagement: React.FC = () => {
   const { message } = App.useApp();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -670,8 +672,15 @@ const MemoryManagement: React.FC = () => {
 
   useEffect(() => {
     loadAgents();
-    loadAllMemories();
   }, []);
+
+  // 当用户信息加载后，自动设置用户名并加载该用户的记忆
+  useEffect(() => {
+    if (user?.username) {
+      setSelectedUserId(user.username);
+      loadMemoriesByLevel('user', user.username, undefined, undefined);
+    }
+  }, [user?.username]);
 
   return (
     <div style={{ padding: '24px', backgroundColor: '#f0f2f5', minHeight: '100vh' }}>
