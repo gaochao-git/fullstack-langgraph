@@ -138,26 +138,52 @@ export const memoryApi = {
     runId?: string;
     limit?: number;
   }) {
-    switch(level) {
-      case 'user':
-        // 用户记忆：仅user_id
-        return this.getAllMemories(params?.userId, undefined, undefined, params?.limit);
+    // 获取所有记忆，然后在前端根据层级过滤
+    const response = await this.getAllMemories(
+      params?.userId || undefined,
+      params?.agentId || undefined,
+      params?.runId || undefined,
+      params?.limit || 500
+    );
 
-      case 'agent':
-        // 智能体记忆：仅agent_id
-        return this.getAllMemories(undefined, params?.agentId, undefined, params?.limit);
+    if (response.status === 'ok' && response.data) {
+      // 在前端根据层级过滤
+      let filteredData = response.data;
 
-      case 'session':
-        // 会话记忆：user_id + run_id
-        return this.getAllMemories(params?.userId, undefined, params?.runId, params?.limit);
+      switch(level) {
+        case 'user':
+          // 纯用户记忆：有user_id，没有agent_id和run_id
+          filteredData = response.data.filter((m: Memory) =>
+            m.user_id && !m.agent_id && !m.run_id
+          );
+          break;
 
-      case 'user_agent':
-        // 交互记忆：user_id + agent_id
-        return this.getAllMemories(params?.userId, params?.agentId, undefined, params?.limit);
+        case 'agent':
+          // 纯智能体记忆：有agent_id，没有user_id
+          filteredData = response.data.filter((m: Memory) =>
+            m.agent_id && !m.user_id
+          );
+          break;
 
-      default:
-        return this.getAllMemories(params?.userId, params?.agentId, params?.runId, params?.limit);
+        case 'session':
+          // 会话记忆：有run_id
+          filteredData = response.data.filter((m: Memory) =>
+            m.run_id
+          );
+          break;
+
+        case 'user_agent':
+          // 用户-智能体交互记忆：有user_id和agent_id，没有run_id
+          filteredData = response.data.filter((m: Memory) =>
+            m.user_id && m.agent_id && !m.run_id
+          );
+          break;
+      }
+
+      response.data = filteredData;
     }
+
+    return response;
   },
 
   /**

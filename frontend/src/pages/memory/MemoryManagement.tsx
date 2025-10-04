@@ -329,7 +329,7 @@ const MemoryManagement: React.FC = () => {
           const agent = agents.find(a => a.agent_id === values.agent_id);
           if (agent) searchInfo += `（智能体：${agent.agent_name}）`;
         }
-        if (values.threshold) searchInfo += `（相似度≥${values.threshold}）`;
+        if (values.threshold) searchInfo += `（距离≤${values.threshold}）`;
 
         message.success(searchInfo);
         setSearchModalVisible(false);
@@ -632,12 +632,13 @@ const MemoryManagement: React.FC = () => {
       width: 100,
       render: (score: number) => {
         if (score === undefined || score === null) return '-';
-        const percentage = (1 - score / 2) * 100; // 将cosine距离转换为相似度百分比
+        // score是余弦距离(0-2)，转换为相似度百分比
+        const percentage = (1 - score / 2) * 100;
         let color = 'green';
         if (percentage < 60) color = 'red';
         else if (percentage < 80) color = 'orange';
         return (
-          <Tooltip title={`余弦距离: ${score?.toFixed(4) || 'N/A'}`}>
+          <Tooltip title={`余弦距离: ${score?.toFixed(4) || 'N/A'}（距离越小越相似）`}>
             <Tag color={color}>
               {percentage.toFixed(1)}%
             </Tag>
@@ -1311,16 +1312,16 @@ const MemoryManagement: React.FC = () => {
             <Col span={12}>
               <Form.Item
                 name="threshold"
-                label="相似度阈值"
-                tooltip="0-1之间，值越大要求越相似，默认0.7"
-                initialValue={0.7}
+                label="距离阈值"
+                tooltip="余弦距离0-2之间，值越小越相似，默认0.5"
+                initialValue={0.5}
               >
                 <InputNumber
                   min={0}
-                  max={1}
+                  max={2}
                   step={0.1}
                   style={{ width: '100%' }}
-                  placeholder="0.7"
+                  placeholder="0.5"
                 />
               </Form.Item>
             </Col>
