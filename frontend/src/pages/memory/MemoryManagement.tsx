@@ -110,7 +110,7 @@ const MemoryManagement: React.FC = () => {
   const loadMemoriesByLevel = async (level?: string, userId?: string, agentId?: string, runId?: string) => {
     setLoading(true);
     try {
-      // 使用新的Mem0标准API
+      // 使用Mem0标准API - 通过参数组合来查询不同层级的记忆
       let response;
       if (level && ['user', 'agent', 'session', 'user_agent'].includes(level)) {
         response = await memoryApi.getMemoriesByLevel(level as any, {
@@ -120,8 +120,8 @@ const MemoryManagement: React.FC = () => {
           limit: 100
         });
       } else {
-        // 如果没有指定层级或层级不合法，获取所有记忆
-        response = await memoryApi.getAllMemories(userId, agentId, runId, 100);
+        // 获取所有记忆 - 不传任何参数
+        response = await memoryApi.getAllMemories(undefined, undefined, undefined, 100);
       }
       console.log('Memory response:', response);
 
@@ -153,14 +153,18 @@ const MemoryManagement: React.FC = () => {
    * 更新统计数据
    */
   const updateStats = (memoriesData: Memory[]) => {
+    // 根据Mem0三层架构统计
     const userMemories = memoriesData.filter(m =>
-      m.metadata?.level === 'user' || (!m.metadata?.level && m.user_id)
+      m.user_id && !m.agent_id && !m.run_id  // 纯用户记忆
     );
     const agentMemories = memoriesData.filter(m =>
-      m.metadata?.level === 'agent'
+      m.agent_id && !m.user_id  // 纯智能体记忆
     );
     const sessionMemories = memoriesData.filter(m =>
-      m.metadata?.level === 'session'
+      m.run_id  // 有run_id的都算会话记忆
+    );
+    const userAgentMemories = memoriesData.filter(m =>
+      m.user_id && m.agent_id && !m.run_id  // 用户-智能体交互记忆
     );
 
     setStats({

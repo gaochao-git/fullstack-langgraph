@@ -56,7 +56,11 @@ class MemoryAddRequest(BaseModel):
     infer: bool = True
 
 class MemoryUpdateRequest(BaseModel):
-    """更新记忆请求 - 只能更新内容"""
+    """更新记忆请求 - 只能更新内容
+
+    注意：Mem0开源版update方法有bug会丢失metadata，
+    这是Mem0的问题，不是我们的实现问题
+    """
     content: str
 
 
@@ -125,8 +129,9 @@ async def search_memories(
 
     搜索符合条件的记忆，支持语义搜索。
     """
-    # 如果没有指定用户，使用当前用户
-    if not user_id:
+    # 如果没有指定任何条件，使用当前用户
+    # 如果指定了agent_id或run_id，则按指定条件查询
+    if not user_id and not agent_id and not run_id:
         user_id = current_user.get("username", "system")
 
     try:
@@ -169,8 +174,9 @@ async def get_all_memories(
 
     获取指定条件的所有记忆，完全符合Mem0标准。
     """
-    # 如果没有指定用户，使用当前用户
-    if not user_id:
+    # 如果没有指定任何条件，使用当前用户
+    # 如果指定了agent_id或run_id，则按指定条件查询
+    if not user_id and not agent_id and not run_id:
         user_id = current_user.get("username", "system")
 
     try:
@@ -250,13 +256,30 @@ async def update_memory(
     try:
         memory = await memory_service._get_memory()
 
-        # Mem0原生update方法
-        if hasattr(memory.memory, 'update'):
-            result = memory.memory.update(
+        # Mem0的update方法有bug会丢失metadata
+        # 需要先获取原记忆，提取metadata，再调用_update_memory
+        if hasattr(memory.memory, 'get') and hasattr(memory.memory, '_update_memory'):
+            # 获取原记忆
+            existing_memory = memory.memory.get(memory_id)
+            if not existing_memory:
+                raise BusinessException(f"记忆不存在: {memory_id}", ResponseCode.NOT_FOUND)
+
+            # 提取原始metadata
+            original_metadata = existing_memory.get('metadata', {})
+
+            # 准备embeddings
+            embeddings = memory.memory.embedding_model.embed(request.content, "update")
+            existing_embeddings = {request.content: embeddings}
+
+            # 调用内部方法，传入原始metadata
+            memory.memory._update_memory(
                 memory_id=memory_id,
-                data=request.content
+                data=request.content,
+                existing_embeddings=existing_embeddings,
+                metadata=original_metadata
             )
-            logger.info(f"成功更新记忆内容: {memory_id}")
+
+            logger.info(f"成功更新记忆内容: {memory_id}, 保留metadata")
             return success_response(
                 data={"memory_id": memory_id, "updated": True},
                 msg="记忆内容更新成功"
@@ -313,8 +336,8 @@ async def delete_all_memories(
 
     删除指定条件的所有记忆。危险操作，需要确认。
     """
-    # 如果没有指定用户，使用当前用户
-    if not user_id:
+    # 如果没有指定任何条件，使用当前用户（防止误删所有数据）
+    if not user_id and not agent_id and not run_id:
         user_id = current_user.get("username", "system")
 
     try:
