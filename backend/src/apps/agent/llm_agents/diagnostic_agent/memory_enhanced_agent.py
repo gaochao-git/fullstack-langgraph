@@ -18,7 +18,6 @@ from src.apps.agent.memory_factory import get_enterprise_memory
 from src.apps.agent.memory_utils import (
     search_combined_memory,
     build_layered_context,
-    analyze_conversation_for_memory,
     save_layered_memories
 )
 from src.shared.core.logging import get_logger
@@ -162,21 +161,12 @@ class MemoryEnhancedDiagnosticAgent:
     ):
         """分层保存记忆"""
         try:
-            # 使用辅助函数分析对话内容
-            analysis = analyze_conversation_for_memory(conversation_messages)
-
-            # 添加状态相关的分析
-            if state.get("diagnosis_result"):
-                analysis["has_problem_solution"] = True
-                analysis["problem_type"] = self._extract_problem_type(state)
-
-            # 使用辅助函数分层保存记忆
+            # 直接保存到三层，让Mem0自己决定UPDATE/ADD/DELETE
             saved_memories = await save_layered_memories(
                 memory=self.memory,
                 messages=conversation_messages,
                 user_id=user_id,
-                agent_id=agent_id,
-                analysis=analysis
+                agent_id=agent_id
             )
 
             # 记录保存结果
@@ -186,59 +176,6 @@ class MemoryEnhancedDiagnosticAgent:
 
         except Exception as e:
             logger.error(f"分层保存记忆失败: {e}", exc_info=True)
-
-    def _contains_user_profile_info(self, messages: List[Dict]) -> bool:
-        """检测是否包含用户档案信息"""
-        user_profile_keywords = [
-            "我是", "我叫", "我负责", "我的专长", "我擅长",
-            "我的职位", "我的部门", "我的联系方式"
-        ]
-
-        for msg in messages:
-            if msg.get("role") == "user":
-                content = msg.get("content", "").lower()
-                if any(keyword in content for keyword in user_profile_keywords):
-                    return True
-        return False
-
-    def _contains_valuable_experience(self, messages: List[Dict], state: DiagnosticState) -> bool:
-        """检测是否包含有价值的诊断经验"""
-        # 如果问题已解决，认为是有价值的经验
-        if state.get("resolved"):
-            return True
-
-        # 如果包含具体的解决方案
-        solution_keywords = ["解决", "修复", "优化", "已恢复", "正常了"]
-        for msg in messages:
-            if msg.get("role") == "assistant":
-                content = msg.get("content", "").lower()
-                if any(keyword in content for keyword in solution_keywords):
-                    return True
-
-        return False
-
-    def _extract_problem_type(self, state: DiagnosticState) -> str:
-        """提取问题类型"""
-        user_message = ""
-        for msg in state["messages"]:
-            if hasattr(msg, 'type') and msg.type == "human":
-                user_message = msg.content.lower()
-                break
-
-        problem_types = {
-            "cpu": ["cpu", "处理器"],
-            "memory": ["内存", "memory"],
-            "disk": ["磁盘", "disk", "存储"],
-            "network": ["网络", "network", "连接"],
-            "database": ["数据库", "database", "mysql", "postgresql"],
-            "service": ["服务", "service", "进程"],
-        }
-
-        for ptype, keywords in problem_types.items():
-            if any(kw in user_message for kw in keywords):
-                return ptype
-
-        return "general"
 
     def create_graph(self):
         """创建集成三层记忆的诊断图"""

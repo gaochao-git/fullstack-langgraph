@@ -220,21 +220,20 @@ async def save_layered_memories(
     analysis: Optional[Dict[str, Any]] = None
 ) -> Dict[str, List[str]]:
     """
-    根据对话内容分层保存记忆
+    分层保存记忆到三层（用户/智能体/交互）
+
+    不做关键词判断，直接三层都保存，让Mem0的LLM自动决定合并/去重
 
     Args:
         memory: EnterpriseMemory实例
         messages: 对话消息列表
         user_id: 用户ID
         agent_id: 智能体ID
-        analysis: 对话分析结果（可选）
+        analysis: 对话分析结果（保留参数兼容性，但不使用）
 
     Returns:
         保存的记忆ID字典
     """
-    if analysis is None:
-        analysis = analyze_conversation_for_memory(messages)
-
     saved_memories = {
         "user": [],
         "agent": [],
@@ -242,40 +241,25 @@ async def save_layered_memories(
     }
 
     try:
-        tasks = []
-
-        # 1. 保存用户档案记忆
-        if analysis.get("has_user_profile") or analysis.get("has_preferences"):
-            task = memory.add_user_memory(
+        # 直接三层都保存，让Mem0自己决定UPDATE/ADD/DELETE
+        tasks = [
+            ("user", memory.add_user_memory(
                 messages=messages,
                 user_id=user_id,
-                memory_type="profile",
                 metadata={"source": "diagnostic_conversation"}
-            )
-            tasks.append(("user", task))
-
-        # 2. 保存智能体经验记忆
-        if analysis.get("has_problem_solution"):
-            task = memory.add_agent_memory(
+            )),
+            ("agent", memory.add_agent_memory(
                 messages=messages,
                 agent_id=agent_id,
-                memory_type="experience",
-                metadata={
-                    "problem_type": analysis.get("problem_type"),
-                    "solution_type": analysis.get("solution_type")
-                }
-            )
-            tasks.append(("agent", task))
-
-        # 3. 总是保存用户-智能体交互记忆
-        interaction_task = memory.add_user_agent_memory(
-            messages=messages,
-            user_id=user_id,
-            agent_id=agent_id,
-            memory_type="interaction",
-            metadata={"conversation_type": "diagnostic"}
-        )
-        tasks.append(("interaction", interaction_task))
+                metadata={"source": "diagnostic_conversation"}
+            )),
+            ("interaction", memory.add_user_agent_memory(
+                messages=messages,
+                user_id=user_id,
+                agent_id=agent_id,
+                metadata={"conversation_type": "diagnostic"}
+            ))
+        ]
 
         # 并行执行保存任务
         for memory_type, task in tasks:
