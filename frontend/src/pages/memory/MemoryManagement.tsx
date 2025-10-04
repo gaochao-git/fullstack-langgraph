@@ -92,7 +92,7 @@ const MemoryManagement: React.FC = () => {
     sessionCount: 0,
     userAgentCount: 0
   });
-  const [memoryLevel, setMemoryLevel] = useState<string>('user_agent');
+  const [memoryLevel, setMemoryLevel] = useState<string>('user');
   const [searchKeyword, setSearchKeyword] = useState<string>('');  // 当前搜索关键词
   const [isSearchResult, setIsSearchResult] = useState<boolean>(false);  // 是否为搜索结果
 
@@ -1048,7 +1048,7 @@ const MemoryManagement: React.FC = () => {
             name="memoryLevel"
             label="记忆层级"
             rules={[{ required: true, message: '请选择记忆层级' }]}
-            initialValue="user_agent"
+            initialValue="user"
             tooltip="选择记忆的存储层级，决定记忆的共享范围"
           >
             <Segmented
@@ -1135,6 +1135,7 @@ const MemoryManagement: React.FC = () => {
               name="user_id"
               label="用户名"
               rules={[{ required: true, message: '请输入用户名' }]}
+              initialValue={user?.username}
             >
               <Input
                 placeholder="输入用户名"
@@ -1149,6 +1150,7 @@ const MemoryManagement: React.FC = () => {
                 name="user_id"
                 label="用户名"
                 rules={[{ required: true, message: '请输入用户名' }]}
+                initialValue={user?.username}
               >
                 <Input
                   placeholder="输入用户名"
@@ -1195,6 +1197,7 @@ const MemoryManagement: React.FC = () => {
                 name="user_id"
                 label="用户名"
                 rules={[{ required: true, message: '请输入用户名' }]}
+                initialValue={user?.username}
               >
                 <Input
                   placeholder="输入用户名"
