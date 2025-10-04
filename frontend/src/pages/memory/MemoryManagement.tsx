@@ -401,6 +401,40 @@ const MemoryManagement: React.FC = () => {
    */
   const columns = [
     {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 100,
+      render: (id: string) => (
+        <Tooltip
+          title={id}
+          overlayStyle={{ maxWidth: 'none' }}
+          mouseEnterDelay={0.3}
+        >
+          <span style={{ fontFamily: 'monospace', fontSize: '12px', cursor: 'pointer' }}>
+            {id ? id.substring(0, 8) + '...' : '-'}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: 'Hash',
+      dataIndex: 'hash',
+      key: 'hash',
+      width: 100,
+      render: (hash: string) => (
+        <Tooltip
+          title={hash}
+          overlayStyle={{ maxWidth: 'none' }}
+          mouseEnterDelay={0.3}
+        >
+          <span style={{ fontFamily: 'monospace', fontSize: '12px', cursor: 'pointer' }}>
+            {hash ? hash.substring(0, 8) + '...' : '-'}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
       title: '类型',
       dataIndex: ['metadata', 'level'],
       key: 'level',
@@ -718,11 +752,13 @@ const MemoryManagement: React.FC = () => {
                 {(currentLevel === 'user' || currentLevel === 'user_agent') && (
                   <Input
                     style={{ width: 180 }}
-                    placeholder="输入用户名（可选）"
+                    placeholder="输入用户名（回车搜索）"
                     value={selectedUserId}
                     onChange={(e) => {
                       setSelectedUserId(e.target.value);
-                      loadMemoriesByLevel(currentLevel, e.target.value, selectedAgentId, selectedRunId);
+                    }}
+                    onPressEnter={(e) => {
+                      loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, selectedRunId);
                     }}
                     allowClear
                     onClear={() => {
@@ -757,13 +793,13 @@ const MemoryManagement: React.FC = () => {
                   <>
                     <Input
                       style={{ width: 180 }}
-                      placeholder="输入用户名（可选）"
+                      placeholder="输入用户名（回车搜索）"
                       value={selectedUserId}
                       onChange={(e) => {
                         setSelectedUserId(e.target.value);
-                        if (selectedRunId) {
-                          loadMemoriesByLevel(currentLevel, e.target.value, selectedAgentId, selectedRunId);
-                        }
+                      }}
+                      onPressEnter={(e) => {
+                        loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, selectedRunId);
                       }}
                       allowClear
                       onClear={() => {
@@ -776,13 +812,18 @@ const MemoryManagement: React.FC = () => {
                     />
                     <Input
                       style={{ width: 200 }}
-                      placeholder="输入会话ID"
+                      placeholder="输入会话ID（回车搜索）"
                       value={selectedRunId}
                       onChange={(e) => {
                         setSelectedRunId(e.target.value);
-                        if (e.target.value) {
-                          loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, e.target.value);
-                        }
+                      }}
+                      onPressEnter={(e) => {
+                        loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, selectedRunId);
+                      }}
+                      allowClear
+                      onClear={() => {
+                        setSelectedRunId(undefined);
+                        loadMemoriesByLevel(currentLevel, selectedUserId, selectedAgentId, undefined);
                       }}
                       prefix={<ClockCircleOutlined />}
                     />
