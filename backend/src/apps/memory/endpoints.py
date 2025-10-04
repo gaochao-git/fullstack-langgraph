@@ -135,6 +135,8 @@ async def search_memories(
         user_id = current_user.get("username", "system")
 
     try:
+        logger.info(f"搜索记忆请求: query='{query}', threshold={threshold}, user_id={user_id}, agent_id={agent_id}, run_id={run_id}, limit={limit}")
+
         memory = await memory_service._get_memory()
         result = await memory.search_memories(
             query=query,
@@ -154,7 +156,13 @@ async def search_memories(
         # 格式化时间字段
         memories = [format_memory_times(mem) for mem in memories]
 
-        logger.info(f"搜索记忆: query='{query[:50]}...', 返回 {len(memories)} 条结果")
+        # 记录结果详情
+        if memories:
+            scores = [m.get('score', 'N/A') for m in memories[:5]]
+            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(memories)} 条结果, 前5个距离: {scores}")
+        else:
+            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 未找到匹配结果")
+
         return success_response(data=memories)
     except Exception as e:
         logger.error(f"搜索记忆失败: {e}")

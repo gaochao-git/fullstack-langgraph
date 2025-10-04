@@ -1313,8 +1313,8 @@ const MemoryManagement: React.FC = () => {
               <Form.Item
                 name="threshold"
                 label="距离阈值"
-                tooltip="余弦距离0-2之间，值越小越相似，默认0.5"
-                initialValue={0.5}
+                tooltip="保留距离≤阈值的记忆。余弦距离0-2（越小越相似），例如0.3表示只返回很相似的记忆"
+                initialValue={undefined}
               >
                 <InputNumber
                   min={0}

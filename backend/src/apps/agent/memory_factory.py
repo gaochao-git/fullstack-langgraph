@@ -427,16 +427,23 @@ class EnterpriseMemory:
             await self.initialize()
 
         try:
+            # 注意：Mem0的threshold逻辑是 score >= threshold（保留距离大的，与直觉相反）
+            # 对于余弦距离（0-2，越小越相似），我们期望 score <= threshold（保留相似的）
+            # 所以不传threshold给Mem0，在返回结果中自己过滤
             results = self.memory.search(
                 query,
                 user_id=user_id,
                 agent_id=agent_id,
                 run_id=run_id,
                 limit=limit,
-                threshold=threshold
+                threshold=None  # 不使用Mem0的错误threshold逻辑
             )
 
-            logger.info(f"搜索记忆: query='{query[:50]}...', 返回 {len(results)} 条结果")
+            # 正确过滤：保留 score <= threshold 的结果（距离小的，相似的）
+            if threshold is not None:
+                results = [r for r in results if r.get('score', float('inf')) <= threshold]
+
+            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(results)} 条结果")
             return results
 
         except Exception as e:
