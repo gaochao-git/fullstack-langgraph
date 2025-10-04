@@ -22,7 +22,7 @@ import {
   Input,
   InputNumber,
   Select,
-  message,
+  App,
   Popconfirm,
   Typography,
   Alert,
@@ -68,6 +68,7 @@ const { Option } = Select;
  * AI 记忆管理页面组件
  */
 const MemoryManagement: React.FC = () => {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -371,7 +372,7 @@ const MemoryManagement: React.FC = () => {
         setMemories([]);
         updateStats([]);
         setIsSearchResult(false);
-        message.info('未找到相关记忆');
+        message.error(response.msg || '搜索记忆失败');
       }
     } catch (error) {
       console.error('搜索记忆失败:', error);
