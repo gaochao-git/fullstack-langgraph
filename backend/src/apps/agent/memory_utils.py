@@ -23,7 +23,7 @@ async def search_combined_memory(
     threshold: Optional[float] = None
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
-    并行检索多层记忆
+    并行检索多层记忆（优化：只生成一次embedding）
 
     Args:
         memory: EnterpriseMemory实例
@@ -37,23 +37,34 @@ async def search_combined_memory(
         包含各层记忆的字典
     """
     try:
-        # 并行执行三层检索
+        # 性能优化：提前生成一次embedding，避免重复调用API
+        import time
+        start_time = time.time()
+
+        embeddings = memory.memory.embedding_model.embed(query, "search")
+        embed_time = time.time() - start_time
+        logger.info(f"⚡ Embedding生成耗时: {embed_time:.2f}秒")
+
+        # 并行执行三层向量搜索（复用embedding）
         user_memories, agent_memories, interaction_memories = await asyncio.gather(
             # 用户级记忆
-            memory.search_memories(
+            memory.search_with_embedding(
                 query=query,
+                embeddings=embeddings,
                 user_id=user_id,
                 limit=limit_per_level
             ),
             # 智能体级记忆
-            memory.search_memories(
+            memory.search_with_embedding(
                 query=query,
+                embeddings=embeddings,
                 agent_id=agent_id,
                 limit=limit_per_level
             ),
             # 用户-智能体交互记忆
-            memory.search_memories(
+            memory.search_with_embedding(
                 query=query,
+                embeddings=embeddings,
                 user_id=user_id,
                 agent_id=agent_id,
                 limit=limit_per_level

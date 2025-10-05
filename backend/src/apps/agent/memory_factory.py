@@ -464,6 +464,79 @@ class EnterpriseMemory:
             logger.error(f"搜索记忆失败: {e}")
             raise
 
+    async def search_with_embedding(
+        self,
+        query: str,
+        embeddings: List[float],
+        user_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        limit: int = 10,
+        threshold: Optional[float] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        使用已生成的embedding搜索记忆（性能优化版本）
+
+        避免重复调用embedding API，直接使用传入的embedding向量进行搜索
+
+        Args:
+            query: 查询文本（仅用于日志）
+            embeddings: 已生成的embedding向量
+            user_id: 用户ID
+            agent_id: 智能体ID
+            run_id: 会话ID
+            limit: 返回数量
+            threshold: 距离阈值
+
+        Returns:
+            记忆列表
+        """
+        if not self.memory:
+            await self.initialize()
+
+        try:
+            # 构建过滤条件
+            filters = {}
+            if user_id:
+                filters['user_id'] = user_id
+            if agent_id:
+                filters['agent_id'] = agent_id
+            if run_id:
+                filters['run_id'] = run_id
+
+            # 直接调用vector_store搜索，跳过embedding生成
+            memories = self.memory.vector_store.search(
+                query=query,
+                vectors=embeddings,
+                limit=limit,
+                filters=filters
+            )
+
+            # 格式化结果（参考Mem0的_search_vector_store实现）
+            results = []
+            for mem in memories:
+                memory_item = {
+                    'id': mem.id,
+                    'memory': mem.payload.get("data", ""),
+                    'hash': mem.payload.get("hash"),
+                    'created_at': mem.payload.get("created_at"),
+                    'updated_at': mem.payload.get("updated_at"),
+                    'score': mem.score,
+                    'metadata': {k: v for k, v in mem.payload.items()
+                                if k not in ('data', 'hash', 'created_at', 'updated_at')}
+                }
+                results.append(memory_item)
+
+            # 应用阈值过滤
+            if threshold is not None:
+                results = [r for r in results if r.get('score', 999) <= threshold]
+
+            return results
+
+        except Exception as e:
+            logger.error(f"使用embedding搜索记忆失败: {e}")
+            raise
+
     async def list_all_memories(
         self,
         user_id: Optional[str] = None,
