@@ -175,7 +175,13 @@ class Settings(BaseSettings):
     MEM0_MEMORY_VERSION: str = "v1.1"  # 记忆版本控制
     MEM0_SEARCH_LIMIT: int = 10  # 默认搜索返回数量
     MEM0_RELEVANCE_THRESHOLD: float = 0.2  # 距离阈值（越小越相似）
-    
+
+    # Neo4j图存储配置
+    NEO4J_ENABLED: bool = False  # 是否启用Neo4j图存储
+    NEO4J_URL: str = "bolt://localhost:7687"  # Neo4j连接URL
+    NEO4J_USERNAME: str = "neo4j"  # Neo4j用户名
+    NEO4J_PASSWORD: Optional[str] = None  # Neo4j密码
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -154,12 +154,32 @@ class EnterpriseMemory:
             }
         }
 
-        return {
+        # 图存储配置（Neo4j）
+        graph_store_config = None
+        if hasattr(settings, 'NEO4J_ENABLED') and settings.NEO4J_ENABLED:
+            graph_store_config = {
+                "provider": "neo4j",
+                "config": {
+                    "url": settings.NEO4J_URL,
+                    "username": settings.NEO4J_USERNAME,
+                    "password": settings.NEO4J_PASSWORD
+                }
+            }
+            logger.info(f"✅ 启用Neo4j图存储: {settings.NEO4J_URL}")
+
+        # 构建配置字典
+        config = {
             "llm": llm_config,
             "embedder": embedder_config_dict,
             "vector_store": vector_store_config,
             "version": settings.MEM0_MEMORY_VERSION
         }
+
+        # 如果启用了图存储，添加到配置中
+        if graph_store_config:
+            config["graph_store"] = graph_store_config
+
+        return config
 
     # ==================== 核心方法：标准三层记忆 ====================
 
