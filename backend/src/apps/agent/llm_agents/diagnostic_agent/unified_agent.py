@@ -39,12 +39,6 @@ class UnifiedDiagnosticAgent:
         self.memory_config = memory_config or {}
         self.enable_memory = self.memory_config.get("enable_memory", True)
 
-    async def initialize(self):
-        """初始化记忆系统"""
-        if self.enable_memory:
-            self.memory = await get_enterprise_memory()
-            logger.info("✅ Mem0记忆系统已初始化")
-
     async def retrieve_memory_hook(self, state: DiagnosticState, config: RunnableConfig) -> DiagnosticState:
         """
         pre_model_hook: LLM调用前检索记忆
@@ -55,7 +49,14 @@ class UnifiedDiagnosticAgent:
         3. 构建分层上下文
         4. 注入到系统消息
         """
-        if not self.enable_memory or not self.memory:
+        if not self.enable_memory:
+            return state
+
+        # 懒加载：首次使用时从全局单例获取
+        if not self.memory:
+            self.memory = await get_enterprise_memory()
+
+        if not self.memory:
             return state
 
         try:
@@ -115,7 +116,14 @@ class UnifiedDiagnosticAgent:
         2. 分层保存到三层记忆
         3. 后台异步执行，不阻塞主流程
         """
-        if not self.enable_memory or not self.memory:
+        if not self.enable_memory:
+            return state
+
+        # 懒加载：首次使用时从全局单例获取
+        if not self.memory:
+            self.memory = await get_enterprise_memory()
+
+        if not self.memory:
             return state
 
         try:
@@ -278,11 +286,7 @@ async def create_unified_diagnostic_agent(llm, tools, checkpointer, agent_id="di
             "memory_distance_threshold": 0.5
         }
 
-    # 创建统一Agent
+    # 创建统一Agent（记忆系统已在应用启动时通过lifespan初始化）
     agent = UnifiedDiagnosticAgent(llm, tools, checkpointer, memory_config)
-
-    # 初始化记忆系统
-    if memory_config.get("enable_memory", True):
-        await agent.initialize()
 
     return agent.create_graph(main_prompt=system_prompt)
