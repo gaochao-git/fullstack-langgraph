@@ -294,7 +294,7 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
         # 保存记忆（流式处理完成后）
         if collected_messages and not has_interrupt:
             final_state = {"messages": collected_messages}
-            await save_memory_context(final_state, config, request_body.agent_id)
+            await save_memory_context(final_state, config, request_body.agent_id, thread_id)
 
         # End event - only send if no interrupt occurred
         if not has_interrupt:
@@ -308,7 +308,7 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
 
         # 保存记忆（非流式处理完成后）
         if isinstance(result, dict) and "messages" in result:
-            await save_memory_context(result, config, request_body.agent_id)
+            await save_memory_context(result, config, request_body.agent_id, thread_id)
 
         # 处理结果
         final_response = {

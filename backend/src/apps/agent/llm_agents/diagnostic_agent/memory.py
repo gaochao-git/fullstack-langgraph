@@ -76,7 +76,7 @@ async def retrieve_memory_context(query: str, config: Dict, agent_id: str) -> Op
         return None
 
 
-async def save_memory_context(final_state: Dict, config: Dict, agent_id: str) -> None:
+async def save_memory_context(final_state: Dict, config: Dict, agent_id: str, thread_id: str = None) -> None:
     """
     保存记忆上下文（公共接口）
 
@@ -84,6 +84,7 @@ async def save_memory_context(final_state: Dict, config: Dict, agent_id: str) ->
         final_state: 图的最终状态
         config: 运行配置
         agent_id: 智能体ID
+        thread_id: 会话线程ID（可选，作为run_id保存会话级记忆）
     """
     try:
         # 获取记忆配置
@@ -94,7 +95,7 @@ async def save_memory_context(final_state: Dict, config: Dict, agent_id: str) ->
             return
 
         # 保存记忆
-        await _save_memory_after_graph(final_state, config, memory_config)
+        await _save_memory_after_graph(final_state, config, memory_config, thread_id)
     except Exception as e:
         logger.error(f"保存记忆失败: {e}", exc_info=True)
 
@@ -243,7 +244,7 @@ def create_memory_hooks(memory_config: Dict):
     return pre_hook, post_hook
 
 
-async def _save_memory_after_graph(state: Dict, config: RunnableConfig, memory_config: Dict) -> None:
+async def _save_memory_after_graph(state: Dict, config: RunnableConfig, memory_config: Dict, thread_id: str = None) -> None:
     """
     在图执行完成后保存记忆
 
@@ -251,6 +252,7 @@ async def _save_memory_after_graph(state: Dict, config: RunnableConfig, memory_c
         state: 图的最终状态（包含完整对话消息）
         config: 运行配置
         memory_config: 记忆配置
+        thread_id: 会话线程ID（可选，作为run_id传递给Mem0）
     """
     memory = await _get_memory()
     if not memory:
@@ -266,7 +268,7 @@ async def _save_memory_after_graph(state: Dict, config: RunnableConfig, memory_c
             logger.warning("缺少agent_id，跳过记忆保存")
             return
 
-        logger.info(f"💾 [图完成后] 准备保存记忆: user_id={user_id}, agent_id={agent_id}")
+        logger.info(f"💾 [图完成后] 准备保存记忆: user_id={user_id}, agent_id={agent_id}, thread_id={thread_id}")
 
         # 只保存最后一轮对话（最新的 user + assistant 消息对）
         messages = state.get("messages", [])
@@ -305,7 +307,8 @@ async def _save_memory_after_graph(state: Dict, config: RunnableConfig, memory_c
                     memory,
                     conversation_messages,
                     user_id,
-                    agent_id
+                    agent_id,
+                    thread_id
                 ))
             except Exception as e:
                 logger.error(f"❌ [图完成后] 后台保存记忆失败: {e}", exc_info=True)
@@ -321,14 +324,15 @@ async def _save_memory_after_graph(state: Dict, config: RunnableConfig, memory_c
         logger.error(f"❌ [图完成后] 保存记忆失败: {e}", exc_info=True)
 
 
-async def _save_memories_async(memory, conversation_messages, user_id, agent_id):
-    """异步保存记忆到Mem0三层"""
+async def _save_memories_async(memory, conversation_messages, user_id, agent_id, thread_id=None):
+    """异步保存记忆到Mem0多层（thread_id作为run_id）"""
     try:
         saved_memories = await save_layered_memories(
             memory=memory,
             messages=conversation_messages,
             user_id=user_id,
-            agent_id=agent_id
+            agent_id=agent_id,
+            run_id=thread_id
         )
 
         # 记录保存结果

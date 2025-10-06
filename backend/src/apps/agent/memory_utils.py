@@ -228,18 +228,20 @@ async def save_layered_memories(
     messages: List[Dict[str, str]],
     user_id: str,
     agent_id: str,
+    run_id: Optional[str] = None,
     analysis: Optional[Dict[str, Any]] = None
 ) -> Dict[str, List[str]]:
     """
-    分层保存记忆到三层（用户/智能体/交互）
+    分层保存记忆到多层（用户/智能体/交互/会话）
 
-    不做关键词判断，直接三层都保存，让Mem0的LLM自动决定合并/去重
+    不做关键词判断，直接多层都保存，让Mem0的LLM自动决定合并/去重
 
     Args:
         memory: EnterpriseMemory实例
         messages: 对话消息列表
         user_id: 用户ID
         agent_id: 智能体ID
+        run_id: 会话线程ID（即thread_id，用于保存会话级记忆）
         analysis: 对话分析结果（保留参数兼容性，但不使用）
 
     Returns:
@@ -248,11 +250,12 @@ async def save_layered_memories(
     saved_memories = {
         "user": [],
         "agent": [],
-        "interaction": []
+        "interaction": [],
+        "session": []
     }
 
     try:
-        # 直接三层都保存，让Mem0自己决定UPDATE/ADD/DELETE
+        # 基础三层都保存
         tasks = [
             ("user", memory.add_user_memory(
                 messages=messages,
@@ -271,6 +274,18 @@ async def save_layered_memories(
                 metadata={"conversation_type": "diagnostic"}
             ))
         ]
+
+        # 如果提供了run_id（thread_id），则保存会话级记忆（第4层：user_id + agent_id + run_id）
+        if run_id:
+            tasks.append(
+                ("session", memory.add_conversation_memory(
+                    messages=messages,
+                    user_id=user_id,
+                    agent_id=agent_id,
+                    run_id=run_id,  # run_id即thread_id
+                    metadata={"conversation_type": "session_specific", "thread_id": run_id}
+                ))
+            )
 
         # 并行执行保存任务
         for memory_type, task in tasks:
