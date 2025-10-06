@@ -85,3 +85,13 @@ servers:
     display_name: "交互式图表服务"
     config:
       port: 3008
+
+  cmdb_query:
+    enabled: true
+    script: "servers/cmdb_query/runserver.py"
+    display_name: "CMDB知识图谱查询服务"
+    config:
+      port: 3009
+      neo4j_url: "bolt://82.156.146.51:7687"
+      neo4j_username: "neo4j"
+      neo4j_password: "Neo4jPassword123"
