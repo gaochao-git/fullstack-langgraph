@@ -256,9 +256,33 @@ Extracted Facts:
 
 ### 4.2 自定义提取规则（Custom Prompts）
 
-**是的！可以通过`custom_fact_extraction_prompt`完全自定义提取逻辑。**
+**是的！Mem0支持两种自定义prompt来控制记忆管理流程。**
 
-#### 4.2.1 基本用法
+#### 两种自定义Prompt的区别
+
+| Prompt类型 | 作用时机 | 功能 | 输出 |
+|-----------|---------|------|------|
+| `custom_fact_extraction_prompt` | **提取阶段** | 从对话中提取哪些事实 | `{"facts": [...]}` |
+| `custom_update_memory_prompt` | **更新阶段** | 如何处理提取的事实（ADD/UPDATE/DELETE） | `{"id": "...", "event": "ADD/UPDATE/DELETE/NONE"}` |
+
+**工作流程**：
+```
+对话消息
+  ↓
+【提取阶段】custom_fact_extraction_prompt → 提取事实
+  ↓
+【更新阶段】custom_update_memory_prompt → 决定ADD/UPDATE/DELETE
+  ↓
+存储到向量数据库
+```
+
+---
+
+#### 4.2.1 Custom Fact Extraction Prompt（提取规则）
+
+**作用**：控制从对话中提取**哪些**事实
+
+**基本用法**
 
 ```python
 from mem0 import Memory
@@ -428,6 +452,82 @@ memory.add(
 )
 # ✅ 结果：会保存记忆（符合订单相关信息）
 ```
+
+---
+
+#### 4.2.6 Custom Update Memory Prompt（更新规则）
+
+**作用**：控制提取的事实**如何**更新到现有记忆
+
+**4种更新操作**：
+
+| 操作 | 触发条件 | 示例 |
+|------|---------|------|
+| **ADD** | 新信息，记忆中不存在 | 新增"用户喜欢鸡肉披萨" |
+| **UPDATE** | 信息更全面，需要合并 | "喜欢奶酪披萨" → "喜欢奶酪和鸡肉披萨" |
+| **DELETE** | 新信息与旧记忆矛盾 | 删除过时或错误的记忆 |
+| **NONE** | 信息完全相同 | 保持不变 |
+
+**默认行为**（无自定义prompt）：
+Mem0的LLM会自动决定执行哪种操作。
+
+**自定义用法**：
+
+```python
+custom_update_prompt = """
+根据现有记忆和新信息，决定如何更新记忆：
+
+规则：
+1. 如果新信息不在现有记忆中 → ADD
+2. 如果新信息更全面，可以合并 → UPDATE（保留旧ID，更新内容）
+3. 如果新信息与旧记忆矛盾 → DELETE旧记忆，ADD新记忆
+4. 如果新信息完全相同 → NONE（不做任何操作）
+
+输出格式：
+{
+  "id": "memory_id",
+  "text": "更新后的内容",
+  "event": "ADD/UPDATE/DELETE/NONE",
+  "old_memory": "旧内容"  // UPDATE时可选
+}
+
+示例：
+现有记忆：[{"id": "mem_001", "text": "User likes cheese pizza"}]
+新信息："Loves chicken pizza"
+输出：{"id": "mem_001", "text": "Loves cheese and chicken pizza", "event": "UPDATE", "old_memory": "User likes cheese pizza"}
+"""
+
+config = {
+    "llm": {...},
+    "custom_update_memory_prompt": custom_update_prompt,
+    "version": "v1.1"
+}
+memory = Memory.from_config(config)
+```
+
+**何时使用**：
+- ✅ 需要自定义合并逻辑（如技术配置的版本管理）
+- ✅ 需要控制何时删除旧记忆（如诊断结果的时效性）
+- ✅ 需要精确控制更新策略（如用户偏好的优先级）
+
+**典型场景**（运维诊断）：
+
+```python
+ops_update_prompt = """
+运维诊断记忆更新规则：
+
+1. 配置信息：UPDATE（保留历史，记录变更）
+2. 故障诊断：ADD（每次故障独立记录）
+3. 性能指标：UPDATE（保留趋势，更新最新值）
+4. 解决方案：如果更优，UPDATE；否则ADD作为备选
+5. 过时信息：DELETE（如旧版本软件的配置）
+
+输出格式：
+{"id": "...", "text": "...", "event": "ADD/UPDATE/DELETE/NONE"}
+"""
+```
+
+---
 
 ### 4.3 自动推理机制（infer=True）
 
