@@ -19,6 +19,8 @@ from ..llm_agents.agent_registry import AgentRegistry
 from .agent_service import agent_service
 from ..models import AgentDocumentSession
 from ..llm_agents.hooks import create_token_usage_hook
+from ..llm_agents.diagnostic_agent.memory import retrieve_memory_context, save_memory_context
+
 logger = get_logger(__name__)
 
 # 定义运行请求体
@@ -94,8 +96,14 @@ def prepare_config(request_body, thread_id):
 
 async def prepare_graph_input(request_body, config, thread_id):
     """准备图输入 - 构建消息格式并处理文档上下文"""
+    # 检索记忆并构建上下文
+    memory_context = await retrieve_memory_context(request_body.query, config, request_body.agent_id)
+
     # 构建消息格式的输入
-    messages = [{"type": "human","content": request_body.query}]
+    messages = []
+    if memory_context:
+        messages.append({"type": "system", "content": memory_context})
+    messages.append({"type": "human", "content": request_body.query})
     
     # 如果有文档，获取文档信息并添加到消息中
     docs_info = []
@@ -283,6 +291,11 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
             yield f"id: {event_id}\nevent: token_usage\ndata: {json.dumps(token_usage_event, ensure_ascii=False)}\n\n"
             logger.info(f"📊 发送token使用情况: {total_tokens}/{max_tokens} ({usage_ratio*100:.1f}%)")
         
+        # 保存记忆（流式处理完成后）
+        if collected_messages and not has_interrupt:
+            final_state = {"messages": collected_messages}
+            await save_memory_context(final_state, config, request_body.agent_id)
+
         # End event - only send if no interrupt occurred
         if not has_interrupt:
             event_id += 1
@@ -292,14 +305,18 @@ async def execute_graph_request(request_body: RunCreate, thread_id: str, request
     else:
         # 非流式处理
         result = await graph.ainvoke(graph_input, config=config, stream_mode=stream_modes)
-        
+
+        # 保存记忆（非流式处理完成后）
+        if isinstance(result, dict) and "messages" in result:
+            await save_memory_context(result, config, request_body.agent_id)
+
         # 处理结果
         final_response = {
             "thread_id": thread_id,
             "status": "completed",
             "result": result
         }
-        
+
         # 如果结果中有messages，提取最后一条AI消息
         if isinstance(result, dict) and "messages" in result:
             messages = result["messages"]

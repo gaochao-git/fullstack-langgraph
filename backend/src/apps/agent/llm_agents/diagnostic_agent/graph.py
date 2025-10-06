@@ -12,7 +12,6 @@ from .llm import get_llm_config
 from .prompts import get_system_prompt_async
 from .tools import get_diagnostic_tools
 from .sub_agents import create_simplified_sub_agent_task_tool
-from .memory_hooks import create_memory_hooks
 from src.apps.agent.llm_agents.decorators import agent
 from src.apps.agent.checkpoint_factory import get_checkpointer
 from src.apps.agent.models import AgentConfig
@@ -80,12 +79,6 @@ async def create_diagnostic_agent(config: RunnableConfig):
     # 获取checkpointer
     checkpointer = await get_checkpointer()
 
-    # 获取记忆配置
-    memory_config = _get_memory_config(agent_id)
-
-    # 创建记忆hooks
-    pre_hook, post_hook = create_memory_hooks(memory_config)
-
     # 创建子智能体任务工具
     sub_agent_task_tool = create_simplified_sub_agent_task_tool(
         tools=tools,
@@ -96,16 +89,14 @@ async def create_diagnostic_agent(config: RunnableConfig):
     # 合并所有工具
     all_tools = tools + [sub_agent_task_tool]
 
-    # 使用 create_react_agent 创建图（使用默认的 MessagesState）
+    # 使用 create_react_agent 创建图（不使用hooks）
     graph = create_react_agent(
         model=llm,
         tools=all_tools,
         checkpointer=checkpointer,
-        pre_model_hook=pre_hook,
-        post_model_hook=post_hook,
     )
 
-    logger.info(f"✅ 诊断Agent已创建 (记忆: {memory_config.get('enable_memory', True)})")
+    logger.info(f"✅ 诊断Agent已创建")
 
     return graph
 
