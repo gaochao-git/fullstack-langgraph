@@ -188,7 +188,7 @@ async def execute_command(
     - head: 查看文件开头内容（注意：建议使用-n参数限制行数，如head -n 20）
     - wc: 统计行数、字数、字符数
     - sort: 对文本进行排序
-    - find: 查找文件（只允许参数：-name, -type, -mtime, -atime, -ctime, -size, -maxdepth）
+    - find: 查找文件（只允许参数：-name, -type, -mtime, -atime, -ctime, -size, -maxdepth）,不要用>/dev/null这种会被阻断
     - netstat: 查看网络连接状态（可使用所有参数，如：-an, -tlnp, -s等）
     
     Args:
@@ -210,6 +210,7 @@ async def execute_command(
             "error": safety_msg,
             "allowed_commands": list(UNRESTRICTED_COMMANDS)
         })
+    
     
     # 额外的安全检查：命令长度限制
     if len(command) > 500:
