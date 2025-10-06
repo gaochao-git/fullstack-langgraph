@@ -135,22 +135,33 @@ async def search_memories(
         )
 
         # 处理Mem0返回格式
+        # 支持graph memory返回格式: {"results": [...], "relations": [...]}
         if isinstance(result, dict):
-            memories = result.get("results", [])
+            vector_memories = result.get("results", [])
+            graph_relations = result.get("relations", [])
+
+            # 格式化时间字段
+            vector_memories = [format_memory_times(mem) if isinstance(mem, dict) else mem for mem in vector_memories]
+
+            # 构建响应数据
+            response_data = {
+                "vector_results": vector_memories,  # 向量搜索结果
+                "graph_relations": graph_relations,  # 图关系结果
+                "total": len(vector_memories),
+                "has_graph": len(graph_relations) > 0
+            }
+
+            logger.info(f"搜索记忆: query='{query[:50]}...', 向量结果={len(vector_memories)}, 图关系={len(graph_relations)}")
+
+            return success_response(data=response_data)
         else:
+            # 兼容旧格式（纯列表）
             memories = result
+            memories = [format_memory_times(mem) if isinstance(mem, dict) else mem for mem in memories]
 
-        # 格式化时间字段（只处理字典类型）
-        memories = [format_memory_times(mem) if isinstance(mem, dict) else mem for mem in memories]
+            logger.info(f"搜索记忆: query='{query[:50]}...', 返回 {len(memories)} 条结果")
 
-        # 记录结果详情
-        if memories:
-            scores = [m.get('score', 'N/A') if isinstance(m, dict) else 'N/A' for m in memories[:5]]
-            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(memories)} 条结果, 前5个距离: {scores}")
-        else:
-            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 未找到匹配结果")
-
-        return success_response(data=memories)
+            return success_response(data=memories)
     except Exception as e:
         logger.error(f"搜索记忆失败: {e}")
         raise BusinessException(f"搜索记忆失败: {str(e)}", ResponseCode.INTERNAL_ERROR)

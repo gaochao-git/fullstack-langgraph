@@ -459,14 +459,36 @@ class EnterpriseMemory:
                 threshold=None  # 不使用Mem0的错误threshold逻辑
             )
 
-            # 处理Mem0返回格式：可能是dict或list
+            # 调试：打印Mem0原始返回格式
+            logger.info(f"Mem0 search返回类型: {type(results)}")
             if isinstance(results, dict):
-                results = results.get('results', [])
+                logger.info(f"Mem0 search返回键: {results.keys()}")
+
+            # 保留完整的graph memory返回格式
+            if isinstance(results, dict):
+                # 如果有图关系，保留完整的dict格式 {"results": [...], "relations": [...]}
+                if 'relations' in results:
+                    logger.info(f"✅ 图记忆返回: {len(results.get('results', []))} 条记忆, {len(results.get('relations', []))} 条关系")
+                    # 对results进行threshold过滤，但保留relations
+                    if threshold is not None:
+                        memories = results.get('results', [])
+                        filtered_memories = [
+                            r for r in memories
+                            if (r.get('score') if hasattr(r, 'get') else getattr(r, 'score', None) or 999) <= threshold
+                        ]
+                        results['results'] = filtered_memories
+                    return results
+                else:
+                    # v1.1格式但没有graph，提取results列表
+                    memories = results.get('results', [])
+            else:
+                # v1.0格式，直接是列表
+                memories = results
 
             # 正确过滤：保留 score <= threshold 的结果（距离小的，相似的）
             if threshold is not None:
                 filtered_results = []
-                for r in results:
+                for r in memories:
                     try:
                         # 尝试获取score，支持dict和对象属性两种方式
                         score = r.get('score') if hasattr(r, 'get') else getattr(r, 'score', None)
@@ -475,10 +497,10 @@ class EnterpriseMemory:
                     except:
                         # 如果无法获取score，保留该记录
                         filtered_results.append(r)
-                results = filtered_results
+                memories = filtered_results
 
-            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(results)} 条结果")
-            return results
+            logger.info(f"搜索记忆: query='{query[:50]}...', threshold={threshold}, 返回 {len(memories)} 条结果")
+            return memories
 
         except Exception as e:
             logger.error(f"搜索记忆失败: {e}")

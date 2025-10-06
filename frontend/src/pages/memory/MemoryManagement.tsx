@@ -95,6 +95,7 @@ const MemoryManagement: React.FC = () => {
   const [memoryLevel, setMemoryLevel] = useState<string>('user');
   const [searchKeyword, setSearchKeyword] = useState<string>('');  // 当前搜索关键词
   const [isSearchResult, setIsSearchResult] = useState<boolean>(false);  // 是否为搜索结果
+  const [graphRelations, setGraphRelations] = useState<any[]>([]);  // 图关系数据
 
   /**
    * 加载智能体列表
@@ -338,8 +339,22 @@ const MemoryManagement: React.FC = () => {
       const response = await memoryApi.searchMemories(searchParams);
 
       if (response.status === 'ok' && response.data) {
-        // 确保 data 是数组
-        let memoriesData = Array.isArray(response.data) ? response.data : [];
+        // 处理图记忆格式: {vector_results: [...], graph_relations: [...]}
+        let memoriesData: Memory[] = [];
+        let relations: any[] = [];
+
+        if (typeof response.data === 'object' && 'vector_results' in response.data) {
+          // 新格式：包含向量和图关系
+          memoriesData = response.data.vector_results || [];
+          relations = response.data.graph_relations || [];
+        } else if (typeof response.data === 'object' && 'results' in response.data) {
+          // Mem0原生格式
+          memoriesData = response.data.results || [];
+          relations = response.data.relations || [];
+        } else if (Array.isArray(response.data)) {
+          // 旧格式：纯数组
+          memoriesData = response.data;
+        }
 
         // 如果有记忆类型筛选，在前端过滤
         if (values.memory_type && values.memory_type.length > 0) {
@@ -354,13 +369,17 @@ const MemoryManagement: React.FC = () => {
         }
 
         setMemories(memoriesData);
+        setGraphRelations(relations);  // 保存图关系
         updateStats(memoriesData);
         setSearchKeyword(values.query);  // 保存搜索关键词
         setIsSearchResult(true);  // 标记为搜索结果
 
         // 构建搜索结果提示信息
         let searchInfo = `搜索到 ${memoriesData.length} 条相关记忆`;
-        if (values.user_id) searchInfo = `用户 ${values.user_id} 的${memoriesData.length} 条相关记忆`;
+        if (relations.length > 0) {
+          searchInfo += `，${relations.length} 条图关系`;
+        }
+        if (values.user_id) searchInfo = `用户 ${values.user_id} 的${memoriesData.length} 条记忆`;
         if (values.agent_id) {
           const agent = agents.find(a => a.agent_id === values.agent_id);
           if (agent) searchInfo += `（智能体：${agent.agent_name}）`;
@@ -962,6 +981,48 @@ const MemoryManagement: React.FC = () => {
             }}
           />
         </Spin>
+
+        {/* 图关系展示 */}
+        {graphRelations.length > 0 && (
+          <Card
+            title={
+              <Space>
+                <DatabaseOutlined />
+                <span>图关系 (Neo4j)</span>
+                <Badge count={graphRelations.length} style={{ backgroundColor: '#52c41a' }} />
+              </Space>
+            }
+            style={{ marginTop: 16 }}
+            size="small"
+          >
+            <Table
+              dataSource={graphRelations}
+              rowKey={(record, index) => `relation-${index}`}
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: '源实体',
+                  dataIndex: 'source',
+                  key: 'source',
+                  render: (text: string) => <Tag color="blue">{text}</Tag>
+                },
+                {
+                  title: '关系',
+                  dataIndex: 'relationship',
+                  key: 'relationship',
+                  render: (text: string) => <Tag color="green">{text}</Tag>
+                },
+                {
+                  title: '目标实体',
+                  dataIndex: 'destination',
+                  key: 'destination',
+                  render: (text: string) => <Tag color="orange">{text}</Tag>
+                }
+              ]}
+            />
+          </Card>
+        )}
       </Card>
 
       {/* 编辑记忆模态框 */}
