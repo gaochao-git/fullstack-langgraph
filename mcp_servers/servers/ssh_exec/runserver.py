@@ -930,6 +930,110 @@ async def resource_top_n(
             client.close()
 
 
+@mcp.tool()
+async def get_system_performance(
+    stat_type: str = "io",
+    interval: int = 1,
+    count: int = 2,
+    host: Optional[str] = None,
+    timeout: int = 30
+) -> str:
+    """获取系统性能统计（整体视角）
+
+    Args:
+        stat_type: 统计类型
+            - io: 磁盘IO统计（iostat），查看磁盘整体读写性能、利用率、等待时间
+            - mem: 内存和CPU统计（vmstat），查看系统整体内存、swap、CPU、IO等待情况
+            - net: 网络流量统计（sar），查看各网卡历史流量、错误率、丢包率
+        interval: 采样间隔（秒），默认1秒，范围1-60
+        count: 采样次数，默认2次，范围1-10
+        host: 目标主机IP或域名
+        timeout: 超时时间（秒），默认30秒
+
+    Returns:
+        JSON格式的系统性能统计数据
+    """
+    client = None
+    try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
+        client = _create_ssh_client(host)
+
+        # 参数验证
+        if not isinstance(interval, int) or interval < 1 or interval > 60:
+            return json_dumps({
+                "error": "interval 必须是 1-60 之间的整数"
+            })
+
+        if not isinstance(count, int) or count < 1 or count > 10:
+            return json_dumps({
+                "error": "count 必须是 1-10 之间的整数"
+            })
+
+        # 统计类型命令映射
+        STAT_COMMANDS = {
+            "io": {
+                "cmd": f"iostat -x {interval} {count} 2>/dev/null",
+                "description": "磁盘IO详细统计（利用率、吞吐量、等待时间）"
+            },
+            "mem": {
+                "cmd": f"vmstat {interval} {count} 2>/dev/null",
+                "description": "系统内存、CPU、IO等待统计"
+            },
+            "net": {
+                "cmd": f"sar -n DEV {interval} {count} 2>/dev/null || echo 'ERROR: sar命令不可用，请安装sysstat包'",
+                "description": "网络设备流量统计（需要sysstat包）"
+            }
+        }
+
+        # 获取命令配置
+        config = STAT_COMMANDS.get(stat_type)
+        if not config:
+            return json_dumps({
+                "error": f"不支持的统计类型: {stat_type}，支持: io, mem, net"
+            })
+
+        cmd = config["cmd"]
+        description = config["description"]
+
+        logger.info(f"执行命令: {cmd.strip()}")
+        stdin, stdout, stderr = client.exec_command(cmd.strip(), timeout=timeout)
+        output = stdout.read().decode()
+        error_output = stderr.read().decode()
+
+        # 检查错误
+        if output.strip().startswith("ERROR:"):
+            return json_dumps({
+                "success": False,
+                "error": output.strip()
+            })
+
+        if error_output:
+            return json_dumps({
+                "success": False,
+                "error": error_output
+            })
+
+        return json_dumps({
+            "success": True,
+            "stat_type": stat_type,
+            "interval": interval,
+            "count": count,
+            "description": description,
+            "output": output
+        }, indent=2)
+
+    except Exception as e:
+        logger.error(f"获取系统性能统计失败: {str(e)}")
+        return json_dumps({
+            "error": f"获取系统性能统计失败: {str(e)}"
+        })
+    finally:
+        if client:
+            client.close()
+
+
 if __name__ == "__main__":
     # 获取端口
     port = config.get('port', 3002)
