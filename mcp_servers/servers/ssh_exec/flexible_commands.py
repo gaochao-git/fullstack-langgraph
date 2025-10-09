@@ -21,52 +21,9 @@ UNRESTRICTED_COMMANDS = {
     "head",    # 查看文件开头
     "wc",      # 统计行数、字数等
     "sort",    # 排序文本
-    "find",    # 查找文件
     "netstat", # 查看网络连接状态
 }
 
-# 限制参数的命令模板
-PARAMETERIZED_COMMANDS = {}
-
-# 验证器映射
-VALIDATORS = {}
-
-
-def _check_find_args(tokens: List[str]) -> Tuple[bool, str]:
-    """检查find命令的参数是否安全
-
-    Args:
-        tokens: find命令段的tokens（只包含find到管道符或命令结束之间的部分）
-
-    Returns:
-        (是否安全, 错误消息)
-    """
-    # find命令的安全参数白名单
-    FIND_SAFE_PARAMS = {
-        '-name',                     # 文件名匹配（最常用）
-        '-type',                     # 文件类型 f/d
-        '-mtime',                    # 修改时间
-        '-atime',                    # 访问时间
-        '-ctime',                    # 状态改变时间
-        '-size',                     # 文件大小
-        '-maxdepth',                 # 搜索深度限制
-        '-path',                     # 路径匹配
-    }
-
-    # 跳过'find'本身，从第二个token开始检查
-    i = 1
-    while i < len(tokens):
-        token = tokens[i]
-
-        # 检查是否是参数（以-开头）
-        if token.startswith('-'):
-            # 只允许白名单中的参数
-            if token not in FIND_SAFE_PARAMS:
-                return False, f"find命令包含未授权的参数: {token}"
-
-        i += 1
-
-    return True, "find命令参数检查通过"
 
 def is_command_safe(command: str) -> Tuple[bool, str]:
     """检查命令是否安全 - 使用白名单机制"""
@@ -114,12 +71,6 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
             cmd_name = tokens[0]
             if cmd_name not in UNRESTRICTED_COMMANDS:
                 return False, f"命令 '{cmd_name}' 不在允许列表中"
-
-            # 如果是find命令，检查参数
-            if cmd_name == 'find':
-                is_safe, msg = _check_find_args(tokens)
-                if not is_safe:
-                    return False, msg
 
     except ValueError as e:
         # shlex.split 失败通常是因为引号不匹配

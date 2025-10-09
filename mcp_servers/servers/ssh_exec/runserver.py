@@ -78,12 +78,13 @@ def _create_ssh_client(host=None):
         raise Exception(f"无法建立SSH连接: {str(e)}")
 
 @mcp.tool()
-async def get_system_info(host: Optional[str] = None) -> str:
+async def get_system_info(host: Optional[str] = None, timeout: int = 30) -> str:
     """获取系统基本信息。包括：主机名、内核版本、操作系统信息、运行时间、CPU型号、CPU核数、内存使用情况、磁盘使用情况、系统负载、登录用户
-    
+
     Args:
         host: 目标主机IP或域名（可选）。如果不提供，使用配置中的默认主机
-    
+        timeout: 命令执行超时时间（秒），默认30秒
+
     Returns:
         包含系统信息的JSON字符串，字段包括：
         - hostname: 主机名
@@ -176,8 +177,9 @@ async def execute_command(
     - head: 查看文件开头内容（注意：建议使用-n参数限制行数，如head -n 20）
     - wc: 统计行数、字数、字符数
     - sort: 对文本进行排序
-    - find: 查找文件（只允许参数：-name, -type, -mtime, -atime, -ctime, -size, -maxdepth）,不要用>/dev/null这种会被阻断
     - netstat: 查看网络连接状态（可使用所有参数，如：-an, -tlnp, -s等）
+
+    注意：查找文件请使用专门的 find_file 工具，该工具提供更安全的参数验证
     
     Args:
         command: 要在远程服务器上执行的命令
@@ -233,6 +235,147 @@ async def execute_command(
         return json_dumps({
             "error": f"执行命令失败: {str(e)}",
             "command": command
+        })
+    finally:
+        if client:
+            client.close()
+
+
+@mcp.tool()
+async def find_file(
+    path: str = "/",
+    name: Optional[str] = None,
+    file_type: Optional[str] = None,
+    size_mb: Optional[int] = None,
+    size_operator: str = "+",
+    mtime_days: Optional[int] = None,
+    ctime_days: Optional[int] = None,
+    limit: int = 100,
+    host: Optional[str] = None,
+    timeout: int = 30
+) -> str:
+    """安全的文件查找工具
+
+    Args:
+        path: 搜索路径，默认为根目录 /
+        name: 文件名匹配模式（支持通配符，如 "*.log"）
+        file_type: 文件类型，f=普通文件，d=目录
+        size_mb: 文件大小（MB）
+        size_operator: 大小运算符，+ 表示大于，- 表示小于，默认为 +
+        mtime_days: 修改时间（天数），正数表示N天前，负数表示N天内
+        ctime_days: 状态改变时间（天数）
+        limit: 返回结果数量限制，默认100
+        host: 目标主机IP或域名
+        timeout: 命令执行超时时间（秒），默认30秒
+
+    Returns:
+        JSON格式的查找结果，包含文件路径、大小、修改时间等信息
+    """
+    client = None
+    try:
+        client = _create_ssh_client(host)
+
+        # 构建安全的find命令
+        find_parts = ["find", path]
+
+        # 添加文件类型
+        if file_type:
+            if file_type not in ['f', 'd', 'l']:
+                return json_dumps({
+                    "error": "file_type必须是 f(文件)、d(目录) 或 l(链接) 之一"
+                })
+            find_parts.extend(["-type", file_type])
+
+        # 添加文件名匹配
+        if name:
+            # 转义特殊字符，防止命令注入
+            safe_name = name.replace("'", "'\\''")
+            find_parts.extend(["-name", f"'{safe_name}'"])
+
+        # 添加文件大小
+        if size_mb is not None:
+            if not isinstance(size_mb, int) or size_mb < 1:
+                return json_dumps({
+                    "error": "size_mb必须是大于0的整数"
+                })
+            if size_operator not in ['+', '-', '']:
+                return json_dumps({
+                    "error": "size_operator必须是 +（大于）、-（小于）或空（等于）"
+                })
+            find_parts.extend(["-size", f"{size_operator}{size_mb}M"])
+
+        # 添加修改时间
+        if mtime_days is not None:
+            if not isinstance(mtime_days, int):
+                return json_dumps({
+                    "error": "mtime_days必须是整数"
+                })
+            find_parts.extend(["-mtime", str(mtime_days)])
+
+        # 添加状态改变时间
+        if ctime_days is not None:
+            if not isinstance(ctime_days, int):
+                return json_dumps({
+                    "error": "ctime_days必须是整数"
+                })
+            find_parts.extend(["-ctime", str(ctime_days)])
+
+        # 添加结果限制和详细信息显示
+        find_parts.append("-printf")
+        find_parts.append("'%p|%s|%TY-%Tm-%Td %TH:%TM|%u|%g\\n'")
+
+        # 限制结果数量
+        find_cmd = " ".join(find_parts) + f" 2>/dev/null | head -n {limit}"
+
+        logger.info(f"执行查找命令: {find_cmd}")
+
+        # 执行命令
+        stdin, stdout, stderr = client.exec_command(find_cmd, timeout=timeout)
+        output = stdout.read().decode()
+        error_output = stderr.read().decode()
+
+        # 解析结果
+        files = []
+        for line in output.strip().split('\n'):
+            if not line:
+                continue
+
+            parts = line.split('|')
+            if len(parts) == 5:
+                file_path, size_bytes, mtime, owner, group = parts
+
+                # 转换大小为人类可读格式
+                size_bytes_int = int(size_bytes) if size_bytes.isdigit() else 0
+                if size_bytes_int >= 1024 * 1024 * 1024:
+                    size_human = f"{size_bytes_int / (1024**3):.2f}G"
+                elif size_bytes_int >= 1024 * 1024:
+                    size_human = f"{size_bytes_int / (1024**2):.2f}M"
+                elif size_bytes_int >= 1024:
+                    size_human = f"{size_bytes_int / 1024:.2f}K"
+                else:
+                    size_human = f"{size_bytes_int}B"
+
+                files.append({
+                    "path": file_path,
+                    "size_bytes": size_bytes_int,
+                    "size_human": size_human,
+                    "modified_time": mtime,
+                    "owner": owner,
+                    "group": group
+                })
+
+        return json_dumps({
+            "success": True,
+            "search_path": path,
+            "total_found": len(files),
+            "limit": limit,
+            "files": files
+        }, indent=2)
+
+    except Exception as e:
+        logger.error(f"文件查找失败: {str(e)}")
+        return json_dumps({
+            "error": f"文件查找失败: {str(e)}"
         })
     finally:
         if client:
