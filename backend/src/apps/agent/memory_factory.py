@@ -202,6 +202,10 @@ class EnterpriseMemory:
         Returns:
             memory_id: 记忆ID
         """
+        if not settings.MEM0_ENABLE:
+            logger.debug("Mem0未启用，跳过添加用户记忆")
+            return "mem0_disabled"
+
         if not self.memory:
             await self.initialize()
 
@@ -443,6 +447,10 @@ class EnterpriseMemory:
         threshold: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """搜索记忆（Mem0原生方法）"""
+        if not settings.MEM0_ENABLE:
+            logger.debug("Mem0未启用，返回空记忆列表")
+            return []
+
         if not self.memory:
             await self.initialize()
 
@@ -533,6 +541,10 @@ class EnterpriseMemory:
         Returns:
             记忆列表
         """
+        if not settings.MEM0_ENABLE:
+            logger.debug("Mem0未启用，返回空记忆列表")
+            return []
+
         if not self.memory:
             await self.initialize()
 

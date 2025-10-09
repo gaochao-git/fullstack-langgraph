@@ -58,16 +58,19 @@ async def lifespan(app: FastAPI):
         logger.warning("应用将在没有预注册Agent的情况下运行")
 
     # 初始化Mem0长期记忆系统（向量数据库 PostgreSQL）
-    try:
-        memory = await get_enterprise_memory()
-        if memory:
-            logger.info("✅ Mem0长期记忆系统初始化成功 (PostgreSQL向量库)")
-        else:
-            logger.info("Mem0长期记忆系统未启用")
-    except Exception as e:
-        logger.error(f"Mem0长期记忆系统初始化失败: {e}")
-        # Mem0失败不应该阻止应用启动
-        logger.warning("应用将在没有长期记忆功能的情况下运行")
+    if settings.MEM0_ENABLE:
+        try:
+            memory = await get_enterprise_memory()
+            if memory:
+                logger.info("✅ Mem0长期记忆系统初始化成功 (PostgreSQL向量库)")
+            else:
+                logger.info("Mem0长期记忆系统未启用")
+        except Exception as e:
+            logger.error(f"Mem0长期记忆系统初始化失败: {e}")
+            # Mem0失败不应该阻止应用启动
+            logger.warning("应用将在没有长期记忆功能的情况下运行")
+    else:
+        logger.info("Mem0长期记忆系统已禁用 (MEM0_ENABLE=false)")
 
     yield
     

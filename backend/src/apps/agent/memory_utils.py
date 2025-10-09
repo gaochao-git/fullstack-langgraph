@@ -10,6 +10,7 @@
 import asyncio
 from typing import List, Dict, Any, Optional
 from src.shared.core.logging import get_logger
+from src.shared.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -36,6 +37,15 @@ async def search_combined_memory(
     Returns:
         包含各层记忆的字典
     """
+    # 检查是否启用 Mem0
+    if not settings.MEM0_ENABLE:
+        logger.debug("Mem0未启用，返回空记忆")
+        return {
+            "user_global": [],
+            "agent_global": [],
+            "user_agent": []
+        }
+
     try:
         # 性能优化：提前生成一次embedding，避免重复调用API
         import time

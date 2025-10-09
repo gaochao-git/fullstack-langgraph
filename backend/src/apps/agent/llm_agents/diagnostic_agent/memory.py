@@ -17,6 +17,7 @@ from src.apps.agent.memory_utils import (
 from src.apps.agent.models import AgentConfig
 from src.shared.db.config import get_async_db_context
 from src.shared.core.logging import get_logger
+from src.shared.core.config import settings
 
 logger = get_logger(__name__)
 
@@ -26,6 +27,10 @@ _memory_instance = None
 
 async def _get_memory():
     """获取全局记忆实例（懒加载）"""
+    if not settings.MEM0_ENABLE:
+        logger.debug("Mem0未启用")
+        return None
+
     global _memory_instance
     if _memory_instance is None:
         _memory_instance = await get_enterprise_memory()

@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.shared.core.logging import get_logger
+from src.shared.core.config import settings
 from src.shared.core.exceptions import BusinessException, ResponseCode
 from src.apps.memory.schema import (
     MemoryCreate, MemoryUpdate, MemorySearch,
@@ -23,6 +24,9 @@ class MemoryService:
     
     async def _get_memory(self):
         """获取记忆实例（懒加载）"""
+        if not settings.MEM0_ENABLE:
+            raise BusinessException("Mem0记忆系统未启用", ResponseCode.SERVICE_UNAVAILABLE)
+
         if not self._memory_instance:
             self._memory_instance = await get_enterprise_memory()
         return self._memory_instance
