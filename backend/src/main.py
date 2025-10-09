@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 导入核心模块
+from src.apps.agent.memory_factory import get_enterprise_memory
 from .shared.core.config import settings
 from .shared.core.logging import setup_logging, get_logger
 from .shared.core.middleware import setup_middlewares
@@ -58,7 +59,6 @@ async def lifespan(app: FastAPI):
 
     # 初始化Mem0长期记忆系统（向量数据库 PostgreSQL）
     try:
-        from src.apps.agent.memory_factory import get_enterprise_memory
         memory = await get_enterprise_memory()
         if memory:
             logger.info("✅ Mem0长期记忆系统初始化成功 (PostgreSQL向量库)")
