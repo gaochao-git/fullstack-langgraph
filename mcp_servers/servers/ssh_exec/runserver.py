@@ -806,9 +806,9 @@ async def resource_top_n(
 
     Args:
         resource_type: 资源类型
-            - cpu: CPU占用
-            - mem: 内存占用
-            - net: 网络流量（所有网卡）
+            - cpu: CPU占用TOP N进程
+            - mem: 内存占用TOP N进程
+            - net: 网络流量TOP N连接
         top_n: 返回前N个结果，默认10，范围1-100
         host: 目标主机IP或域名
         timeout: 超时时间（秒），默认30秒
@@ -821,198 +821,62 @@ async def resource_top_n(
         client = _create_ssh_client(host)
 
         # 参数验证
-        if resource_type not in ['cpu', 'mem', 'net']:
-            return json_dumps({
-                "error": "resource_type 必须是 cpu, mem 或 net"
-            })
-
         if not isinstance(top_n, int) or top_n < 1 or top_n > 100:
             return json_dumps({
                 "error": "top_n 必须是 1-100 之间的整数"
             })
 
-        # 构建命令
-        if resource_type == "cpu":
-            # 按CPU排序
-            ps_cmd = f"ps aux | head -1 && ps aux | sort -k3 -rn | head -n {top_n}"
-            sort_column = "CPU"
-            return_type = "processes"
-
-        elif resource_type == "mem":
-            # 按内存排序
-            ps_cmd = f"ps aux | head -1 && ps aux | sort -k4 -rn | head -n {top_n}"
-            sort_column = "MEM"
-            return_type = "processes"
-
-        else:  # net
-            # 网络流量统计（所有网卡）
-            # 方案：采样两次 /proc/net/dev，计算差值得到流量速率
-            net_cmd = """
-# 第一次采样
-cat /proc/net/dev > /tmp/net_stat1_$$
-sleep 2
-# 第二次采样
-cat /proc/net/dev > /tmp/net_stat2_$$
-
-# 计算差值并统计
-awk '
-BEGIN { FS="[: ]+" }
-NR==FNR {
-    if (NF >= 10 && $1 != "Inter" && $1 != "face") {
-        iface = $2;
-        rx1[iface] = $3;  # 接收字节
-        tx1[iface] = $11; # 发送字节
-    }
-    next;
-}
-{
-    if (NF >= 10 && $1 != "Inter" && $1 != "face") {
-        iface = $2;
-        rx2 = $3;
-        tx2 = $11;
-        if (iface in rx1) {
-            rx_rate = (rx2 - rx1[iface]) / 2;  # 除以2秒
-            tx_rate = (tx2 - tx1[iface]) / 2;
-            total_rate = rx_rate + tx_rate;
-
-            # 转换为人类可读格式
-            if (total_rate > 1024*1024*1024) {
-                rate_str = sprintf("%.2f GB/s", total_rate/1024/1024/1024);
-            } else if (total_rate > 1024*1024) {
-                rate_str = sprintf("%.2f MB/s", total_rate/1024/1024);
-            } else if (total_rate > 1024) {
-                rate_str = sprintf("%.2f KB/s", total_rate/1024);
-            } else {
-                rate_str = sprintf("%.0f B/s", total_rate);
-            }
-
-            if (rx_rate > 1024*1024) {
-                rx_str = sprintf("%.2f MB/s", rx_rate/1024/1024);
-            } else if (rx_rate > 1024) {
-                rx_str = sprintf("%.2f KB/s", rx_rate/1024);
-            } else {
-                rx_str = sprintf("%.0f B/s", rx_rate);
-            }
-
-            if (tx_rate > 1024*1024) {
-                tx_str = sprintf("%.2f MB/s", tx_rate/1024/1024);
-            } else if (tx_rate > 1024) {
-                tx_str = sprintf("%.2f KB/s", tx_rate/1024);
-            } else {
-                tx_str = sprintf("%.0f B/s", tx_rate);
-            }
-
-            if (total_rate > 0) {
-                print iface "|" rx_str "|" tx_str "|" rate_str "|" total_rate;
+        # 资源类型命令映射（便于后续扩展）
+        RESOURCE_COMMANDS = {
+            "cpu": {
+                "cmd": f"ps aux | head -1 && ps aux | sort -k3 -rn | head -n {top_n}",
+                "description": "CPU占用TOP N进程"
+            },
+            "mem": {
+                "cmd": f"ps aux | head -1 && ps aux | sort -k4 -rn | head -n {top_n}",
+                "description": "内存占用TOP N进程"
+            },
+            "net": {
+                "cmd": f"timeout 5 iftop -i $(ip link show bond0 >/dev/null 2>&1 && echo bond0 || echo eth0) -t -s 2 -n -N 2>/dev/null | head -{top_n * 2 + 10}",
+                "description": "网络连接流量统计"
             }
         }
-    }
-}
-' /tmp/net_stat1_$$ /tmp/net_stat2_$$ | sort -t'|' -k5 -rn | head -n {top_n}
 
-# 清理临时文件
-rm -f /tmp/net_stat1_$$ /tmp/net_stat2_$$
-"""
-            ps_cmd = net_cmd.strip()
-            sort_column = "Network Traffic"
-            return_type = "network"
+        # 获取命令配置
+        config = RESOURCE_COMMANDS.get(resource_type)
+        if not config:
+            return json_dumps({
+                "error": f"不支持的资源类型: {resource_type}"
+            })
 
-        logger.info(f"执行命令: {ps_cmd}")
-        stdin, stdout, stderr = client.exec_command(ps_cmd, timeout=timeout)
+        ps_cmd = config["cmd"]
+        description = config["description"]
+
+        logger.info(f"执行命令: {ps_cmd.strip()}")
+        stdin, stdout, stderr = client.exec_command(ps_cmd.strip(), timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
-        if error_output and resource_type != "net":
+        # 统一返回原始输出
+        if output.strip().startswith("ERROR:"):
+            return json_dumps({
+                "success": False,
+                "error": output.strip()
+            })
+
+        if error_output:
             return json_dumps({
                 "success": False,
                 "error": error_output
             })
 
-        # 根据类型解析输出
-        if return_type == "processes":
-            # 解析 ps aux 输出
-            lines = output.strip().split('\n')
-            if len(lines) < 2:
-                return json_dumps({
-                    "success": False,
-                    "error": "无法获取进程信息"
-                })
-
-            header = lines[0]
-            processes = []
-
-            for line in lines[1:]:
-                parts = line.split(None, 10)
-                if len(parts) >= 11:
-                    processes.append({
-                        "user": parts[0],
-                        "pid": parts[1],
-                        "cpu_percent": parts[2],
-                        "mem_percent": parts[3],
-                        "vsz_kb": parts[4],
-                        "rss_kb": parts[5],
-                        "tty": parts[6],
-                        "stat": parts[7],
-                        "start": parts[8],
-                        "time": parts[9],
-                        "command": parts[10]
-                    })
-
-            return json_dumps({
-                "success": True,
-                "resource_type": resource_type,
-                "sort_by": sort_column,
-                "top_n": top_n,
-                "total_processes": len(processes),
-                "header": header,
-                "processes": processes
-            }, indent=2)
-
-        else:  # network
-            # 解析网络流量输出（格式：interface|rx_rate|tx_rate|total_rate|total_bytes）
-            lines = output.strip().split('\n')
-            traffic_data = []
-
-            for line in lines:
-                if not line.strip():
-                    continue
-                parts = line.split('|')
-                if len(parts) == 5:
-                    traffic_data.append({
-                        "interface": parts[0],       # 网卡名称
-                        "rx_rate": parts[1],         # 接收速率（下载）
-                        "tx_rate": parts[2],         # 发送速率（上传）
-                        "total_rate": parts[3],      # 总速率
-                        "total_bytes_per_sec": float(parts[4])  # 用于排序
-                    })
-
-            # 如果没有流量数据
-            if not traffic_data:
-                return json_dumps({
-                    "success": True,
-                    "resource_type": resource_type,
-                    "top_n": top_n,
-                    "message": "当前所有网卡流量为0或无活跃网卡",
-                    "traffic": []
-                }, indent=2)
-
-            return json_dumps({
-                "success": True,
-                "resource_type": resource_type,
-                "sort_by": "Network Traffic (All Interfaces)",
-                "top_n": top_n,
-                "total_interfaces": len(traffic_data),
-                "description": "所有网卡流量统计（2秒采样）",
-                "note": "rx=接收(下载), tx=发送(上传), total=总流量",
-                "traffic": [
-                    {
-                        "interface": item["interface"],
-                        "rx_rate": item["rx_rate"],
-                        "tx_rate": item["tx_rate"],
-                        "total_rate": item["total_rate"]
-                    } for item in traffic_data
-                ]
-            }, indent=2)
+        return json_dumps({
+            "success": True,
+            "resource_type": resource_type,
+            "top_n": top_n,
+            "description": description,
+            "output": output
+        }, indent=2)
 
     except Exception as e:
         logger.error(f"获取资源TOP N失败: {str(e)}")
