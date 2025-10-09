@@ -28,11 +28,7 @@ UNRESTRICTED_COMMANDS = {
 def is_command_safe(command: str) -> Tuple[bool, str]:
     """检查命令是否安全 - 使用白名单机制"""
     # 先移除允许的安全重定向，避免误判
-    safe_redirects = [
-        '2>/dev/null', '2> /dev/null',  # 错误输出重定向到null
-        '>/dev/null', '> /dev/null',    # 标准输出重定向到null
-        '1>/dev/null', '1> /dev/null',  # 显式标准输出重定向到null
-    ]
+    safe_redirects = ['2>/dev/null']
     cleaned_command = command
     for safe_redirect in safe_redirects:
         cleaned_command = cleaned_command.replace(safe_redirect, '')
@@ -44,7 +40,6 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
         '`', '$(',                     # 命令替换
         '..',                          # 目录遍历
         '/etc/passwd', '/etc/shadow',  # 敏感文件
-        '/root/', '~/',                # 敏感目录
     ]
 
     for pattern in dangerous_patterns:
