@@ -809,6 +809,7 @@ async def resource_top_n(
             - cpu: CPU占用TOP N进程
             - mem: 内存占用TOP N进程
             - net: 网络流量TOP N连接
+            - disk_io: 磁盘IO TOP N进程
         top_n: 返回前N个结果，默认10，范围1-100
         host: 目标主机IP或域名
         timeout: 超时时间（秒），默认30秒
@@ -839,6 +840,10 @@ async def resource_top_n(
             "net": {
                 "cmd": f"timeout 5 iftop -i $(ip link show bond0 >/dev/null 2>&1 && echo bond0 || echo eth0) -t -s 2 -n -N 2>/dev/null | head -{top_n * 2 + 10}",
                 "description": "网络连接流量统计"
+            },
+            "disk_io": {
+                "cmd": f"iotop -obn 2 -d 2 -P 2>/dev/null",
+                "description": "磁盘IO TOP N进程"
             }
         }
 
