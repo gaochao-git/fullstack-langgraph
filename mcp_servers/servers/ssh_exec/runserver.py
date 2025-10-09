@@ -96,8 +96,11 @@ async def get_system_info(host: Optional[str] = None, timeout: int = 30) -> str:
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
-        
+
         commands = {
             'hostname': 'hostname',
             'kernel': 'uname -r',
@@ -115,7 +118,7 @@ async def get_system_info(host: Optional[str] = None, timeout: int = 30) -> str:
         
         for key, command in commands.items():
             try:
-                stdin, stdout, stderr = client.exec_command(command)
+                stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
                 output = stdout.read().decode().strip()
                 error = stderr.read().decode().strip()
                 
@@ -185,10 +188,17 @@ async def find_file(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 构建安全的find命令
         find_parts = ["find", path]
+
+        # 排除内核虚拟文件系统目录
+        exclude_pattern = "\\( -path /proc -o -path /sys -o -path /dev -o -path /run \\) -prune -o"
+        find_parts.append(exclude_pattern)
 
         # 添加文件类型
         if file_type:
@@ -316,6 +326,9 @@ async def list_directory(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
@@ -387,6 +400,9 @@ async def list_processes(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 构建安全的 ps 命令
@@ -444,6 +460,9 @@ async def read_file_tail(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
@@ -504,6 +523,9 @@ async def read_file_head(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
@@ -570,6 +592,9 @@ async def search_file_content(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
@@ -634,6 +659,9 @@ async def get_disk_usage(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 构建安全的 df 命令
@@ -693,6 +721,9 @@ async def list_network_connections(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
@@ -760,6 +791,9 @@ async def ping_host(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
@@ -819,6 +853,9 @@ async def resource_top_n(
     """
     client = None
     try:
+        # 兜底限制，超时时间不能超过100秒
+        timeout = min(timeout, 100)
+
         client = _create_ssh_client(host)
 
         # 参数验证
