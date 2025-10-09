@@ -17,13 +17,10 @@ servers:
     display_name: "SSH远程连接服务"
     config:
       port: 3002
-      host: 82.156.146.51
-      ssh_port: 22
-      configs:
-        - username: root
-          password: "123456"
-        - username: gaochao
-          key_file: "/Users/gaochao/.ssh/id_rsa"
+      ssh_port: 22  # SSH默认端口
+      ssh_username: root  # SSH默认用户名
+      ssh_key_file: "/Users/gaochao/.ssh/id_rsa"  # SSH私钥路径
+      # host由调用时动态指定
           
   es_search:
     enabled: true

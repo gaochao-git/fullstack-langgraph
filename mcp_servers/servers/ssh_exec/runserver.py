@@ -35,59 +35,47 @@ config = MCPServerConfig('ssh_exec')
 
 def _create_ssh_client(host=None):
     """创建新的SSH连接，每次调用都重新连接
-    
+
     Args:
-        host: 目标主机IP或域名，如果不提供则使用配置中的默认主机
+        host: 目标主机IP或域名，必须提供
     """
-    ssh_configs = config.get('configs', [])
     if host is None:
-        host = config.get('host')
-    port = config.get('ssh_port', 22)  # 使用ssh_port而不是port
-    
-    for ssh_config in ssh_configs:
-        try:
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            
-            # 判断是密钥认证还是密码认证
-            if 'key_file' in ssh_config:
-                # 密钥认证
-                key_path = os.path.expanduser(ssh_config['key_file'])
-                if not os.path.exists(key_path):
-                    logger.debug(f"私钥文件不存在: {key_path}")
-                    continue
-                
-                try:
-                    key = paramiko.RSAKey.from_private_key_file(key_path)
-                    client.connect(
-                        hostname=host,
-                        port=port,
-                        username=ssh_config["username"],
-                        pkey=key,
-                        timeout=10
-                    )
-                    logger.info(f"SSH密钥连接成功，主机: {host}, 用户: {ssh_config['username']}, 密钥: {key_path}")
-                except Exception as key_error:
-                    logger.debug(f"密钥认证失败: {key_error}")
-                    continue
-            else:
-                # 密码认证
-                client.connect(
-                    hostname=host,
-                    port=port,
-                    username=ssh_config["username"],
-                    password=ssh_config.get("password", ""),
-                    timeout=10
-                )
-                logger.info(f"SSH密码连接成功，主机: {host}, 用户: {ssh_config['username']}")
-            
-            return client
-            
-        except Exception as e:
-            logger.debug(f"尝试用户 {ssh_config['username']} 失败: {e}")
-            continue
-    
-    raise Exception("无法建立SSH连接，请检查网络和服务器状态")
+        raise Exception("必须指定目标主机host参数")
+
+    port = config.get('ssh_port', 22)
+    username = config.get('ssh_username')
+    key_file = config.get('ssh_key_file')
+
+    if not username:
+        raise Exception("配置中缺少ssh_username")
+
+    try:
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        # 使用密钥认证
+        if key_file:
+            key_path = os.path.expanduser(key_file)
+            if not os.path.exists(key_path):
+                raise Exception(f"私钥文件不存在: {key_path}")
+
+            key = paramiko.RSAKey.from_private_key_file(key_path)
+            client.connect(
+                hostname=host,
+                port=port,
+                username=username,
+                pkey=key,
+                timeout=10
+            )
+            logger.info(f"SSH密钥连接成功，主机: {host}, 用户: {username}, 密钥: {key_path}")
+        else:
+            raise Exception("配置中缺少ssh_key_file")
+
+        return client
+
+    except Exception as e:
+        logger.error(f"SSH连接失败: {e}")
+        raise Exception(f"无法建立SSH连接: {str(e)}")
 
 @mcp.tool()
 async def get_system_info(host: Optional[str] = None) -> str:
@@ -254,9 +242,9 @@ async def execute_command(
 if __name__ == "__main__":
     # 获取端口
     port = config.get('port', 3002)
-    
+
     logger.info(f"Starting {config.display_name} on port {port}")
-    logger.info(f"SSH config: host={config.get('host')}, configs={len(config.get('configs', []))} users")
-    
+    logger.info(f"SSH config: username={config.get('ssh_username')}, key_file={config.get('ssh_key_file')}")
+
     # 使用SSE传输方式启动服务器
     mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
