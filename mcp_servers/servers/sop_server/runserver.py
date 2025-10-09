@@ -123,8 +123,11 @@ async def get_sop_content(sop_id: str) -> str:
         }, ensure_ascii=False, indent=2)
 
 @mcp.tool()
-async def list_sops() -> str:
+async def list_sops(limit: int = 1000) -> str:
     """列出所有可用的SOP
+
+    Args:
+        limit: 返回的SOP数量限制，默认1000
 
     Returns:
         JSON格式的SOP列表（仅包含ID和标题）
