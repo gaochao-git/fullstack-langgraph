@@ -18,32 +18,29 @@ class SOPService:
     """SOP服务 - 清晰的单一职责实现"""
     
     async def create_sop(
-        self, 
-        db: AsyncSession, 
-        sop_data: SOPTemplateCreate
+        self,
+        db: AsyncSession,
+        sop_data: Dict[str, Any]
     ) -> SOPTemplate:
         """创建SOP模板"""
         async with db.begin():
             # 业务验证
             result = await db.execute(
-                select(SOPTemplate).where(SOPTemplate.sop_id == sop_data.sop_id)
+                select(SOPTemplate).where(SOPTemplate.sop_id == sop_data['sop_id'])
             )
             existing = result.scalar_one_or_none()
             if existing:
-                raise BusinessException(f"SOP template with ID {sop_data.sop_id} already exists", ResponseCode.CONFLICT)
-            
-            # 转换数据
-            if isinstance(sop_data, dict):
-                data = sop_data
-            else:
-                data = sop_data.dict()
-            
+                raise BusinessException(f"SOP template with ID {sop_data['sop_id']} already exists", ResponseCode.CONFLICT)
+
+            # 准备数据
+            data = sop_data.copy()
+
             # 设置默认值
-            data.setdefault('create_by', 'system')  # 如果没有传入create_by，使用默认值
+            data.setdefault('create_by', 'system')
             data.setdefault('create_time', now_shanghai())
             data.setdefault('update_time', now_shanghai())
-            
-            logger.info(f"Creating SOP template: {sop_data.sop_id}")
+
+            logger.info(f"Creating SOP template: {data['sop_id']}")
             instance = SOPTemplate(**data)
             db.add(instance)
             await db.flush()
@@ -99,10 +96,10 @@ class SOPService:
         return templates, total
     
     async def update_sop(
-        self, 
-        db: AsyncSession, 
-        sop_id: str, 
-        sop_data: SOPTemplateUpdate
+        self,
+        db: AsyncSession,
+        sop_id: str,
+        sop_data: Dict[str, Any]
     ) -> Optional[SOPTemplate]:
         """更新SOP模板"""
         async with db.begin():
@@ -113,27 +110,24 @@ class SOPService:
             existing = result.scalar_one_or_none()
             if not existing:
                 raise BusinessException(f"SOP template with ID {sop_id} not found", ResponseCode.NOT_FOUND)
-            
-            # 转换数据
-            if isinstance(sop_data, dict):
-                data = sop_data.copy()
-            else:
-                data = sop_data.dict(exclude_unset=True)
-            
+
+            # 准备数据
+            data = sop_data.copy()
+
             # 移除不可更新字段
             data.pop('sop_id', None)
             data.pop('create_time', None)
             data.pop('create_by', None)
-            
+
             # 如果没有传入update_by，使用默认值
             data.setdefault('update_by', 'system')
             data['update_time'] = now_shanghai()
-            
+
             logger.info(f"Updating SOP template: {sop_id}")
             await db.execute(
                 update(SOPTemplate).where(SOPTemplate.sop_id == sop_id).values(**data)
             )
-            
+
             # 返回更新后的数据
             result = await db.execute(
                 select(SOPTemplate).where(SOPTemplate.sop_id == sop_id)
