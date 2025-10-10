@@ -73,6 +73,7 @@ def _create_ssh_client(host=None):
         logger.error(f"SSH连接失败: {e}")
         raise Exception(f"无法建立SSH连接: {str(e)}")
 
+
 @mcp.tool()
 async def get_system_info(host: str, timeout: int = 30) -> str:
     """获取系统基本信息。包括：主机名、内核版本、操作系统信息、运行时间、CPU型号、CPU核数、内存使用情况、磁盘使用情况、系统负载、登录用户
@@ -275,7 +276,7 @@ async def find_file(
         logger.info(f"执行查找命令: {find_cmd}")
 
         # 执行命令
-        stdin, stdout, stderr = client.exec_command(find_cmd, timeout=timeout)
+        stdin, stdout, stderr = client.exec_command(f"sudo {find_cmd}", timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
@@ -329,10 +330,10 @@ async def find_file(
 
 @mcp.tool()
 async def list_directory(
+    host: str,
     path: str = "/tmp",
     show_hidden: bool = False,
     sort_by: str = "name",
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """列出目录内容（替代 ls 命令）
@@ -403,10 +404,10 @@ async def list_directory(
 
 @mcp.tool()
 async def list_processes(
+    host: str,
     filter_user: Optional[str] = None,
     filter_name: Optional[str] = None,
     show_all: bool = True,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """列出系统进程（替代 ps 命令）
@@ -465,9 +466,9 @@ async def list_processes(
 
 @mcp.tool()
 async def read_file_tail(
+    host: str,
     file_path: str,
     lines: int = 100,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """读取文件末尾内容（替代 tail 命令）
@@ -500,7 +501,7 @@ async def read_file_tail(
         tail_cmd = f"tail -n {lines} '{safe_path}'"
 
         logger.info(f"执行命令: {tail_cmd}")
-        stdin, stdout, stderr = client.exec_command(tail_cmd, timeout=timeout)
+        stdin, stdout, stderr = client.exec_command(f"sudo {tail_cmd}", timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
@@ -528,9 +529,9 @@ async def read_file_tail(
 
 @mcp.tool()
 async def read_file_head(
+    host: str,
     file_path: str,
     lines: int = 100,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """读取文件开头内容（替代 head 命令）
@@ -563,7 +564,7 @@ async def read_file_head(
         head_cmd = f"head -n {lines} '{safe_path}'"
 
         logger.info(f"执行命令: {head_cmd}")
-        stdin, stdout, stderr = client.exec_command(head_cmd, timeout=timeout)
+        stdin, stdout, stderr = client.exec_command(f"sudo {head_cmd}", timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
@@ -591,12 +592,12 @@ async def read_file_head(
 
 @mcp.tool()
 async def grep_file_content(
+    host: str,
     file_path: str,
     pattern: str,
     max_lines: int = 100,
     context_lines: int = 0,
     case_sensitive: bool = True,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """在文件中搜索内容
@@ -643,7 +644,7 @@ async def grep_file_content(
         grep_cmd += f" '{safe_pattern}' '{safe_path}' | head -n {max_lines}"
 
         logger.info(f"执行命令: {grep_cmd}")
-        stdin, stdout, stderr = client.exec_command(grep_cmd, timeout=timeout)
+        stdin, stdout, stderr = client.exec_command(f"sudo {grep_cmd}", timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
@@ -666,8 +667,8 @@ async def grep_file_content(
 
 @mcp.tool()
 async def get_disk_usage(
+    host: str,
     mount_point: Optional[str] = None,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """获取磁盘使用情况（替代 df 命令）
@@ -724,10 +725,10 @@ async def get_disk_usage(
 
 @mcp.tool()
 async def list_network_connections(
+    host: str,
     protocol: Optional[str] = None,
     state: Optional[str] = None,
     listening_only: bool = False,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """列出网络连接（替代 netstat 命令）
@@ -796,9 +797,9 @@ async def list_network_connections(
 
 @mcp.tool()
 async def test_connectivity(
+    source_host: str,
     target_host: str,
     target_port: Optional[int] = None,
-    source_host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """测试网络和端口连通性
@@ -874,9 +875,9 @@ async def test_connectivity(
 
 @mcp.tool()
 async def resource_top_n(
+    host: str,
     resource_type: str = "cpu",
     top_n: int = 10,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """查看资源占用 TOP N
@@ -975,10 +976,10 @@ async def resource_top_n(
 
 @mcp.tool()
 async def get_system_performance(
+    host: str,
     stat_type: str = "io",
     interval: int = 1,
     count: int = 2,
-    host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """获取系统性能统计（整体视角）
