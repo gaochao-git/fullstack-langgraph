@@ -986,6 +986,7 @@ async def get_system_performance(
 
     Args:
         stat_type: 统计类型
+            - cpu: CPU使用率统计（mpstat），查看各CPU核心使用率、用户态、内核态、空闲率
             - io: 磁盘IO统计（iostat），查看磁盘整体读写性能、利用率、等待时间
             - mem: 内存和CPU统计（vmstat），查看系统整体内存、swap、CPU、IO等待情况
             - net: 网络流量统计（sar），查看各网卡历史流量、错误率、丢包率
@@ -1017,6 +1018,10 @@ async def get_system_performance(
 
         # 统计类型命令映射
         STAT_COMMANDS = {
+            "cpu": {
+                "cmd": f"mpstat {interval} {count} 2>/dev/null || echo 'ERROR: mpstat命令不可用，请安装sysstat包'",
+                "description": "CPU详细统计（各核心使用率、用户态、内核态、空闲率）"
+            },
             "io": {
                 "cmd": f"iostat -x {interval} {count} 2>/dev/null",
                 "description": "磁盘IO详细统计（利用率、吞吐量、等待时间）"
@@ -1035,7 +1040,7 @@ async def get_system_performance(
         config = STAT_COMMANDS.get(stat_type)
         if not config:
             return json_dumps({
-                "error": f"不支持的统计类型: {stat_type}，支持: io, mem, net"
+                "error": f"不支持的统计类型: {stat_type}，支持: cpu, io, mem, net"
             })
 
         cmd = config["cmd"]
