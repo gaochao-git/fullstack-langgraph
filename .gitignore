@@ -17,6 +17,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# PIDs
+**/pids/*.pid
+!**/pids/.gitkeep
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -206,7 +210,6 @@ backend/documents/templates/
 backend/documents/uploads/
 backend/uploads/
 production_build
-*.pid
 software/
 Unla
 documents/
