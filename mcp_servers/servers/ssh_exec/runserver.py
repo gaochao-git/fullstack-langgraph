@@ -158,30 +158,38 @@ async def get_system_info(host: Optional[str] = None, timeout: int = 30) -> str:
 
 @mcp.tool()
 async def find_file(
-    path: str = "/",
-    name: Optional[str] = None,
-    file_type: Optional[str] = None,
-    size_mb: Optional[int] = None,
-    size_operator: str = "+",
-    mtime_days: Optional[int] = None,
-    ctime_days: Optional[int] = None,
-    limit: int = 100,
+    path: str,
+    options: str,
     host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
     """安全的文件查找工具
 
     Args:
-        path: 搜索路径，默认为根目录 /
-        name: 文件名匹配模式（支持通配符，如 "*.log"）
-        file_type: 文件类型，f=普通文件，d=目录
-        size_mb: 文件大小（MB）
-        size_operator: 大小运算符，+ 表示大于，- 表示小于，默认为 +
-        mtime_days: 修改时间（天数），正数表示N天前，负数表示N天内
-        ctime_days: 状态改变时间（天数）
-        limit: 返回结果数量限制，默认100
+        path: 搜索路径
+        options: 查找选项，JSON字符串格式，支持以下字段：
+            - name: 文件名匹配模式（支持通配符，如 "*.log"）
+            - file_type: 文件类型（f=普通文件, d=目录, l=链接）
+            - size_mb: 文件大小（MB）
+            - size_operator: 大小运算符（+ 表示大于，- 表示小于，默认 +）
+            - mtime_days: 修改时间（天数，正数表示N天前，负数表示N天内）
+            - ctime_days: 状态改变时间（天数）
+            - limit: 返回结果数量限制（默认100）
         host: 目标主机IP或域名
         timeout: 命令执行超时时间（秒），默认30秒
+
+    Examples:
+        查找所有日志文件:
+        options = '{"name": "*.log"}'
+
+        查找大于100MB的文件:
+        options = '{"size_mb": 100, "size_operator": "+"}'
+
+        查找7天内修改的配置文件:
+        options = '{"name": "*.conf", "mtime_days": -7}'
+
+        查找所有目录:
+        options = '{"file_type": "d", "limit": 50}'
 
     Returns:
         JSON格式的查找结果，包含文件路径、大小、修改时间等信息
@@ -190,6 +198,21 @@ async def find_file(
     try:
         # 兜底限制，超时时间不能超过100秒
         timeout = min(timeout, 100)
+
+        # 解析 options
+        try:
+            opts = json.loads(options) if options else {}
+        except json.JSONDecodeError:
+            return json_dumps({"error": "options 必须是有效的 JSON 字符串"})
+
+        # 提取参数
+        name = opts.get('name')
+        file_type = opts.get('file_type')
+        size_mb = opts.get('size_mb')
+        size_operator = opts.get('size_operator', '+')
+        mtime_days = opts.get('mtime_days')
+        ctime_days = opts.get('ctime_days')
+        limit = opts.get('limit', 100)
 
         client = _create_ssh_client(host)
 
