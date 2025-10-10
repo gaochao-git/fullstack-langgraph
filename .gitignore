@@ -9,8 +9,8 @@ mcp_servers/servers/echarts_server/generated_charts/
 *.local
 
 # Logs
-logs
-*.log
+**/logs/*.log*
+!**/logs/.gitkeep
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -97,7 +97,6 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -207,7 +206,6 @@ backend/documents/templates/
 backend/documents/uploads/
 backend/uploads/
 production_build
-*.log
 *.pid
 software/
 Unla
