@@ -74,7 +74,7 @@ def _create_ssh_client(host=None):
         raise Exception(f"无法建立SSH连接: {str(e)}")
 
 @mcp.tool()
-async def get_system_info(host: Optional[str] = None, timeout: int = 30) -> str:
+async def get_system_info(host: str, timeout: int = 30) -> str:
     """获取系统基本信息。包括：主机名、内核版本、操作系统信息、运行时间、CPU型号、CPU核数、内存使用情况、磁盘使用情况、系统负载、登录用户
 
     Args:
@@ -158,16 +158,15 @@ async def get_system_info(host: Optional[str] = None, timeout: int = 30) -> str:
 
 @mcp.tool()
 async def find_file(
-    path: str,
-    options: str,
-    host: Optional[str] = None,
+    payload: str,
+    host: str,
     timeout: int = 30
 ) -> str:
     """安全的文件查找工具
 
     Args:
-        path: 搜索路径
-        options: 查找选项，JSON字符串格式，支持以下字段：
+        payload: 查找参数，JSON字符串格式，支持以下字段：
+            - path: 搜索路径（必填）
             - name: 文件名匹配模式（支持通配符，如 "*.log"）
             - file_type: 文件类型（f=普通文件, d=目录, l=链接）
             - size_mb: 文件大小（MB）
@@ -180,16 +179,16 @@ async def find_file(
 
     Examples:
         查找所有日志文件:
-        options = '{"name": "*.log"}'
+        payload = '{"path": "/var/log", "name": "*.log"}'
 
         查找大于100MB的文件:
-        options = '{"size_mb": 100, "size_operator": "+"}'
+        payload = '{"path": "/home", "size_mb": 100, "size_operator": "+"}'
 
         查找7天内修改的配置文件:
-        options = '{"name": "*.conf", "mtime_days": -7}'
+        payload = '{"path": "/etc", "name": "*.conf", "mtime_days": -7}'
 
         查找所有目录:
-        options = '{"file_type": "d", "limit": 50}'
+        payload = '{"path": "/opt", "file_type": "d", "limit": 50}'
 
     Returns:
         JSON格式的查找结果，包含文件路径、大小、修改时间等信息
@@ -199,13 +198,14 @@ async def find_file(
         # 兜底限制，超时时间不能超过100秒
         timeout = min(timeout, 100)
 
-        # 解析 options
+        # 解析 payload
         try:
-            opts = json.loads(options) if options else {}
+            opts = json.loads(payload) if payload else {}
         except json.JSONDecodeError:
-            return json_dumps({"error": "options 必须是有效的 JSON 字符串"})
+            return json_dumps({"error": "payload 必须是有效的 JSON 字符串"})
 
         # 提取参数
+        path = opts.get('path', '/')
         name = opts.get('name')
         file_type = opts.get('file_type')
         size_mb = opts.get('size_mb')
