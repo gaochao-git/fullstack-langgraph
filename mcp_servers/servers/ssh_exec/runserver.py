@@ -567,7 +567,7 @@ async def read_file_head(
 
 
 @mcp.tool()
-async def search_file_content(
+async def grep_file_content(
     file_path: str,
     pattern: str,
     max_lines: int = 100,
@@ -576,7 +576,7 @@ async def search_file_content(
     host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
-    """在文件中搜索内容（替代 grep 命令）
+    """在文件中搜索内容
 
     Args:
         file_path: 文件路径
@@ -772,58 +772,78 @@ async def list_network_connections(
 
 
 @mcp.tool()
-async def ping_host(
-    target: str,
-    count: int = 4,
-    host: Optional[str] = None,
+async def test_connectivity(
+    target_host: str,
+    target_port: Optional[int] = None,
+    source_host: Optional[str] = None,
     timeout: int = 30
 ) -> str:
-    """测试网络连通性（替代 ping 命令）
+    """测试网络和端口连通性
 
     Args:
-        target: 目标主机IP或域名
-        count: ping次数，默认4次，最大10次
-        host: 执行ping的源主机IP或域名
-        timeout: 超时时间（秒），默认30秒
+        target_host: 目标主机IP或域名
+        target_port: 目标端口（可选）。如果不提供，使用ping测试网络连通性；如果提供，测试TCP端口连通性
+        source_host: 执行测试的源主机IP或域名（可选）
+        timeout: 命令执行超时时间（秒），默认30秒
 
     Returns:
-        JSON格式的ping结果
+        JSON格式的连通性测试结果
     """
     client = None
     try:
         # 兜底限制，超时时间不能超过100秒
         timeout = min(timeout, 100)
 
-        client = _create_ssh_client(host)
+        client = _create_ssh_client(source_host)
 
-        # 参数验证
-        if not isinstance(count, int) or count < 1 or count > 10:
-            return json_dumps({"error": "count 必须是 1-10 之间的整数"})
-
-        # 简单验证目标主机格式（防止命令注入）
-        if any(c in target for c in [';', '&', '|', '`', '$', '>', '<', '\n']):
+        # 验证目标主机格式（防止命令注入）
+        if any(c in target_host for c in [';', '&', '|', '`', '$', '>', '<', '\n']):
             return json_dumps({"error": "目标主机包含非法字符"})
 
-        # 构建安全的 ping 命令
-        safe_target = target.replace("'", "'\\''")
-        ping_cmd = f"ping -c {count} '{safe_target}'"
+        safe_host = target_host.replace("'", "'\\''")
 
-        logger.info(f"执行命令: {ping_cmd}")
-        stdin, stdout, stderr = client.exec_command(ping_cmd, timeout=timeout)
+        if target_port is not None:
+            # 端口连通性测试
+            if not isinstance(target_port, int) or target_port < 1 or target_port > 65535:
+                return json_dumps({"error": "端口必须是 1-65535 之间的整数"})
+
+            # 使用telnet测试端口（默认2秒连接超时，通过管道输入空字符让telnet自动退出）
+            connect_timeout = 2
+            test_cmd = f'echo "" | timeout {connect_timeout} telnet {safe_host} {target_port} 2>&1'
+            test_type = "port"
+            description = f"TCP端口{target_port}连通性测试"
+
+        else:
+            # 网络连通性测试（ping，默认4次）
+            count = 4
+            test_cmd = f"ping -c {count} '{safe_host}'"
+            test_type = "network"
+            description = "网络连通性测试（ICMP）"
+
+        logger.info(f"执行命令: {test_cmd}")
+        stdin, stdout, stderr = client.exec_command(test_cmd, timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
-        return json_dumps({
+        result = {
             "success": True,
-            "target": target,
-            "count": count,
-            "output": output,
-            "error": error_output if error_output else None
-        }, indent=2)
+            "test_type": test_type,
+            "target_host": target_host,
+            "description": description,
+            "output": output
+        }
+
+        if target_port is not None:
+            result["target_port"] = target_port
+
+        if error_output:
+            result["error"] = error_output
+
+        return json_dumps(result, indent=2)
 
     except Exception as e:
-        logger.error(f"Ping失败: {str(e)}")
-        return json_dumps({"error": f"Ping失败: {str(e)}"})
+        logger.error(f"连通性测试失败: {str(e)}")
+        return json_dumps({"error": f"连通性测试失败: {str(e)}"})
     finally:
         if client:
             client.close()
