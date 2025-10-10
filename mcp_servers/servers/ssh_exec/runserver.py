@@ -376,8 +376,8 @@ async def list_directory(
         safe_path = path.replace("'", "'\\''")
         ls_cmd += f" '{safe_path}'"
 
-        logger.info(f"执行命令: {ls_cmd}")
-        stdin, stdout, stderr = client.exec_command(ls_cmd, timeout=timeout)
+        logger.info(f"执行命令: sudo {ls_cmd}")
+        stdin, stdout, stderr = client.exec_command(f"sudo {ls_cmd}", timeout=timeout)
         output = stdout.read().decode()
         error_output = stderr.read().decode()
 
