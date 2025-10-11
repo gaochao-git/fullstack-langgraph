@@ -285,7 +285,7 @@ class ScanTaskProcessor:
             # 保存JSONL结果
             if result["document"]:
                 # 保存langextract格式的JSONL
-                self.scanner.save_results([result["document"]], str(jsonl_path))
+                scanner.save_results([result["document"]], str(jsonl_path))
             else:
                 # 如果没有提取到任何内容，保存空结果
                 with open(jsonl_path, 'w', encoding='utf-8') as f:
@@ -295,12 +295,12 @@ class ScanTaskProcessor:
                         "extractions": []
                     }
                     f.write(json.dumps(empty_result, ensure_ascii=False) + '\n')
-            
+
             # 修复JSONL中的char_interval
             self._fix_jsonl_char_intervals(str(jsonl_path), content)
-            
+
             # 生成可视化HTML
-            self.scanner.generate_visualization(str(jsonl_path), str(html_path))
+            scanner.generate_visualization(str(jsonl_path), str(html_path))
             
             # 返回相对路径
             jsonl_relative = f"scan_results/{task_id}/{base_name}.jsonl"
