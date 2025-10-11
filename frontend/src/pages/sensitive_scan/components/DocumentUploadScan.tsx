@@ -46,9 +46,9 @@ interface DocumentUploadScanProps {
 // 文件上传状态接口
 interface FileUploadStatus {
   uid: string;
-  file: File;
   fileId?: string;
   fileName: string;
+  fileSize: number;
   status: 'pending' | 'uploading' | 'processing' | 'success' | 'failed';
   progress?: number;
   error?: string;

@@ -244,9 +244,9 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
         isDark ? "bg-gray-800 text-gray-100" : "bg-gray-50 text-gray-900"
       )}>
         {loading ? (
-          <div className="flex items-center justify-center h-[400px]">
-            <Spin size="large" tip="加载中..." />
-          </div>
+          <Spin size="large" tip="加载中..." spinning>
+            <div className="flex items-center justify-center h-[400px]" />
+          </Spin>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-[400px] text-red-500">
             <X className="h-12 w-12 mb-2" />

@@ -419,7 +419,7 @@ const ScanTaskList: React.FC = () => {
         onCancel={() => setUploadModalVisible(false)}
         footer={null}
         width={isMobile ? '95%' : 1000}
-        destroyOnClose
+        destroyOnHidden
         styles={{
           body: { padding: isMobile ? '12px' : '24px' }
         }}
