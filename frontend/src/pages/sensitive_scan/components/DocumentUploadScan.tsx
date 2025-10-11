@@ -13,7 +13,8 @@ import {
   Form,
   Select,
   InputNumber,
-  Divider
+  Divider,
+  Tooltip
 } from 'antd';
 import {
   InboxOutlined,
@@ -486,16 +487,34 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
 
         {/* 操作按钮 */}
         <Space>
-          <Button
-            type="primary"
-            size="large"
-            icon={<ScanOutlined />}
-            onClick={handleStartScan}
-            loading={scanning}
-            disabled={uploadedFiles.length === 0 || uploadedFiles.every(f => f.status !== 'success')}
+          <Tooltip
+            title={
+              uploadedFiles.length === 0
+                ? '请先上传文件'
+                : uploadedFiles.some(f => f.status === 'uploading' || f.status === 'processing' || f.status === 'pending')
+                ? '请等待所有文件上传和解析完成'
+                : uploadedFiles.some(f => f.status === 'failed')
+                ? '存在失败的文件，请删除或重新上传'
+                : uploadedFiles.every(f => f.status !== 'success')
+                ? '没有成功上传的文件，请重新上传'
+                : ''
+            }
           >
-            {scanning ? '创建任务中...' : '开始扫描'}
-          </Button>
+            <Button
+              type="primary"
+              size="large"
+              icon={<ScanOutlined />}
+              onClick={handleStartScan}
+              loading={scanning}
+              disabled={
+                uploadedFiles.length === 0 ||
+                uploadedFiles.some(f => f.status === 'uploading' || f.status === 'processing' || f.status === 'pending' || f.status === 'failed') ||
+                uploadedFiles.every(f => f.status !== 'success')
+              }
+            >
+              {scanning ? '创建任务中...' : '开始扫描'}
+            </Button>
+          </Tooltip>
 
           <Button
             size="large"
