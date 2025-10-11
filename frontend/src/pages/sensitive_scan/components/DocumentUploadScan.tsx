@@ -89,11 +89,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
 
       if (response.status === 'ok') {
         setConfigs(response.data.items);
-        // 设置默认配置
-        const defaultConfig = response.data.items.find((c: ScanConfig) => c.is_default);
-        if (defaultConfig) {
-          form.setFieldValue('config_id', defaultConfig.config_id);
-        }
+        // 不在这里设置默认值，避免循环引用警告
       }
     } catch (error) {
       console.error('获取配置列表失败:', error);
@@ -429,6 +425,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
               label="配置模板"
               name="config_id"
               tooltip="选择预定义的扫描配置模板"
+              initialValue={configs.find(c => c.is_default)?.config_id}
             >
               <Select
                 placeholder="选择配置模板"
