@@ -17,7 +17,7 @@
 -- Position to start replication or point-in-time recovery from
 --
 
--- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000028', MASTER_LOG_POS=473833565;
+-- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000031', MASTER_LOG_POS=245725373;
 
 --
 -- Table structure for table `agent_configs`
@@ -35,12 +35,12 @@ CREATE TABLE `agent_configs` (
   `agent_icon` varchar(50) DEFAULT 'Bot' COMMENT '智能体图标',
   `agent_capabilities` json DEFAULT NULL COMMENT '智能体能力列表，JSON数组格式',
   `agent_version` varchar(20) NOT NULL DEFAULT '1.0.0' COMMENT '智能体版本号',
-  `agent_status` varchar(20) NOT NULL DEFAULT 'stopped' COMMENT '运行状态（running/stopped/error）',
   `agent_enabled` varchar(10) NOT NULL DEFAULT 'yes' COMMENT '是否启用（yes/no）',
   `is_builtin` varchar(10) NOT NULL DEFAULT 'no' COMMENT '是否为内置智能体（yes/no）',
   `tools_info` json DEFAULT NULL COMMENT '工具配置信息，包含系统工具和MCP工具',
   `llm_info` json DEFAULT NULL COMMENT '大语言模型配置信息',
   `prompt_info` json DEFAULT NULL COMMENT '提示词配置信息',
+  `memory_info` json DEFAULT NULL COMMENT '智能体记忆',
   `total_runs` int(11) NOT NULL DEFAULT '0' COMMENT '总运行次数统计',
   `thumbs_up_count` int(11) DEFAULT '0' COMMENT '点赞',
   `thumbs_down_count` int(11) DEFAULT '0' COMMENT '点踩',
@@ -48,7 +48,6 @@ CREATE TABLE `agent_configs` (
   `avg_response_time` float NOT NULL DEFAULT '0' COMMENT '平均响应时间（毫秒）',
   `last_used` datetime DEFAULT NULL COMMENT '最后使用时间',
   `config_version` varchar(20) NOT NULL DEFAULT '1.0' COMMENT '配置版本号',
-  `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否处于活跃状态',
   `agent_owner` varchar(100) NOT NULL DEFAULT 'system' COMMENT '智能体所有者用户名',
   `visibility_type` varchar(100) NOT NULL DEFAULT 'public' COMMENT '可见权限级别:private,team,department,public',
   `visibility_additional_users` text COMMENT '指定某些人可以看',
@@ -86,7 +85,7 @@ CREATE TABLE `agent_document_session` (
   KEY `idx_session_thread` (`thread_id`),
   KEY `idx_session_file` (`file_id`),
   KEY `idx_session_agent` (`agent_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=870 DEFAULT CHARSET=utf8 COMMENT='智能体会话文档关联表';
+) ENGINE=InnoDB AUTO_INCREMENT=871 DEFAULT CHARSET=utf8 COMMENT='智能体会话文档关联表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -121,7 +120,7 @@ CREATE TABLE `agent_document_upload` (
   KEY `idx_doc_create_by` (`create_by`),
   KEY `idx_doc_status` (`process_status`),
   KEY `idx_doc_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=996 DEFAULT CHARSET=utf8mb4 COMMENT='智能体文档上传表';
+) ENGINE=InnoDB AUTO_INCREMENT=1032 DEFAULT CHARSET=utf8mb4 COMMENT='智能体文档上传表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -147,7 +146,7 @@ CREATE TABLE `agent_message_feedbacks` (
   UNIQUE KEY `unique_user_message_feedback` (`user_name`,`message_id`),
   KEY `idx_agent_id` (`agent_id`),
   KEY `idx_thread_id` (`thread_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COMMENT='智能体消息反馈记录表';
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COMMENT='智能体消息反馈记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -171,7 +170,7 @@ CREATE TABLE `agent_permission` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `agent_key` (`agent_key`),
   UNIQUE KEY `agent_id_user` (`agent_id`,`user_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=54 DEFAULT CHARSET=utf8mb4 COMMENT='智能权限表';
+) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COMMENT='智能权限表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -202,7 +201,7 @@ CREATE TABLE `agent_run_logs` (
   KEY `idx_thread_id` (`thread_id`),
   KEY `idx_start_time` (`start_time`),
   KEY `idx_run_status` (`run_status`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体运行日志表';
+) ENGINE=InnoDB AUTO_INCREMENT=551 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体运行日志表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -288,7 +287,7 @@ CREATE TABLE `auth_login_history` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_login_time` (`login_time`),
   KEY `idx_success` (`success`)
-) ENGINE=InnoDB AUTO_INCREMENT=208 DEFAULT CHARSET=utf8mb4 COMMENT='登录历史记录表';
+) ENGINE=InnoDB AUTO_INCREMENT=394 DEFAULT CHARSET=utf8mb4 COMMENT='登录历史记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -352,7 +351,7 @@ CREATE TABLE `auth_tokens` (
   KEY `idx_expires_at` (`expires_at`),
   KEY `idx_revoked` (`revoked`),
   KEY `idx_auth_tokens_user_device` (`user_id`,`device_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=365 DEFAULT CHARSET=utf8mb4 COMMENT='JWT令牌管理表';
+) ENGINE=InnoDB AUTO_INCREMENT=739 DEFAULT CHARSET=utf8mb4 COMMENT='JWT令牌管理表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -386,7 +385,7 @@ CREATE TABLE `celery_periodic_task_configs` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `task_name` (`task_name`),
   KEY `idx_task_enabled` (`task_enabled`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='定时任务配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COMMENT='定时任务配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -440,7 +439,7 @@ CREATE TABLE `celery_task_records` (
   UNIQUE KEY `task_id` (`task_id`),
   KEY `idx_task_status` (`task_status`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='异步任务记录表';
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COMMENT='异步任务记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -465,7 +464,7 @@ CREATE TABLE `celery_taskmeta` (
   `queue` varchar(155) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `task_id` (`task_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=226 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -707,7 +706,7 @@ CREATE TABLE `mcp_servers` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `server_id` (`server_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COMMENT='MCP服务器配置表';
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COMMENT='MCP服务器配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -730,7 +729,7 @@ CREATE TABLE `mcp_servers_permission` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `server_id_user` (`server_id`,`user_name`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COMMENT='mcp server权限表';
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='mcp server权限表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -758,7 +757,7 @@ CREATE TABLE `rbac_menus` (
   `sort_order` int(11) DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `menu_id` (`menu_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8 COMMENT='菜单表';
+) ENGINE=InnoDB AUTO_INCREMENT=77 DEFAULT CHARSET=utf8 COMMENT='菜单表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -785,7 +784,7 @@ CREATE TABLE `rbac_permissions` (
   UNIQUE KEY `permission_id` (`permission_id`),
   UNIQUE KEY `uniq_name_method` (`permission_name`,`http_method`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=1002 DEFAULT CHARSET=utf8 COMMENT='api权限表';
+) ENGINE=InnoDB AUTO_INCREMENT=1040 DEFAULT CHARSET=utf8 COMMENT='api权限表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -830,7 +829,7 @@ CREATE TABLE `rbac_roles_permissions` (
   `update_by` varchar(50) NOT NULL DEFAULT '' COMMENT '更新人',
   PRIMARY KEY (`id`),
   UNIQUE KEY `role_back_front_id` (`role_id`,`back_permission_id`,`front_permission_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4352 DEFAULT CHARSET=utf8 COMMENT='角色-权限关联表';
+) ENGINE=InnoDB AUTO_INCREMENT=5449 DEFAULT CHARSET=utf8 COMMENT='角色-权限关联表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -886,7 +885,35 @@ CREATE TABLE `rbac_users_roles` (
   `update_by` varchar(50) NOT NULL DEFAULT '' COMMENT '更新人',
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_id` (`user_id`,`role_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8 COMMENT='用户-角色关联表';
+) ENGINE=InnoDB AUTO_INCREMENT=48 DEFAULT CHARSET=utf8 COMMENT='用户-角色关联表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `scan_configs`
+--
+
+DROP TABLE IF EXISTS `scan_configs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `scan_configs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `config_id` varchar(64) NOT NULL COMMENT '配置ID',
+  `config_name` varchar(200) NOT NULL COMMENT '配置名称',
+  `config_description` text COMMENT '配置描述',
+  `prompt_description` text NOT NULL COMMENT '扫描提示词',
+  `examples_config` text COMMENT 'Few-shot示例配置，JSON格式',
+  `is_default` int(11) DEFAULT '0' COMMENT '是否为默认配置',
+  `status` varchar(20) DEFAULT 'active' COMMENT '配置状态',
+  `create_by` varchar(100) NOT NULL COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_config_id` (`config_id`),
+  KEY `idx_config_name` (`config_name`),
+  KEY `idx_create_by` (`create_by`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COMMENT='扫描配置表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -914,7 +941,7 @@ CREATE TABLE `scan_files` (
   UNIQUE KEY `uk_task_file` (`task_id`,`file_id`),
   KEY `idx_task_id` (`task_id`),
   KEY `idx_file_id` (`file_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COMMENT='扫描文件表';
+) ENGINE=InnoDB AUTO_INCREMENT=80 DEFAULT CHARSET=utf8mb4 COMMENT='扫描文件表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -940,7 +967,7 @@ CREATE TABLE `scan_tasks` (
   KEY `idx_status` (`task_status`),
   KEY `idx_create_by` (`create_by`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COMMENT='敏感数据扫描任务表';
+) ENGINE=InnoDB AUTO_INCREMENT=74 DEFAULT CHARSET=utf8mb4 COMMENT='敏感数据扫描任务表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -977,20 +1004,14 @@ CREATE TABLE `sop_prompt_templates` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
   `sop_id` varchar(100) NOT NULL COMMENT 'SOP唯一标识符，如SOP-DB-001',
   `sop_title` varchar(500) NOT NULL COMMENT 'SOP标题名称',
-  `sop_category` varchar(100) NOT NULL COMMENT 'SOP分类（如database、system、network等）',
   `sop_description` text COMMENT 'SOP详细描述',
-  `sop_severity` varchar(20) NOT NULL COMMENT 'SOP严重等级（high、medium、low）',
-  `sop_steps` json NOT NULL COMMENT 'SOP执行步骤，JSON格式存储步骤列表',
-  `tools_required` json DEFAULT NULL COMMENT '所需工具列表，JSON格式存储工具名称数组',
-  `sop_recommendations` text COMMENT 'SOP建议和最佳实践',
-  `team_name` varchar(100) NOT NULL COMMENT '负责团队名称',
   `create_by` varchar(100) NOT NULL COMMENT '创建人用户名',
   `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `sop_id` (`sop_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COMMENT='SOP标准操作程序模板表';
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='SOP标准操作程序模板表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1015,7 +1036,7 @@ CREATE TABLE `user_threads` (
   KEY `ix_user_threads_id` (`id`),
   KEY `ix_user_threads_user_name` (`user_name`),
   KEY `ix_user_threads_thread_id` (`thread_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=790 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1039 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -1026,4 +1047,4 @@ CREATE TABLE `user_threads` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-09-22  9:38:52
+-- Dump completed on 2025-10-11 12:19:47
