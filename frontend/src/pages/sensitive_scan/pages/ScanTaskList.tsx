@@ -90,9 +90,20 @@ const ScanTaskList: React.FC = () => {
       completed: { color: 'success', text: '已完成' },
       failed: { color: 'error', text: '失败' }
     };
-    
+
     const config = statusMap[status] || { color: 'default', text: status };
     return <Tag color={config.color}>{config.text}</Tag>;
+  };
+
+  // 通知状态文本
+  const getNotifyStatusText = (notifyStatus: string) => {
+    const statusMap: Record<string, string> = {
+      pending: '待通知',
+      sent: '已通知',
+      failed: '通知失败'
+    };
+
+    return statusMap[notifyStatus] || notifyStatus;
   };
 
   // 表格列定义
@@ -110,6 +121,13 @@ const ScanTaskList: React.FC = () => {
       key: 'status',
       width: 100,
       render: (status) => getStatusTag(status),
+    },
+    {
+      title: '通知状态',
+      dataIndex: 'notify_status',
+      key: 'notify_status',
+      width: 100,
+      render: (notifyStatus) => getNotifyStatusText(notifyStatus),
     },
     {
       title: '总文件数',

@@ -5,6 +5,9 @@
 // 任务状态
 export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+// 通知状态
+export type NotifyStatus = 'pending' | 'sent' | 'failed';
+
 // 文件状态
 export type FileStatus = 'pending' | 'reading' | 'scanning' | 'completed' | 'failed';
 
@@ -12,6 +15,7 @@ export type FileStatus = 'pending' | 'reading' | 'scanning' | 'completed' | 'fai
 export interface ScanTask {
   task_id: string;
   status: TaskStatus;
+  notify_status: NotifyStatus;
   total_files: number;
   processed_files?: number;
   failed_files?: number;
@@ -48,6 +52,7 @@ export interface TaskProgress {
 export interface TaskDetail {
   task_id: string;
   status: TaskStatus;
+  notify_status: NotifyStatus;
   total_files: number;
   processed_files: number;
   failed_files: number;
@@ -67,6 +72,7 @@ export interface TaskDetail {
 export interface TaskResult {
   task_id: string;
   status: TaskStatus;
+  notify_status: NotifyStatus;
   summary: {
     total_files: number;
     completed_files: number;

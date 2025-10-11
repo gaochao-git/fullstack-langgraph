@@ -87,6 +87,7 @@ class LangExtractScanTaskService:
                 task_id=task_id,
                 task_status='pending',
                 task_errors=None,
+                notify_status='pending',
                 create_by=create_by,
                 create_time=now_shanghai(),
                 update_time=now_shanghai()
@@ -188,6 +189,7 @@ class LangExtractScanTaskService:
         return {
             "task_id": task.task_id,
             "status": task.task_status,
+            "notify_status": task.notify_status,
             "total_files": total_files,
             "processed_files": processed_files,
             "failed_files": failed_files,
@@ -300,6 +302,7 @@ class LangExtractScanTaskService:
         return {
             "task_id": task.task_id,
             "status": task.task_status,
+            "notify_status": task.notify_status,
             "summary": {
                 "total_files": len(files_with_names),
                 "completed_files": completed_files,
@@ -357,6 +360,7 @@ class LangExtractScanTaskService:
             task_list.append({
                 "task_id": task.task_id,
                 "status": task.task_status,
+                "notify_status": task.notify_status,
                 "total_files": file_stats['total'],
                 "completed_files": file_stats['completed'],
                 "failed_files": file_stats['failed'],

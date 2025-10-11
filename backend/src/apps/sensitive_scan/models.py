@@ -26,6 +26,13 @@ class FileStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class NotifyStatus(str, enum.Enum):
+    """通知状态枚举"""
+    PENDING = "pending"      # 待通知
+    SENT = "sent"           # 已发送
+    FAILED = "failed"       # 发送失败
+
+
 class ScanTask(Base):
     """扫描任务表"""
     __tablename__ = "scan_tasks"
@@ -37,7 +44,10 @@ class ScanTask(Base):
     # 任务基本信息 - 匹配实际表结构
     task_status = Column(String(64), default='pending', nullable=False, comment="任务状态,pending,processing,completed,failed")
     task_errors = Column(Text, comment="错误信息")
-    
+
+    # 通知状态
+    notify_status = Column(String(20), default='pending', nullable=False, comment="通知状态：pending-待通知，sent-已发送，failed-发送失败")
+
     # 时间戳
     start_time = Column(DateTime, comment="开始时间")
     end_time = Column(DateTime, comment="结束时间")
@@ -52,6 +62,7 @@ class ScanTask(Base):
     __table_args__ = (
         Index('uk_task_id', 'task_id', unique=True),
         Index('idx_status', 'task_status'),
+        Index('idx_notify_status', 'notify_status'),
         Index('idx_create_time', 'create_time'),
         Index('idx_create_by', 'create_by'),
     )
