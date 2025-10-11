@@ -239,9 +239,9 @@ class LangExtractScanTaskService:
             },
             "file_status_summary": file_status_summary,
             "errors": errors,
-            "create_time": task.create_time.isoformat(),
-            "start_time": task.start_time.isoformat() if task.start_time else None,
-            "end_time": task.end_time.isoformat() if task.end_time else None
+            "create_time": task.create_time.strftime('%Y-%m-%d %H:%M:%S') if task.create_time else None,
+            "start_time": task.start_time.strftime('%Y-%m-%d %H:%M:%S') if task.start_time else None,
+            "end_time": task.end_time.strftime('%Y-%m-%d %H:%M:%S') if task.end_time else None
         }
     
     async def _count_sensitive_items(self, db: AsyncSession, task_id: str) -> int:
@@ -319,8 +319,8 @@ class LangExtractScanTaskService:
                 "jsonl_path": scan_file.jsonl_path,
                 "html_path": scan_file.html_path,
                 "error": scan_file.file_error,
-                "start_time": scan_file.start_time.isoformat() if scan_file.start_time else None,
-                "end_time": scan_file.end_time.isoformat() if scan_file.end_time else None,
+                "start_time": scan_file.start_time.strftime('%Y-%m-%d %H:%M:%S') if scan_file.start_time else None,
+                "end_time": scan_file.end_time.strftime('%Y-%m-%d %H:%M:%S') if scan_file.end_time else None,
                 "sensitive_items": 0  # 默认值
             }
 
@@ -345,7 +345,7 @@ class LangExtractScanTaskService:
                 "failed_files": failed_files
             },
             "files": files_data,
-            "completed_time": task.end_time.isoformat() if task.end_time else None
+            "completed_time": task.end_time.strftime('%Y-%m-%d %H:%M:%S') if task.end_time else None
         }
     
     async def list_tasks(
@@ -402,9 +402,9 @@ class LangExtractScanTaskService:
                 "failed_files": file_stats['failed'],
                 "sensitive_items": sensitive_items,
                 "create_by": task.create_by,
-                "create_time": task.create_time.isoformat(),
-                "start_time": task.start_time.isoformat() if task.start_time else None,
-                "end_time": task.end_time.isoformat() if task.end_time else None
+                "create_time": task.create_time.strftime('%Y-%m-%d %H:%M:%S') if task.create_time else None,
+                "start_time": task.start_time.strftime('%Y-%m-%d %H:%M:%S') if task.start_time else None,
+                "end_time": task.end_time.strftime('%Y-%m-%d %H:%M:%S') if task.end_time else None
             })
         
         return task_list, total

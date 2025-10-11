@@ -209,21 +209,20 @@ const ScanTaskList: React.FC = () => {
       dataIndex: 'create_time',
       key: 'create_time',
       width: 180,
-      render: (time) => new Date(time).toLocaleString('zh-CN', { hour12: false }),
     },
     {
       title: '开始时间',
       dataIndex: 'start_time',
       key: 'start_time',
       width: 180,
-      render: (time) => time ? new Date(time).toLocaleString('zh-CN', { hour12: false }) : '-',
+      render: (time) => time || '-',
     },
     {
       title: '结束时间',
       dataIndex: 'end_time',
       key: 'end_time',
       width: 180,
-      render: (time) => time ? new Date(time).toLocaleString('zh-CN', { hour12: false }) : '-',
+      render: (time) => time || '-',
     },
     {
       title: '操作',
