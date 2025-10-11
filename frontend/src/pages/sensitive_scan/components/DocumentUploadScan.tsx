@@ -6,7 +6,7 @@ import {
   Alert,
   List,
   Space,
-  message,
+  App,
   Progress,
   Typography,
   Tag,
@@ -29,6 +29,7 @@ import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
 import { ScanApi } from '../services/scanApi';
 import { ScanConfigApi } from '../services/scanConfigApi';
 import { fileApi } from '@/services/fileApi';
+import { configService } from '@/services/configApi';
 import type { ScanConfig } from '../types/scanConfig';
 
 const { Dragger } = Upload;
@@ -40,6 +41,7 @@ interface DocumentUploadScanProps {
 }
 
 const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -49,6 +51,17 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
   const [uploadedCount, setUploadedCount] = useState(0);
   const [configs, setConfigs] = useState<ScanConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
+  const [supportedFormats, setSupportedFormats] = useState<string>('加载中...');
+
+  // 获取上传配置
+  useEffect(() => {
+    configService.getUploadConfig().then(config => {
+      setSupportedFormats(config.allowed_extensions.join(', '));
+    }).catch(err => {
+      console.error('获取上传配置失败:', err);
+      setSupportedFormats('常见文档和图片格式');
+    });
+  }, []);
 
   // 获取配置列表
   useEffect(() => {
@@ -100,34 +113,31 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
       showRemoveIcon: true,
       removeIcon: <DeleteOutlined style={{ color: '#ff4d4f' }} />
     },
-    beforeUpload: (file) => {
-      // 检查文件类型
-      const allowedTypes = [
-        'text/plain',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/csv'
-      ];
+    beforeUpload: async (file) => {
+      try {
+        // 获取全局上传配置
+        const config = await configService.getUploadConfig();
 
-      const isAllowed = allowedTypes.includes(file.type) ||
-                       /\.(txt|pdf|doc|docx|xls|xlsx|csv|md)$/i.test(file.name);
+        // 检查文件大小
+        const maxSize = config.max_upload_size_mb * 1024 * 1024;
+        if (file.size > maxSize) {
+          message.error(`文件 ${file.name} 超过大小限制（最大 ${config.max_upload_size_mb}MB）`);
+          return false;
+        }
 
-      if (!isAllowed) {
-        message.error(`${file.name} 不是支持的文件格式`);
+        // 检查文件类型
+        const fileExt = `.${file.name.split('.').pop()?.toLowerCase()}`;
+        if (!config.allowed_extensions.includes(fileExt)) {
+          message.error(`不支持的文件类型: ${fileExt}。支持的格式: ${config.allowed_extensions.join(', ')}`);
+          return false;
+        }
+
+        return false; // 阻止自动上传
+      } catch (error) {
+        console.error('获取上传配置失败:', error);
+        message.error('获取上传配置失败，请刷新页面重试');
         return false;
       }
-
-      // 检查文件大小（100MB）
-      const isLt100M = file.size / 1024 / 1024 < 100;
-      if (!isLt100M) {
-        message.error('文件大小不能超过 100MB');
-        return false;
-      }
-
-      return false; // 阻止自动上传
     },
     onChange: ({ fileList: newFileList }) => {
       setFileList(newFileList);
@@ -187,7 +197,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
 
       try {
         // 并行等待所有文件解析完成
-        await Promise.all(
+        const parseResults = await Promise.allSettled(
           uploadedFileIds.map(fileId =>
             fileApi.waitForFileReady(fileId, undefined, (status) => {
               console.log(`文件 ${fileId} 解析状态: ${status.status}`);
@@ -195,9 +205,30 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
           )
         );
 
+        // 检查是否有解析失败的文件
+        const failedFiles = parseResults
+          .map((result, index) => ({
+            result,
+            fileId: uploadedFileIds[index],
+            fileName: fileList[index]?.name || uploadedFileIds[index]
+          }))
+          .filter(item => item.result.status === 'rejected');
+
+        if (failedFiles.length > 0) {
+          // 显示详细的错误信息
+          failedFiles.forEach(({ fileName, result }) => {
+            const errorMsg = result.status === 'rejected' ? result.reason.message : '未知错误';
+            message.error(`文件 "${fileName}" 解析失败: ${errorMsg}`, 10); // 显示10秒
+          });
+          throw new Error(`${failedFiles.length} 个文件解析失败`);
+        }
+
         message.success('所有文件解析完成，开始创建扫描任务...');
       } catch (error: any) {
-        message.error(`文件解析失败: ${error.message || '未知错误'}`);
+        // 如果不是文件解析失败（已经显示过详细错误），才显示通用错误
+        if (!error.message?.includes('文件解析失败')) {
+          message.error(`处理失败: ${error.message || '未知错误'}`);
+        }
         throw error;
       }
 
@@ -282,7 +313,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
           </p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
           <p className="ant-upload-hint">
-            支持多文件上传，支持 txt, pdf, doc, docx, xls, xlsx, csv 格式
+            支持多文件上传，支持格式: {supportedFormats}
           </p>
         </Dragger>
 
