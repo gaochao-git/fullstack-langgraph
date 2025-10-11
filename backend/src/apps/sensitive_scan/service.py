@@ -43,15 +43,16 @@ class LangExtractScanTaskService:
 
     def _count_jsonl_extractions(self, jsonl_path: Path) -> int:
         """
-        从单个JSONL文件中计算敏感项数量（辅助方法）
+        从单个JSONL文件中计算唯一敏感项数量（辅助方法）
+        统计去重后的敏感项数量，与HTML报告保持一致
 
         Args:
             jsonl_path: JSONL文件的完整路径
 
         Returns:
-            敏感项数量
+            唯一敏感项数量
         """
-        count = 0
+        unique_items = set()
         try:
             with open(jsonl_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -59,12 +60,17 @@ class LangExtractScanTaskService:
                         try:
                             data = json.loads(line)
                             if 'extractions' in data:
-                                count += len(data['extractions'])
+                                for extraction in data['extractions']:
+                                    # 使用(extraction_class, extraction_text)作为唯一标识去重
+                                    ext_class = extraction.get('extraction_class', '')
+                                    ext_text = extraction.get('extraction_text', '')
+                                    if ext_class and ext_text:
+                                        unique_items.add((ext_class, ext_text))
                         except:
                             pass
         except Exception as e:
             logger.warning(f"读取JSONL文件失败 {jsonl_path}: {e}")
-        return count
+        return len(unique_items)
 
     async def create_scan_task(
         self,
