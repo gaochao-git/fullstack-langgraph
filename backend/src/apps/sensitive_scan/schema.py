@@ -61,6 +61,7 @@ class FileScanResult(BaseModel):
     error: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
+    sensitive_items: int = 0
 
 
 class TaskSummary(BaseModel):

@@ -33,6 +33,7 @@ export interface ScanFile {
   error?: string;
   start_time?: string;
   end_time?: string;
+  sensitive_items?: number;
 }
 
 // 任务进度

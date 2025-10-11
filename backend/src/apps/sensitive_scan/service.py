@@ -40,7 +40,32 @@ class LangExtractScanTaskService:
         
         # 扫描器会自动从settings获取配置
         self.scanner = LangExtractSensitiveScanner()
-    
+
+    def _count_jsonl_extractions(self, jsonl_path: Path) -> int:
+        """
+        从单个JSONL文件中计算敏感项数量（辅助方法）
+
+        Args:
+            jsonl_path: JSONL文件的完整路径
+
+        Returns:
+            敏感项数量
+        """
+        count = 0
+        try:
+            with open(jsonl_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            data = json.loads(line)
+                            if 'extractions' in data:
+                                count += len(data['extractions'])
+                        except:
+                            pass
+        except Exception as e:
+            logger.warning(f"读取JSONL文件失败 {jsonl_path}: {e}")
+        return count
+
     async def create_scan_task(
         self, 
         db: AsyncSession,
@@ -166,7 +191,7 @@ class LangExtractScanTaskService:
         }
     
     async def _count_sensitive_items(self, db: AsyncSession, task_id: str) -> int:
-        """统计敏感数据项数量"""
+        """统计任务的所有敏感数据项数量"""
         # 查询所有完成的文件
         result = await db.execute(
             select(ScanFile.jsonl_path)
@@ -176,25 +201,15 @@ class LangExtractScanTaskService:
                 ScanFile.jsonl_path.isnot(None)
             ))
         )
-        
+
         total_items = 0
         for row in result:
             jsonl_path = row.jsonl_path
             if jsonl_path:
                 full_path = Path(settings.DOCUMENT_DIR) / jsonl_path
                 if full_path.exists():
-                    with open(full_path, 'r', encoding='utf-8') as f:
-                        # langextract生成的JSONL格式
-                        for line in f:
-                            if line.strip():
-                                try:
-                                    data = json.loads(line)
-                                    # 计算提取的敏感数据数量
-                                    if 'extractions' in data:
-                                        total_items += len(data['extractions'])
-                                except:
-                                    pass
-        
+                    total_items += self._count_jsonl_extractions(full_path)
+
         return total_items
     
     async def get_task_result(
@@ -242,7 +257,33 @@ class LangExtractScanTaskService:
         status_counts = {row.file_status: row.count for row in stats_result}
         completed_files = status_counts.get('completed', 0)
         failed_files = status_counts.get('failed', 0)
-        
+
+        # 为每个文件计算敏感项数量
+        files_data = []
+        for scan_file, file_name in files_with_names:
+            file_dict = {
+                "file_id": scan_file.file_id,
+                "file_name": file_name,  # 从 JOIN 结果获取
+                "status": scan_file.file_status,
+                "jsonl_path": scan_file.jsonl_path,
+                "html_path": scan_file.html_path,
+                "error": scan_file.file_error,
+                "start_time": scan_file.start_time.isoformat() if scan_file.start_time else None,
+                "end_time": scan_file.end_time.isoformat() if scan_file.end_time else None,
+                "sensitive_items": 0  # 默认值
+            }
+
+            # 如果文件已完成且有JSONL结果，读取敏感项数量
+            if scan_file.file_status == 'completed' and scan_file.jsonl_path:
+                try:
+                    jsonl_file_path = Path(settings.DOCUMENT_DIR) / scan_file.jsonl_path
+                    if jsonl_file_path.exists():
+                        file_dict["sensitive_items"] = self._count_jsonl_extractions(jsonl_file_path)
+                except Exception as e:
+                    logger.warning(f"读取JSONL文件失败 {scan_file.jsonl_path}: {e}")
+
+            files_data.append(file_dict)
+
         return {
             "task_id": task.task_id,
             "status": task.task_status,
@@ -251,19 +292,7 @@ class LangExtractScanTaskService:
                 "completed_files": completed_files,
                 "failed_files": failed_files
             },
-            "files": [
-                {
-                    "file_id": scan_file.file_id,
-                    "file_name": file_name,  # 从 JOIN 结果获取
-                    "status": scan_file.file_status,
-                    "jsonl_path": scan_file.jsonl_path,
-                    "html_path": scan_file.html_path,
-                    "error": scan_file.file_error,
-                    "start_time": scan_file.start_time.isoformat() if scan_file.start_time else None,
-                    "end_time": scan_file.end_time.isoformat() if scan_file.end_time else None
-                }
-                for scan_file, file_name in files_with_names
-            ],
+            "files": files_data,
             "completed_time": task.end_time.isoformat() if task.end_time else None
         }
     
