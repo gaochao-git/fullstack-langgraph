@@ -188,7 +188,7 @@ const ScanTaskList: React.FC = () => {
       title: '敏感项数(去重/总数)',
       dataIndex: 'sensitive_uniq_items',
       key: 'sensitive_uniq_items',
-      width: 150,
+      width: 170,
       render: (count, record) => {
         const uniqueCount = count || 0;
         const totalCount = record.sensitive_items_total || 0;
