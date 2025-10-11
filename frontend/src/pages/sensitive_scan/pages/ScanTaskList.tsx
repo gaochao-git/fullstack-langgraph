@@ -45,7 +45,7 @@ const ScanTaskList: React.FC = () => {
   const [uploadModalVisible, setUploadModalVisible] = useState(false);
 
   // 获取任务列表
-  const fetchTasks = async () => {
+  const fetchTasks = async (showLoading: boolean = true) => {
     setLoading(true);
     try {
       const response = await ScanApi.listTasks({
@@ -53,8 +53,8 @@ const ScanTaskList: React.FC = () => {
         size: pageSize,
         create_by: queryCreateBy || undefined,
         task_id: queryTaskId || undefined
-      });
-      
+      }, showLoading);
+
       if (response.data.status === 'ok') {
         setTasks(response.data.data.items);
         setTotal(response.data.data.pagination.total);
@@ -73,6 +73,30 @@ const ScanTaskList: React.FC = () => {
   useEffect(() => {
     fetchTasks();
   }, [currentPage, pageSize, queryTaskId, queryCreateBy]);
+
+  // 智能自动刷新：只在有进行中的任务时才刷新
+  useEffect(() => {
+    // 检查是否有进行中的任务（pending 或 processing）
+    const hasRunningTasks = tasks.some(
+      task => task.status === 'pending' || task.status === 'processing'
+    );
+
+    if (!hasRunningTasks) {
+      // 没有进行中的任务，不需要自动刷新
+      return;
+    }
+
+    // 有进行中的任务，设置定时刷新（5秒间隔）
+    const timer = setInterval(() => {
+      console.log('自动刷新任务状态...');
+      fetchTasks(false); // 自动刷新时不显示loading，避免页面闪烁
+    }, 5000); // 5秒刷新一次
+
+    // 清理定时器
+    return () => {
+      clearInterval(timer);
+    };
+  }, [tasks]); // 依赖 tasks，当任务状态变化时重新评估是否需要自动刷新
 
   // 处理任务创建成功
   const handleTaskCreated = (taskId: string) => {
