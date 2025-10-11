@@ -23,9 +23,12 @@ import {
   FilePdfOutlined,
   FileWordOutlined,
   FileExcelOutlined,
-  FileUnknownOutlined
+  FileUnknownOutlined,
+  CloseCircleOutlined,
+  CheckCircleOutlined,
+  LoadingOutlined
 } from '@ant-design/icons';
-import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
+import type { UploadProps } from 'antd/es/upload/interface';
 import { ScanApi } from '../services/scanApi';
 import { ScanConfigApi } from '../services/scanConfigApi';
 import { fileApi } from '@/services/fileApi';
@@ -40,15 +43,22 @@ interface DocumentUploadScanProps {
   onTaskCreated?: (taskId: string) => void;
 }
 
+// 文件上传状态接口
+interface FileUploadStatus {
+  uid: string;
+  file: File;
+  fileId?: string;
+  fileName: string;
+  status: 'pending' | 'uploading' | 'processing' | 'success' | 'failed';
+  progress?: number;
+  error?: string;
+}
+
 const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [parsing, setParsing] = useState(false);  // 新增：文件解析中
+  const [uploadedFiles, setUploadedFiles] = useState<FileUploadStatus[]>([]);
   const [scanning, setScanning] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadedCount, setUploadedCount] = useState(0);
   const [configs, setConfigs] = useState<ScanConfig[]>([]);
   const [loadingConfigs, setLoadingConfigs] = useState(false);
   const [supportedFormats, setSupportedFormats] = useState<string>('加载中...');
@@ -95,152 +105,181 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
   // 获取文件图标
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    
-    if (['pdf'].includes(ext)) return <FilePdfOutlined style={{ fontSize: 48 }} />;
-    if (['doc', 'docx'].includes(ext)) return <FileWordOutlined style={{ fontSize: 48 }} />;
-    if (['xls', 'xlsx', 'csv'].includes(ext)) return <FileExcelOutlined style={{ fontSize: 48 }} />;
-    if (['txt', 'md'].includes(ext)) return <FileTextOutlined style={{ fontSize: 48 }} />;
-    
-    return <FileUnknownOutlined style={{ fontSize: 48 }} />;
+
+    if (['pdf'].includes(ext)) return <FilePdfOutlined style={{ fontSize: 20 }} />;
+    if (['doc', 'docx'].includes(ext)) return <FileWordOutlined style={{ fontSize: 20 }} />;
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return <FileExcelOutlined style={{ fontSize: 20 }} />;
+    if (['txt', 'md'].includes(ext)) return <FileTextOutlined style={{ fontSize: 20 }} />;
+
+    return <FileUnknownOutlined style={{ fontSize: 20 }} />;
+  };
+
+  // 处理文件选择 - 立即上传
+  const handleFileSelect = async (file: File): Promise<boolean> => {
+    try {
+      // 获取全局上传配置
+      const config = await configService.getUploadConfig();
+
+      // 检查文件大小
+      const maxSize = config.max_upload_size_mb * 1024 * 1024;
+      if (file.size > maxSize) {
+        message.error(`文件 ${file.name} 超过大小限制（最大 ${config.max_upload_size_mb}MB）`);
+        return false;
+      }
+
+      // 检查文件类型
+      const fileExt = `.${file.name.split('.').pop()?.toLowerCase()}`;
+      if (!config.allowed_extensions.includes(fileExt)) {
+        message.error(`不支持的文件类型: ${fileExt}。支持的格式: ${config.allowed_extensions.join(', ')}`);
+        return false;
+      }
+
+      // 添加到文件列表（pending状态）
+      const fileStatus: FileUploadStatus = {
+        uid: `${Date.now()}-${Math.random()}`,
+        file,
+        fileName: file.name,
+        status: 'pending'
+      };
+      setUploadedFiles(prev => [...prev, fileStatus]);
+
+      // 立即上传文件
+      uploadFile(fileStatus);
+
+      return false; // 阻止 antd Upload 组件的默认上传
+    } catch (error) {
+      console.error('文件验证失败:', error);
+      message.error('文件验证失败，请重试');
+      return false;
+    }
+  };
+
+  // 上传单个文件
+  const uploadFile = async (fileStatus: FileUploadStatus) => {
+    let parseFailedInCallback = false;
+
+    try {
+      // 更新状态为上传中
+      setUploadedFiles(prev =>
+        prev.map(f => f.uid === fileStatus.uid ? { ...f, status: 'uploading', progress: 0 } : f)
+      );
+
+      // 上传文件
+      const uploadResult = await fileApi.uploadFile(
+        fileStatus.file,
+        undefined,
+        undefined,
+        (percent) => {
+          setUploadedFiles(prev =>
+            prev.map(f => f.uid === fileStatus.uid ? { ...f, progress: percent } : f)
+          );
+        }
+      );
+
+      // 上传成功，更新状态为解析中
+      setUploadedFiles(prev =>
+        prev.map(f => f.uid === fileStatus.uid
+          ? { ...f, status: 'processing', fileId: uploadResult.file_id, progress: 100 }
+          : f
+        )
+      );
+
+      // 等待文件解析完成
+      try {
+        await fileApi.waitForFileReady(uploadResult.file_id, undefined, (status) => {
+          console.log(`文件 ${uploadResult.file_id} 解析状态:`, status);
+
+          // 如果解析失败，立即更新状态
+          if (status.status === 'failed' || status.status === 3) {
+            parseFailedInCallback = true;
+            setUploadedFiles(prev =>
+              prev.map(f => f.uid === fileStatus.uid
+                ? { ...f, status: 'failed', error: status.message || '文件解析失败' }
+                : f
+              )
+            );
+          }
+        });
+
+        // 解析成功
+        setUploadedFiles(prev =>
+          prev.map(f => f.uid === fileStatus.uid ? { ...f, status: 'success' } : f)
+        );
+        message.success(`文件 ${fileStatus.fileName} 上传并解析成功`);
+
+      } catch (parseError: any) {
+        // 如果已经在回调中处理过失败状态，只显示消息，不再重复设置状态
+        if (parseFailedInCallback) {
+          message.error(`文件 ${fileStatus.fileName} 解析失败: ${parseError.message || '未知错误'}`);
+          return;
+        }
+        // 否则抛出错误，由外层处理
+        throw parseError;
+      }
+
+    } catch (error: any) {
+      // 上传失败（解析失败已在上面处理）
+      setUploadedFiles(prev =>
+        prev.map(f => f.uid === fileStatus.uid
+          ? { ...f, status: 'failed', error: error.message || '处理失败' }
+          : f
+        )
+      );
+      message.error(`文件 ${fileStatus.fileName} 处理失败: ${error.message || '未知错误'}`);
+    }
+  };
+
+  // 移除文件
+  const handleRemoveFile = (uid: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.uid !== uid));
   };
 
   // 上传配置
   const uploadProps: UploadProps = {
     name: 'file',
     multiple: true,
-    fileList: fileList,
-    showUploadList: {
-      showRemoveIcon: true,
-      removeIcon: <DeleteOutlined style={{ color: '#ff4d4f' }} />
-    },
-    beforeUpload: async (file) => {
-      try {
-        // 获取全局上传配置
-        const config = await configService.getUploadConfig();
-
-        // 检查文件大小
-        const maxSize = config.max_upload_size_mb * 1024 * 1024;
-        if (file.size > maxSize) {
-          message.error(`文件 ${file.name} 超过大小限制（最大 ${config.max_upload_size_mb}MB）`);
-          return false;
-        }
-
-        // 检查文件类型
-        const fileExt = `.${file.name.split('.').pop()?.toLowerCase()}`;
-        if (!config.allowed_extensions.includes(fileExt)) {
-          message.error(`不支持的文件类型: ${fileExt}。支持的格式: ${config.allowed_extensions.join(', ')}`);
-          return false;
-        }
-
-        return false; // 阻止自动上传
-      } catch (error) {
-        console.error('获取上传配置失败:', error);
-        message.error('获取上传配置失败，请刷新页面重试');
-        return false;
-      }
-    },
-    onChange: ({ fileList: newFileList }) => {
-      setFileList(newFileList);
-    },
-    onRemove: (file) => {
-      const newFileList = fileList.filter(f => f.uid !== file.uid);
-      setFileList(newFileList);
-    }
+    fileList: [],
+    showUploadList: false,
+    beforeUpload: handleFileSelect
   };
 
   // 开始扫描
   const handleStartScan = async () => {
-    if (fileList.length === 0) {
-      message.warning('请先选择要扫描的文件');
+    // 检查是否有文件
+    if (uploadedFiles.length === 0) {
+      message.warning('请先上传文件');
       return;
     }
 
-    setUploading(true);
-    setUploadProgress(0);
-    setUploadedCount(0);
+    // 检查是否所有文件都已成功上传
+    const successFiles = uploadedFiles.filter(f => f.status === 'success' && f.fileId);
+    const processingFiles = uploadedFiles.filter(f => f.status === 'uploading' || f.status === 'processing');
+    const failedFiles = uploadedFiles.filter(f => f.status === 'failed');
+
+    if (processingFiles.length > 0) {
+      message.warning(`还有 ${processingFiles.length} 个文件正在上传或解析中，请稍候...`);
+      return;
+    }
+
+    if (successFiles.length === 0) {
+      message.error('没有可用于扫描的文件，请重新上传');
+      return;
+    }
+
+    if (failedFiles.length > 0) {
+      message.warning(`有 ${failedFiles.length} 个文件上传失败，将仅扫描成功上传的文件`);
+    }
+
+    setScanning(true);
 
     try {
-      // 上传所有文件
-      const uploadedFileIds: string[] = [];
-
-      for (let i = 0; i < fileList.length; i++) {
-        const file = fileList[i];
-        if (file.originFileObj) {
-          try {
-            // 调用真实的文件上传API
-            const uploadResult = await fileApi.uploadFile(
-              file.originFileObj,
-              undefined, // agent_id
-              undefined, // user_name (从token获取)
-              (percent) => {
-                // 计算总体上传进度
-                const fileProgress = percent / fileList.length;
-                const previousProgress = (i / fileList.length) * 100;
-                setUploadProgress(Math.round(previousProgress + fileProgress));
-              }
-            );
-
-            uploadedFileIds.push(uploadResult.file_id);
-            setUploadedCount(i + 1);
-          } catch (error: any) {
-            message.error(`文件 ${file.name} 上传失败: ${error.message || '未知错误'}`);
-            throw error;
-          }
-        }
-      }
-
-      setUploading(false);
-
-      // 等待所有文件解析完成
-      message.info('文件上传完成，等待文件解析...');
-      setParsing(true);
-
-      try {
-        // 并行等待所有文件解析完成
-        const parseResults = await Promise.allSettled(
-          uploadedFileIds.map(fileId =>
-            fileApi.waitForFileReady(fileId, undefined, (status) => {
-              console.log(`文件 ${fileId} 解析状态: ${status.status}`);
-            })
-          )
-        );
-
-        // 检查是否有解析失败的文件
-        const failedFiles = parseResults
-          .map((result, index) => ({
-            result,
-            fileId: uploadedFileIds[index],
-            fileName: fileList[index]?.name || uploadedFileIds[index]
-          }))
-          .filter(item => item.result.status === 'rejected');
-
-        if (failedFiles.length > 0) {
-          // 显示详细的错误信息
-          failedFiles.forEach(({ fileName, result }) => {
-            const errorMsg = result.status === 'rejected' ? result.reason.message : '未知错误';
-            message.error(`文件 "${fileName}" 解析失败: ${errorMsg}`, 10); // 显示10秒
-          });
-          throw new Error(`${failedFiles.length} 个文件解析失败`);
-        }
-
-        message.success('所有文件解析完成，开始创建扫描任务...');
-      } catch (error: any) {
-        // 如果不是文件解析失败（已经显示过详细错误），才显示通用错误
-        if (!error.message?.includes('文件解析失败')) {
-          message.error(`处理失败: ${error.message || '未知错误'}`);
-        }
-        throw error;
-      }
-
-      setParsing(false);
-      setScanning(true);
-
       // 获取表单参数
       const formValues = await form.validateFields();
 
-      // 创建扫描任务，传递配置和参数
+      // 创建扫描任务
+      const fileIds = successFiles.map(f => f.fileId!);
       const response = await ScanApi.createTask({
-        file_ids: uploadedFileIds,
+        file_ids: fileIds,
         config_id: formValues.config_id,
         max_workers: formValues.max_workers || 10,
         batch_length: formValues.batch_length || 10,
@@ -252,9 +291,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
         message.success('扫描任务创建成功');
 
         // 清空文件列表
-        setFileList([]);
-        setUploadProgress(0);
-        setUploadedCount(0);
+        setUploadedFiles([]);
 
         // 通知父组件任务已创建
         if (onTaskCreated && response.data?.task_id) {
@@ -266,46 +303,29 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
     } catch (error: any) {
       message.error(error.message || '扫描任务创建失败');
     } finally {
-      setUploading(false);
-      setParsing(false);
       setScanning(false);
+    }
+  };
+
+  // 获取状态标签
+  const getStatusTag = (file: FileUploadStatus) => {
+    switch (file.status) {
+      case 'uploading':
+        return <Tag icon={<LoadingOutlined />} color="processing">上传中 {file.progress}%</Tag>;
+      case 'processing':
+        return <Tag icon={<LoadingOutlined />} color="processing">解析中</Tag>;
+      case 'success':
+        return <Tag icon={<CheckCircleOutlined />} color="success">已完成</Tag>;
+      case 'failed':
+        return <Tag icon={<CloseCircleOutlined />} color="error">失败</Tag>;
+      default:
+        return <Tag color="default">等待中</Tag>;
     }
   };
 
   return (
     <Card>
-      <style>{`
-        .document-upload-scan .ant-upload-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-top: 12px;
-        }
-        .document-upload-scan .ant-upload-list-item {
-          margin: 0 !important;
-          padding: 4px 8px !important;
-          height: auto !important;
-          border: 1px solid #d9d9d9;
-          border-radius: 4px;
-          background: #fafafa;
-        }
-        .document-upload-scan .ant-upload-list-item-info {
-          display: flex;
-          align-items: center;
-        }
-        .document-upload-scan .ant-upload-list-item-name {
-          padding: 0 4px !important;
-        }
-        .document-upload-scan .ant-upload-list-item-actions {
-          position: static !important;
-          opacity: 1 !important;
-          margin-left: 4px;
-        }
-        .document-upload-scan .ant-upload-list-item-actions .anticon-delete {
-          font-size: 14px;
-        }
-      `}</style>
-      <Space direction="vertical" style={{ width: '100%' }} size="large" className="document-upload-scan">
+      <Space direction="vertical" style={{ width: '100%' }} size="large">
         {/* 文件上传区域 */}
         <Dragger {...uploadProps} style={{ padding: 20 }}>
           <p className="ant-upload-drag-icon">
@@ -313,18 +333,83 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
           </p>
           <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
           <p className="ant-upload-hint">
-            支持多文件上传，支持格式: {supportedFormats}
+            支持多文件上传，文件将自动上传并解析。支持格式: {supportedFormats}
           </p>
         </Dragger>
 
-
-        {/* 上传进度 */}
-        {uploading && (
-          <Card size="small">
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <Text>正在上传文件... ({uploadedCount}/{fileList.length})</Text>
-              <Progress percent={uploadProgress} />
-            </Space>
+        {/* 已上传文件列表 - 紧凑横向显示 */}
+        {uploadedFiles.length > 0 && (
+          <Card size="small" title="已上传文件">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {uploadedFiles.map((file) => (
+                <div
+                  key={file.uid}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '4px 12px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '4px',
+                    backgroundColor: '#fafafa',
+                    maxWidth: '300px'
+                  }}
+                >
+                  {getFileIcon(file.fileName)}
+                  <span style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontSize: '14px'
+                  }}>
+                    {file.fileName}
+                  </span>
+                  {getStatusTag(file)}
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleRemoveFile(file.uid)}
+                    disabled={file.status === 'uploading' || file.status === 'processing'}
+                    style={{ padding: '0 4px', minWidth: 'auto' }}
+                  />
+                </div>
+              ))}
+            </div>
+            {/* 显示错误信息 */}
+            {uploadedFiles.some(f => f.error) && (
+              <div style={{ marginTop: '12px' }}>
+                {uploadedFiles
+                  .filter(f => f.error)
+                  .map(f => (
+                    <Alert
+                      key={f.uid}
+                      message={`${f.fileName}: ${f.error}`}
+                      type="error"
+                      showIcon
+                      closable
+                      style={{ marginBottom: '8px' }}
+                    />
+                  ))}
+              </div>
+            )}
+            {/* 显示上传进度 */}
+            {uploadedFiles.some(f => f.status === 'uploading' && f.progress !== undefined) && (
+              <div style={{ marginTop: '12px' }}>
+                {uploadedFiles
+                  .filter(f => f.status === 'uploading' && f.progress !== undefined)
+                  .map(f => (
+                    <div key={f.uid} style={{ marginBottom: '8px' }}>
+                      <div style={{ marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                        {f.fileName}
+                      </div>
+                      <Progress percent={f.progress} size="small" />
+                    </div>
+                  ))}
+              </div>
+            )}
           </Card>
         )}
 
@@ -409,16 +494,16 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
             size="large"
             icon={<ScanOutlined />}
             onClick={handleStartScan}
-            loading={uploading || parsing || scanning}
-            disabled={fileList.length === 0}
+            loading={scanning}
+            disabled={uploadedFiles.length === 0 || uploadedFiles.every(f => f.status !== 'success')}
           >
-            {uploading ? '上传中...' : parsing ? '文件解析中...' : scanning ? '创建任务中...' : '开始扫描'}
+            {scanning ? '创建任务中...' : '开始扫描'}
           </Button>
-          
+
           <Button
             size="large"
-            onClick={() => setFileList([])}
-            disabled={uploading || scanning}
+            onClick={() => setUploadedFiles([])}
+            disabled={scanning || uploadedFiles.some(f => f.status === 'uploading' || f.status === 'processing')}
           >
             清空列表
           </Button>

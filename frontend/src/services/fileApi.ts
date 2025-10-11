@@ -103,32 +103,35 @@ export const fileApi = {
 
   // 等待文件处理完成（支持进度回调）
   async waitForFileReady(
-    fileId: string, 
+    fileId: string,
     agentId?: string,
     onStatusUpdate?: (status: FileProcessStatus) => void
   ): Promise<void> {
     const interval = 2000; // 固定2秒轮询间隔
-    
+
     while (true) {
       try {
         const status = await this.getFileStatus(fileId, agentId);
-        
+
         // 回调状态更新
         if (onStatusUpdate) {
           onStatusUpdate(status);
         }
-        
+
         if (status.status === 'ready') {
           return;
-        } else if (status.status === 'failed') {
-          throw new Error(status.message || '文件处理失败');
+        } else if (status.status === 'failed' || status.status === 3) {
+          // 文件处理失败，创建一个标记错误并抛出
+          const error: any = new Error(status.message || '文件处理失败');
+          error.isFileProcessingError = true;  // 标记为文件处理错误
+          throw error;
         }
-        
+
         // 固定等待2秒后重试
         await new Promise(resolve => setTimeout(resolve, interval));
       } catch (error: any) {
-        // 如果是文件处理失败错误，直接抛出
-        if (error.message?.includes('文件处理失败') || error.message?.includes('文件解析失败')) {
+        // 如果是文件处理失败错误，直接抛出，停止轮询
+        if (error.isFileProcessingError) {
           throw error;
         }
         // 其他错误（如网络错误），继续重试
