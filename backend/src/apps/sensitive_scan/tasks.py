@@ -96,7 +96,11 @@ class ScanTaskProcessor:
                         except Exception as e:
                             logger.warning(f"解析配置examples失败: {e}")
 
-                    logger.info(f"使用自定义扫描配置: {config.config_name}")
+                    logger.info(
+                        f"使用自定义扫描配置: {config.config_name}, "
+                        f"参数: max_workers={max_workers}, batch_length={batch_length}, "
+                        f"extraction_passes={extraction_passes}, max_char_buffer={max_char_buffer}"
+                    )
                     return LangExtractSensitiveScanner(
                         custom_prompt=config.prompt_description,
                         custom_examples=examples,
@@ -109,7 +113,11 @@ class ScanTaskProcessor:
             logger.warning(f"获取扫描配置失败，使用默认配置: {e}")
 
         # 没有配置或获取失败，使用默认配置
-        logger.info("使用默认扫描配置")
+        logger.info(
+            f"使用默认扫描配置, "
+            f"参数: max_workers={max_workers}, batch_length={batch_length}, "
+            f"extraction_passes={extraction_passes}, max_char_buffer={max_char_buffer}"
+        )
         return LangExtractSensitiveScanner(
             max_workers=max_workers,
             batch_length=batch_length,
