@@ -43,6 +43,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [parsing, setParsing] = useState(false);  // 新增：文件解析中
   const [scanning, setScanning] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedCount, setUploadedCount] = useState(0);
@@ -179,6 +180,28 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
       }
 
       setUploading(false);
+
+      // 等待所有文件解析完成
+      message.info('文件上传完成，等待文件解析...');
+      setParsing(true);
+
+      try {
+        // 并行等待所有文件解析完成
+        await Promise.all(
+          uploadedFileIds.map(fileId =>
+            fileApi.waitForFileReady(fileId, undefined, (status) => {
+              console.log(`文件 ${fileId} 解析状态: ${status.status}`);
+            })
+          )
+        );
+
+        message.success('所有文件解析完成，开始创建扫描任务...');
+      } catch (error: any) {
+        message.error(`文件解析失败: ${error.message || '未知错误'}`);
+        throw error;
+      }
+
+      setParsing(false);
       setScanning(true);
 
       // 获取表单参数
@@ -213,6 +236,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
       message.error(error.message || '扫描任务创建失败');
     } finally {
       setUploading(false);
+      setParsing(false);
       setScanning(false);
     }
   };
@@ -354,10 +378,10 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
             size="large"
             icon={<ScanOutlined />}
             onClick={handleStartScan}
-            loading={uploading || scanning}
+            loading={uploading || parsing || scanning}
             disabled={fileList.length === 0}
           >
-            {uploading ? '上传中...' : scanning ? '创建任务中...' : '开始扫描'}
+            {uploading ? '上传中...' : parsing ? '文件解析中...' : scanning ? '创建任务中...' : '开始扫描'}
           </Button>
           
           <Button

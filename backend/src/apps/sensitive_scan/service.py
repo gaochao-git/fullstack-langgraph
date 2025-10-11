@@ -79,6 +79,45 @@ class LangExtractScanTaskService:
     ) -> Dict[str, Any]:
         """创建扫描任务"""
         async with db.begin():
+            # 检查文件是否都已解析完成
+            result = await db.execute(
+                select(AgentDocumentUpload.file_id, AgentDocumentUpload.process_status, AgentDocumentUpload.file_name)
+                .where(AgentDocumentUpload.file_id.in_(file_ids))
+            )
+            files = result.all()
+
+            # 验证文件存在性
+            found_file_ids = {f.file_id for f in files}
+            missing_files = set(file_ids) - found_file_ids
+            if missing_files:
+                raise BusinessException(
+                    f"文件不存在: {', '.join(missing_files)}",
+                    ResponseCode.NOT_FOUND
+                )
+
+            # 检查文件解析状态 (0->uploaded, 1->processing, 2->ready, 3->failed)
+            not_ready_files = []
+            failed_files = []
+            for f in files:
+                if f.process_status == 3:  # failed
+                    failed_files.append(f.file_name)
+                elif f.process_status != 2:  # not ready
+                    not_ready_files.append(f.file_name)
+
+            if failed_files:
+                raise BusinessException(
+                    f"以下文件解析失败，无法扫描: {', '.join(failed_files)}",
+                    ResponseCode.BAD_REQUEST
+                )
+
+            if not_ready_files:
+                raise BusinessException(
+                    f"以下文件尚未解析完成，请稍后再试: {', '.join(not_ready_files)}",
+                    ResponseCode.BAD_REQUEST
+                )
+
+            logger.info(f"文件状态检查通过，共 {len(files)} 个文件，全部已解析完成")
+
             # 生成任务ID
             task_id = f"task_{uuid.uuid4().hex[:12]}"
 
