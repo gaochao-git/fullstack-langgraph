@@ -176,17 +176,31 @@ class DocumentService:
             '.tex': self._process_text_file,
             '.rtf': self._process_text_file,
         }
-    
+
+    def _resolve_file_path(self, file_path_str: str) -> Path:
+        """
+        解析文件路径，将相对路径转换为绝对路径
+
+        Args:
+            file_path_str: 文件路径字符串（相对路径，如 gaochao/2025-01/uuid.pdf）
+
+        Returns:
+            Path: 完整的文件路径对象
+        """
+        # 相对路径转绝对路径
+        # gaochao/2025-01/uuid.pdf -> /path/to/uploads/gaochao/2025-01/uuid.pdf
+        return UPLOAD_DIR / file_path_str
+
     async def upload_file(self, db: AsyncSession, file_content: bytes, filename: str, user_name: str) -> Dict[str, Any]:
         """
         上传文件
-        
+
         Args:
             db: 数据库会话
             file_content: 文件内容
             filename: 文件名
             user_name: 用户名
-            
+
         Returns:
             文件信息
         """
@@ -196,7 +210,7 @@ class DocumentService:
                 f"文件大小超过限制（最大{settings.MAX_UPLOAD_SIZE_MB}MB）",
                 ResponseCode.BAD_REQUEST
             )
-        
+
         # 检查文件类型
         file_ext = Path(filename).suffix.lower()
         if file_ext not in SUPPORTED_FILE_TYPES:
@@ -204,17 +218,35 @@ class DocumentService:
                 f"不支持的文件类型：{file_ext}",
                 ResponseCode.BAD_REQUEST
             )
-        
-        # 生成文件ID和保存路径
+
+        # 生成文件ID
         file_id = str(uuid.uuid4())
+
+        # 构建分类存储路径: uploads/用户名/年月/文件
+        # 例如: uploads/gaochao/2025-01/uuid.pdf
+        from src.shared.db.models import now_shanghai
+        current_time = now_shanghai()
+        year_month = current_time.strftime('%Y-%m')
+
+        # 创建用户和日期目录
+        user_dir = UPLOAD_DIR / user_name
+        date_dir = user_dir / year_month
+        date_dir.mkdir(parents=True, exist_ok=True)
+
         # 安全处理：只使用生成的文件ID和扩展名，避免路径遍历
         safe_filename = f"{file_id}{file_ext}"
-        file_path = UPLOAD_DIR / safe_filename
-        
+        file_path = date_dir / safe_filename
+
+        # 保存相对路径（用于数据库存储和跨环境兼容）
+        # 例如: gaochao/2025-01/uuid.pdf
+        relative_path = f"{user_name}/{year_month}/{safe_filename}"
+
         # 保存文件
         import aiofiles
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(file_content)
+
+        logger.info(f"文件保存到分类目录: {relative_path}")
         
         # 保存到数据库
         async with db.begin():
@@ -223,18 +255,18 @@ class DocumentService:
                 file_name=filename,
                 file_size=len(file_content),
                 file_type=file_ext,
-                file_path=str(file_path),
+                file_path=relative_path,  # 保存相对路径，便于跨环境使用
                 process_status=ProcessStatus.UPLOADED,
                 create_by=user_name,
                 update_by=user_name
             )
             db.add(doc_upload)
             await db.flush()
-            
+
             # 获取生成的ID
             doc_id = doc_upload.id
-        
-        logger.info(f"文件上传成功: {filename} -> {file_id}")
+
+        logger.info(f"文件上传成功: {filename} -> {file_id} (路径: {relative_path})")
         
         # 异步处理文档 - 使用后台任务，避免事务冲突
         import asyncio
@@ -276,10 +308,11 @@ class DocumentService:
                 doc_upload.process_start_time = now_shanghai()
                 await db.flush()
             
-            file_path = Path(doc_upload.file_path)
+            # 解析文件路径（相对路径 -> 绝对路径）
+            file_path = self._resolve_file_path(doc_upload.file_path)
             file_ext = doc_upload.file_type
             file_name = doc_upload.file_name
-            
+
             # 根据文件类型提取文本 - 使用策略模式
             full_text = await self._dispatch_file_processing(file_path, file_ext, file_name, file_id)
             
@@ -1324,17 +1357,36 @@ class DocumentService:
             "chunk_count": len(chunks),
             "file_type": file_ext
         }
-        
+
+        # 获取原文件路径，保存.parse.txt到同一目录
+        async with db.begin():
+            # 查询文档记录获取原文件路径
+            result = await db.execute(
+                select(AgentDocumentUpload).where(AgentDocumentUpload.file_id == file_id)
+            )
+            doc_upload = result.scalar_one_or_none()
+            if not doc_upload:
+                raise BusinessException(f"文档记录不存在: {file_id}", ResponseCode.NOT_FOUND)
+
+            # 获取原文件的完整路径
+            original_file_path = self._resolve_file_path(doc_upload.file_path)
+
+            # .parse.txt保存在原文件同一目录
+            # 例如: gaochao/2025-01/uuid.pdf -> gaochao/2025-01/uuid.parse.txt
+            parse_file_path = original_file_path.parent / f"{file_id}.parse.txt"
+
+            # 相对路径（用于数据库存储）
+            parse_relative_path = f"{doc_upload.file_path.rsplit('.', 1)[0]}.parse.txt"
+
         # 保存解析后的内容到文件
-        parse_file_path = UPLOAD_DIR / f"{file_id}.parse.txt"
         try:
             async with aiofiles.open(parse_file_path, 'w', encoding='utf-8') as f:
                 await f.write(full_text)
-            logger.info(f"解析内容已保存到文件: {parse_file_path}")
+            logger.info(f"解析内容已保存到文件: {parse_relative_path}")
         except Exception as e:
             logger.error(f"保存解析内容到文件失败: {e}")
             raise
-        
+
         # 更新数据库
         async with db.begin():
             # 重新查询文档记录
@@ -1344,8 +1396,8 @@ class DocumentService:
             doc_upload = result.scalar_one_or_none()
             if doc_upload:
                 doc_upload.process_status = ProcessStatus.READY
-                # 存储解析文件的路径而不是内容
-                doc_upload.doc_content = str(parse_file_path)
+                # 存储解析文件的相对路径
+                doc_upload.doc_content = parse_relative_path
                 
                 # 不再存储分块内容，设为空字符串
                 doc_upload.doc_chunks = ""
@@ -1393,9 +1445,9 @@ class DocumentService:
         # 构建返回结果
         file_info_map = {}
         for doc in doc_uploads:
-            # 构建文件路径，需要加上文件扩展名
-            file_path = os.path.join(UPLOAD_DIR, f"{doc.file_id}{doc.file_type}")
-            
+            # 解析文件路径（相对路径 -> 绝对路径）
+            file_path = str(self._resolve_file_path(doc.file_path))
+
             # 解析元数据
             metadata = {}
             try:
@@ -1403,7 +1455,7 @@ class DocumentService:
                     metadata = json.loads(doc.doc_metadata)
             except:
                 pass
-            
+
             file_info_map[doc.file_id] = {
                 "file_id": doc.file_id,
                 "file_name": doc.file_name,
@@ -1441,10 +1493,10 @@ class DocumentService:
         
         if not doc_upload:
             return None
-        
-        # 构建文件路径，需要加上文件扩展名
-        file_path = os.path.join(UPLOAD_DIR, f"{doc_upload.file_id}{doc_upload.file_type}")
-        
+
+        # 解析文件路径（相对路径 -> 绝对路径）
+        file_path = str(self._resolve_file_path(doc_upload.file_path))
+
         return {
             "file_id": doc_upload.file_id,
             "file_name": doc_upload.file_name,

@@ -10,9 +10,11 @@ from datetime import datetime
 from src.shared.core.config import settings
 
 LOG_LEVEL = os.getenv('CELERY_LOG_LEVEL', 'INFO')
-# 使用项目统一的日志目录
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-LOG_DIR = os.path.join(BASE_DIR, settings.LOG_DIR, 'celery')
+# 使用backend统一的日志目录: backend/logs
+# __file__ 是 backend/src/celery/logger.py
+# 向上3级到 backend/，然后拼接 logs
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))  # backend/src -> backend
+LOG_DIR = os.path.join(BACKEND_DIR, 'logs')
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 

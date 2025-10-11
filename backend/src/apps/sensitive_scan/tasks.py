@@ -99,15 +99,29 @@ class ScanTaskProcessor:
                 )
                 db.commit()
             
-            # 构建文件路径
-            file_path = Path(settings.UPLOAD_DIR) / f"{file_id}.txt"
-            
+            # 从数据库获取文件路径
+            with get_db_session() as db:
+                from sqlalchemy import select
+                result = db.execute(
+                    select(AgentDocumentUpload.file_path).where(
+                        AgentDocumentUpload.file_id == file_id
+                    )
+                )
+                db_file_path = result.scalar_one_or_none()
+
+                if not db_file_path:
+                    raise Exception(f"文件记录不存在: {file_id}")
+
+            # 解析路径（相对路径 -> 绝对路径）
+            file_path = Path(settings.UPLOAD_DIR) / db_file_path
+
             if not file_path.exists() or not file_path.is_file():
-                # 尝试解析后的文件
-                file_path = Path(settings.UPLOAD_DIR) / f"{file_id}.parse.txt"
-                
-            if not file_path.exists() or not file_path.is_file():
-                raise Exception(f"文件不存在: {file_path}")
+                # 尝试解析后的文件（.parse.txt）
+                parse_path = file_path.parent / f"{file_path.stem}.parse.txt"
+                if parse_path.exists() and parse_path.is_file():
+                    file_path = parse_path
+                else:
+                    raise Exception(f"文件不存在: {file_path}")
             
             # 获取文件名
             original_filename = file_path.name
