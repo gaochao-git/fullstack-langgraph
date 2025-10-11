@@ -17,7 +17,7 @@
 -- Position to start replication or point-in-time recovery from
 --
 
--- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000031', MASTER_LOG_POS=143037038;
+-- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000031', MASTER_LOG_POS=245725373;
 
 --
 -- Table structure for table `agent_configs`
@@ -120,7 +120,7 @@ CREATE TABLE `agent_document_upload` (
   KEY `idx_doc_create_by` (`create_by`),
   KEY `idx_doc_status` (`process_status`),
   KEY `idx_doc_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=1017 DEFAULT CHARSET=utf8mb4 COMMENT='智能体文档上传表';
+) ENGINE=InnoDB AUTO_INCREMENT=1032 DEFAULT CHARSET=utf8mb4 COMMENT='智能体文档上传表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -201,7 +201,7 @@ CREATE TABLE `agent_run_logs` (
   KEY `idx_thread_id` (`thread_id`),
   KEY `idx_start_time` (`start_time`),
   KEY `idx_run_status` (`run_status`)
-) ENGINE=InnoDB AUTO_INCREMENT=496 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体运行日志表';
+) ENGINE=InnoDB AUTO_INCREMENT=551 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='智能体运行日志表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -287,7 +287,7 @@ CREATE TABLE `auth_login_history` (
   KEY `idx_user_id` (`user_id`),
   KEY `idx_login_time` (`login_time`),
   KEY `idx_success` (`success`)
-) ENGINE=InnoDB AUTO_INCREMENT=388 DEFAULT CHARSET=utf8mb4 COMMENT='登录历史记录表';
+) ENGINE=InnoDB AUTO_INCREMENT=394 DEFAULT CHARSET=utf8mb4 COMMENT='登录历史记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -351,7 +351,7 @@ CREATE TABLE `auth_tokens` (
   KEY `idx_expires_at` (`expires_at`),
   KEY `idx_revoked` (`revoked`),
   KEY `idx_auth_tokens_user_device` (`user_id`,`device_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=727 DEFAULT CHARSET=utf8mb4 COMMENT='JWT令牌管理表';
+) ENGINE=InnoDB AUTO_INCREMENT=739 DEFAULT CHARSET=utf8mb4 COMMENT='JWT令牌管理表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -439,7 +439,7 @@ CREATE TABLE `celery_task_records` (
   UNIQUE KEY `task_id` (`task_id`),
   KEY `idx_task_status` (`task_status`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=40 DEFAULT CHARSET=utf8mb4 COMMENT='异步任务记录表';
+) ENGINE=InnoDB AUTO_INCREMENT=51 DEFAULT CHARSET=utf8mb4 COMMENT='异步任务记录表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -464,7 +464,7 @@ CREATE TABLE `celery_taskmeta` (
   `queue` varchar(155) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `task_id` (`task_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=177 DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=226 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -784,7 +784,7 @@ CREATE TABLE `rbac_permissions` (
   UNIQUE KEY `permission_id` (`permission_id`),
   UNIQUE KEY `uniq_name_method` (`permission_name`,`http_method`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=1026 DEFAULT CHARSET=utf8 COMMENT='api权限表';
+) ENGINE=InnoDB AUTO_INCREMENT=1040 DEFAULT CHARSET=utf8 COMMENT='api权限表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -889,6 +889,34 @@ CREATE TABLE `rbac_users_roles` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `scan_configs`
+--
+
+DROP TABLE IF EXISTS `scan_configs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `scan_configs` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID，自增',
+  `config_id` varchar(64) NOT NULL COMMENT '配置ID',
+  `config_name` varchar(200) NOT NULL COMMENT '配置名称',
+  `config_description` text COMMENT '配置描述',
+  `prompt_description` text NOT NULL COMMENT '扫描提示词',
+  `examples_config` text COMMENT 'Few-shot示例配置，JSON格式',
+  `is_default` int(11) DEFAULT '0' COMMENT '是否为默认配置',
+  `status` varchar(20) DEFAULT 'active' COMMENT '配置状态',
+  `create_by` varchar(100) NOT NULL COMMENT '创建人用户名',
+  `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_config_id` (`config_id`),
+  KEY `idx_config_name` (`config_name`),
+  KEY `idx_create_by` (`create_by`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COMMENT='扫描配置表';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `scan_files`
 --
 
@@ -913,7 +941,7 @@ CREATE TABLE `scan_files` (
   UNIQUE KEY `uk_task_file` (`task_id`,`file_id`),
   KEY `idx_task_id` (`task_id`),
   KEY `idx_file_id` (`file_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=68 DEFAULT CHARSET=utf8mb4 COMMENT='扫描文件表';
+) ENGINE=InnoDB AUTO_INCREMENT=80 DEFAULT CHARSET=utf8mb4 COMMENT='扫描文件表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -939,7 +967,7 @@ CREATE TABLE `scan_tasks` (
   KEY `idx_status` (`task_status`),
   KEY `idx_create_by` (`create_by`),
   KEY `idx_create_time` (`create_time`)
-) ENGINE=InnoDB AUTO_INCREMENT=63 DEFAULT CHARSET=utf8mb4 COMMENT='敏感数据扫描任务表';
+) ENGINE=InnoDB AUTO_INCREMENT=74 DEFAULT CHARSET=utf8mb4 COMMENT='敏感数据扫描任务表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -983,7 +1011,7 @@ CREATE TABLE `sop_prompt_templates` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `sop_id` (`sop_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COMMENT='SOP标准操作程序模板表';
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='SOP标准操作程序模板表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1008,7 +1036,7 @@ CREATE TABLE `user_threads` (
   KEY `ix_user_threads_id` (`id`),
   KEY `ix_user_threads_user_name` (`user_name`),
   KEY `ix_user_threads_thread_id` (`thread_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1003 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1039 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -1019,4 +1047,4 @@ CREATE TABLE `user_threads` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-10-09 11:47:37
+-- Dump completed on 2025-10-11 12:19:47
