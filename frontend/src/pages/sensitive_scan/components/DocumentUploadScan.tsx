@@ -340,7 +340,7 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
                   tooltip="最大字符缓冲区大小（100-10000）"
                   style={{ marginBottom: 0 }}
                 >
-                  <InputNumber min={100} max={10000} style={{ width: 120 }} />
+                  <InputNumber min={1000} max={10000} style={{ width: 120 }} />
                 </Form.Item>
               </Space>
             </Form.Item>
