@@ -1061,18 +1061,26 @@ class DocumentService:
                         # 避免重复添加标题
                         if shape != slide.shapes.title:
                             text_content.append(shape.text.strip())
-                    
+
                     # 检测并提取图片
-                    if shape.shape_type == 13:  # MSO_SHAPE_TYPE.PICTURE
-                        has_images = True
+                    # 情况1: 直接插入的图片 (shape_type == 13)
+                    # 情况2: 粘贴到占位符的图片 (shape_type == 14 且有 image 属性)
+                    is_picture = shape.shape_type == 13
+                    is_placeholder_with_image = (
+                        shape.shape_type == 14 and
+                        hasattr(shape, 'image')
+                    )
+
+                    if is_picture or is_placeholder_with_image:
                         try:
                             # 获取图片数据
                             image = shape.image
                             image_bytes = image.blob
-                            
+
+                            has_images = True
                             image_count += 1
                             placeholder = f"[[PPT_IMAGE_PLACEHOLDER_{image_count}]]"
-                            
+
                             # 记录图片信息
                             images_to_process.append({
                                 'index': image_count,
@@ -1080,8 +1088,12 @@ class DocumentService:
                                 'placeholder': placeholder,
                                 'data': image_bytes
                             })
-                            
+
                             slide_images.append(placeholder)
+                            logger.info(f"幻灯片 {slide_idx} 检测到图片 {image_count} (类型={shape.shape_type})")
+                        except AttributeError:
+                            # 占位符没有实际图片内容，跳过
+                            pass
                         except Exception as e:
                             logger.warning(f"无法提取幻灯片 {slide_idx} 的图片: {e}")
                     
