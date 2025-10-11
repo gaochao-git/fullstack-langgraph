@@ -241,13 +241,10 @@ class LangExtractScanTaskService:
         
         if not task:
             raise BusinessException(f"任务不存在: {task_id}", ResponseCode.NOT_FOUND)
-        
-        if task.task_status not in ['completed', 'failed']:
-            raise BusinessException(
-                f"任务未完成，当前状态: {task.task_status}", 
-                ResponseCode.BAD_REQUEST
-            )
-        
+
+        logger.info(f"查询到任务: {task.task_id}, 状态: {task.task_status}")
+
+        # 所有状态都查询文件列表，显示实时状态
         # 使用 LEFT JOIN 一次查询获取所有文件信息和文件名
         files_result = await db.execute(
             select(ScanFile, AgentDocumentUpload.file_name)

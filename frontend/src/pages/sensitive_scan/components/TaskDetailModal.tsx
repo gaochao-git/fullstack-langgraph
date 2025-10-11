@@ -90,9 +90,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, task
   // 监听visible变化
   useEffect(() => {
     if (visible && taskId) {
+      // 清空之前的数据，避免显示上一个任务的内容
+      setTaskResult(null);
       setLoading(true);
       // 直接获取结果，因为结果接口包含了所有需要的信息
       fetchTaskResult();
+    } else if (!visible) {
+      // 关闭时清空数据
+      setTaskResult(null);
     }
   }, [visible, taskId]);
 
@@ -227,6 +232,35 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, task
           </div>
         ) : taskResult ? (
           <div>
+            {/* 任务状态提示 */}
+            {taskResult.status === 'pending' && (
+              <Alert
+                message="任务等待中"
+                description="任务已创建，等待执行。请稍后刷新查看进度"
+                type="default"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+            {taskResult.status === 'processing' && (
+              <Alert
+                message="任务正在处理中"
+                description="扫描任务正在执行，请刷新查看最新进度"
+                type="info"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+            {taskResult.status === 'failed' && (
+              <Alert
+                message="任务执行失败"
+                description="扫描任务执行过程中出现错误"
+                type="error"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
             {/* 任务概要 */}
             <div style={{ marginBottom: 16 }}>
               <Space>
@@ -237,13 +271,22 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, task
             </div>
 
             {/* 文件扫描结果列表 */}
-            <Table
-              dataSource={taskResult.files}
-              columns={fileColumns}
-              rowKey="file_id"
-              pagination={false}
-              size="small"
-            />
+            {taskResult.files.length > 0 ? (
+              <Table
+                dataSource={taskResult.files}
+                columns={fileColumns}
+                rowKey="file_id"
+                pagination={false}
+                size="small"
+              />
+            ) : (
+              <Alert
+                message="暂无文件信息"
+                description="文件列表为空"
+                type="warning"
+                showIcon
+              />
+            )}
           </div>
         ) : (
           <Alert

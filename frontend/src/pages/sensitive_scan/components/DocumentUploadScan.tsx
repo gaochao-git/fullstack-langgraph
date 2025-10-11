@@ -95,6 +95,10 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
     name: 'file',
     multiple: true,
     fileList: fileList,
+    showUploadList: {
+      showRemoveIcon: true,
+      removeIcon: <DeleteOutlined style={{ color: '#ff4d4f' }} />
+    },
     beforeUpload: (file) => {
       // 检查文件类型
       const allowedTypes = [
@@ -106,22 +110,22 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'text/csv'
       ];
-      
-      const isAllowed = allowedTypes.includes(file.type) || 
+
+      const isAllowed = allowedTypes.includes(file.type) ||
                        /\.(txt|pdf|doc|docx|xls|xlsx|csv|md)$/i.test(file.name);
-      
+
       if (!isAllowed) {
         message.error(`${file.name} 不是支持的文件格式`);
         return false;
       }
-      
+
       // 检查文件大小（100MB）
       const isLt100M = file.size / 1024 / 1024 < 100;
       if (!isLt100M) {
         message.error('文件大小不能超过 100MB');
         return false;
       }
-      
+
       return false; // 阻止自动上传
     },
     onChange: ({ fileList: newFileList }) => {
@@ -215,7 +219,38 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
 
   return (
     <Card>
-      <Space direction="vertical" style={{ width: '100%' }} size="large">
+      <style>{`
+        .document-upload-scan .ant-upload-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 12px;
+        }
+        .document-upload-scan .ant-upload-list-item {
+          margin: 0 !important;
+          padding: 4px 8px !important;
+          height: auto !important;
+          border: 1px solid #d9d9d9;
+          border-radius: 4px;
+          background: #fafafa;
+        }
+        .document-upload-scan .ant-upload-list-item-info {
+          display: flex;
+          align-items: center;
+        }
+        .document-upload-scan .ant-upload-list-item-name {
+          padding: 0 4px !important;
+        }
+        .document-upload-scan .ant-upload-list-item-actions {
+          position: static !important;
+          opacity: 1 !important;
+          margin-left: 4px;
+        }
+        .document-upload-scan .ant-upload-list-item-actions .anticon-delete {
+          font-size: 14px;
+        }
+      `}</style>
+      <Space direction="vertical" style={{ width: '100%' }} size="large" className="document-upload-scan">
         {/* 文件上传区域 */}
         <Dragger {...uploadProps} style={{ padding: 20 }}>
           <p className="ant-upload-drag-icon">
@@ -227,47 +262,6 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
           </p>
         </Dragger>
 
-        {/* 文件列表 */}
-        {fileList.length > 0 && (
-          <Card title={`已选择 ${fileList.length} 个文件`} size="small">
-            <List
-              dataSource={fileList}
-              renderItem={(file) => (
-                <List.Item
-                  actions={[
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => {
-                        const newFileList = fileList.filter(f => f.uid !== file.uid);
-                        setFileList(newFileList);
-                      }}
-                      disabled={uploading || scanning}
-                    >
-                      删除
-                    </Button>
-                  ]}
-                >
-                  <List.Item.Meta
-                    avatar={getFileIcon(file.name)}
-                    title={file.name}
-                    description={
-                      <Space>
-                        <Text type="secondary">
-                          {(file.size! / 1024 / 1024).toFixed(2)} MB
-                        </Text>
-                        {file.status === 'error' && (
-                          <Tag color="error">上传失败</Tag>
-                        )}
-                      </Space>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          </Card>
-        )}
 
         {/* 上传进度 */}
         {uploading && (
