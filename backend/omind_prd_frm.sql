@@ -17,7 +17,7 @@
 -- Position to start replication or point-in-time recovery from
 --
 
--- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000031', MASTER_LOG_POS=245725373;
+-- CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000031', MASTER_LOG_POS=246898338;
 
 --
 -- Table structure for table `agent_configs`
@@ -958,6 +958,7 @@ CREATE TABLE `scan_tasks` (
   `task_errors` text COMMENT '错误信息',
   `start_time` datetime DEFAULT NULL COMMENT '开始时间',
   `end_time` datetime DEFAULT NULL COMMENT '结束时间',
+  `notify_status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT '通知状态：pending-待通知，sent-已发送，failed-发送失败',
   `create_by` varchar(100) NOT NULL DEFAULT 'system' COMMENT '创建人用户名',
   `update_by` varchar(100) DEFAULT NULL COMMENT '最后更新人用户名',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -966,7 +967,8 @@ CREATE TABLE `scan_tasks` (
   UNIQUE KEY `uk_task_id` (`task_id`),
   KEY `idx_status` (`task_status`),
   KEY `idx_create_by` (`create_by`),
-  KEY `idx_create_time` (`create_time`)
+  KEY `idx_create_time` (`create_time`),
+  KEY `idx_notify_status` (`notify_status`)
 ) ENGINE=InnoDB AUTO_INCREMENT=74 DEFAULT CHARSET=utf8mb4 COMMENT='敏感数据扫描任务表';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1047,4 +1049,4 @@ CREATE TABLE `user_threads` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-10-11 12:19:47
+-- Dump completed on 2025-10-11 12:49:45
