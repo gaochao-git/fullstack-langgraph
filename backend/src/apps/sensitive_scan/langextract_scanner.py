@@ -98,8 +98,8 @@ class LangExtractSensitiveScanner:
         self.api_key = settings.LLM_API_KEY
 
         # 使用自定义或默认的配置
-        self.custom_prompt = custom_prompt
-        self.sensitive_types = custom_examples if custom_examples is not None else self._create_sensitive_examples()
+        self.custom_prompt = custom_prompt if custom_prompt else DEFAULT_SCAN_PROMPT
+        self.examples = custom_examples if custom_examples is not None else self._create_sensitive_examples()
 
         # 扫描参数
         self.max_workers = max_workers
@@ -149,26 +149,14 @@ class LangExtractSensitiveScanner:
                 format_type=data.FormatType.JSON
             )
             
-            # 使用自定义提示词或默认提示词
-            prompt = self.custom_prompt if self.custom_prompt else """识别并提取文本中的敏感信息。
-
-敏感信息类型包括：
-- 身份证号（18位数字，可能包含X）
-- 手机号（11位数字，可能用中文表示）
-- 银行卡号（16-19位数字）
-- 邮箱地址
-- 密码（通常跟在"密码"、"password"等词后面）
-- API密钥/Token（以sk-、ak-等开头的字符串）
-- IP地址（10.x.x.x、192.168.x.x、172.16-31.x.x）
-- 护照号、社保号、车牌号等
-
-提取时请保持原文格式，包括空格、标点等。"""
+            # 使用配置的提示词（已在__init__中设置为自定义或默认值）
+            prompt = self.custom_prompt
 
             # 执行提取
             result = lx.extract(
                 text_or_documents=[doc],
                 prompt_description=prompt,
-                examples=self.sensitive_types,
+                examples=self.examples,
                 model=model,
                 max_workers=self.max_workers,
                 batch_length=self.batch_length,

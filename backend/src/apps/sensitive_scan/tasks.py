@@ -30,26 +30,47 @@ class ScanTaskProcessor:
         if not settings.LLM_MODEL or not settings.LLM_API_KEY or not settings.LLM_BASE_URL:
             raise ValueError("必须在配置文件中设置 LLM_MODEL, LLM_API_KEY 和 LLM_BASE_URL")
 
-    def _get_scanner_with_config(self, task_id: str) -> LangExtractSensitiveScanner:
+    def _get_scanner_with_config(
+        self,
+        config_id: str = None,
+        max_workers: int = 10,
+        batch_length: int = 10,
+        extraction_passes: int = 1,
+        max_char_buffer: int = 2000
+    ) -> LangExtractSensitiveScanner:
         """
-        根据任务获取对应的扫描器配置
+        根据配置ID获取对应的扫描器配置
 
         Args:
-            task_id: 任务ID
+            config_id: 配置ID（可选）
+            max_workers: 最大并行工作线程数
+            batch_length: 批处理长度
+            extraction_passes: 提取遍数
+            max_char_buffer: 最大字符缓冲区大小
 
         Returns:
             配置好的扫描器实例
         """
-        # 从数据库获取任务关联的配置
-        # 这里暂时返回默认配置的扫描器，后续可以扩展支持任务级别的配置选择
+        # 从数据库获取配置
         try:
             with get_db_session() as db:
                 from .models import ScanConfig
-                result = db.execute(
-                    select(ScanConfig).where(
-                        and_(ScanConfig.is_default == 1, ScanConfig.status == 'active')
+
+                # 如果指定了config_id，使用指定的配置
+                if config_id:
+                    result = db.execute(
+                        select(ScanConfig).where(
+                            and_(ScanConfig.config_id == config_id, ScanConfig.status == 'active')
+                        )
                     )
-                )
+                else:
+                    # 否则使用默认配置
+                    result = db.execute(
+                        select(ScanConfig).where(
+                            and_(ScanConfig.is_default == 1, ScanConfig.status == 'active')
+                        )
+                    )
+
                 config = result.scalar_one_or_none()
 
                 if config:
@@ -78,14 +99,23 @@ class ScanTaskProcessor:
                     logger.info(f"使用自定义扫描配置: {config.config_name}")
                     return LangExtractSensitiveScanner(
                         custom_prompt=config.prompt_description,
-                        custom_examples=examples
+                        custom_examples=examples,
+                        max_workers=max_workers,
+                        batch_length=batch_length,
+                        extraction_passes=extraction_passes,
+                        max_char_buffer=max_char_buffer
                     )
         except Exception as e:
             logger.warning(f"获取扫描配置失败，使用默认配置: {e}")
 
         # 没有配置或获取失败，使用默认配置
         logger.info("使用默认扫描配置")
-        return LangExtractSensitiveScanner()
+        return LangExtractSensitiveScanner(
+            max_workers=max_workers,
+            batch_length=batch_length,
+            extraction_passes=extraction_passes,
+            max_char_buffer=max_char_buffer
+        )
     
     def process_scan_task(
         self,
