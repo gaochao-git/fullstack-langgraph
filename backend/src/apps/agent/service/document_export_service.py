@@ -18,20 +18,30 @@ logger = get_logger(__name__)
 
 class DocumentExportService:
     """文档导出服务"""
-    
+
     def __init__(self):
         # 文档基础目录
         self.doc_dir = settings.DOCUMENT_DIR
-        
-        # 确保所有子目录存在
+
+        # 模板目录：使用代码同级目录下的templates
+        # /backend/src/apps/agent/service/templates
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))
+        self.template_dir = os.path.join(current_file_dir, 'templates')
+
+        # 其他目录使用DOCUMENT_DIR
         self.upload_dir = os.path.join(self.doc_dir, 'uploads')
-        self.template_dir = os.path.join(self.doc_dir, 'templates')
         self.generated_dir = os.path.join(self.doc_dir, 'generated')
-        
-        # 创建必要的目录
-        for directory in [self.upload_dir, self.template_dir, self.generated_dir]:
+
+        # 创建必要的目录（模板目录应该已存在，不需要创建）
+        for directory in [self.upload_dir, self.generated_dir]:
             os.makedirs(directory, exist_ok=True)
-        
+
+        # 验证模板目录存在
+        if not os.path.exists(self.template_dir):
+            logger.warning(f"模板目录不存在: {self.template_dir}")
+        else:
+            logger.info(f"使用模板目录: {self.template_dir}")
+
         # 检查Pandoc安装状态
         self.pandoc_available = self._check_pandoc()
     
