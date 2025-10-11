@@ -12,7 +12,11 @@ from src.shared.schemas.response import (
 from src.shared.core.exceptions import BusinessException
 from src.apps.auth.dependencies import get_current_user_optional
 from .service import scan_task_service
-from .schema import ScanTaskCreate, ScanTaskProgress, ScanTaskResult
+from .config_service import scan_config_service
+from .schema import (
+    ScanTaskCreate, ScanTaskProgress, ScanTaskResult,
+    ScanConfigCreate, ScanConfigUpdate, ScanConfigResponse
+)
 
 router = APIRouter(tags=["Sensitive Data Scan"])
 
@@ -30,6 +34,11 @@ async def create_scan_task(
     task = await scan_task_service.create_scan_task(
         db=db,
         file_ids=task_data.file_ids,
+        config_id=task_data.config_id,
+        max_workers=task_data.max_workers,
+        batch_length=task_data.batch_length,
+        extraction_passes=task_data.extraction_passes,
+        max_char_buffer=task_data.max_char_buffer,
         create_by=create_by
     )
     
@@ -109,3 +118,105 @@ async def get_scan_result_html(
     """获取扫描结果的HTML报告"""
     content = await scan_task_service.get_result_html_content(db, task_id, file_id)
     return success_response(data={"html": content}, msg="获取HTML报告成功")
+
+
+# ==================== 扫描配置管理 API ====================
+
+@router.post("/v1/scan/configs", response_model=UnifiedResponse)
+async def create_scan_config(
+    config_data: ScanConfigCreate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """创建扫描配置"""
+    create_by = current_user.get('username', 'system') if current_user else 'system'
+
+    config = await scan_config_service.create_config(
+        db=db,
+        config_data=config_data,
+        create_by=create_by
+    )
+
+    return success_response(
+        data=config,
+        msg="创建配置成功",
+        code=ResponseCode.CREATED
+    )
+
+
+@router.put("/v1/scan/configs/{config_id}", response_model=UnifiedResponse)
+async def update_scan_config(
+    config_id: str,
+    config_data: ScanConfigUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """更新扫描配置"""
+    update_by = current_user.get('username', 'system') if current_user else 'system'
+
+    config = await scan_config_service.update_config(
+        db=db,
+        config_id=config_id,
+        config_data=config_data,
+        update_by=update_by
+    )
+
+    return success_response(data=config, msg="更新配置成功")
+
+
+@router.delete("/v1/scan/configs/{config_id}", response_model=UnifiedResponse)
+async def delete_scan_config(
+    config_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """删除扫描配置"""
+    await scan_config_service.delete_config(db=db, config_id=config_id)
+    return success_response(msg="删除配置成功")
+
+
+@router.get("/v1/scan/configs/{config_id}", response_model=UnifiedResponse)
+async def get_scan_config(
+    config_id: str,
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取配置详情"""
+    config = await scan_config_service.get_config(db=db, config_id=config_id)
+    return success_response(data=config, msg="获取配置成功")
+
+
+@router.get("/v1/scan/configs/default/get", response_model=UnifiedResponse)
+async def get_default_scan_config(
+    db: AsyncSession = Depends(get_async_db)
+):
+    """获取默认配置"""
+    config = await scan_config_service.get_default_config(db=db)
+    if config:
+        return success_response(data=config, msg="获取默认配置成功")
+    else:
+        return success_response(data=None, msg="未设置默认配置")
+
+
+@router.get("/v1/scan/configs", response_model=UnifiedResponse)
+async def list_scan_configs(
+    page: int = Query(1, ge=1, description="页码"),
+    size: int = Query(10, ge=1, le=100, description="每页数量"),
+    config_name: Optional[str] = Query(None, description="配置名称（模糊查询）"),
+    status: Optional[str] = Query(None, description="状态"),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """查询配置列表"""
+    config_list, total = await scan_config_service.list_configs(
+        db=db,
+        page=page,
+        size=size,
+        config_name=config_name,
+        status=status
+    )
+
+    return paginated_response(
+        items=config_list,
+        total=total,
+        page=page,
+        size=size,
+        msg="查询配置列表成功"
+    )

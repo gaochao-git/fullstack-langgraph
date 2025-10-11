@@ -7,7 +7,8 @@ import {
   Tag,
   Input,
   message,
-  Modal
+  Modal,
+  Tabs
 } from 'antd';
 import {
   SearchOutlined,
@@ -20,6 +21,7 @@ import { ScanTask } from '../types/scanTask';
 import { ScanApi } from '../services/scanApi';
 import TaskDetailModal from '../components/TaskDetailModal';
 import DocumentUploadScan from '../components/DocumentUploadScan';
+import ScanConfigManagement from '../components/ScanConfigManagement';
 import { useIsMobile } from '@/hooks';
 
 const { Search } = Input;
@@ -369,16 +371,33 @@ const ScanTaskList: React.FC = () => {
         }}
       />
 
-      {/* 上传文件扫描模态框 */}
+      {/* 上传文件扫描模态框 - 支持配置管理 */}
       <Modal
-        title="上传文件并扫描"
+        title="文件扫描与配置管理"
         open={uploadModalVisible}
         onCancel={() => setUploadModalVisible(false)}
         footer={null}
-        width={800}
+        width={isMobile ? '95%' : 1000}
         destroyOnClose
+        styles={{
+          body: { padding: isMobile ? '12px' : '24px' }
+        }}
       >
-        <DocumentUploadScan onTaskCreated={handleTaskCreated} />
+        <Tabs
+          defaultActiveKey="upload"
+          items={[
+            {
+              key: 'upload',
+              label: '上传文件',
+              children: <DocumentUploadScan onTaskCreated={handleTaskCreated} />
+            },
+            {
+              key: 'config',
+              label: '配置管理',
+              children: <ScanConfigManagement />
+            }
+          ]}
+        />
       </Modal>
     </div>
   );

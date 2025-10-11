@@ -8,11 +8,21 @@ from datetime import datetime
 class ScanTaskCreate(BaseModel):
     """创建扫描任务请求"""
     file_ids: List[str] = Field(..., min_items=1, description="要扫描的文件ID列表")
-    
+    config_id: Optional[str] = Field(None, description="使用的配置ID，不传则使用默认配置")
+    max_workers: int = Field(10, ge=1, le=50, description="最大并行工作线程数")
+    batch_length: int = Field(10, ge=1, le=100, description="批处理长度")
+    extraction_passes: int = Field(1, ge=1, le=5, description="提取遍数")
+    max_char_buffer: int = Field(2000, ge=100, le=10000, description="最大字符缓冲区大小")
+
     class Config:
         json_schema_extra = {
             "example": {
-                "file_ids": ["file_1234567890ab", "file_abcdef123456"]
+                "file_ids": ["file_1234567890ab", "file_abcdef123456"],
+                "config_id": "config_123456789abc",
+                "max_workers": 10,
+                "batch_length": 10,
+                "extraction_passes": 1,
+                "max_char_buffer": 2000
             }
         }
 
@@ -78,3 +88,70 @@ class ScanTaskResult(BaseModel):
     summary: TaskSummary
     files: List[FileScanResult]
     completed_time: Optional[str] = None
+
+
+# ============= 扫描配置相关 Schema =============
+
+class ExampleExtraction(BaseModel):
+    """示例中的提取项"""
+    extraction_class: str = Field(..., description="敏感信息类型")
+    extraction_text: str = Field(..., description="提取的文本")
+
+
+class ScanExample(BaseModel):
+    """Few-shot 示例"""
+    text: str = Field(..., description="示例文本")
+    extractions: List[ExampleExtraction] = Field(..., description="提取的敏感信息列表")
+
+
+class ScanConfigCreate(BaseModel):
+    """创建扫描配置请求"""
+    config_name: str = Field(..., min_length=1, max_length=200, description="配置名称")
+    config_description: Optional[str] = Field(None, description="配置描述")
+    prompt_description: str = Field(..., min_length=1, description="扫描提示词")
+    examples: Optional[List[ScanExample]] = Field(None, description="Few-shot示例列表")
+    is_default: bool = Field(False, description="是否设为默认配置")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "config_name": "标准敏感信息扫描",
+                "config_description": "识别常见的个人敏感信息",
+                "prompt_description": "识别并提取文本中的敏感信息，包括身份证号、手机号、银行卡号等",
+                "examples": [
+                    {
+                        "text": "客户姓名：李明，手机：13912345678",
+                        "extractions": [
+                            {"extraction_class": "姓名", "extraction_text": "李明"},
+                            {"extraction_class": "手机号", "extraction_text": "13912345678"}
+                        ]
+                    }
+                ],
+                "is_default": False
+            }
+        }
+
+
+class ScanConfigUpdate(BaseModel):
+    """更新扫描配置请求"""
+    config_name: Optional[str] = Field(None, min_length=1, max_length=200, description="配置名称")
+    config_description: Optional[str] = Field(None, description="配置描述")
+    prompt_description: Optional[str] = Field(None, min_length=1, description="扫描提示词")
+    examples: Optional[List[ScanExample]] = Field(None, description="Few-shot示例列表")
+    is_default: Optional[bool] = Field(None, description="是否设为默认配置")
+    status: Optional[str] = Field(None, description="配置状态：active-启用，inactive-禁用")
+
+
+class ScanConfigResponse(BaseModel):
+    """扫描配置响应"""
+    config_id: str
+    config_name: str
+    config_description: Optional[str] = None
+    prompt_description: str
+    examples: Optional[List[ScanExample]] = None
+    is_default: bool
+    status: str
+    create_by: str
+    update_by: Optional[str] = None
+    create_time: str
+    update_time: str

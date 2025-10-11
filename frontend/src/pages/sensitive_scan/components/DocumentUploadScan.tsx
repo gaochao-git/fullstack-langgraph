@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Upload,
@@ -9,7 +9,11 @@ import {
   message,
   Progress,
   Typography,
-  Tag
+  Tag,
+  Form,
+  Select,
+  InputNumber,
+  Divider
 } from 'antd';
 import {
   InboxOutlined,
@@ -23,21 +27,56 @@ import {
 } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
 import { ScanApi } from '../services/scanApi';
+import { ScanConfigApi } from '../services/scanConfigApi';
 import { fileApi } from '@/services/fileApi';
+import type { ScanConfig } from '../types/scanConfig';
 
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
+const { Option } = Select;
 
 interface DocumentUploadScanProps {
   onTaskCreated?: (taskId: string) => void;
 }
 
 const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }) => {
+  const [form] = Form.useForm();
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedCount, setUploadedCount] = useState(0);
+  const [configs, setConfigs] = useState<ScanConfig[]>([]);
+  const [loadingConfigs, setLoadingConfigs] = useState(false);
+
+  // 获取配置列表
+  useEffect(() => {
+    fetchConfigs();
+  }, []);
+
+  const fetchConfigs = async () => {
+    setLoadingConfigs(true);
+    try {
+      const response = await ScanConfigApi.listConfigs({
+        page: 1,
+        size: 100,
+        status: 'active'
+      });
+
+      if (response.status === 'ok') {
+        setConfigs(response.data.items);
+        // 设置默认配置
+        const defaultConfig = response.data.items.find((c: ScanConfig) => c.is_default);
+        if (defaultConfig) {
+          form.setFieldValue('config_id', defaultConfig.config_id);
+        }
+      }
+    } catch (error) {
+      console.error('获取配置列表失败:', error);
+    } finally {
+      setLoadingConfigs(false);
+    }
+  };
 
   // 获取文件图标
   const getFileIcon = (fileName: string) => {
@@ -138,10 +177,20 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
       setUploading(false);
       setScanning(true);
 
-      // 创建扫描任务
-      const response = await ScanApi.createTask(uploadedFileIds);
+      // 获取表单参数
+      const formValues = await form.validateFields();
 
-      if (response.data.status === 'ok') {
+      // 创建扫描任务，传递配置和参数
+      const response = await ScanApi.createTask({
+        file_ids: uploadedFileIds,
+        config_id: formValues.config_id,
+        max_workers: formValues.max_workers || 10,
+        batch_length: formValues.batch_length || 10,
+        extraction_passes: formValues.extraction_passes || 1,
+        max_char_buffer: formValues.max_char_buffer || 2000
+      });
+
+      if (response.status === 'ok') {
         message.success('扫描任务创建成功');
 
         // 清空文件列表
@@ -150,11 +199,11 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
         setUploadedCount(0);
 
         // 通知父组件任务已创建
-        if (onTaskCreated && response.data.data?.task_id) {
-          onTaskCreated(response.data.data.task_id);
+        if (onTaskCreated && response.data?.task_id) {
+          onTaskCreated(response.data.task_id);
         }
       } else {
-        message.error(response.data.msg || '创建扫描任务失败');
+        message.error(response.msg || '创建扫描任务失败');
       }
     } catch (error: any) {
       message.error(error.message || '扫描任务创建失败');
@@ -167,21 +216,6 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
   return (
     <Card>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
-        {/* 使用说明 */}
-        <Alert
-          message="使用说明"
-          description={
-            <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
-              <li>支持上传 TXT、PDF、Word、Excel、CSV 等格式的文档</li>
-              <li>单个文件大小不超过 100MB</li>
-              <li>系统将自动识别并提取文档中的敏感信息</li>
-              <li>扫描结果包括：身份证号、手机号、邮箱、银行卡号、API密钥等</li>
-            </ul>
-          }
-          type="info"
-          showIcon
-        />
-
         {/* 文件上传区域 */}
         <Dragger {...uploadProps} style={{ padding: 20 }}>
           <p className="ant-upload-drag-icon">
@@ -244,6 +278,80 @@ const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }
             </Space>
           </Card>
         )}
+
+        {/* 扫描配置 */}
+        <Card title="扫描配置" size="small">
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{
+              max_workers: 10,
+              batch_length: 10,
+              extraction_passes: 1,
+              max_char_buffer: 2000
+            }}
+          >
+            <Form.Item
+              label="配置模板"
+              name="config_id"
+              tooltip="选择预定义的扫描配置模板"
+            >
+              <Select
+                placeholder="选择配置模板"
+                loading={loadingConfigs}
+                allowClear
+              >
+                {configs.map((config) => (
+                  <Option key={config.config_id} value={config.config_id}>
+                    {config.is_default && '【默认】'}
+                    {config.config_name}
+                    {config.config_description && ` - ${config.config_description}`}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="高级参数">
+              <Space size="middle" wrap>
+                <Form.Item
+                  label="并行线程数"
+                  name="max_workers"
+                  tooltip="最大并行工作线程数（1-50）"
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber min={1} max={50} style={{ width: 120 }} />
+                </Form.Item>
+
+                <Form.Item
+                  label="批处理长度"
+                  name="batch_length"
+                  tooltip="批处理长度（1-100）"
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber min={1} max={100} style={{ width: 120 }} />
+                </Form.Item>
+
+                <Form.Item
+                  label="提取遍数"
+                  name="extraction_passes"
+                  tooltip="提取遍数（1-5）"
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber min={1} max={5} style={{ width: 120 }} />
+                </Form.Item>
+
+                <Form.Item
+                  label="字符缓冲区"
+                  name="max_char_buffer"
+                  tooltip="最大字符缓冲区大小（100-10000）"
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber min={100} max={10000} style={{ width: 120 }} />
+                </Form.Item>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Card>
 
         {/* 操作按钮 */}
         <Space>

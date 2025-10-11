@@ -23,73 +23,107 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ============================================================================
+# 默认配置常量（便于删除或修改）
+# ============================================================================
+
+# 默认扫描提示词
+DEFAULT_SCAN_PROMPT = """识别并提取文本中的敏感信息。
+
+敏感信息类型包括：
+- 身份证号（18位数字，可能包含X）
+- 手机号（11位数字，可能用中文表示）
+- 银行卡号（16-19位数字）
+- 邮箱地址
+- 密码（通常跟在"密码"、"password"等词后面）
+- API密钥/Token（以sk-、ak-等开头的字符串）
+- IP地址（10.x.x.x、192.168.x.x、172.16-31.x.x）
+- 护照号、社保号、车牌号等
+
+提取时请保持原文格式，包括空格、标点等。"""
+
+# 默认Few-shot示例数据
+DEFAULT_EXAMPLES = [
+    {
+        "text": "客户信息：姓名：李明，身份证：320106198808156789，手机：13912345678，银行卡：6222021234567890123。",
+        "extractions": [
+            {"class": "姓名", "text": "李明"},
+            {"class": "身份证号", "text": "320106198808156789"},
+            {"class": "手机号", "text": "13912345678"},
+            {"class": "银行卡号", "text": "6222021234567890123"}
+        ]
+    },
+    {
+        "text": "联系人王 小 明，身份证 3301 0619 9012 3456 78，电话：一三九 八八八八 九九九九，银行账号6228 4800 1234 5678 901",
+        "extractions": [
+            {"class": "姓名", "text": "王 小 明"},
+            {"class": "身份证号", "text": "3301 0619 9012 3456 78"},
+            {"class": "手机号", "text": "一三九 八八八八 九九九九"},
+            {"class": "银行卡号", "text": "6228 4800 1234 5678 901"}
+        ]
+    }
+]
+
+# ============================================================================
+
+
 class LangExtractSensitiveScanner:
     """LangExtract 敏感信息扫描配置类"""
-    
-    def __init__(self):
+
+    def __init__(
+        self,
+        custom_prompt: Optional[str] = None,
+        custom_examples: Optional[List] = None,
+        max_workers: int = 10,
+        batch_length: int = 10,
+        extraction_passes: int = 1,
+        max_char_buffer: int = 2000
+    ):
         """
-        初始化扫描器配置，所有配置从settings获取
+        初始化扫描器配置
+
+        Args:
+            custom_prompt: 自定义提示词（可选）
+            custom_examples: 自定义few-shot示例（可选）
+            max_workers: 最大并行工作线程数
+            batch_length: 批处理长度
+            extraction_passes: 提取遍数
+            max_char_buffer: 最大字符缓冲区大小
         """
         from src.shared.core.config import settings
-        
+
         # 从settings获取所有配置
         self.model_id = settings.LLM_MODEL
         self.base_url = settings.LLM_BASE_URL
         self.api_key = settings.LLM_API_KEY
-        
-        # 定义敏感信息类型和示例
-        self.sensitive_types = self._create_sensitive_examples()
+
+        # 使用自定义或默认的配置
+        self.custom_prompt = custom_prompt
+        self.sensitive_types = custom_examples if custom_examples is not None else self._create_sensitive_examples()
+
+        # 扫描参数
+        self.max_workers = max_workers
+        self.batch_length = batch_length
+        self.extraction_passes = extraction_passes
+        self.max_char_buffer = max_char_buffer
         
     def _create_sensitive_examples(self) -> List[lx.data.ExampleData]:
-        """创建敏感信息的 few-shot examples"""
+        """创建敏感信息的 few-shot examples（从顶部常量加载）"""
         examples = []
-        
-        # 四要素示例 - 标准格式
-        examples.append(lx.data.ExampleData(
-            text="客户信息：姓名：李明，身份证：320106198808156789，手机：13912345678，银行卡：6222021234567890123。",
-            extractions=[
+
+        for example_data in DEFAULT_EXAMPLES:
+            extractions = [
                 lx.data.Extraction(
-                    extraction_class="姓名",
-                    extraction_text="李明"
-                ),
-                lx.data.Extraction(
-                    extraction_class="身份证号",
-                    extraction_text="320106198808156789"
-                ),
-                lx.data.Extraction(
-                    extraction_class="手机号",
-                    extraction_text="13912345678"
-                ),
-                lx.data.Extraction(
-                    extraction_class="银行卡号",
-                    extraction_text="6222021234567890123"
+                    extraction_class=ext["class"],
+                    extraction_text=ext["text"]
                 )
+                for ext in example_data["extractions"]
             ]
-        ))
-        
-        # 非标准格式示例 - 包含空格、中文数字等
-        examples.append(lx.data.ExampleData(
-            text="联系人王 小 明，身份证 3301 0619 9012 3456 78，电话：一三九 八八八八 九九九九，银行账号6228 4800 1234 5678 901",
-            extractions=[
-                lx.data.Extraction(
-                    extraction_class="姓名",
-                    extraction_text="王 小 明"
-                ),
-                lx.data.Extraction(
-                    extraction_class="身份证号",
-                    extraction_text="3301 0619 9012 3456 78"
-                ),
-                lx.data.Extraction(
-                    extraction_class="手机号",
-                    extraction_text="一三九 八八八八 九九九九"
-                ),
-                lx.data.Extraction(
-                    extraction_class="银行卡号",
-                    extraction_text="6228 4800 1234 5678 901"
-                )
-            ]
-        ))
-        
+            examples.append(lx.data.ExampleData(
+                text=example_data["text"],
+                extractions=extractions
+            ))
+
         return examples
     
     def scan_document(self, file_id: str, text: str) -> dict:
@@ -115,8 +149,8 @@ class LangExtractSensitiveScanner:
                 format_type=data.FormatType.JSON
             )
             
-            # 提示词
-            prompt = """识别并提取文本中的敏感信息。
+            # 使用自定义提示词或默认提示词
+            prompt = self.custom_prompt if self.custom_prompt else """识别并提取文本中的敏感信息。
 
 敏感信息类型包括：
 - 身份证号（18位数字，可能包含X）
@@ -129,17 +163,17 @@ class LangExtractSensitiveScanner:
 - 护照号、社保号、车牌号等
 
 提取时请保持原文格式，包括空格、标点等。"""
-            
+
             # 执行提取
             result = lx.extract(
                 text_or_documents=[doc],
                 prompt_description=prompt,
                 examples=self.sensitive_types,
                 model=model,
-                max_workers=10,
-                batch_length=10,
-                extraction_passes=1,
-                max_char_buffer=2000,
+                max_workers=self.max_workers,
+                batch_length=self.batch_length,
+                extraction_passes=self.extraction_passes,
+                max_char_buffer=self.max_char_buffer,
                 debug=False
             )
             

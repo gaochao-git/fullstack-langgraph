@@ -12,11 +12,15 @@ export class ScanApi {
   /**
    * 创建扫描任务
    */
-  static async createTask(fileIds: string[]) {
-    const response = await omind_post('/api/v1/scan/tasks', {
-      file_ids: fileIds
-    });
-    return { data: response };
+  static async createTask(params: {
+    file_ids: string[];
+    config_id?: string;
+    max_workers?: number;
+    batch_length?: number;
+    extraction_passes?: number;
+    max_char_buffer?: number;
+  }) {
+    return await omind_post('/api/v1/scan/tasks', params);
   }
 
   /**

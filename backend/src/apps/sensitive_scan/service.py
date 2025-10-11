@@ -67,16 +67,21 @@ class LangExtractScanTaskService:
         return count
 
     async def create_scan_task(
-        self, 
+        self,
         db: AsyncSession,
         file_ids: List[str],
+        config_id: Optional[str] = None,
+        max_workers: int = 10,
+        batch_length: int = 10,
+        extraction_passes: int = 1,
+        max_char_buffer: int = 2000,
         create_by: str = "system"
     ) -> Dict[str, Any]:
         """创建扫描任务"""
         async with db.begin():
             # 生成任务ID
             task_id = f"task_{uuid.uuid4().hex[:12]}"
-            
+
             # 创建任务记录
             task = ScanTask(
                 task_id=task_id,
@@ -87,7 +92,7 @@ class LangExtractScanTaskService:
                 update_time=now_shanghai()
             )
             db.add(task)
-            
+
             # 创建文件记录
             for file_id in file_ids:
                 file_record = ScanFile(
@@ -99,19 +104,27 @@ class LangExtractScanTaskService:
                     update_time=now_shanghai()
                 )
                 db.add(file_record)
-            
+
             await db.flush()
             await db.refresh(task)
-            
-            # 使用 Celery 启动后台扫描任务
+
+            # 使用 Celery 启动后台扫描任务，传递配置和参数
             from .tasks import scan_files_task
-            scan_files_task.delay(task_id, file_ids)
-            
+            scan_files_task.delay(
+                task_id,
+                file_ids,
+                config_id,
+                max_workers,
+                batch_length,
+                extraction_passes,
+                max_char_buffer
+            )
+
             return {
                 "task_id": task.task_id,
                 "status": task.task_status,
                 "total_files": len(file_ids),
-                "create_time": task.create_time.isoformat()
+                "create_time": task.create_time.strftime('%Y-%m-%d %H:%M:%S')
             }
     
     

@@ -5,13 +5,13 @@ import json
 from typing import List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
-from sqlalchemy import update, and_
+from sqlalchemy import update, and_, select
 from src.celery.celery import app
 from src.celery.db_utils import get_db_session
 from src.shared.core.logging import get_logger
 from src.shared.core.config import settings
 from src.shared.db.models import now_shanghai
-from .models import ScanTask, ScanFile
+from .models import ScanTask, ScanFile, ScanConfig
 from .langextract_scanner import LangExtractSensitiveScanner
 from src.apps.agent.models import AgentDocumentUpload
 
@@ -20,22 +20,86 @@ logger = get_logger(__name__)
 
 class ScanTaskProcessor:
     """扫描任务处理器 - 专门用于Celery Worker环境"""
-    
+
     def __init__(self):
         # 确保扫描结果目录存在
         self.scan_results_dir = Path(settings.DOCUMENT_DIR) / "scan_results"
         self.scan_results_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 初始化扫描器
+
+        # 检查LLM配置
         if not settings.LLM_MODEL or not settings.LLM_API_KEY or not settings.LLM_BASE_URL:
             raise ValueError("必须在配置文件中设置 LLM_MODEL, LLM_API_KEY 和 LLM_BASE_URL")
-        
-        self.scanner = LangExtractSensitiveScanner()
+
+    def _get_scanner_with_config(self, task_id: str) -> LangExtractSensitiveScanner:
+        """
+        根据任务获取对应的扫描器配置
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            配置好的扫描器实例
+        """
+        # 从数据库获取任务关联的配置
+        # 这里暂时返回默认配置的扫描器，后续可以扩展支持任务级别的配置选择
+        try:
+            with get_db_session() as db:
+                from .models import ScanConfig
+                result = db.execute(
+                    select(ScanConfig).where(
+                        and_(ScanConfig.is_default == 1, ScanConfig.status == 'active')
+                    )
+                )
+                config = result.scalar_one_or_none()
+
+                if config:
+                    # 解析examples
+                    import langextract as lx
+                    examples = None
+                    if config.examples_config:
+                        try:
+                            examples_data = json.loads(config.examples_config)
+                            examples = []
+                            for ex in examples_data:
+                                extractions = [
+                                    lx.data.Extraction(
+                                        extraction_class=ext['extraction_class'],
+                                        extraction_text=ext['extraction_text']
+                                    )
+                                    for ext in ex.get('extractions', [])
+                                ]
+                                examples.append(lx.data.ExampleData(
+                                    text=ex['text'],
+                                    extractions=extractions
+                                ))
+                        except Exception as e:
+                            logger.warning(f"解析配置examples失败: {e}")
+
+                    logger.info(f"使用自定义扫描配置: {config.config_name}")
+                    return LangExtractSensitiveScanner(
+                        custom_prompt=config.prompt_description,
+                        custom_examples=examples
+                    )
+        except Exception as e:
+            logger.warning(f"获取扫描配置失败，使用默认配置: {e}")
+
+        # 没有配置或获取失败，使用默认配置
+        logger.info("使用默认扫描配置")
+        return LangExtractSensitiveScanner()
     
-    def process_scan_task(self, task_id: str, file_ids: List[str]):
+    def process_scan_task(
+        self,
+        task_id: str,
+        file_ids: List[str],
+        config_id: str = None,
+        max_workers: int = 10,
+        batch_length: int = 10,
+        extraction_passes: int = 1,
+        max_char_buffer: int = 2000
+    ):
         """处理扫描任务"""
         logger.info(f"开始处理扫描任务: {task_id}")
-        
+
         try:
             with get_db_session() as db:
                 # 更新任务状态为处理中
@@ -49,10 +113,18 @@ class ScanTaskProcessor:
                     )
                 )
                 db.commit()
-            
+
             # 处理每个文件
             for file_id in file_ids:
-                self._scan_file_with_langextract(task_id, file_id)
+                self._scan_file_with_langextract(
+                    task_id,
+                    file_id,
+                    config_id,
+                    max_workers,
+                    batch_length,
+                    extraction_passes,
+                    max_char_buffer
+                )
             
             # 更新任务状态为完成
             with get_db_session() as db:
@@ -83,7 +155,16 @@ class ScanTaskProcessor:
                 db.commit()
             raise
     
-    def _scan_file_with_langextract(self, task_id: str, file_id: str):
+    def _scan_file_with_langextract(
+        self,
+        task_id: str,
+        file_id: str,
+        config_id: str = None,
+        max_workers: int = 10,
+        batch_length: int = 10,
+        extraction_passes: int = 1,
+        max_char_buffer: int = 2000
+    ):
         """使用langextract扫描单个文件"""
         try:
             with get_db_session() as db:
@@ -144,9 +225,18 @@ class ScanTaskProcessor:
             
             # 使用langextract进行扫描
             logger.info(f"开始使用langextract扫描文件: {file_id}")
-            
+
+            # 获取配置并创建scanner
+            scanner = self._get_scanner_with_config(
+                config_id=config_id,
+                max_workers=max_workers,
+                batch_length=batch_length,
+                extraction_passes=extraction_passes,
+                max_char_buffer=max_char_buffer
+            )
+
             # 使用scanner进行扫描（同步操作）
-            result = self.scanner.scan_document(file_id, content)
+            result = scanner.scan_document(file_id, content)
             
             if not result["success"]:
                 raise Exception(f"扫描失败: {result.get('error', '未知错误')}")
@@ -282,30 +372,52 @@ class ScanTaskProcessor:
 
 
 @app.task(bind=True, time_limit=3600, soft_time_limit=3300, queue='priority_low')
-def scan_files_task(self, task_id: str, file_ids: List[str]):
+def scan_files_task(
+    self,
+    task_id: str,
+    file_ids: List[str],
+    config_id: str = None,
+    max_workers: int = 10,
+    batch_length: int = 10,
+    extraction_passes: int = 1,
+    max_char_buffer: int = 2000
+):
     """
     扫描文件任务（Celery版本）
-    
+
     Args:
         task_id: 扫描任务ID
         file_ids: 文件ID列表
+        config_id: 配置ID（可选）
+        max_workers: 最大并行工作线程数
+        batch_length: 批处理长度
+        extraction_passes: 提取遍数
+        max_char_buffer: 最大字符缓冲区大小
     """
-    logger.info(f"开始执行扫描任务: {task_id}, 文件数: {len(file_ids)}")
-    
+    logger.info(f"开始执行扫描任务: {task_id}, 文件数: {len(file_ids)}, 配置ID: {config_id}")
+
     try:
         # 创建处理器实例
         processor = ScanTaskProcessor()
-        
+
         # 处理扫描任务
-        processor.process_scan_task(task_id, file_ids)
-        
+        processor.process_scan_task(
+            task_id,
+            file_ids,
+            config_id,
+            max_workers,
+            batch_length,
+            extraction_passes,
+            max_char_buffer
+        )
+
         logger.info(f"扫描任务完成: {task_id}")
         return {
-            "status": "success", 
+            "status": "success",
             "task_id": task_id,
             "total_files": len(file_ids)
         }
-        
+
     except Exception as e:
         logger.error(f"扫描任务失败 {task_id}: {str(e)}")
         # 支持重试，每次重试间隔5分钟，最多重试3次
