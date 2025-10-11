@@ -205,6 +205,13 @@ class ScanTaskProcessor:
     ):
         """使用langextract扫描单个文件"""
         try:
+            logger.info(f"========== 开始扫描文件 ==========")
+            logger.info(f"任务ID: {task_id}")
+            logger.info(f"文件ID: {file_id}")
+            logger.info(f"配置ID: {config_id}")
+            logger.info(f"扫描参数: max_workers={max_workers}, batch_length={batch_length}, "
+                       f"extraction_passes={extraction_passes}, max_char_buffer={max_char_buffer}")
+
             with get_db_session() as db:
                 # 更新文件状态为读取中
                 db.execute(
@@ -217,7 +224,8 @@ class ScanTaskProcessor:
                     )
                 )
                 db.commit()
-            
+                logger.info(f"文件状态已更新为: reading")
+
             # 从数据库获取文件路径
             with get_db_session() as db:
                 from sqlalchemy import select
@@ -229,25 +237,60 @@ class ScanTaskProcessor:
                 db_file_path = result.scalar_one_or_none()
 
                 if not db_file_path:
+                    logger.error(f"数据库中未找到文件记录: {file_id}")
                     raise Exception(f"文件记录不存在: {file_id}")
 
-            # 解析路径（相对路径 -> 绝对路径）
-            file_path = Path(settings.UPLOAD_DIR) / db_file_path
+                logger.info(f"从数据库获取文件路径: {db_file_path}")
 
-            if not file_path.exists() or not file_path.is_file():
-                # 尝试解析后的文件（.parse.txt）
-                parse_path = file_path.parent / f"{file_path.stem}.parse.txt"
-                if parse_path.exists() and parse_path.is_file():
-                    file_path = parse_path
-                else:
-                    raise Exception(f"文件不存在: {file_path}")
-            
+            # 解析路径（相对路径 -> 绝对路径）
+            original_file_path = Path(settings.UPLOAD_DIR) / db_file_path
+            logger.info(f"原始文件路径: {original_file_path}")
+
+            # 必须使用 .parse.txt 解析文件（确保内容是纯文本格式）
+            parse_path = original_file_path.parent / f"{original_file_path.stem}.parse.txt"
+            logger.info(f"查找解析文件: {parse_path}")
+
+            if parse_path.exists() and parse_path.is_file():
+                file_path = parse_path
+                logger.info(f"✅ 找到解析文件: {parse_path}")
+            else:
+                logger.error(f"❌ 未找到解析文件: {parse_path}")
+                logger.error(f"敏感信息扫描需要纯文本格式的文件")
+                logger.error(f"请确保文件已被正确解析（上传后系统会自动生成 .parse.txt 文件）")
+                raise Exception(
+                    f"文件未解析：找不到 {parse_path.name}。"
+                    f"请等待文件解析完成后再进行扫描。"
+                )
+
             # 获取文件名
             original_filename = file_path.name
-            
+            logger.info(f"文件名: {original_filename}")
+
             # 读取文件内容
+            logger.info(f"开始读取文件内容...")
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 content = f.read()
+            logger.info(f"文件读取完成，内容长度: {len(content)} 字符")
+
+            # 检查是否是二进制文件（通过检测特殊字符比例）
+            if content:
+                # 计算不可打印字符的比例
+                printable_chars = sum(1 for c in content[:1000] if c.isprintable() or c in '\n\r\t')
+                total_chars = min(len(content), 1000)
+                printable_ratio = printable_chars / total_chars if total_chars > 0 else 0
+
+                logger.info(f"文件可打印字符比例: {printable_ratio:.2%}")
+
+                if printable_ratio < 0.5:
+                    logger.error(f"❌ 检测到二进制文件或未正确解析的文档")
+                    logger.error(f"文件内容预览: {repr(content[:200])}")
+                    raise Exception(
+                        f"文件格式错误：检测到二进制内容。"
+                        f"请确保文件已被正确解析为文本格式（.parse.txt），"
+                        f"或上传纯文本文件（.txt）。"
+                    )
+
+            logger.info(f"文件内容预览: {content[:200]}...")
             
             # 更新文件状态为扫描中
             with get_db_session() as db:
@@ -260,11 +303,13 @@ class ScanTaskProcessor:
                     )
                 )
                 db.commit()
-            
+                logger.info(f"文件状态已更新为: scanning")
+
             # 使用langextract进行扫描
-            logger.info(f"开始使用langextract扫描文件: {file_id}")
+            logger.info(f"========== 开始 LangExtract 扫描 ==========")
 
             # 获取配置并创建scanner
+            logger.info(f"获取扫描器配置...")
             scanner = self._get_scanner_with_config(
                 config_id=config_id,
                 max_workers=max_workers,
@@ -272,28 +317,46 @@ class ScanTaskProcessor:
                 extraction_passes=extraction_passes,
                 max_char_buffer=max_char_buffer
             )
+            logger.info(f"扫描器配置完成")
 
             # 使用scanner进行扫描（同步操作）
+            logger.info(f"调用 scanner.scan_document()...")
             result = scanner.scan_document(file_id, content)
-            
+            logger.info(f"scanner.scan_document() 调用完成")
+            logger.info(f"扫描结果: success={result['success']}, extractions={result.get('extractions', 0)}")
+
             if not result["success"]:
-                raise Exception(f"扫描失败: {result.get('error', '未知错误')}")
-            
-            logger.info(f"langextract扫描完成: {file_id}, 发现 {result['extractions']} 个敏感信息")
+                error_msg = result.get('error', '未知错误')
+                logger.error(f"扫描失败: {error_msg}")
+                raise Exception(f"扫描失败: {error_msg}")
+
+            logger.info(f"========== LangExtract 扫描完成 ==========")
+            logger.info(f"发现 {result['extractions']} 个敏感信息")
+
+            # 打印每个敏感项
+            if result.get('sensitive_items'):
+                for i, item in enumerate(result['sensitive_items']):
+                    logger.info(f"  敏感项 {i+1}: {item['type']} = {item['text']}")
             
             # 创建任务目录
+            logger.info(f"创建任务目录...")
             task_dir = self.scan_results_dir / task_id
             task_dir.mkdir(parents=True, exist_ok=True)
-            
+            logger.info(f"任务目录: {task_dir}")
+
             # 生成输出文件路径
             base_name = f"{file_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             jsonl_path = task_dir / f"{base_name}.jsonl"
             html_path = task_dir / f"{base_name}.html"
-            
+            logger.info(f"JSONL 路径: {jsonl_path}")
+            logger.info(f"HTML 路径: {html_path}")
+
             # 保存JSONL结果
+            logger.info(f"保存 JSONL 结果...")
             if result["document"]:
                 # 保存langextract格式的JSONL
                 scanner.save_results([result["document"]], str(jsonl_path))
+                logger.info(f"JSONL 保存成功（有提取结果）")
             else:
                 # 如果没有提取到任何内容，保存空结果
                 with open(jsonl_path, 'w', encoding='utf-8') as f:
@@ -303,18 +366,23 @@ class ScanTaskProcessor:
                         "extractions": []
                     }
                     f.write(json.dumps(empty_result, ensure_ascii=False) + '\n')
+                logger.info(f"JSONL 保存成功（空结果）")
 
             # 修复JSONL中的char_interval
+            logger.info(f"修复 JSONL 字符位置...")
             self._fix_jsonl_char_intervals(str(jsonl_path), content)
 
             # 生成可视化HTML
+            logger.info(f"生成可视化 HTML...")
             scanner.generate_visualization(str(jsonl_path), str(html_path))
-            
+            logger.info(f"HTML 生成成功")
+
             # 返回相对路径
             jsonl_relative = f"scan_results/{task_id}/{base_name}.jsonl"
             html_relative = f"scan_results/{task_id}/{base_name}.html"
-            
+
             # 更新文件状态为完成
+            logger.info(f"更新文件状态为 completed...")
             with get_db_session() as db:
                 db.execute(
                     update(ScanFile)
@@ -328,9 +396,14 @@ class ScanTaskProcessor:
                     )
                 )
                 db.commit()
-                
+                logger.info(f"文件状态已更新为: completed")
+
+            logger.info(f"========== 文件扫描流程完成 ==========")
+
         except Exception as e:
-            logger.error(f"扫描文件失败 {file_id}: {str(e)}")
+            logger.error(f"========== 扫描文件失败 ==========")
+            logger.error(f"文件ID: {file_id}")
+            logger.error(f"错误信息: {str(e)}", exc_info=True)
             with get_db_session() as db:
                 db.execute(
                     update(ScanFile)

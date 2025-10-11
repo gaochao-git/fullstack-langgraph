@@ -129,18 +129,28 @@ class LangExtractSensitiveScanner:
     def scan_document(self, file_id: str, text: str) -> dict:
         """
         扫描单个文档的敏感信息
-        
+
         Args:
             file_id: 文件ID
             text: 文件文本内容
-            
+
         Returns:
             扫描结果，包含提取的敏感信息
         """
         try:
+            logger.info(f"开始扫描文档 {file_id}")
+            logger.info(f"文本长度: {len(text)} 字符")
+            logger.info(f"文本内容预览: {text[:200]}...")
+
             # 创建 LangExtract Document 对象
             doc = lx.data.Document(document_id=file_id, text=text)
+            logger.info(f"创建 Document 对象完成")
+
             # 创建模型实例
+            logger.info(f"配置 LLM 模型: {self.model_id}")
+            logger.info(f"API Base URL: {self.base_url}")
+            logger.info(f"API Key: {self.api_key[:10]}...{self.api_key[-4:] if len(self.api_key) > 14 else ''}")
+
             model = OpenAILanguageModel(
                 model_id=self.model_id,
                 api_key=self.api_key,
@@ -148,11 +158,19 @@ class LangExtractSensitiveScanner:
                 temperature=0,
                 format_type=data.FormatType.JSON
             )
-            
+            logger.info(f"模型实例创建完成")
+
             # 使用配置的提示词（已在__init__中设置为自定义或默认值）
             prompt = self.custom_prompt
+            logger.info(f"使用提示词: {prompt[:100]}...")
+            logger.info(f"Few-shot 示例数量: {len(self.examples)}")
+
+            # 打印扫描参数
+            logger.info(f"扫描参数: max_workers={self.max_workers}, batch_length={self.batch_length}, "
+                       f"extraction_passes={self.extraction_passes}, max_char_buffer={self.max_char_buffer}")
 
             # 执行提取
+            logger.info(f"调用 langextract.extract() 开始提取...")
             result = lx.extract(
                 text_or_documents=[doc],
                 prompt_description=prompt,
@@ -164,11 +182,23 @@ class LangExtractSensitiveScanner:
                 max_char_buffer=self.max_char_buffer,
                 debug=False
             )
+            logger.info(f"langextract.extract() 调用完成")
             
             # 处理结果
             result_list = list(result)
+            logger.info(f"提取结果数量: {len(result_list)}")
+
             if result_list and len(result_list) > 0:
                 annotated_doc = result_list[0]
+                logger.info(f"提取到 {len(annotated_doc.extractions)} 个敏感信息")
+
+                # 打印每个提取项的详细信息
+                for i, ext in enumerate(annotated_doc.extractions):
+                    logger.info(f"  提取项 {i+1}: 类型={ext.extraction_class}, "
+                               f"文本={ext.extraction_text}, "
+                               f"位置={ext.char_interval.start_pos if ext.char_interval else None}-"
+                               f"{ext.char_interval.end_pos if ext.char_interval else None}")
+
                 return {
                     "success": True,
                     "file_id": file_id,
@@ -184,6 +214,7 @@ class LangExtractSensitiveScanner:
                     ]
                 }
             else:
+                logger.warning(f"未提取到任何敏感信息")
                 return {
                     "success": True,
                     "file_id": file_id,
@@ -191,9 +222,9 @@ class LangExtractSensitiveScanner:
                     "document": None,
                     "sensitive_items": []
                 }
-                
+
         except Exception as e:
-            logger.error(f"扫描文件 {file_id} 时出错: {e}")
+            logger.error(f"扫描文件 {file_id} 时出错: {e}", exc_info=True)
             return {
                 "success": False,
                 "file_id": file_id,
