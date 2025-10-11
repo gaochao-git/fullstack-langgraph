@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Card,
   Upload,
@@ -24,31 +23,21 @@ import {
 } from '@ant-design/icons';
 import type { UploadFile, UploadProps } from 'antd/es/upload/interface';
 import { ScanApi } from '../services/scanApi';
+import { fileApi } from '@/services/fileApi';
 
 const { Dragger } = Upload;
 const { Title, Text } = Typography;
 
-// 文档服务API（假设存在）
-const uploadDocument = async (file: File): Promise<string> => {
-  // 这里应该调用实际的文档上传API
-  // 返回上传后的file_id
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  // 模拟上传，实际应该调用文档服务的上传接口
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(`file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
-    }, 1000);
-  });
-};
+interface DocumentUploadScanProps {
+  onTaskCreated?: (taskId: string) => void;
+}
 
-const DocumentUploadScan: React.FC = () => {
-  const navigate = useNavigate();
+const DocumentUploadScan: React.FC<DocumentUploadScanProps> = ({ onTaskCreated }) => {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedCount, setUploadedCount] = useState(0);
 
   // 获取文件图标
   const getFileIcon = (fileName: string) => {
@@ -111,48 +100,67 @@ const DocumentUploadScan: React.FC = () => {
       message.warning('请先选择要扫描的文件');
       return;
     }
-    
+
     setUploading(true);
     setUploadProgress(0);
-    
+    setUploadedCount(0);
+
     try {
       // 上传所有文件
       const uploadedFileIds: string[] = [];
-      
+
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
         if (file.originFileObj) {
-          const fileId = await uploadDocument(file.originFileObj);
-          uploadedFileIds.push(fileId);
-          
-          // 更新进度
-          setUploadProgress(Math.round(((i + 1) / fileList.length) * 100));
+          try {
+            // 调用真实的文件上传API
+            const uploadResult = await fileApi.uploadFile(
+              file.originFileObj,
+              undefined, // agent_id
+              undefined, // user_name (从token获取)
+              (percent) => {
+                // 计算总体上传进度
+                const fileProgress = percent / fileList.length;
+                const previousProgress = (i / fileList.length) * 100;
+                setUploadProgress(Math.round(previousProgress + fileProgress));
+              }
+            );
+
+            uploadedFileIds.push(uploadResult.file_id);
+            setUploadedCount(i + 1);
+          } catch (error: any) {
+            message.error(`文件 ${file.name} 上传失败: ${error.message || '未知错误'}`);
+            throw error;
+          }
         }
       }
-      
+
       setUploading(false);
       setScanning(true);
-      
+
       // 创建扫描任务
       const response = await ScanApi.createTask(uploadedFileIds);
-      
+
       if (response.data.status === 'ok') {
         message.success('扫描任务创建成功');
-        
+
         // 清空文件列表
         setFileList([]);
-        
-        // 跳转到任务详情页
-        navigate(`/sensitive-scan/task/${response.data.data.task_id}`);
+        setUploadProgress(0);
+        setUploadedCount(0);
+
+        // 通知父组件任务已创建
+        if (onTaskCreated && response.data.data?.task_id) {
+          onTaskCreated(response.data.data.task_id);
+        }
       } else {
         message.error(response.data.msg || '创建扫描任务失败');
       }
-    } catch (error) {
-      message.error('扫描任务创建失败');
+    } catch (error: any) {
+      message.error(error.message || '扫描任务创建失败');
     } finally {
       setUploading(false);
       setScanning(false);
-      setUploadProgress(0);
     }
   };
 
@@ -231,7 +239,7 @@ const DocumentUploadScan: React.FC = () => {
         {uploading && (
           <Card size="small">
             <Space direction="vertical" style={{ width: '100%' }}>
-              <Text>正在上传文件...</Text>
+              <Text>正在上传文件... ({uploadedCount}/{fileList.length})</Text>
               <Progress percent={uploadProgress} />
             </Space>
           </Card>

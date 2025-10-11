@@ -6,17 +6,20 @@ import {
   Space,
   Tag,
   Input,
-  message
+  message,
+  Modal
 } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
-  EyeOutlined
+  EyeOutlined,
+  UploadOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { ScanTask } from '../types/scanTask';
 import { ScanApi } from '../services/scanApi';
 import TaskDetailModal from '../components/TaskDetailModal';
+import DocumentUploadScan from '../components/DocumentUploadScan';
 import { useIsMobile } from '@/hooks';
 
 const { Search } = Input;
@@ -36,6 +39,8 @@ const ScanTaskList: React.FC = () => {
   // 实际用于查询的参数
   const [queryCreateBy, setQueryCreateBy] = useState<string>('');
   const [queryTaskId, setQueryTaskId] = useState<string>('');
+  // 上传扫描模态框
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
 
   // 获取任务列表
   const fetchTasks = async () => {
@@ -66,6 +71,14 @@ const ScanTaskList: React.FC = () => {
   useEffect(() => {
     fetchTasks();
   }, [currentPage, pageSize, queryTaskId, queryCreateBy]);
+
+  // 处理任务创建成功
+  const handleTaskCreated = (taskId: string) => {
+    setUploadModalVisible(false);
+    message.success(`扫描任务已创建: ${taskId}`);
+    // 刷新任务列表
+    fetchTasks();
+  };
 
   // 状态标签
   const getStatusTag = (status: string) => {
@@ -259,6 +272,13 @@ const ScanTaskList: React.FC = () => {
                   icon={<ReloadOutlined />}
                   onClick={fetchTasks}
                 />
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  onClick={() => setUploadModalVisible(true)}
+                >
+                  上传
+                </Button>
               </div>
             ) : (
               // 桌面端布局 - 单行显示
@@ -303,6 +323,13 @@ const ScanTaskList: React.FC = () => {
                 >
                   刷新
                 </Button>
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  onClick={() => setUploadModalVisible(true)}
+                >
+                  上传文件
+                </Button>
               </Space>
             )}
           </div>
@@ -341,6 +368,18 @@ const ScanTaskList: React.FC = () => {
           setSelectedTaskStatus(null);
         }}
       />
+
+      {/* 上传文件扫描模态框 */}
+      <Modal
+        title="上传文件并扫描"
+        open={uploadModalVisible}
+        onCancel={() => setUploadModalVisible(false)}
+        footer={null}
+        width={800}
+        destroyOnClose
+      >
+        <DocumentUploadScan onTaskCreated={handleTaskCreated} />
+      </Modal>
     </div>
   );
 };
