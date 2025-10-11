@@ -17,11 +17,12 @@ import type { ColumnsType } from 'antd/es/table';
 import { ScanTask } from '../types/scanTask';
 import { ScanApi } from '../services/scanApi';
 import TaskDetailModal from '../components/TaskDetailModal';
+import { useIsMobile } from '@/hooks';
 
 const { Search } = Input;
 
 const ScanTaskList: React.FC = () => {
-  
+  const isMobile = useIsMobile();
   const [tasks, setTasks] = useState<ScanTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -189,78 +190,145 @@ const ScanTaskList: React.FC = () => {
   ];
 
   return (
-    <Card>
-      {/* 搜索栏 */}
-      <div style={{ marginBottom: 16 }}>
-        <Space>
-          <Search
-            placeholder="搜索任务ID"
-            allowClear
-            enterButton={<SearchOutlined />}
-            style={{ width: 200 }}
-            value={searchTaskId}
-            onChange={(e) => {
-              setSearchTaskId(e.target.value);
-              // 清空时立即查询
-              if (!e.target.value && searchTaskId) {
-                setCurrentPage(1);
-                setQueryTaskId('');
-              }
-            }}
-            onSearch={(value) => {
-              setCurrentPage(1);
-              setQueryTaskId(value);
-            }}
-          />
-          
-          <Search
-            placeholder="搜索创建人"
-            allowClear
-            enterButton={<SearchOutlined />}
-            style={{ width: 200 }}
-            value={searchCreateBy}
-            onChange={(e) => {
-              setSearchCreateBy(e.target.value);
-              // 清空时立即查询
-              if (!e.target.value && searchCreateBy) {
-                setCurrentPage(1);
-                setQueryCreateBy('');
-              }
-            }}
-            onSearch={(value) => {
-              setCurrentPage(1);
-              setQueryCreateBy(value);
-            }}
-          />
-          
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={fetchTasks}
-          >
-            刷新
-          </Button>
-        </Space>
-      </div>
-
-      {/* 任务列表 */}
-      <Table
-        columns={columns}
-        dataSource={tasks}
-        rowKey="task_id"
-        loading={loading}
-        scroll={{ x: 1200 }}
-        pagination={{
-          current: currentPage,
-          pageSize: pageSize,
-          total: total,
-          showSizeChanger: true,
-          showTotal: (total) => `共 ${total} 条`,
-          onChange: (page, size) => {
-            setCurrentPage(page);
-            setPageSize(size || 10);
-          },
+    <div className="scan-task-list-container">
+      <style>{`
+        @media (max-width: 768px) {
+          .scan-task-list-card .ant-card-head {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          .scan-task-list-card .ant-card-head-title {
+            margin-bottom: 8px;
+          }
+          .scan-task-list-card .ant-card-extra {
+            width: 100%;
+            margin-left: 0;
+          }
+        }
+      `}</style>
+      <Card
+        title="敏感数据扫描任务"
+        className="scan-task-list-card"
+        styles={{
+          body: { padding: isMobile ? '12px' : '24px' },
+          header: isMobile ? { padding: '12px 16px' } : undefined
         }}
-      />
+        extra={
+          <div style={{
+            width: isMobile ? '100%' : 'auto',
+            marginTop: isMobile ? '12px' : 0
+          }}>
+            {isMobile ? (
+              // 移动端布局 - 多行显示
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <Search
+                  placeholder="搜索任务ID"
+                  allowClear
+                  style={{ flex: 1, minWidth: '120px' }}
+                  value={searchTaskId}
+                  onChange={(e) => {
+                    setSearchTaskId(e.target.value);
+                    if (!e.target.value && searchTaskId) {
+                      setCurrentPage(1);
+                      setQueryTaskId('');
+                    }
+                  }}
+                  onSearch={(value) => {
+                    setCurrentPage(1);
+                    setQueryTaskId(value);
+                  }}
+                />
+                <Search
+                  placeholder="搜索创建人"
+                  allowClear
+                  style={{ flex: 1, minWidth: '120px' }}
+                  value={searchCreateBy}
+                  onChange={(e) => {
+                    setSearchCreateBy(e.target.value);
+                    if (!e.target.value && searchCreateBy) {
+                      setCurrentPage(1);
+                      setQueryCreateBy('');
+                    }
+                  }}
+                  onSearch={(value) => {
+                    setCurrentPage(1);
+                    setQueryCreateBy(value);
+                  }}
+                />
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={fetchTasks}
+                />
+              </div>
+            ) : (
+              // 桌面端布局 - 单行显示
+              <Space>
+                <Search
+                  placeholder="搜索任务ID"
+                  allowClear
+                  style={{ width: 200 }}
+                  value={searchTaskId}
+                  onChange={(e) => {
+                    setSearchTaskId(e.target.value);
+                    if (!e.target.value && searchTaskId) {
+                      setCurrentPage(1);
+                      setQueryTaskId('');
+                    }
+                  }}
+                  onSearch={(value) => {
+                    setCurrentPage(1);
+                    setQueryTaskId(value);
+                  }}
+                />
+                <Search
+                  placeholder="搜索创建人"
+                  allowClear
+                  style={{ width: 200 }}
+                  value={searchCreateBy}
+                  onChange={(e) => {
+                    setSearchCreateBy(e.target.value);
+                    if (!e.target.value && searchCreateBy) {
+                      setCurrentPage(1);
+                      setQueryCreateBy('');
+                    }
+                  }}
+                  onSearch={(value) => {
+                    setCurrentPage(1);
+                    setQueryCreateBy(value);
+                  }}
+                />
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={fetchTasks}
+                >
+                  刷新
+                </Button>
+              </Space>
+            )}
+          </div>
+        }
+      >
+
+        {/* 任务列表 */}
+        <Table
+          columns={columns}
+          dataSource={tasks}
+          rowKey="task_id"
+          loading={loading}
+          scroll={{ x: 1200 }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: total,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条`,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size || 10);
+            },
+          }}
+        />
+      </Card>
 
       {/* 任务详情弹窗 */}
       <TaskDetailModal
@@ -273,7 +341,7 @@ const ScanTaskList: React.FC = () => {
           setSelectedTaskStatus(null);
         }}
       />
-    </Card>
+    </div>
   );
 };
 
