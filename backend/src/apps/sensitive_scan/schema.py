@@ -71,7 +71,8 @@ class FileScanResult(BaseModel):
     error: Optional[str] = None
     start_time: Optional[str] = None
     end_time: Optional[str] = None
-    sensitive_items: int = 0
+    sensitive_uniq_items: int = 0  # 去重后的敏感项数量
+    sensitive_items_total: int = 0  # 未去重的总敏感项数量
 
 
 class TaskSummary(BaseModel):

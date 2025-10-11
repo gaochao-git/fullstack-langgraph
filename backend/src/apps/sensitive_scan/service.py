@@ -41,18 +41,19 @@ class LangExtractScanTaskService:
         # 扫描器会自动从settings获取配置
         self.scanner = LangExtractSensitiveScanner()
 
-    def _count_jsonl_extractions(self, jsonl_path: Path) -> int:
+    def _count_jsonl_extractions(self, jsonl_path: Path) -> tuple[int, int]:
         """
-        从单个JSONL文件中计算唯一敏感项数量（辅助方法）
-        统计去重后的敏感项数量，与HTML报告保持一致
+        从单个JSONL文件中计算敏感项数量（辅助方法）
+        返回去重和未去重的数量
 
         Args:
             jsonl_path: JSONL文件的完整路径
 
         Returns:
-            唯一敏感项数量
+            (唯一敏感项数量, 总敏感项数量)
         """
         unique_items = set()
+        total_count = 0
         try:
             with open(jsonl_path, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -61,6 +62,7 @@ class LangExtractScanTaskService:
                             data = json.loads(line)
                             if 'extractions' in data:
                                 for extraction in data['extractions']:
+                                    total_count += 1
                                     # 使用(extraction_class, extraction_text)作为唯一标识去重
                                     ext_class = extraction.get('extraction_class', '')
                                     ext_text = extraction.get('extraction_text', '')
@@ -70,7 +72,7 @@ class LangExtractScanTaskService:
                             pass
         except Exception as e:
             logger.warning(f"读取JSONL文件失败 {jsonl_path}: {e}")
-        return len(unique_items)
+        return len(unique_items), total_count
 
     async def create_scan_task(
         self,
@@ -230,7 +232,10 @@ class LangExtractScanTaskService:
                 errors = json.loads(task.task_errors)
             except:
                 errors = [task.task_errors]
-        
+
+        # 获取敏感项统计
+        sensitive_items, sensitive_items_total = await self._count_sensitive_items(db, task_id)
+
         return {
             "task_id": task.task_id,
             "status": task.task_status,
@@ -241,7 +246,8 @@ class LangExtractScanTaskService:
             "progress": progress,
             "statistics": {
                 "processed_files": processed_files,
-                "sensitive_items": await self._count_sensitive_items(db, task_id)
+                "sensitive_uniq_items": sensitive_items,  # 去重后的数量
+                "sensitive_items_total": sensitive_items_total  # 总数量
             },
             "file_status_summary": file_status_summary,
             "errors": errors,
@@ -250,8 +256,12 @@ class LangExtractScanTaskService:
             "end_time": task.end_time.strftime('%Y-%m-%d %H:%M:%S') if task.end_time else None
         }
     
-    async def _count_sensitive_items(self, db: AsyncSession, task_id: str) -> int:
-        """统计任务的所有敏感数据项数量"""
+    async def _count_sensitive_items(self, db: AsyncSession, task_id: str) -> tuple[int, int]:
+        """统计任务的所有敏感数据项数量
+
+        Returns:
+            (唯一敏感项总数, 总敏感项数)
+        """
         # 查询所有完成的文件
         result = await db.execute(
             select(ScanFile.jsonl_path)
@@ -262,15 +272,18 @@ class LangExtractScanTaskService:
             ))
         )
 
+        unique_total = 0
         total_items = 0
         for row in result:
             jsonl_path = row.jsonl_path
             if jsonl_path:
                 full_path = Path(settings.DOCUMENT_DIR) / jsonl_path
                 if full_path.exists():
-                    total_items += self._count_jsonl_extractions(full_path)
+                    unique_count, total_count = self._count_jsonl_extractions(full_path)
+                    unique_total += unique_count
+                    total_items += total_count
 
-        return total_items
+        return unique_total, total_items
     
     async def get_task_result(
         self,
@@ -327,7 +340,8 @@ class LangExtractScanTaskService:
                 "error": scan_file.file_error,
                 "start_time": scan_file.start_time.strftime('%Y-%m-%d %H:%M:%S') if scan_file.start_time else None,
                 "end_time": scan_file.end_time.strftime('%Y-%m-%d %H:%M:%S') if scan_file.end_time else None,
-                "sensitive_items": 0  # 默认值
+                "sensitive_uniq_items": 0,  # 去重后的敏感项数
+                "sensitive_items_total": 0  # 未去重的总敏感项数
             }
 
             # 如果文件已完成且有JSONL结果，读取敏感项数量
@@ -335,7 +349,9 @@ class LangExtractScanTaskService:
                 try:
                     jsonl_file_path = Path(settings.DOCUMENT_DIR) / scan_file.jsonl_path
                     if jsonl_file_path.exists():
-                        file_dict["sensitive_items"] = self._count_jsonl_extractions(jsonl_file_path)
+                        unique_count, total_count = self._count_jsonl_extractions(jsonl_file_path)
+                        file_dict["sensitive_uniq_items"] = unique_count
+                        file_dict["sensitive_items_total"] = total_count
                 except Exception as e:
                     logger.warning(f"读取JSONL文件失败 {scan_file.jsonl_path}: {e}")
 
@@ -396,9 +412,10 @@ class LangExtractScanTaskService:
             
             # 获取敏感项统计（仅对已完成的任务）
             sensitive_items = 0
+            sensitive_items_total = 0
             if task.task_status == 'completed':
-                sensitive_items = await self._count_sensitive_items(db, task.task_id)
-            
+                sensitive_items, sensitive_items_total = await self._count_sensitive_items(db, task.task_id)
+
             task_list.append({
                 "task_id": task.task_id,
                 "status": task.task_status,
@@ -406,7 +423,8 @@ class LangExtractScanTaskService:
                 "total_files": file_stats['total'],
                 "completed_files": file_stats['completed'],
                 "failed_files": file_stats['failed'],
-                "sensitive_items": sensitive_items,
+                "sensitive_uniq_items": sensitive_items,
+                "sensitive_items_total": sensitive_items_total,
                 "create_by": task.create_by,
                 "create_time": task.create_time.strftime('%Y-%m-%d %H:%M:%S') if task.create_time else None,
                 "start_time": task.start_time.strftime('%Y-%m-%d %H:%M:%S') if task.start_time else None,

@@ -141,19 +141,23 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, taskId, task
       render: (status) => getStatusTag(status),
     },
     {
-      title: '敏感项数',
-      dataIndex: 'sensitive_items',
-      key: 'sensitive_items',
-      width: 100,
+      title: '敏感项数(去重/总数)',
+      dataIndex: 'sensitive_uniq_items',
+      key: 'sensitive_uniq_items',
+      width: 150,
       align: 'center' as const,
-      render: (count) => (
-        <span style={{
-          color: count > 0 ? '#ff4d4f' : '#52c41a',
-          fontWeight: count > 0 ? 'bold' : 'normal'
-        }}>
-          {count || 0}
-        </span>
-      ),
+      render: (count, record) => {
+        const uniqueCount = count || 0;
+        const totalCount = record.sensitive_items_total || 0;
+        return (
+          <span style={{
+            color: uniqueCount > 0 ? '#ff4d4f' : '#52c41a',
+            fontWeight: uniqueCount > 0 ? 'bold' : 'normal'
+          }}>
+            {uniqueCount} / {totalCount}
+          </span>
+        );
+      },
     },
     {
       title: '开始时间',

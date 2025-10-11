@@ -24,7 +24,8 @@ export interface ScanTask {
   start_time?: string;
   end_time?: string;
   completed_files?: number;
-  sensitive_items?: number;
+  sensitive_uniq_items?: number;  // 去重后的敏感项数量
+  sensitive_items_total?: number;  // 未去重的总敏感项数量
 }
 
 // 扫描文件
@@ -37,7 +38,8 @@ export interface ScanFile {
   error?: string;
   start_time?: string;
   end_time?: string;
-  sensitive_items?: number;
+  sensitive_uniq_items?: number;  // 去重后的敏感项数量
+  sensitive_items_total?: number;  // 未去重的总敏感项数量
 }
 
 // 任务进度
@@ -59,7 +61,8 @@ export interface TaskDetail {
   progress: TaskProgress;
   statistics: {
     processed_files: number;
-    sensitive_items: number;
+    sensitive_uniq_items: number;  // 去重后的敏感项数量
+    sensitive_items_total: number;  // 未去重的总敏感项数量
   };
   file_status_summary: Record<FileStatus, number>;
   errors: string[];
